@@ -63,11 +63,11 @@
     "docMenu": [
       {
         "name": "About",
-        "path": "/pxt-sample/about.html"
+        "path": "/pxt-sample/docs/about.html"
       },
       {
         "name": "Docs",
-        "path": "/pxt-sample/docs.html"
+        "path": "/pxt-sample/docs/docs.html"
       }
     ],
     "id": "sample",
