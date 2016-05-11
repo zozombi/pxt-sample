@@ -17,14 +17,12 @@
       "description": "",
       "files": [
         "main.blocks",
-        "main.ts",
-        "README.md"
+        "main.ts"
       ]
     },
     "files": {
       "main.blocks": "<xml xmlns='http://www.w3.org/1999/xhtml'>\n</xml>\n",
-      "main.ts": "\n",
-      "README.md": "Describe your project here!"
+      "main.ts": "\n"
     }
   },
   "tsprj": {
@@ -36,18 +34,16 @@
       },
       "description": "",
       "files": [
-        "main.ts",
-        "README.md"
+        "main.ts"
       ]
     },
     "files": {
-      "main.ts": "\n",
-      "README.md": "Describe your project here!"
+      "main.ts": "\n"
     }
   },
   "runtime": {
     "mathBlocks": true,
-    "loopBlocks": true,
+    "loopsBlocks": true,
     "logicBlocks": true,
     "variablesBlocks": true,
     "textBlocks": true,
@@ -57,7 +53,7 @@
     "autoRun": true
   },
   "versions": {
-    "target": "0.0.16",
-    "pxt": "0.2.117"
+    "target": "0.0.18",
+    "pxt": "0.2.122"
   }
 }

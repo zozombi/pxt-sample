@@ -145,4 +145,3 @@ var pxsim;
     }(pxsim.BaseBoard));
     pxsim.Board = Board;
 })(pxsim || (pxsim = {}));
-//# sourceMappingURL=sim.js.map
