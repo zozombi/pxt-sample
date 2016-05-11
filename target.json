@@ -56,18 +56,18 @@
     "autoRun": true
   },
   "appTheme": {
-    "logoUrl": "https://sample.pxt.io/",
-    "homeUrl": "https://sample.pxt.io/",
+    "logoUrl": "/pxt-sample/",
+    "homeUrl": "/pxt-sample/",
     "embedUrl": "https://sample.pxt.io/",
     "visualStudioCode": false,
     "docMenu": [
       {
         "name": "About",
-        "path": "/about"
+        "path": "/pxt-sample/about.html"
       },
       {
         "name": "Docs",
-        "path": "/docs"
+        "path": "/pxt-sample/docs.html"
       }
     ],
     "id": "sample",
