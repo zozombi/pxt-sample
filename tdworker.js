@@ -3,7 +3,7 @@ window.localStorage = {}
 function require() { return null }
 
 importScripts(
-    "/tdast.js"
+    "/pxt-sample/tdast.js"
 )
 
 onmessage = function(ev) {

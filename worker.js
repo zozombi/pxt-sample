@@ -1,4 +1,4 @@
-importScripts("/typescript.js", "/pxtlib.js");
+importScripts("/pxt-sample/typescript.js", "/pxt-sample/pxtlib.js");
 var pm = postMessage;
 onmessage = function (ev) {
     var res = ts.pxt.service.performOperation(ev.data.op, ev.data.arg);

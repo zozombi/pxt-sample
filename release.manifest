@@ -1,38 +1,38 @@
 CACHE MANIFEST
 
 CACHE:
-/semantic.js
-/main.js
-/typescript.js
-/lzma/lzma_worker-min.js
-/jquery.js
-/blockly/blockly_compressed.js
-/blockly/blocks_compressed.js
-/blockly/msg/js/en.js
-/fuse/fuse.min.js
-/pxtlib.js
-/pxtblocks.js
-/pxteditor.js
-/pxtsim.js
-/pxtwinrt.js
-/semantic.css
-/custom.css
-/icons.css
-/fonts/icons.woff2
-/blockly/media/sprites.png
-/blockly/media/click.mp3
-/blockly/media/disconnect.wav
-/blockly/media/delete.mp3
-/images/microbit.bw.svg
-/images/newblock.png
-/images/newkodu.png
-/images/newtypescript.png
-/images/newvisualstudiocode.png
+/pxt-sample/semantic.js
+/pxt-sample/main.js
+/pxt-sample/typescript.js
+/pxt-sample/lzma/lzma_worker-min.js
+/pxt-sample/jquery.js
+/pxt-sample/blockly/blockly_compressed.js
+/pxt-sample/blockly/blocks_compressed.js
+/pxt-sample/blockly/msg/js/en.js
+/pxt-sample/fuse/fuse.min.js
+/pxt-sample/pxtlib.js
+/pxt-sample/pxtblocks.js
+/pxt-sample/pxteditor.js
+/pxt-sample/pxtsim.js
+/pxt-sample/pxtwinrt.js
+/pxt-sample/semantic.css
+/pxt-sample/custom.css
+/pxt-sample/icons.css
+/pxt-sample/fonts/icons.woff2
+/pxt-sample/blockly/media/sprites.png
+/pxt-sample/blockly/media/click.mp3
+/pxt-sample/blockly/media/disconnect.wav
+/pxt-sample/blockly/media/delete.mp3
+/pxt-sample/images/microbit.bw.svg
+/pxt-sample/images/newblock.png
+/pxt-sample/images/newkodu.png
+/pxt-sample/images/newtypescript.png
+/pxt-sample/images/newvisualstudiocode.png
 
-/worker.js
-# ver Wed May 11 2016 13:13:04 GMT+0200 (Central European Daylight Time)
+/pxt-sample/worker.js
+# ver Wed May 11 2016 13:27:53 GMT+0200 (Central European Daylight Time)
 
-/target.json
+/pxt-sample/target.json
 
 # External
 https://az416426.vo.msecnd.net/scripts/a/ai.0.js
