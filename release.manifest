@@ -1,0 +1,41 @@
+CACHE MANIFEST
+
+CACHE:
+/semantic.js
+/main.js
+/typescript.js
+/lzma/lzma_worker-min.js
+/jquery.js
+/blockly/blockly_compressed.js
+/blockly/blocks_compressed.js
+/blockly/msg/js/en.js
+/fuse/fuse.min.js
+/pxtlib.js
+/pxtblocks.js
+/pxteditor.js
+/pxtsim.js
+/pxtwinrt.js
+/semantic.css
+/custom.css
+/icons.css
+/fonts/icons.woff2
+/blockly/media/sprites.png
+/blockly/media/click.mp3
+/blockly/media/disconnect.wav
+/blockly/media/delete.mp3
+/images/microbit.bw.svg
+/images/newblock.png
+/images/newkodu.png
+/images/newtypescript.png
+/images/newvisualstudiocode.png
+
+/worker.js
+# ver Wed May 11 2016 13:12:36 GMT+0200 (Central European Daylight Time)
+
+/target.json
+
+# External
+https://az416426.vo.msecnd.net/scripts/a/ai.0.js
+  
+NETWORK:
+*

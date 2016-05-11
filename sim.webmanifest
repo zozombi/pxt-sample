@@ -1,0 +1,22 @@
+{
+  "lang": "en",
+  "dir": "ltr",
+  "name": "Sample PXT",
+  "short_name": "Sample PXT",
+  "icons": [
+    {
+      "src": "https://az851932.vo.msecnd.net/pub/zuxbkpza",
+      "sizes": "128x128",
+      "type": "image/png"
+    },
+    {
+      "src": "https://az851932.vo.msecnd.net/pub/hbcabbim",
+      "sizes": "200x200",
+      "type": "image/png"
+    }
+  ],
+  "scope": "/",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "landscape"
+}

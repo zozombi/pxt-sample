@@ -1,0 +1,35 @@
+{
+  "logoUrl": "https://sample.pxt.io/",
+  "homeUrl": "https://sample.pxt.io/",
+  "embedUrl": "https://sample.pxt.io/",
+  "visualStudioCode": false,
+  "docMenu": [
+    {
+      "name": "About",
+      "path": "/about"
+    },
+    {
+      "name": "Docs",
+      "path": "/docs"
+    }
+  ],
+  "id": "sample",
+  "title": "Sample PXT Target",
+  "name": "Sample PXT",
+  "locales": {
+    "pl": {
+      "name": "Przykład PXT",
+      "title": "Przykładowe Doświadczenie PXT",
+      "docMenu": [
+        {
+          "name": "O nas",
+          "path": "/about"
+        },
+        {
+          "name": "Dokumentacja",
+          "path": "/docs"
+        }
+      ]
+    }
+  }
+}
