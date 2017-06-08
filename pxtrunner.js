@@ -175,7 +175,7 @@ var pxt;
                     hljs.highlightBlock(block);
             });
         }
-        function fillWithWidget(options, $container, $js, $svg, woptions) {
+        function fillWithWidget(options, $container, $js, $svg, decompileResult, woptions) {
             if (woptions === void 0) { woptions = {}; }
             if (!$svg || !$svg[0]) {
                 var $c_1 = $('<div class="ui segment"></div>');
@@ -183,12 +183,20 @@ var pxt;
                 $container.replaceWith($c_1);
                 return;
             }
-            var cdn = pxt.webConfig.pxtCdnUrl;
+            var cdn = pxt.webConfig.commitCdnUrl;
             var images = cdn + "images";
-            var $h = $('<div class="ui bottom attached tabular icon small compact menu">'
+            var $h = $('<div class="ui bottom attached tabular icon small compact menu hideprint">'
                 + ' <div class="right icon menu"></div></div>');
             var $c = $('<div class="ui top attached segment"></div>');
             var $menu = $h.find('.right.menu');
+            var theme = pxt.appTarget.appTheme || {};
+            if (woptions.showEdit && !theme.hideDocsEdit) {
+                var $editBtn = $('<a class="item"><i aria-label="edit" class="edit icon"></i></a>').click(function () {
+                    decompileResult.package.compressToFileAsync(options.showJavaScript ? pxt.JAVASCRIPT_PROJECT_NAME : pxt.BLOCKS_PROJECT_NAME)
+                        .done(function (buf) { return window.open(getEditUrl(options) + "/#project:" + window.btoa(pxt.Util.uint8ArrayToString(buf)), 'pxt'); });
+                });
+                $menu.append($editBtn);
+            }
             if (options.showJavaScript) {
                 // blocks
                 $c.append($js);
@@ -229,7 +237,7 @@ var pxt;
                 }
             }
             // runner menu
-            if (woptions.run) {
+            if (woptions.run && !theme.hideDocsSimulator) {
                 var $runBtn = $('<a class="item"><i aria-label="run" class="play icon"></i></a>').click(function () {
                     if ($c.find('.sim')[0])
                         $c.find('.sim').remove(); // remove previous simulators
@@ -237,7 +245,7 @@ var pxt;
                         var padding = '81.97%';
                         if (pxt.appTarget.simulator)
                             padding = (100 / pxt.appTarget.simulator.aspectRatio) + '%';
-                        var $embed = $("<div class=\"ui card sim\"><div class=\"ui content\"><div style=\"position:relative;height:0;padding-bottom:" + padding + ";overflow:hidden;\"><iframe style=\"position:absolute;top:0;left:0;width:100%;height:100%;\" src=\"" + (getRunUrl(options) + "#nofooter=1&code=" + encodeURIComponent($js.text())) + "\" allowfullscreen=\"allowfullscreen\" sandbox=\"allow-popups allow-scripts allow-same-origin\" frameborder=\"0\"></iframe></div></div></div>");
+                        var $embed = $("<div class=\"ui card sim\"><div class=\"ui content\"><div style=\"position:relative;height:0;padding-bottom:" + padding + ";overflow:hidden;\"><iframe style=\"position:absolute;top:0;left:0;width:100%;height:100%;\" src=\"" + (getRunUrl(options) + "#nofooter=1&code=" + encodeURIComponent($js.text())) + "\" allowfullscreen=\"allowfullscreen\" sandbox=\"allow-popups allow-forms allow-scripts allow-same-origin\" frameborder=\"0\"></iframe></div></div></div>");
                         $c.append($embed);
                     }
                 });
@@ -259,11 +267,11 @@ var pxt;
             if (options.downloadScreenshots && woptions.hexname) {
                 pxt.debug("Downloading screenshot for: " + woptions.hexname);
                 var filename_1 = woptions.hexname.substr(0, woptions.hexname.lastIndexOf('.'));
-                var fontSize = window.getComputedStyle($svg.get(0).querySelector(".blocklyText")).getPropertyValue("font-size");
-                var customCss = "\n.blocklyMainBackground {\n    stroke:none !important;\n}\n\n.blocklyText {\n    font-family:'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', 'source-code-pro', monospace !important;\n    font-size:" + fontSize + " !important;  \n}\n\n.blocklyCheckbox,\n.blocklyLed {\n    fill: #ff3030 !important;\n    text-shadow: 0px 0px 6px #f00;\n    font-size: 17pt !important;\n}";
+                var fontSize = window.getComputedStyle($svg.get(0).getElementsByClassName("blocklyText").item(0)).getPropertyValue("font-size");
+                var customCss = "\n.blocklyMainBackground {\n    stroke:none !important;\n}\n\n.blocklyText {\n    font-family:'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', 'source-code-pro', monospace !important;\n    font-size:" + fontSize + " !important;\n}\n\n.blocklyCheckbox,\n.blocklyLed {\n    fill: #ff3030 !important;\n    text-shadow: 0px 0px 6px #f00;\n    font-size: 17pt !important;\n}";
                 var svgElement = $svg.get(0);
                 var bbox = $svg.get(0).getBoundingClientRect();
-                pxt.blocks.layout.svgToPngAsync(svgElement, customCss, 0, 0, bbox.width, bbox.height)
+                pxt.blocks.layout.svgToPngAsync(svgElement, customCss, 0, 0, bbox.width, bbox.height, 4)
                     .done(function (uri) {
                     if (uri)
                         pxt.BrowserUtils.browserDownloadDataUri(uri, (name || (pxt.appTarget.nickname || pxt.appTarget.id) + "-" + filename_1) + ".png");
@@ -314,7 +322,8 @@ var pxt;
                 var hex = options.hex && compiled && r.compileJS.outfiles[pxtc.BINARY_HEX]
                     ? r.compileJS.outfiles[pxtc.BINARY_HEX] : undefined;
                 var hexname = (pxt.appTarget.nickname || pxt.appTarget.id) + "-" + (options.hexName || '') + "-" + snippetCount++ + ".hex";
-                fillWithWidget(options, c, js, s, {
+                fillWithWidget(options, c, js, s, r, {
+                    showEdit: options.showEdit,
                     run: options.simulator && compiled,
                     hexname: hexname,
                     hex: hex,
@@ -340,13 +349,15 @@ var pxt;
                 var info = decompileCallInfo(file.statements[0]);
                 if (!info)
                     return;
-                var s = r.compileBlocks && r.compileBlocks.success ? $(r.blocksSvg) : undefined;
+                var block = Blockly.Blocks[info.attrs.blockId];
+                var xml = block && block.codeCard ? block.codeCard.blocksXml : undefined;
+                var s = xml ? $(pxt.blocks.render(xml)) : r.compileBlocks && r.compileBlocks.success ? $(r.blocksSvg) : undefined;
                 var sig = info.decl.getText().replace(/^export/, '');
                 sig = sig.slice(0, sig.indexOf('{')).trim() + ';';
                 var js = $('<code class="lang-typescript highlight"/>').text(sig);
                 if (options.snippetReplaceParent)
                     c = c.parent();
-                fillWithWidget(options, c, js, s, { showJs: true, hideGutter: true });
+                fillWithWidget(options, c, js, s, r, { showJs: true, hideGutter: true });
             }, { package: options.package, snippetMode: true });
         }
         function renderShuffleAsync(options) {
@@ -383,9 +394,9 @@ var pxt;
                 var text = $el.text();
                 var mbtn = /^(\|+)([^\|]+)\|+$/.exec(text);
                 if (mbtn) {
-                    var lev = mbtn[1].length == 1 ? "primary" : "";
+                    var lev = mbtn[1].length == 1 ? "docs inlinebutton" : "docs inlineblock";
                     var txt = mbtn[2];
-                    $el.replaceWith($("<button class=\"ui button " + lev + "\"/>").text(pxt.U.rlf(txt)));
+                    $el.replaceWith($("<span class=\"" + lev + "\"/>").text(pxt.U.rlf(txt)));
                     return renderNextAsync();
                 }
                 var m = /^\[([^\]]+)\]$/.exec(text);
@@ -517,12 +528,30 @@ var pxt;
                                 });
                                 break;
                             case ts.SyntaxKind.ForStatement:
-                                addItem({
-                                    name: ns ? "Loops" : "for",
-                                    url: "blocks/loops" + (ns ? "" : "/for"),
-                                    description: ns ? lf("Loops and repetition") : lf("Repeat code for a given number of times."),
-                                    blocksXml: '<xml xmlns="http://www.w3.org/1999/xhtml"><block type="controls_simple_for"></block></xml>'
-                                });
+                                var fs = stmt;
+                                // look for the 'repeat' loop style signature in the condition expression, explicitly: (let i = 0; i < X; i++)
+                                // for loops will have the '<=' conditional.
+                                var forloop = true;
+                                if (fs.condition.getChildCount() == 3) {
+                                    forloop = !(fs.condition.getChildAt(0).getText() == "0" ||
+                                        fs.condition.getChildAt(1).kind == ts.SyntaxKind.LessThanToken);
+                                }
+                                if (forloop) {
+                                    addItem({
+                                        name: ns ? "Loops" : "for",
+                                        url: "blocks/loops" + (ns ? "" : "/for"),
+                                        description: ns ? lf("Loops and repetition") : lf("Repeat code for a given number of times using an index."),
+                                        blocksXml: '<xml xmlns="http://www.w3.org/1999/xhtml"><block type="controls_simple_for"></block></xml>'
+                                    });
+                                }
+                                else {
+                                    addItem({
+                                        name: ns ? "Loops" : "repeat",
+                                        url: "blocks/loops" + (ns ? "" : "/repeat"),
+                                        description: ns ? lf("Loops and repetition") : lf("Repeat code for a given number of times."),
+                                        blocksXml: '<xml xmlns="http://www.w3.org/1999/xhtml"><block type="controls_repeat_ext"></block></xml>'
+                                    });
+                                }
                                 break;
                             case ts.SyntaxKind.VariableStatement:
                                 addItem({
@@ -582,6 +611,10 @@ var pxt;
         function getRunUrl(options) {
             return options.pxtUrl ? options.pxtUrl + '/--run' : pxt.webConfig && pxt.webConfig.runUrl ? pxt.webConfig.runUrl : '/--run';
         }
+        function getEditUrl(options) {
+            var url = options.pxtUrl || pxt.appTarget.appTheme.homeUrl;
+            return (url || "").replace(/\/$/, '');
+        }
         function mergeConfig(options) {
             // additional config options
             if (!options.packageClass)
@@ -600,6 +633,7 @@ var pxt;
                 options = {};
             if (options.pxtUrl)
                 options.pxtUrl = options.pxtUrl.replace(/\/$/, '');
+            options.showEdit = !pxt.BrowserUtils.isIFrame();
             mergeConfig(options);
             if (options.simulatorClass) {
                 // simulators
@@ -608,7 +642,7 @@ var pxt;
                     var padding = '81.97%';
                     if (pxt.appTarget.simulator)
                         padding = (100 / pxt.appTarget.simulator.aspectRatio) + '%';
-                    var $sim = $("<div class=\"ui centered card\"><div class=\"ui content\">\n                    <div style=\"position:relative;height:0;padding-bottom:" + padding + ";overflow:hidden;\">\n                    <iframe style=\"position:absolute;top:0;left:0;width:100%;height:100%;\" allowfullscreen=\"allowfullscreen\" frameborder=\"0\" sandbox=\"allow-popups allow-scripts allow-same-origin\"></iframe>\n                    </div>\n                    </div></div>");
+                    var $sim = $("<div class=\"ui centered card\"><div class=\"ui content\">\n                    <div style=\"position:relative;height:0;padding-bottom:" + padding + ";overflow:hidden;\">\n                    <iframe style=\"position:absolute;top:0;left:0;width:100%;height:100%;\" allowfullscreen=\"allowfullscreen\" frameborder=\"0\" sandbox=\"allow-popups allow-forms allow-scripts allow-same-origin\"></iframe>\n                    </div>\n                    </div></div>");
                     $sim.find("iframe").attr("src", getRunUrl(options) + "#nofooter=1&code=" + encodeURIComponent($c.text().trim()));
                     if (options.snippetReplaceParent)
                         $c = $c.parent();
@@ -630,6 +664,8 @@ var pxt;
     })(runner = pxt.runner || (pxt.runner = {}));
 })(pxt || (pxt = {}));
 /// <reference path="../built/pxtlib.d.ts" />
+/// <reference path="../built/pxteditor.d.ts" />
+/// <reference path="../built/pxtcompiler.d.ts" />
 /// <reference path="../built/pxtblocks.d.ts" />
 /// <reference path="../built/pxtsim.d.ts" />
 var pxt;
@@ -661,6 +697,7 @@ var pxt;
         }());
         var Host = (function () {
             function Host() {
+                this.githubPackageCache = {};
             }
             Host.prototype.readFile = function (module, filename) {
                 var epkg = getEditorPkg(module);
@@ -681,11 +718,18 @@ var pxt;
                 return Promise.resolve(null);
             };
             Host.prototype.downloadPackageAsync = function (pkg) {
+                var _this = this;
                 var proto = pkg.verProtocol();
+                var cached = undefined;
+                // cache resolve github packages
+                if (proto == "github")
+                    cached = this.githubPackageCache[pkg._verspec];
                 var epkg = getEditorPkg(pkg);
-                return pkg.commonDownloadAsync()
+                return (cached ? Promise.resolve(cached) : pkg.commonDownloadAsync())
                     .then(function (resp) {
                     if (resp) {
+                        if (proto == "github" && !cached)
+                            _this.githubPackageCache[pkg._verspec] = pxt.Util.clone(resp);
                         epkg.setFiles(resp);
                         return Promise.resolve();
                     }
@@ -745,12 +789,14 @@ var pxt;
         function initInnerAsync() {
             pxt.setAppTarget(window.pxtTargetBundle);
             pxt.Util.assert(!!pxt.appTarget);
+            var cookieValue = /PXT_LANG=(.*?)(?:;|$)/.exec(document.cookie);
             var mlang = /(live)?lang=([a-z]{2,}(-[A-Z]+)?)/i.exec(window.location.href);
-            var lang = mlang ? mlang[2] : (pxt.appTarget.appTheme.defaultLocale || navigator.userLanguage || navigator.language);
-            var live = mlang && !!mlang[1];
+            var lang = mlang ? mlang[2] : (cookieValue && cookieValue[1] || pxt.appTarget.appTheme.defaultLocale || navigator.userLanguage || navigator.language);
+            var live = !pxt.appTarget.appTheme.disableLiveTranslations || (mlang && !!mlang[1]);
+            var versions = pxt.appTarget.versions;
             patchSemantic();
             var cfg = pxt.webConfig;
-            return pxt.Util.updateLocalizationAsync(cfg.pxtCdnUrl, lang, live)
+            return pxt.Util.updateLocalizationAsync(cfg.commitCdnUrl, lang, versions ? versions.pxtCrowdinBranch : "", live)
                 .then(function () {
                 runner.mainPkg = new pxt.MainPackage(new Host());
             });
@@ -883,7 +929,7 @@ var pxt;
             if (locale != runner.editorLocale) {
                 var localeLiveRx = /^live-/;
                 runner.editorLocale = locale;
-                return pxt.Util.updateLocalizationAsync(pxt.webConfig.pxtCdnUrl, runner.editorLocale.replace(localeLiveRx, ''), localeLiveRx.test(runner.editorLocale));
+                return pxt.Util.updateLocalizationAsync(pxt.webConfig.commitCdnUrl, runner.editorLocale.replace(localeLiveRx, ''), pxt.appTarget.versions.pxtCrowdinBranch, localeLiveRx.test(runner.editorLocale));
             }
             return Promise.resolve();
         }
@@ -904,29 +950,19 @@ var pxt;
                         var docsUrl = pxt.webConfig.docsUrl || '/--docs';
                         var url = mp[1] == "doc" ? "" + mp[2] : docsUrl + "?md=" + mp[2];
                         window.open(url, "_blank");
-                    }
-                    break;
-                case "tutorial":
-                    var t = m;
-                    switch (t.subtype) {
-                        case "stepchange":
-                            var ts_1 = t;
-                            var loading_1 = document.getElementById('loading');
-                            var content_1 = document.getElementById('content');
-                            $(content_1).hide();
-                            $(loading_1).show();
-                            renderTutorialAsync(content_1, ts_1.tutorial, ts_1.step)
-                                .finally(function () {
-                                $(loading_1).hide();
-                                $(content_1).show();
-                            });
-                            break;
+                        // notify parent iframe that we have completed the popout
+                        if (window.parent)
+                            window.parent.postMessage({
+                                type: "popoutcomplete"
+                            }, "*");
                     }
                     break;
                 case "localtoken":
                     var dm = m;
                     if (dm && dm.localToken) {
                         pxt.Cloud.localToken = dm.localToken;
+                        pendingLocalToken.forEach(function (p) { return p(); });
+                        pendingLocalToken = [];
                     }
                     break;
             }
@@ -944,7 +980,7 @@ var pxt;
                         case "tutorial":
                             var body = $('body');
                             body.addClass('tutorial');
-                            return renderTutorialAsync(content, src, 0);
+                            return renderTutorialAsync(content, src);
                         default:
                             return renderMarkdownAsync(content, src);
                     }
@@ -975,13 +1011,27 @@ var pxt;
                     p.then(function () { return render(m[1], decodeURIComponent(m[2])); });
                 }
             }
-            window.addEventListener("message", receiveDocMessage, false);
-            window.addEventListener("hashchange", function () {
-                renderHash();
-            }, false);
-            parent.postMessage({ type: "sidedocready" }, "*");
-            // delay load doc page to allow simulator to load first
-            setTimeout(function () { return renderHash(); }, 1);
+            var promise = Promise.resolve();
+            if (pxt.appTarget.appTheme && pxt.appTarget.appTheme.extendEditor) {
+                var opts_1 = {};
+                promise = promise.then(function () { return pxt.BrowserUtils.loadScriptAsync(pxt.webConfig.commitCdnUrl + "editor.js"); })
+                    .then(function () { return pxt.editor.initExtensionsAsync(opts_1); })
+                    .then(function (res) {
+                    if (res.fieldEditors)
+                        res.fieldEditors.forEach(function (fi) {
+                            pxt.blocks.registerFieldEditor(fi.selector, fi.editor, fi.validator);
+                        });
+                });
+            }
+            promise.done(function () {
+                window.addEventListener("message", receiveDocMessage, false);
+                window.addEventListener("hashchange", function () {
+                    renderHash();
+                }, false);
+                parent.postMessage({ type: "sidedocready" }, "*");
+                // delay load doc page to allow simulator to load first
+                setTimeout(function () { return renderHash(); }, 1);
+            });
         }
         runner.startDocsServer = startDocsServer;
         function renderProjectAsync(content, projectid, template) {
@@ -1004,13 +1054,11 @@ var pxt;
             if (options === void 0) { options = {}; }
             var path = options.path;
             var parts = (path || '').split('/');
-            var bc = !path ? null : parts.map(function (e, i) {
-                return {
-                    href: "/" + parts.slice(0, i + 1).join("/"),
-                    name: e
-                };
+            var html = pxt.docs.renderMarkdown({
+                template: template,
+                markdown: md,
+                theme: pxt.appTarget.appTheme,
             });
-            var html = pxt.docs.renderMarkdown(template, md, pxt.appTarget.appTheme, null, bc);
             $(content).html(html);
             $(content).find('a').attr('target', '_blank');
             return pxt.runner.renderAsync({
@@ -1041,55 +1089,75 @@ var pxt;
             });
         }
         runner.renderMarkdownAsync = renderMarkdownAsync;
-        function renderTutorialAsync(content, tutorialid, step) {
+        function renderTutorialAsync(content, tutorialid) {
             tutorialid = tutorialid.replace(/^\//, "");
-            return pxt.Cloud.downloadMarkdownAsync(tutorialid, runner.editorLocale, pxt.Util.localizeLive)
+            var initPromise = Promise.resolve();
+            if (pxt.Cloud.isLocalHost()) {
+                initPromise = waitForLocalTokenAsync();
+            }
+            return initPromise.then(function () { return pxt.Cloud.downloadMarkdownAsync(tutorialid, runner.editorLocale, pxt.Util.localizeLive); })
                 .then(function (tutorialmd) {
-                var steps = tutorialmd.split(/\###.*(?!$)/i);
+                var steps = tutorialmd.split(/^###[^#].*$/gmi);
+                var stepInfo = [];
+                tutorialmd.replace(/###[^#](.*)/g, function (f, s) {
+                    var info = {
+                        fullscreen: s.indexOf('@fullscreen') > -1,
+                        hasHint: s.indexOf('@nohint') < 0
+                    };
+                    stepInfo.push(info);
+                    return "";
+                });
                 if (steps.length < 1)
                     return;
                 var options = steps[0];
-                steps = steps.slice(1, steps.length);
+                steps = steps.slice(1, steps.length); // Remove tutorial title
                 // Extract toolbox block ids
-                var uptoSteps = steps.slice(0, step + 1).join();
-                uptoSteps = uptoSteps.replace(/((?!.)\s)+/g, "\n");
-                var regex = /```(sim|block|blocks|shuffle)\n([\s\S]*?)\n```/gmi;
-                var match;
-                var code = '';
-                while ((match = regex.exec(uptoSteps)) != null) {
-                    code += match[2] + "\n";
-                }
-                // Render current step
-                return renderMarkdownAsync(content, steps[step], { tutorial: true })
+                var toolboxSubset = {};
+                return Promise.resolve()
                     .then(function () {
-                    if (code == '')
-                        return;
-                    // Convert all blocks to blocks
-                    return pxt.runner.decompileToBlocksAsync(code, {
-                        emPixels: 14,
-                        layout: pxt.blocks.BlockLayout.Flow,
-                        package: undefined
-                    }).then(function (r) {
-                        var blocksxml = r.compileBlocks.outfiles['main.blocks'];
-                        var toolboxSubset = {};
-                        if (blocksxml) {
-                            var headless = pxt.blocks.loadWorkspaceXml(blocksxml);
-                            var allblocks = headless.getAllBlocks();
-                            for (var bi = 0; bi < allblocks.length; ++bi) {
-                                var blk = allblocks[bi];
-                                toolboxSubset[blk.type] = 1;
+                    var uptoSteps = steps.join();
+                    uptoSteps = uptoSteps.replace(/((?!.)\s)+/g, "\n");
+                    var regex = /```(sim|block|blocks|shuffle|filterblocks)\n([\s\S]*?)\n```/gmi;
+                    var match;
+                    var code = '';
+                    while ((match = regex.exec(uptoSteps)) != null) {
+                        code += match[2] + "\n";
+                    }
+                    if (code != '') {
+                        return pxt.runner.decompileToBlocksAsync(code, {
+                            emPixels: 14,
+                            layout: pxt.blocks.BlockLayout.Flow,
+                            package: undefined
+                        }).then(function (r) {
+                            var blocksxml = r.compileBlocks.outfiles['main.blocks'];
+                            if (blocksxml) {
+                                var headless = pxt.blocks.loadWorkspaceXml(blocksxml);
+                                var allblocks = headless.getAllBlocks();
+                                for (var bi = 0; bi < allblocks.length; ++bi) {
+                                    var blk = allblocks[bi];
+                                    toolboxSubset[blk.type] = 1;
+                                }
                             }
-                        }
-                        if (toolboxSubset != {}) {
-                            window.parent.postMessage({
-                                type: "tutorial",
-                                tutorial: tutorialid,
-                                subtype: "steploaded",
-                                data: toolboxSubset,
-                                location: "bottom"
-                            }, "*");
-                        }
-                    });
+                        });
+                    }
+                    return;
+                })
+                    .then(function () { return renderMarkdownAsync(content, tutorialmd, { tutorial: true }); })
+                    .then(function () {
+                    // Split the steps
+                    var stepcontent = content.innerHTML.split(/<h3.*\/h3>/gi);
+                    for (var i = 0; i < stepcontent.length - 1; i++) {
+                        stepInfo[i].headerContent = stepcontent[i + 1].split(/(<.*?>.*<\/.*?>)/i)[1];
+                        stepInfo[i].content = stepcontent[i + 1];
+                    }
+                    // return the result
+                    window.parent.postMessage({
+                        type: "tutorial",
+                        tutorial: tutorialid,
+                        subtype: "loaded",
+                        stepInfo: stepInfo,
+                        toolboxSubset: toolboxSubset
+                    }, "*");
                 });
             });
         }
@@ -1105,7 +1173,7 @@ var pxt;
                 if (resp.diagnostics && resp.diagnostics.length > 0)
                     resp.diagnostics.forEach(function (diag) { return console.error(diag.messageText); });
                 if (!resp.success)
-                    return Promise.resolve({ compileJS: resp });
+                    return Promise.resolve({ package: runner.mainPkg, compileJS: resp });
                 // decompile to blocks
                 var apis = pxtc.getApiInfo(resp.ast);
                 return ts.pxtc.localizeApisAsync(apis, runner.mainPkg)
@@ -1116,9 +1184,10 @@ var pxt;
                     if (bresp.diagnostics && bresp.diagnostics.length > 0)
                         bresp.diagnostics.forEach(function (diag) { return console.error(diag.messageText); });
                     if (!bresp.success)
-                        return { compileJS: resp, compileBlocks: bresp };
+                        return { package: runner.mainPkg, compileJS: resp, compileBlocks: bresp };
                     pxt.debug(bresp.outfiles["main.blocks"]);
                     return {
+                        package: runner.mainPkg,
                         compileJS: resp,
                         compileBlocks: bresp,
                         blocksSvg: pxt.blocks.render(bresp.outfiles["main.blocks"], options)
@@ -1127,6 +1196,15 @@ var pxt;
             });
         }
         runner.decompileToBlocksAsync = decompileToBlocksAsync;
+        var pendingLocalToken = [];
+        function waitForLocalTokenAsync() {
+            if (pxt.Cloud.localToken) {
+                return Promise.resolve();
+            }
+            return new Promise(function (resolve, reject) {
+                pendingLocalToken.push(resolve);
+            });
+        }
         runner.initCallbacks = [];
         function init() {
             initInnerAsync()

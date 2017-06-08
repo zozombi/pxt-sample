@@ -1,5 +1,6 @@
 /// <reference path="../../built/pxtlib.d.ts"/>
-importScripts("/pxt-sample/typescript.js", "/pxt-sample/fuse.min.js", "/pxt-sample/pxtlib.js");
+/// <reference path="../../built/pxtcompiler.d.ts"/>
+importScripts("/pxt-sample/typescript.js", "/pxt-sample/fuse.min.js", "/pxt-sample/pxtlib.js", "/pxt-sample/pxtcompiler.js");
 var pm = postMessage;
 // work around safari not providing atob
 if (typeof atob === "undefined") {

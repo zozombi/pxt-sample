@@ -8,14 +8,15 @@ var pxt;
         function deployCoreAsync(res) {
             var drives = pxt.appTarget.compile.deployDrives;
             pxt.Util.assert(!!drives);
-            pxt.log("deploying to drives " + drives);
+            pxt.debug("deploying to drives " + drives);
             var drx = new RegExp(drives);
-            var r = res.outfiles[pxtc.BINARY_HEX];
+            var firmware = pxt.appTarget.compile.useUF2 ? pxtc.BINARY_UF2 : pxtc.BINARY_HEX;
+            var r = res.outfiles[firmware];
             function writeAsync(folder) {
-                pxt.log("writing .hex to " + folder.displayName);
-                return pxt.winrt.promisify(folder.createFileAsync("firmware.hex", Windows.Storage.CreationCollisionOption.replaceExisting)
+                pxt.debug("writing " + firmware + " to " + folder.displayName);
+                return pxt.winrt.promisify(folder.createFileAsync(firmware, Windows.Storage.CreationCollisionOption.replaceExisting)
                     .then(function (file) { return Windows.Storage.FileIO.writeTextAsync(file, r); })).then(function (r) { }).catch(function (e) {
-                    pxt.log("failed to write to " + folder.displayName + " - " + e);
+                    pxt.debug("failed to write " + firmware + " to " + folder.displayName + " - " + e);
                 });
             }
             return pxt.winrt.promisify(Windows.Storage.KnownFolders.removableDevices.getFoldersAsync())
@@ -169,5 +170,311 @@ var pxt;
                 ;
             });
         }
+    })(winrt = pxt.winrt || (pxt.winrt = {}));
+})(pxt || (pxt = {}));
+/// <reference path="../built/pxtlib.d.ts"/>
+/// <reference path="../built/pxteditor.d.ts"/>
+var pxt;
+(function (pxt) {
+    var winrt;
+    (function (winrt) {
+        var workspace;
+        (function (workspace) {
+            var U = pxt.Util;
+            var lf = U.lf;
+            var folder;
+            var allScripts = [];
+            var currentTarget;
+            function lookup(id) {
+                return allScripts.filter(function (x) { return x.id == id; })[0];
+            }
+            function getHeaders() {
+                return allScripts.map(function (e) { return e.header; });
+            }
+            function getHeader(id) {
+                var e = lookup(id);
+                if (e && !e.header.isDeleted)
+                    return e.header;
+                return null;
+            }
+            function mergeFsPkg(pkg) {
+                var e = lookup(pkg.path);
+                if (!e) {
+                    e = {
+                        id: pkg.path,
+                        header: null,
+                        text: null,
+                        fsText: null
+                    };
+                    allScripts.push(e);
+                }
+                var time = pkg.files.map(function (f) { return f.mtime; });
+                time.sort(function (a, b) { return b - a; });
+                var modTime = Math.round(time[0] / 1000) || U.nowSeconds();
+                var hd = {
+                    target: currentTarget,
+                    name: pkg.config.name,
+                    meta: {},
+                    editor: pxt.JAVASCRIPT_PROJECT_NAME,
+                    pubId: pkg.config.installedVersion,
+                    pubCurrent: false,
+                    _rev: null,
+                    id: pkg.path,
+                    recentUse: modTime,
+                    modificationTime: modTime,
+                    blobId: null,
+                    blobCurrent: false,
+                    isDeleted: false,
+                    icon: pkg.icon
+                };
+                if (!e.header) {
+                    e.header = hd;
+                }
+                else {
+                    var eh = e.header;
+                    eh.name = hd.name;
+                    eh.pubId = hd.pubId;
+                    eh.modificationTime = hd.modificationTime;
+                    eh.isDeleted = hd.isDeleted;
+                    eh.icon = hd.icon;
+                }
+            }
+            function initAsync(target) {
+                allScripts = [];
+                currentTarget = target;
+                var applicationData = Windows.Storage.ApplicationData.current;
+                var localFolder = applicationData.localFolder;
+                pxt.debug("winrt: initializing workspace");
+                return winrt.promisify(localFolder.createFolderAsync(currentTarget, Windows.Storage.CreationCollisionOption.openIfExists))
+                    .then(function (fd) {
+                    folder = fd;
+                    pxt.debug("winrt: initialized workspace at " + folder.path);
+                    return syncAsync();
+                }).then(function () { });
+            }
+            function fetchTextAsync(e) {
+                pxt.debug("winrt: fetch " + e.id);
+                return readPkgAsync(e.id, true)
+                    .then(function (resp) {
+                    if (!e.text) {
+                        // otherwise we were beaten to it
+                        e.text = {};
+                        e.mtime = 0;
+                        for (var _i = 0, _a = resp.files; _i < _a.length; _i++) {
+                            var f = _a[_i];
+                            e.text[f.name] = f.content;
+                            e.mtime = Math.max(e.mtime, f.mtime);
+                        }
+                        e.fsText = U.flatClone(e.text);
+                    }
+                    return e.text;
+                });
+            }
+            var headerQ = new U.PromiseQueue();
+            function getTextAsync(id) {
+                pxt.debug("winrt: get text " + id);
+                var e = lookup(id);
+                if (!e)
+                    return Promise.resolve(null);
+                if (e.text)
+                    return Promise.resolve(e.text);
+                return headerQ.enqueue(id, function () { return fetchTextAsync(e); });
+            }
+            function saveCoreAsync(h, text) {
+                if (h.temporary)
+                    return Promise.resolve();
+                var e = lookup(h.id);
+                U.assert(e.header === h);
+                if (!text)
+                    return Promise.resolve();
+                h.saveId = null;
+                e.textNeedsSave = true;
+                e.text = text;
+                return headerQ.enqueue(h.id, function () {
+                    U.assert(!!e.fsText);
+                    var pkg = {
+                        files: [],
+                        config: null,
+                        path: h.id,
+                    };
+                    for (var _i = 0, _a = Object.keys(e.text); _i < _a.length; _i++) {
+                        var fn = _a[_i];
+                        if (e.text[fn] !== e.fsText[fn])
+                            pkg.files.push({
+                                name: fn,
+                                mtime: null,
+                                content: e.text[fn],
+                                prevContent: e.fsText[fn]
+                            });
+                    }
+                    var savedText = U.flatClone(e.text);
+                    if (pkg.files.length == 0)
+                        return Promise.resolve();
+                    return writePkgAsync(h.id, pkg)
+                        .then(function (pkg) {
+                        e.fsText = savedText;
+                        mergeFsPkg(pkg);
+                        if (text) {
+                            h.saveId = null;
+                        }
+                    });
+                });
+            }
+            function saveAsync(h, text) {
+                return saveCoreAsync(h, text);
+            }
+            function installAsync(h0, text) {
+                var h = h0;
+                var path = h.name.replace(/[^a-zA-Z0-9]+/g, " ").trim().replace(/ /g, "-");
+                if (lookup(path)) {
+                    var n = 2;
+                    while (lookup(path + "-" + n))
+                        n++;
+                    path += "-" + n;
+                    h.name += " " + n;
+                }
+                h.id = path;
+                h.recentUse = U.nowSeconds();
+                h.modificationTime = h.recentUse;
+                h.target = currentTarget;
+                var e = {
+                    id: h.id,
+                    header: h,
+                    text: text,
+                    fsText: {}
+                };
+                allScripts.push(e);
+                return saveCoreAsync(h, text)
+                    .then(function () { return h; });
+            }
+            function saveToCloudAsync(h) {
+                return Promise.resolve();
+            }
+            function pathjoin() {
+                var parts = [];
+                for (var _i = 0; _i < arguments.length; _i++) {
+                    parts[_i - 0] = arguments[_i];
+                }
+                return parts.join('\\');
+            }
+            function readFileAsync(path) {
+                var fp = pathjoin(folder.path, path);
+                pxt.debug("winrt: reading " + fp);
+                return winrt.promisify(Windows.Storage.StorageFile.getFileFromPathAsync(fp)
+                    .then(function (file) { return Windows.Storage.FileIO.readTextAsync(file); }));
+            }
+            function writeFileAsync(dir, name, content) {
+                var fd = pathjoin(folder.path, dir);
+                pxt.debug("winrt: writing " + pathjoin(fd, name));
+                return winrt.promisify(Windows.Storage.StorageFolder.getFolderFromPathAsync(fd))
+                    .then(function (dk) { return dk.createFileAsync(name, Windows.Storage.CreationCollisionOption.replaceExisting); })
+                    .then(function (f) { return Windows.Storage.FileIO.writeTextAsync(f, content); })
+                    .then(function () { });
+            }
+            function statOptAsync(path) {
+                var fn = pathjoin(folder.path, path);
+                pxt.debug("winrt: " + fn);
+                return winrt.promisify(Windows.Storage.StorageFile.getFileFromPathAsync(fn)
+                    .then(function (file) { return file.getBasicPropertiesAsync()
+                    .then(function (props) {
+                    return {
+                        name: path,
+                        mtime: props.dateModified.getTime()
+                    };
+                }); }));
+            }
+            function throwError(code, msg) {
+                if (msg === void 0) { msg = null; }
+                var err = new Error(msg || "Error " + code);
+                err.statusCode = code;
+                throw err;
+            }
+            function writePkgAsync(logicalDirname, data) {
+                pxt.debug("winrt: writing package at " + logicalDirname);
+                return winrt.promisify(folder.createFolderAsync(logicalDirname, Windows.Storage.CreationCollisionOption.openIfExists))
+                    .then(function () { return Promise.map(data.files, function (f) { return readFileAsync(pathjoin(logicalDirname, f.name))
+                    .then(function (text) {
+                    if (f.name == pxt.CONFIG_NAME) {
+                        try {
+                            var cfg = JSON.parse(f.content);
+                            if (!cfg.name) {
+                                pxt.log("Trying to save invalid JSON config");
+                                throwError(410);
+                            }
+                        }
+                        catch (e) {
+                            pxt.log("Trying to save invalid format JSON config");
+                            throwError(410);
+                        }
+                    }
+                    if (text !== f.prevContent) {
+                        pxt.log("merge error for " + f.name + ": previous content changed...");
+                        throwError(409);
+                    }
+                }, function (err) { }); }); })
+                    .then(function () { return Promise.map(data.files, function (f) { return writeFileAsync(logicalDirname, f.name, f.content); }); })
+                    .then(function () { return readPkgAsync(logicalDirname, false); });
+            }
+            function readPkgAsync(logicalDirname, fileContents) {
+                pxt.debug("winrt: reading package under " + logicalDirname);
+                return readFileAsync(pathjoin(logicalDirname, pxt.CONFIG_NAME))
+                    .then(function (text) {
+                    var cfg = JSON.parse(text);
+                    var files = [pxt.CONFIG_NAME].concat(cfg.files || []).concat(cfg.testFiles || []);
+                    return Promise.map(files, function (fn) {
+                        return statOptAsync(pathjoin(logicalDirname, fn))
+                            .then(function (st) {
+                            var rf = {
+                                name: fn,
+                                mtime: st ? st.mtime : null
+                            };
+                            if (st == null || !fileContents)
+                                return rf;
+                            else
+                                return readFileAsync(pathjoin(logicalDirname, fn))
+                                    .then(function (text) {
+                                    rf.content = text;
+                                    return rf;
+                                });
+                        });
+                    })
+                        .then(function (files) {
+                        var rs = {
+                            path: logicalDirname,
+                            config: cfg,
+                            files: files
+                        };
+                        return rs;
+                    });
+                });
+            }
+            function syncAsync() {
+                return winrt.promisify(folder.getFoldersAsync())
+                    .then(function (fds) { return Promise.all(fds.map(function (fd) { return readPkgAsync(fd.name, false); })); })
+                    .then(function (hs) {
+                    hs.forEach(mergeFsPkg);
+                    return undefined;
+                });
+            }
+            function resetAsync() {
+                return winrt.promisify(folder.deleteAsync(Windows.Storage.StorageDeleteOption.default)
+                    .then(function () {
+                    folder = undefined;
+                    allScripts = [];
+                    pxt.storage.clearLocal();
+                }));
+            }
+            workspace.provider = {
+                getHeaders: getHeaders,
+                getHeader: getHeader,
+                getTextAsync: getTextAsync,
+                initAsync: initAsync,
+                saveAsync: saveAsync,
+                installAsync: installAsync,
+                saveToCloudAsync: saveToCloudAsync,
+                syncAsync: syncAsync,
+                resetAsync: resetAsync
+            };
+        })(workspace = winrt.workspace || (winrt.workspace = {}));
     })(winrt = pxt.winrt || (pxt.winrt = {}));
 })(pxt || (pxt = {}));

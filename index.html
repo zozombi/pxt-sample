@@ -3,22 +3,27 @@
 
 <head>
     <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
     <meta name="viewport" content="width=device-width,height=device-height,user-scalable=no,initial-scale=1.0,maximum-scale=1.0,minimum-scale=1.0">
 
     
 <!-- include appmeta.html -->
+
+<!-- include robotsmeta.html -->
+
+<!-- end include robotsmeta.html -->
+
 <title>Sample PXT Target</title>
 <meta name="description" content="" />
-
 <link rel="manifest" href="/pxt-sample/sim.webmanifest">
 
-<link rel="apple-touch-icon" href="">
-<link rel="icon" href="">
-<link rel="shortcut icon" href="">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Sample PXT Target">
+<meta name="apple-mobile-web-app-status-bar-style" content="translucent-black">
+<meta name="format-detection" content="telephone=no">
 <meta name="application-name" content="Sample PXT Target">
+
 <meta name="msapplication-TileColor" content="">
 <meta name="msapplication-TileImage" content="">
 <meta name="msapplication-config" content="/static/icons/browserconfig.xml">
@@ -38,9 +43,15 @@
 <link rel="apple-touch-icon" href="">
 <link rel="icon" type="image/png" href="">
 <link rel="shortcut icon" href="">
+
 <!-- end include appmeta.html -->
 
 
+    <link rel="stylesheet" data-rtl="/pxt-sample/rtlsemantic.css" href="/pxt-sample/semantic.css" type="text/css">    
+    <style type="text/css">
+        @import "/pxt-sample/custom.css";
+        @import "/pxt-sample/icons.css";
+    </style>
 </head>
 
 <body class="main">
@@ -58,13 +69,6 @@
         <div id='compilemsg' class="ui ignored info message"></div>
     </div>
 
-    <link rel="stylesheet" data-name="vs/editor/editor.main" href="/pxt-sample/vs/editor/editor.main.css">
-    <style type="text/css">
-        @import "/pxt-sample/semantic.css";
-        @import "/pxt-sample/custom.css";
-        @import "/pxt-sample/icons.css";
-    </style>
-
     <script>
         // This line gets patched up by the cloud
         var pxtConfig = {
@@ -72,12 +76,14 @@
     "workerjs": "/pxt-sample/worker.js",
     "tdworkerjs": "/pxt-sample/tdworker.js",
     "monacoworkerjs": "/pxt-sample/monacoworker.js",
-    "pxtVersion": "1.0.7",
+    "pxtVersion": "1.5.26",
     "pxtRelId": "",
     "pxtCdnUrl": "/pxt-sample/",
+    "commitCdnUrl": "/pxt-sample/",
+    "blobCdnUrl": "/pxt-sample/",
+    "cdnUrl": "/pxt-sample/",
     "targetVersion": "0.0.0",
     "targetRelId": "",
-    "targetCdnUrl": "/pxt-sample/",
     "targetUrl": "",
     "simUrl": "/pxt-sample/simulator.html",
     "partsUrl": "/pxt-sample/siminstructions.html",
@@ -112,6 +118,8 @@
             telemetryItem.properties["stage"] = (pxtConfig.relprefix || "/--").replace(/[^a-z]/ig, '')
             if (typeof window !== "undefined" && window.location && /[?&]electron=1/i.test(window.location.href))
                 telemetryItem.properties["electron"] = 1;
+            if (typeof window !== "undefined" && window.location && /uwp/i.test(window.location.href))
+                telemetryItem.properties["uwp"] = 1;
         });
     });
     appInsights.trackPageView();
@@ -123,9 +131,7 @@
 
     <!-- patch to load JS in electron -->
     <script>if (typeof module === 'object') {window.module = module; module = undefined;}</script>
-    <script type="text/javascript" src="/pxt-sample/lzma/lzma_worker-min.js"></script>
     <script type="text/javascript" src="/pxt-sample/jquery.js"></script>
-    <script type="text/javascript" src="/pxt-sample/typescript.js"></script>
     <script type="text/javascript" src="/pxt-sample/blockly/blockly_compressed.js"></script>
     <script type="text/javascript" src="/pxt-sample/blockly/blocks_compressed.js"></script>
     <script type="text/javascript" src="/pxt-sample/blockly/msg/js/en.js"></script>
@@ -157,6 +163,24 @@
                 return pxt.webConfig.monacoworkerjs;
             }
         };
+
+        // this get rewritten to blob URLs with SHAs while uploading to the cloud
+        // keep in sync with release.manifest
+        window.MonacoPaths = {
+            "vs/loader": "/pxt-sample/vs/loader.js",
+            "vs/base/worker/workerMain": "/pxt-sample/vs/base/worker/workerMain.js",
+            "vs/basic-languages/src/bat": "/pxt-sample/vs/basic-languages/src/bat.js",
+            "vs/basic-languages/src/cpp": "/pxt-sample/vs/basic-languages/src/cpp.js",
+            "vs/editor/editor.main.css": "/pxt-sample/vs/editor/editor.main.css",
+            "vs/editor/editor.main": "/pxt-sample/vs/editor/editor.main.js",
+            "vs/editor/editor.main.nls": "/pxt-sample/vs/editor/editor.main.nls.js",
+            "vs/language/json/jsonMode": "/pxt-sample/vs/language/json/jsonMode.js",
+            "vs/language/json/jsonWorker": "/pxt-sample/vs/language/json/jsonWorker.js",
+            "vs/language/typescript/lib/typescriptServices": "/pxt-sample/vs/language/typescript/lib/typescriptServices.js",
+            "vs/language/typescript/src/mode": "/pxt-sample/vs/language/typescript/src/mode.js",
+            "vs/language/typescript/src/worker": "/pxt-sample/vs/language/typescript/src/worker.js",
+            "lzma/lzma_worker-min.js": "/pxt-sample/lzma/lzma_worker-min.js"
+        }
     </script>
 </body>
 

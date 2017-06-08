@@ -25,21 +25,24 @@ var appcache = require("./appcache");
 var screenshot = require("./screenshot");
 var hidbridge = require("./hidbridge");
 var share = require("./share");
+var lang = require("./lang");
 var tutorial = require("./tutorial");
 var editortoolbar = require("./editortoolbar");
 var filelist = require("./filelist");
 var container = require("./container");
 var scriptsearch = require("./scriptsearch");
 var projects = require("./projects");
+var sounds = require("./sounds");
+var make = require("./make");
 var monaco = require("./monaco");
 var pxtjson = require("./pxtjson");
 var blocks = require("./blocks");
 var logview = require("./logview");
 var draganddrop = require("./draganddrop");
-var hwdbg = require("./hwdbg");
 var electron = require("./electron");
 var Cloud = pxt.Cloud;
 var Util = pxt.Util;
+var CategoryMode = pxt.blocks.CategoryMode;
 var lf = Util.lf;
 pxsim.util.injectPolyphils();
 var theEditor;
@@ -112,11 +115,31 @@ var ProjectView = (function (_super) {
         }, 4000, false);
         this.editorChangeHandler = Util.debounce(function () {
             if (!_this.editor.isIncomplete()) {
-                _this.saveFile(); // don't wait till save is done
+                _this.saveFileAsync().done(); // don't wait till save is done
                 _this.typecheck();
             }
             _this.markdownChangeHandler();
         }, 500, false);
+        this.hexFileImporters = [{
+                id: "default",
+                canImport: function (data) { return data.meta.cloudId == "ks/" + pxt.appTarget.id || data.meta.cloudId == pxt.CLOUD_ID + pxt.appTarget.id // match on targetid
+                    || (Util.startsWith(data.meta.cloudId, pxt.CLOUD_ID + pxt.appTarget.id)); } // trying to load white-label file into main target
+                ,
+                importAsync: function (project, data) {
+                    var h = {
+                        target: pxt.appTarget.id,
+                        editor: data.meta.editor,
+                        name: data.meta.name,
+                        meta: {},
+                        pubId: "",
+                        pubCurrent: false
+                    };
+                    var files = JSON.parse(data.source);
+                    // we cannot load the workspace until we've loaded the project
+                    return workspace.installAsync(h, files)
+                        .then(function (hd) { return _this.loadHeaderAsync(hd, null); });
+                }
+            }];
         // Close on escape
         this.closeOnEscape = function (e) {
             if (e.keyCode !== 27)
@@ -125,7 +148,7 @@ var ProjectView = (function (_super) {
             _this.toggleSimulatorFullscreen();
         };
         this.debouncedSaveProjectName = Util.debounce(function () {
-            _this.saveProjectName();
+            _this.saveProjectNameAsync().done();
         }, 2000, false);
         document.title = pxt.appTarget.title || pxt.appTarget.name;
         this.reload = false; //set to true in case of reset of the project where we are going to reload the page.
@@ -133,7 +156,7 @@ var ProjectView = (function (_super) {
         this.state = {
             showFiles: false,
             active: document.visibilityState == 'visible',
-            collapseEditorTools: pxt.appTarget.simulator.headless
+            collapseEditorTools: pxt.appTarget.simulator.headless || pxt.BrowserUtils.isMobile()
         };
         if (!this.settings.editorFontSize)
             this.settings.editorFontSize = /mobile/i.test(navigator.userAgent) ? 15 : 20;
@@ -182,7 +205,7 @@ var ProjectView = (function (_super) {
     ProjectView.prototype.componentDidUpdate = function () {
         this.saveSettings();
         this.editor.domUpdate();
-        simulator.setState(this.state.header ? this.state.header.editor : '');
+        simulator.setState(this.state.header ? this.state.header.editor : '', this.state.tutorialOptions && !!this.state.tutorialOptions.tutorial);
         this.editor.resize();
     };
     ProjectView.prototype.fireResize = function () {
@@ -194,9 +217,6 @@ var ProjectView = (function (_super) {
         else {
             document.fireEvent('onresize');
         }
-    };
-    ProjectView.prototype.saveFile = function () {
-        this.saveFileAsync().done();
     };
     ProjectView.prototype.saveFileAsync = function () {
         var _this = this;
@@ -211,30 +231,61 @@ var ProjectView = (function (_super) {
         });
     };
     ProjectView.prototype.isBlocksActive = function () {
-        return this.editor == this.blocksEditor
+        return !this.state.embedSimView && this.editor == this.blocksEditor
             && this.editorFile && this.editorFile.name == "main.blocks";
     };
     ProjectView.prototype.isJavaScriptActive = function () {
-        return this.editor == this.textEditor
+        return !this.state.embedSimView && this.editor == this.textEditor
             && this.editorFile && this.editorFile.name == "main.ts";
+    };
+    ProjectView.prototype.isAnyEditeableJavaScriptOrPackageActive = function () {
+        return this.editor == this.textEditor
+            && this.editorFile && !this.editorFile.isReadonly() && /(\.ts|pxt.json)$/.test(this.editorFile.name);
     };
     ProjectView.prototype.openJavaScript = function () {
         pxt.tickEvent("menu.javascript");
-        if (this.isJavaScriptActive())
+        if (this.isJavaScriptActive()) {
+            if (this.state.embedSimView)
+                this.setState({ embedSimView: false });
             return;
+        }
         if (this.isBlocksActive())
             this.blocksEditor.openTypeScript();
         else
             this.setFile(pkg.mainEditorPkg().files["main.ts"]);
     };
     ProjectView.prototype.openBlocks = function () {
+        var _this = this;
         pxt.tickEvent("menu.blocks");
-        if (this.isBlocksActive())
+        if (this.isBlocksActive()) {
+            if (this.state.embedSimView)
+                this.setState({ embedSimView: false });
             return;
+        }
         if (this.isJavaScriptActive())
             this.textEditor.openBlocks();
+        else if (this.isAnyEditeableJavaScriptOrPackageActive()) {
+            this.saveFileAsync()
+                .then(function () {
+                compiler.newProject();
+                return compiler.getBlocksAsync();
+            })
+                .done(function (bi) {
+                pxt.blocks.initBlocks(bi);
+                _this.blocksEditor.updateBlocksInfo(bi);
+                _this.setFile(pkg.mainEditorPkg().files["main.blocks"]);
+            });
+        }
         else
             this.setFile(pkg.mainEditorPkg().files["main.blocks"]);
+    };
+    ProjectView.prototype.openPreviousEditor = function () {
+        if (this.prevEditorId == "monacoEditor") {
+            this.openJavaScript();
+        }
+        else {
+            this.openBlocks();
+        }
     };
     ProjectView.prototype.openTypeScriptAsync = function () {
         var _this = this;
@@ -247,8 +298,18 @@ var ProjectView = (function (_super) {
             }
         });
     };
+    ProjectView.prototype.openSimView = function () {
+        pxt.tickActivity("menu.simView");
+        if (this.state.embedSimView) {
+            this.startStopSimulator();
+        }
+        else {
+            this.setState({ embedSimView: true });
+            this.startSimulator();
+        }
+    };
     ProjectView.prototype.typecheckNow = function () {
-        this.saveFile(); // don't wait for saving to backend store to finish before typechecking
+        this.saveFileAsync().done(); // don't wait for saving to backend store to finish before typechecking
         this.typecheck();
     };
     ProjectView.prototype.initEditors = function () {
@@ -310,13 +371,14 @@ var ProjectView = (function (_super) {
             .then(function () {
             _this.editorFile = _this.state.currFile; // TODO
             var previousEditor = _this.editor;
+            _this.prevEditorId = previousEditor.getId();
             _this.editor = editorOverride || _this.pickEditorFor(_this.editorFile);
             _this.allEditors.forEach(function (e) { return e.setVisible(e == _this.editor); });
             return previousEditor ? previousEditor.unloadFileAsync() : Promise.resolve();
         })
             .then(function () { return _this.editor.loadFileAsync(_this.editorFile); })
             .then(function () {
-            _this.saveFile(); // make sure state is up to date
+            _this.saveFileAsync().done(); // make sure state is up to date
             _this.typecheck();
             var e = _this.settings.fileHistory.filter(function (e) { return e.id == _this.state.header.id && e.name == _this.editorFile.getName(); })[0];
             if (e)
@@ -337,7 +399,8 @@ var ProjectView = (function (_super) {
             return;
         this.setState({
             currFile: fn,
-            showBlocks: false
+            showBlocks: false,
+            embedSimView: false
         });
         //this.fireResize();
     };
@@ -405,12 +468,13 @@ var ProjectView = (function (_super) {
             return;
         sd.setMarkdown(md);
     };
-    ProjectView.prototype.setSideDoc = function (path) {
+    ProjectView.prototype.setSideDoc = function (path, blocksEditor) {
+        if (blocksEditor === void 0) { blocksEditor = true; }
         var sd = this.refs["sidedoc"];
         if (!sd)
             return;
         if (path)
-            sd.setPath(path);
+            sd.setPath(path, blocksEditor);
         else
             sd.collapse();
     };
@@ -422,25 +486,36 @@ var ProjectView = (function (_super) {
         if (!tc)
             return;
         if (step > -1) {
-            tutorial.TutorialContent.notify({
-                type: "tutorial",
-                tutorial: this.state.tutorial,
-                subtype: "stepchange",
-                step: step
-            });
+            var tutorialOptions = this.state.tutorialOptions;
+            tutorialOptions.tutorialStep = step;
+            this.setState({ tutorialOptions: tutorialOptions });
+            var fullscreen = tutorialOptions.tutorialStepInfo[step].fullscreen;
+            if (fullscreen)
+                this.showTutorialHint();
+            else
+                tutorial.TutorialContent.refresh();
         }
     };
     ProjectView.prototype.handleMessage = function (msg) {
         switch (msg.type) {
+            case "popoutcomplete":
+                this.setState({ sideDocsCollapsed: true, sideDocsLoadUrl: '' });
+                break;
             case "tutorial":
                 var t = msg;
                 switch (t.subtype) {
-                    case 'steploaded':
+                    case 'loaded':
                         var tt = msg;
-                        var showCategories = tt.showCategories ? tt.showCategories : Object.keys(tt.data).length > 7;
-                        this.editor.filterToolbox(tt.data, showCategories, false);
-                        this.setState({ tutorialReady: true, tutorialCardLocation: tt.location });
-                        tutorial.TutorialContent.refresh();
+                        this.editor.filterToolbox({ blocks: tt.toolboxSubset, defaultState: pxt.editor.FilterState.Hidden }, CategoryMode.Basic);
+                        var tutorialOptions = this.state.tutorialOptions;
+                        tutorialOptions.tutorialReady = true;
+                        tutorialOptions.tutorialStepInfo = tt.stepInfo;
+                        this.setState({ tutorialOptions: tutorialOptions });
+                        var fullscreen = tutorialOptions.tutorialStepInfo[0].fullscreen;
+                        if (fullscreen)
+                            this.showTutorialHint();
+                        else
+                            tutorial.TutorialContent.refresh();
                         core.hideLoading();
                         break;
                 }
@@ -448,9 +523,9 @@ var ProjectView = (function (_super) {
         }
     };
     ProjectView.prototype.reloadHeaderAsync = function () {
-        return this.loadHeaderAsync(this.state.header);
+        return this.loadHeaderAsync(this.state.header, this.state.filters);
     };
-    ProjectView.prototype.loadHeaderAsync = function (h) {
+    ProjectView.prototype.loadHeaderAsync = function (h, filters) {
         var _this = this;
         if (!h)
             return Promise.resolve();
@@ -459,7 +534,8 @@ var ProjectView = (function (_super) {
         var logs = this.refs["logs"];
         logs.clear();
         this.setState({
-            showFiles: false
+            showFiles: false,
+            filters: filters
         });
         return pkg.loadPkgAsync(h.id)
             .then(function () {
@@ -488,7 +564,7 @@ var ProjectView = (function (_super) {
                 sideDocsLoadUrl: ''
             });
             pkg.getEditorPkg(pkg.mainPkg).onupdate = function () {
-                _this.loadHeaderAsync(h).done();
+                _this.loadHeaderAsync(h, _this.state.filters).done();
             };
             pkg.mainPkg.getCompileOptionsAsync()
                 .catch(function (e) {
@@ -517,11 +593,12 @@ var ProjectView = (function (_super) {
                 }
             })
                 .done();
+            var preferredEditor = _this.pickEditorFor(file);
             var readme = main.lookupFile("this/README.md");
             if (readme && readme.content && readme.content.trim())
                 _this.setSideMarkdown(readme.content);
-            else if (pkg.mainPkg.config.documentation)
-                _this.setSideDoc(pkg.mainPkg.config.documentation);
+            else if (pkg.mainPkg && pkg.mainPkg.config && pkg.mainPkg.config.documentation)
+                _this.setSideDoc(pkg.mainPkg.config.documentation, preferredEditor == _this.blocksEditor);
         });
     };
     ProjectView.prototype.removeProject = function () {
@@ -573,58 +650,30 @@ var ProjectView = (function (_super) {
             });
         });
     };
+    ProjectView.prototype.convertTouchDevelopToTypeScriptAsync = function (td) {
+        return tdlegacy.td2tsAsync(td);
+    };
     ProjectView.prototype.importHex = function (data) {
-        var _this = this;
         var targetId = pxt.appTarget.id;
         if (!data || !data.meta) {
             core.warningNotification(lf("Sorry, we could not recognize this file."));
             return;
         }
-        if (data.meta.cloudId == "microbit.co.uk" && data.meta.editor == "blockly") {
-            pxt.tickEvent("import.blocks");
-            pxt.debug('importing microbit.co.uk blocks project');
+        var importer = this.hexFileImporters.filter(function (fi) { return fi.canImport(data); })[0];
+        if (importer) {
+            pxt.tickEvent("import." + importer.id);
             core.showLoading(lf("loading project..."));
-            this.createProjectAsync({
-                filesOverride: {
-                    "main.blocks": data.source
-                }, name: data.meta.name
-            }).done(function () { return core.hideLoading(); });
-            return;
+            importer.importAsync(this, data)
+                .done(function () { return core.hideLoading(); }, function (e) {
+                pxt.reportException(e, { importer: importer.id });
+                core.hideLoading();
+                core.errorNotification(lf("Oops, something went wrong when importing your project"));
+            });
         }
-        else if (data.meta.cloudId == "microbit.co.uk" && data.meta.editor == "touchdevelop") {
-            pxt.tickEvent("import.td");
-            pxt.debug('importing microbit.co.uk TD project');
-            core.showLoading("loading project...");
-            this.createProjectAsync({
-                filesOverride: { "main.blocks": "", "main.ts": "  " },
-                name: data.meta.name
-            })
-                .then(function () { return tdlegacy.td2tsAsync(data.source); })
-                .then(function (text) { return _this.textEditor.overrideFile(text); })
-                .done(function () { return core.hideLoading(); });
-            return;
+        else {
+            core.warningNotification(lf("Sorry, we could not import this project."));
+            pxt.tickEvent("warning.importfailed");
         }
-        else if (data.meta.cloudId == "ks/" + targetId || data.meta.cloudId == pxt.CLOUD_ID + targetId // match on targetid
-            || (Util.startsWith(data.meta.cloudId, pxt.CLOUD_ID + targetId)) // trying to load white-label file into main target
-        ) {
-            pxt.tickEvent("import.pxt");
-            pxt.debug("importing project");
-            var h = {
-                target: targetId,
-                editor: data.meta.editor,
-                name: data.meta.name,
-                meta: {},
-                pubId: "",
-                pubCurrent: false
-            };
-            var files = JSON.parse(data.source);
-            // we cannot load the workspace until we've loaded the project
-            workspace.installAsync(h, files)
-                .done(function (hd) { return _this.loadHeaderAsync(hd); });
-            return;
-        }
-        core.warningNotification(lf("Sorry, we could not import this project."));
-        pxt.tickEvent("warning.importfailed");
     };
     ProjectView.prototype.importProjectFile = function (file) {
         var _this = this;
@@ -657,6 +706,22 @@ var ProjectView = (function (_super) {
         else
             core.warningNotification(lf("Oops, don't know how to load this file!"));
     };
+    ProjectView.prototype.importProjectAsync = function (project, filters) {
+        var _this = this;
+        var h = project.header;
+        if (!h) {
+            h = {
+                target: pxt.appTarget.id,
+                editor: pxt.BLOCKS_PROJECT_NAME,
+                name: lf("Untitled"),
+                meta: {},
+                pubId: "",
+                pubCurrent: false
+            };
+        }
+        return workspace.installAsync(h, project.text)
+            .then(function (hd) { return _this.loadHeaderAsync(hd, filters); });
+    };
     ProjectView.prototype.initDragAndDrop = function () {
         var _this = this;
         draganddrop.setupDragAndDrop(document.body, function (file) { return file.size < 1000000 && isHexFile(file.name) || isBlocksFile(file.name); }, function (files) {
@@ -666,27 +731,13 @@ var ProjectView = (function (_super) {
             }
         });
     };
-    ProjectView.prototype.openProject = function () {
+    ProjectView.prototype.openProject = function (tab) {
         pxt.tickEvent("menu.open");
-        this.projects.showOpenProject();
+        this.projects.showOpenProject(tab);
     };
     ProjectView.prototype.exportProjectToFileAsync = function () {
-        var _this = this;
         var mpkg = pkg.mainPkg;
-        return this.saveFileAsync()
-            .then(function () { return mpkg.filesToBePublishedAsync(true); })
-            .then(function (files) {
-            var project = {
-                meta: {
-                    cloudId: pxt.CLOUD_ID + pxt.appTarget.id,
-                    targetVersions: pxt.appTarget.versions,
-                    editor: _this.getPreferredEditor(),
-                    name: mpkg.config.name
-                },
-                source: JSON.stringify(files, null, 2)
-            };
-            return pxt.lzmaCompressAsync(JSON.stringify(project, null, 2));
-        });
+        return mpkg.compressToFileAsync(this.getPreferredEditor());
     };
     ProjectView.prototype.getPreferredEditor = function () {
         return this.editor == this.blocksEditor ? pxt.BLOCKS_PROJECT_NAME : pxt.JAVASCRIPT_PROJECT_NAME;
@@ -708,11 +759,11 @@ var ProjectView = (function (_super) {
             return _this.newProject();
         });
     };
-    ProjectView.prototype.saveProjectToFile = function () {
+    ProjectView.prototype.saveProjectToFileAsync = function () {
         var mpkg = pkg.mainPkg;
-        this.exportProjectToFileAsync()
-            .done(function (buf) {
-            var fn = pkg.genFileName(".pxt");
+        return this.exportProjectToFileAsync()
+            .then(function (buf) {
+            var fn = pkg.genFileName(".mkcd");
             pxt.BrowserUtils.browserDownloadUInt8Array(buf, fn, 'application/octet-stream');
         });
     };
@@ -721,6 +772,7 @@ var ProjectView = (function (_super) {
         this.scriptSearch.showAddPackages();
     };
     ProjectView.prototype.newEmptyProject = function (name, documentation) {
+        this.setState({ tutorialOptions: {} });
         this.newProject({
             filesOverride: { "main.blocks": "<xml xmlns=\"http://www.w3.org/1999/xhtml\"></xml>" },
             name: name, documentation: documentation
@@ -740,7 +792,7 @@ var ProjectView = (function (_super) {
         if (!options.prj)
             options.prj = pxt.appTarget.blocksprj;
         var cfg = pxt.U.clone(options.prj.config);
-        cfg.name = options.name || lf("Untitled"); // pxt.U.fmt(cfg.name, Util.getAwesomeAdj());
+        cfg.name = options.name || lf("Untitled");
         cfg.documentation = options.documentation;
         var files = Util.clone(options.prj.files);
         if (options.filesOverride)
@@ -754,7 +806,7 @@ var ProjectView = (function (_super) {
             pubCurrent: false,
             target: pxt.appTarget.id,
             temporary: options.temporary
-        }, files).then(function (hd) { return _this.loadHeaderAsync(hd); });
+        }, files).then(function (hd) { return _this.loadHeaderAsync(hd, options.filters); });
     };
     ProjectView.prototype.switchTypeScript = function () {
         var mainPkg = pkg.mainEditorPkg();
@@ -762,7 +814,7 @@ var ProjectView = (function (_super) {
         var f = mainPkg.files[tsName];
         this.setFile(f);
     };
-    ProjectView.prototype.saveBlocksToTypeScript = function () {
+    ProjectView.prototype.saveBlocksToTypeScriptAsync = function () {
         return this.blocksEditor.saveToTypeScript();
     };
     ProjectView.prototype.saveTypeScriptAsync = function (open) {
@@ -773,19 +825,20 @@ var ProjectView = (function (_super) {
         var promise = Promise.resolve().then(function () {
             return open ? _this.textEditor.loadMonacoAsync() : Promise.resolve();
         }).then(function () {
-            var src = _this.editor.saveToTypeScript();
-            if (!src)
-                return Promise.resolve();
-            // format before saving
-            //src = pxtc.format(src, 0).formatted;
-            var mainPkg = pkg.mainEditorPkg();
-            var tsName = _this.editorFile.getVirtualFileName();
-            Util.assert(tsName != _this.editorFile.name);
-            return mainPkg.setContentAsync(tsName, src).then(function () {
-                if (open) {
-                    var f = mainPkg.files[tsName];
-                    _this.setFile(f);
-                }
+            return _this.editor.saveToTypeScript().then(function (src) {
+                if (!src)
+                    return Promise.resolve();
+                // format before saving
+                // if (open) src = pxtc.format(src, 0).formatted;
+                var mainPkg = pkg.mainEditorPkg();
+                var tsName = _this.editorFile.getVirtualFileName();
+                Util.assert(tsName != _this.editorFile.name);
+                return mainPkg.setContentAsync(tsName, src).then(function () {
+                    if (open) {
+                        var f = mainPkg.files[tsName];
+                        _this.setFile(f);
+                    }
+                });
             });
         });
         if (open) {
@@ -813,15 +866,42 @@ var ProjectView = (function (_super) {
                 .done(function () { return window.location.reload(); }, function () { return window.location.reload(); });
         });
     };
-    ProjectView.prototype.saveAndCompile = function () {
-        this.saveFile();
-        if (!pxt.appTarget.compile.hasHex) {
-            this.saveProjectToFile();
-        }
-        else {
-            this.compile(true);
-        }
+    ProjectView.prototype.promptRenameProjectAsync = function () {
+        var _this = this;
+        if (!this.state.header)
+            return Promise.resolve(false);
+        var opts = {
+            header: lf("Rename your project"),
+            agreeLbl: lf("Save"),
+            input: lf("Enter your project name here")
+        };
+        return core.confirmAsync(opts).then(function (res) {
+            if (!res || !opts.inputValue)
+                return Promise.resolve(false); // cancelled
+            return new Promise(function (resolve, reject) {
+                _this.setState({ projectName: opts.inputValue }, function () { return resolve(); });
+            }).then(function () { return _this.saveProjectNameAsync(); })
+                .then(function () { return true; });
+        });
     };
+    ProjectView.prototype.saveAndCompile = function () {
+        var _this = this;
+        if (!this.state.header)
+            return;
+        return (this.state.projectName !== lf("Untitled")
+            ? Promise.resolve(true) : this.promptRenameProjectAsync())
+            .then(function () { return _this.saveProjectNameAsync(); })
+            .then(function () { return _this.saveFileAsync(); })
+            .then(function () {
+            if (!pxt.appTarget.compile.hasHex) {
+                _this.saveProjectToFileAsync().done();
+            }
+            else {
+                _this.compile(true);
+            }
+        });
+    };
+    ProjectView.prototype.beforeCompile = function () { };
     ProjectView.prototype.compile = function (saveOnly) {
         var _this = this;
         if (saveOnly === void 0) { saveOnly = false; }
@@ -829,6 +909,10 @@ var ProjectView = (function (_super) {
         if (/webusb=1/i.test(window.location.href)) {
             pxt.usb.initAsync().catch(function (e) { });
         }
+        this.beforeCompile();
+        var userContextWindow = undefined;
+        if (pxt.BrowserUtils.isBrowserDownloadInSameWindow())
+            userContextWindow = window.open("");
         pxt.tickEvent("compile");
         pxt.debug('compiling...');
         if (this.state.compiling) {
@@ -852,20 +936,37 @@ var ProjectView = (function (_super) {
                 return Promise.resolve();
             }
             resp.saveOnly = saveOnly;
+            resp.userContextWindow = userContextWindow;
+            resp.downloadFileBaseName = pkg.genFileName("");
+            resp.confirmAsync = core.confirmAsync;
             return pxt.commands.deployCoreAsync(resp)
                 .catch(function (e) {
-                core.warningNotification(lf(".hex file upload failed, please try again."));
+                core.warningNotification(lf("Upload failed, please try again."));
                 pxt.reportException(e);
+                if (userContextWindow)
+                    try {
+                        userContextWindow.close();
+                    }
+                    catch (e) { }
             });
         }).catch(function (e) {
             pxt.reportException(e);
             core.errorNotification(lf("Compilation failed, please contact support."));
+            if (userContextWindow)
+                try {
+                    userContextWindow.close();
+                }
+                catch (e) { }
         }).finally(function () {
             _this.setState({ compiling: false });
             if (simRestart)
                 _this.runSimulator();
         })
             .done();
+    };
+    ProjectView.prototype.overrideTypescriptFile = function (text) {
+        if (this.textEditor)
+            this.textEditor.overrideFile(text);
     };
     ProjectView.prototype.startStopSimulator = function () {
         if (this.state.running) {
@@ -881,6 +982,17 @@ var ProjectView = (function (_super) {
         pxt.tickEvent('simulator.restart');
         this.stopSimulator();
         this.startSimulator();
+    };
+    ProjectView.prototype.toggleTrace = function () {
+        if (this.state.tracing) {
+            this.editor.clearHighlightedStatements();
+            simulator.setTraceInterval(0);
+        }
+        else {
+            simulator.setTraceInterval(simulator.SLOW_TRACE_INTERVAL);
+        }
+        this.setState({ tracing: !this.state.tracing });
+        this.restartSimulator();
     };
     ProjectView.prototype.startSimulator = function () {
         var _this = this;
@@ -940,28 +1052,15 @@ var ProjectView = (function (_super) {
         this.setState({ mute: !this.state.mute });
     };
     ProjectView.prototype.openInstructions = function () {
+        var _this = this;
         pxt.tickEvent("simulator.make");
-        compiler.compileAsync({ native: true })
-            .done(function (resp) {
-            var p = pkg.mainEditorPkg();
-            var code = p.files["main.ts"];
-            var data = {
-                name: p.header.name || lf("Untitled"),
-                code: code ? code.content : "basic.showString(\"Hi!\");",
-                board: JSON.stringify(pxt.appTarget.simulator.boardDefinition)
-            };
-            var parts = ts.pxtc.computeUsedParts(resp);
-            if (parts.length) {
-                data.parts = parts.join(" ");
-                data.partdefs = JSON.stringify(pkg.mainPkg.computePartDefinitions(parts));
-            }
-            var fnArgs = resp.usedArguments;
-            if (fnArgs)
-                data.fnArgs = JSON.stringify(fnArgs);
-            data.package = Util.values(pkg.mainPkg.deps).filter(function (p) { return p.id != "this"; }).map(function (p) { return (p.id + "=" + p._verspec); }).join('\n');
-            var urlData = Object.keys(data).map(function (k) { return (k + "=" + encodeURIComponent(data[k])); }).join('&');
-            var url = pxt.webConfig.partsUrl + "?" + urlData;
-            window.open(url, '_blank');
+        var running = this.state.running;
+        if (running)
+            this.stopSimulator();
+        make.makeAsync()
+            .finally(function () {
+            if (running)
+                _this.startSimulator();
         });
     };
     ProjectView.prototype.clearLog = function () {
@@ -975,11 +1074,11 @@ var ProjectView = (function (_super) {
         return start.then(function () {
             simulator.driver.setHwDebugger({
                 postMessage: function (msg) {
-                    hwdbg.handleMessage(msg);
+                    pxt.HWDBG.handleMessage(msg);
                 }
             });
-            hwdbg.postMessage = function (msg) { return simulator.driver.handleHwDebuggerMsg(msg); };
-            return hwdbg.startDebugAsync();
+            pxt.HWDBG.postMessage = function (msg) { return simulator.driver.handleHwDebuggerMsg(msg); };
+            return Promise.join(compiler.compileAsync({ debug: true, native: true }), hidbridge.initAsync()).then(function (vals) { return pxt.HWDBG.startDebugAsync(vals[0], vals[1]); });
         });
     };
     ProjectView.prototype.runSimulator = function (opts) {
@@ -992,6 +1091,9 @@ var ProjectView = (function (_super) {
             pxt.tickEvent(opts.debug ? "debug" : "run", { editor: editorId });
         if (!opts.background)
             this.editor.beforeCompile();
+        if (this.state.tracing) {
+            opts.trace = true;
+        }
         this.stopSimulator();
         this.clearLog();
         var state = this.editor.snapshotState();
@@ -999,7 +1101,7 @@ var ProjectView = (function (_super) {
             .then(function (resp) {
             _this.editor.setDiagnostics(_this.editorFile, state);
             if (resp.outfiles[pxtc.BINARY_JS]) {
-                simulator.run(pkg.mainPkg, opts.debug, resp, _this.state.mute);
+                simulator.run(pkg.mainPkg, opts.debug, resp, _this.state.mute, _this.state.highContrast);
                 _this.setState({ running: true, showParts: simulator.driver.runOptions.parts.length > 0 });
             }
             else if (!opts.background) {
@@ -1016,16 +1118,75 @@ var ProjectView = (function (_super) {
     ProjectView.prototype.importFileDialog = function () {
         var _this = this;
         var input;
+        var ext = pxt.appTarget.compile && pxt.appTarget.compile.hasHex ? ".hex" : ".mkcd";
         core.confirmAsync({
-            header: lf("Open .hex file"),
+            header: lf("Open {0} file", ext),
             onLoaded: function ($el) {
                 input = $el.find('input')[0];
             },
-            htmlBody: "<div class=\"ui form\">\n  <div class=\"ui field\">\n    <label>" + lf("Select a .hex file to open.") + "</label>\n    <input type=\"file\" class=\"ui button blue fluid\"></input>\n  </div>\n</div>",
+            htmlBody: "<div class=\"ui form\">\n  <div class=\"ui field\">\n    <label>" + lf("Select a {0} file to open.", ext) + "</label>\n    <input type=\"file\" class=\"ui button blue fluid\"></input>\n  </div>\n</div>",
         }).done(function (res) {
             if (res) {
                 pxt.tickEvent("menu.open.file");
                 _this.importFile(input.files[0]);
+            }
+        });
+    };
+    ProjectView.prototype.showReportAbuse = function () {
+        var _this = this;
+        pxt.tickEvent("menu.reportabuse");
+        var urlInput;
+        var reasonInput;
+        var shareUrl = pxt.appTarget.appTheme.shareUrl || "https://makecode.com/";
+        core.confirmAsync({
+            header: lf("Report Abuse"),
+            onLoaded: function ($el) {
+                urlInput = $el.find('input');
+                reasonInput = $el.find('textarea');
+                if (_this.state.header && _this.state.header.pubCurrent && _this.state.header.pubId)
+                    urlInput.val(shareUrl + _this.state.header.pubId);
+            },
+            agreeLbl: lf("Submit"),
+            htmlBody: "<div class=\"ui form\">\n  <div class=\"ui field\">\n    <label>" + lf("What is the URL of the offensive project?") + "</label>\n    <input type=\"url\" placeholder=\"Enter project URL here...\"></input>\n  </div>\n  <div class=\"ui field\">\n    <label>" + lf("Why do you find it offensive?") + "</label>\n    <textarea></textarea>\n  </div>\n</div>",
+        }).done(function (res) {
+            if (res) {
+                pxt.tickEvent("menu.reportabuse.send");
+                var id = pxt.Cloud.parseScriptId(urlInput.val());
+                if (!id) {
+                    core.errorNotification(lf("Sorry, the project url looks invalid."));
+                }
+                else {
+                    core.infoNotification(lf("Sending abuse report..."));
+                    Cloud.privatePostAsync(id + "/abusereports", {
+                        text: reasonInput.val()
+                    })
+                        .then(function (res) {
+                        core.infoNotification(lf("Report sent. Thank you!"));
+                    })
+                        .catch(core.handleNetworkError);
+                }
+            }
+        });
+    };
+    ProjectView.prototype.importUrlDialog = function () {
+        var input;
+        var shareUrl = pxt.appTarget.appTheme.shareUrl || "https://makecode.com/";
+        core.confirmAsync({
+            header: lf("Open project URL"),
+            onLoaded: function ($el) {
+                input = $el.find('input')[0];
+            },
+            htmlBody: "<div class=\"ui form\">\n<div class=\"ui icon violet message\">\n    <i class=\"user icon\"></i>\n    <div class=\"content\">\n        <h3 class=\"header\">\n            " + lf("User-provided content") + "\n        </h3>\n        <p>\n            " + lf("The content below is provided by a user, and is not endorsed by Microsoft.") + "\n            " + lf("If you think it's not appropriate, please report abuse through Settings -> Report Abuse.") + "\n        </p>\n    </div>\n</div>\n  <div class=\"ui field\">\n    <label>" + lf("Copy the URL of the project.") + "</label>\n    <input type=\"url\" placeholder=\"" + shareUrl + "...\" class=\"ui button blue fluid\"></input>\n  </div>\n</div>",
+        }).done(function (res) {
+            if (res) {
+                pxt.tickEvent("menu.open.url");
+                var id = pxt.Cloud.parseScriptId(input.value);
+                if (!id) {
+                    core.errorNotification(lf("Sorry, the project url looks invalid."));
+                }
+                else {
+                    loadHeaderBySharedId(id);
+                }
             }
         });
     };
@@ -1056,7 +1217,8 @@ var ProjectView = (function (_super) {
         this.setState({ publishing: true });
         var mpkg = pkg.mainPkg;
         var epkg = pkg.getEditorPkg(mpkg);
-        return this.saveFileAsync()
+        return this.saveProjectNameAsync()
+            .then(function () { return _this.saveFileAsync(); })
             .then(function () { return mpkg.filesToBePublishedAsync(true); })
             .then(function (files) {
             if (epkg.header.pubCurrent)
@@ -1085,18 +1247,22 @@ var ProjectView = (function (_super) {
         });
         this.debouncedSaveProjectName();
     };
-    ProjectView.prototype.saveProjectName = function () {
+    ProjectView.prototype.saveProjectNameAsync = function () {
         var _this = this;
         if (!this.state.projectName || !this.state.header)
-            return;
-        pxt.debug('saving project name to ' + this.state.projectName);
+            return Promise.resolve();
         try {
+            // nothing to do?
+            if (pkg.mainPkg.config.name == this.state.projectName)
+                return Promise.resolve();
             //Save the name in the target MainPackage as well
             pkg.mainPkg.config.name = this.state.projectName;
+            pxt.debug('saving project name to ' + this.state.projectName);
             var f = pkg.mainEditorPkg().lookupFile("this/" + pxt.CONFIG_NAME);
             var config = JSON.parse(f.content);
             config.name = this.state.projectName;
-            f.setContentAsync(JSON.stringify(config, null, 4) + "\n").done(function () {
+            return f.setContentAsync(JSON.stringify(config, null, 4) + "\n")
+                .then(function () {
                 if (_this.state.header)
                     _this.setState({
                         projectName: _this.state.header.name
@@ -1104,7 +1270,8 @@ var ProjectView = (function (_super) {
             });
         }
         catch (e) {
-            console.error('failed to read pxt.json');
+            pxt.reportException(e);
+            return Promise.resolve();
         }
     };
     ProjectView.prototype.isTextEditor = function () {
@@ -1120,7 +1287,7 @@ var ProjectView = (function (_super) {
             header: lf("About {0}", pxt.appTarget.name),
             hideCancel: true,
             agreeLbl: lf("Ok"),
-            htmlBody: "\n<p>" + Util.htmlEscape(pxt.appTarget.description) + "</p>\n<p>" + lf("{0} version:", Util.htmlEscape(pxt.appTarget.name)) + " <a href=\"" + Util.htmlEscape(pxt.appTarget.appTheme.githubUrl) + "/releases/tag/v" + Util.htmlEscape(pxt.appTarget.versions.target) + "\" target=\"_blank\">" + Util.htmlEscape(pxt.appTarget.versions.target) + "</a></p>\n<p>" + lf("{0} version:", "PXT") + " <a href=\"https://github.com/Microsoft/pxt/releases/tag/v" + Util.htmlEscape(pxt.appTarget.versions.pxt) + "\" target=\"_blank\">" + Util.htmlEscape(pxt.appTarget.versions.pxt) + "</a></p>\n" + (compileService ? "<p>" + lf("{0} version:", "C++ runtime") + " <a href=\"" + Util.htmlEscape("https://github.com/" + compileService.githubCorePackage + '/releases/tag/' + compileService.gittag) + "\" target=\"_blank\">" + Util.htmlEscape(compileService.gittag) + "</a></p>" : "") + "\n"
+            htmlBody: "\n<p>" + Util.htmlEscape(pxt.appTarget.description) + "</p>\n<p>" + lf("{0} version:", Util.htmlEscape(pxt.appTarget.name)) + " <a href=\"" + Util.htmlEscape(pxt.appTarget.appTheme.githubUrl) + "/releases/tag/v" + Util.htmlEscape(pxt.appTarget.versions.target) + "\" target=\"_blank\">" + Util.htmlEscape(pxt.appTarget.versions.target) + "</a></p>\n<p>" + lf("{0} version:", "Microsoft MakeCode") + " <a href=\"https://github.com/Microsoft/pxt/releases/tag/v" + Util.htmlEscape(pxt.appTarget.versions.pxt) + "\" target=\"_blank\">" + Util.htmlEscape(pxt.appTarget.versions.pxt) + "</a></p>\n" + (compileService && compileService.githubCorePackage && compileService.gittag ? "<p>" + lf("{0} version:", "C++ runtime") + " <a href=\"" + Util.htmlEscape("https://github.com/" + compileService.githubCorePackage + '/releases/tag/' + compileService.gittag) + "\" target=\"_blank\">" + Util.htmlEscape(compileService.gittag) + "</a></p>" : "") + "\n"
         }).done();
     };
     ProjectView.prototype.embed = function () {
@@ -1128,11 +1295,27 @@ var ProjectView = (function (_super) {
         var header = this.state.header;
         this.shareEditor.show(header);
     };
+    ProjectView.prototype.selectLang = function () {
+        this.languagePicker.show();
+    };
+    ProjectView.prototype.renderBlocksAsync = function (req) {
+        return compiler.getBlocksAsync()
+            .then(function (blocksInfo) { return compiler.decompileSnippetAsync(req.ts, blocksInfo); })
+            .then(function (resp) {
+            var svg = pxt.blocks.render(resp, { snippetMode: true });
+            var viewBox = svg.getAttribute("viewBox").split(/\s+/).map(function (d) { return parseInt(d); });
+            return pxt.blocks.layout.blocklyToSvgAsync(svg, '', viewBox[0], viewBox[1], viewBox[2], viewBox[3]);
+        }).then(function (re) { return re.xml; });
+    };
     ProjectView.prototype.gettingStarted = function () {
         pxt.tickEvent("btn.gettingstarted");
         var targetTheme = pxt.appTarget.appTheme;
         Util.assert(!this.state.sideDocsLoadUrl && targetTheme && !!targetTheme.sideDoc);
         this.startTutorial(targetTheme.sideDoc);
+    };
+    ProjectView.prototype.openTutorials = function () {
+        pxt.tickEvent("menu.openTutorials");
+        this.projects.showOpenTutorials();
     };
     ProjectView.prototype.startTutorial = function (tutorialId) {
         pxt.tickEvent("tutorial.start");
@@ -1144,57 +1327,84 @@ var ProjectView = (function (_super) {
         var _this = this;
         var title = tutorialId;
         var result = [];
+        sounds.initTutorial(); // pre load sounds
         return pxt.Cloud.downloadMarkdownAsync(tutorialId)
             .then(function (md) {
-            var titleRegex = /^#(.*)/g.exec(md);
+            var titleRegex = /^#\s*(.*)/g.exec(md);
             if (!titleRegex || titleRegex.length < 1)
                 return;
-            title = titleRegex[1];
-            var steps = md.split('###');
+            title = titleRegex[1].trim();
+            var steps = md.split(/^###[^#].*$/gmi);
             for (var step = 1; step < steps.length; step++) {
                 var stepmd = "###" + steps[step];
                 result.push(stepmd);
             }
             //TODO: parse for tutorial options, mainly initial blocks
         }).then(function () {
-            _this.setState({ tutorial: tutorialId, tutorialName: title, tutorialStep: 0, tutorialSteps: result });
-            var tc = _this.refs["tutorialcard"];
+            var tutorialOptions = {
+                tutorial: tutorialId,
+                tutorialName: title,
+                tutorialStep: 0,
+                tutorialSteps: result
+            };
+            _this.setState({ tutorialOptions: tutorialOptions });
+            var tc = _this.refs["tutorialcontent"];
             tc.setPath(tutorialId);
         }).then(function () {
             return _this.createProjectAsync({
-                filesOverride: {
-                    "main.blocks": "<xml xmlns=\"http://www.w3.org/1999/xhtml\"><block type=\"" + ts.pxtc.ON_START_TYPE + "\"></block></xml>",
-                    "main.ts": "  "
-                },
-                name: tutorialId,
-                temporary: true
+                name: title
             });
         });
     };
-    ProjectView.prototype.exitTutorial = function () {
+    ProjectView.prototype.exitTutorial = function (keep) {
         pxt.tickEvent("tutorial.exit");
-        core.showLoading(lf("exiting tutorial..."));
-        this.exitTutorialAsync()
+        core.showLoading(lf("leaving tutorial..."));
+        this.exitTutorialAsync(keep)
             .then(function () { return Promise.delay(500); })
             .done(function () { return core.hideLoading(); });
     };
-    ProjectView.prototype.exitTutorialAsync = function () {
+    ProjectView.prototype.exitTutorialAsync = function (keep) {
         var _this = this;
         // tutorial project is temporary, no need to delete
         var curr = pkg.mainEditorPkg().header;
-        curr.isDeleted = true;
-        this.setState({ active: false });
+        var files = pkg.mainEditorPkg().getAllFiles();
+        if (!keep) {
+            curr.isDeleted = true;
+        }
+        else {
+            curr.temporary = false;
+        }
+        this.setState({ active: false, filters: undefined });
         return workspace.saveAsync(curr, {})
+            .then(function () { return keep ? workspace.installAsync(curr, files) : Promise.resolve(null); })
             .then(function () {
             if (workspace.getHeaders().length > 0) {
-                _this.loadHeaderAsync(workspace.getHeaders()[0]);
+                return _this.loadHeaderAsync(workspace.getHeaders()[0], null);
             }
             else {
-                _this.newProject();
+                return _this.newProject();
             }
-        }).finally(function () {
-            _this.setState({ active: true, tutorial: null, tutorialName: null, tutorialSteps: null, tutorialStep: -1 });
+        })
+            .finally(function () {
+            core.hideLoading();
+            _this.setState({ active: true, tutorialOptions: undefined });
         });
+    };
+    ProjectView.prototype.toggleHighContrast = function () {
+        var _this = this;
+        var hc = !this.state.highContrast;
+        pxt.tickEvent("menu.highcontrast", { on: hc ? 1 : 0 });
+        this.setState({ highContrast: hc }, function () { return _this.restartSimulator(); });
+    };
+    ProjectView.prototype.completeTutorial = function () {
+        pxt.tickEvent("tutorial.complete");
+        this.tutorialComplete.show();
+    };
+    ProjectView.prototype.showTutorialHint = function () {
+        var th = this.refs["tutorialhint"];
+        th.showHint();
+        var options = this.state.tutorialOptions;
+        pxt.tickEvent("tutorial.showhint", { tutorial: options.tutorial, step: options.tutorialStep });
     };
     ProjectView.prototype.renderCore = function () {
         var _this = this;
@@ -1208,6 +1418,7 @@ var ProjectView = (function (_super) {
         var workspaces = pxt.appTarget.cloud && pxt.appTarget.cloud.workspaces;
         var packages = pxt.appTarget.cloud && pxt.appTarget.cloud.packages;
         var sharingEnabled = pxt.appTarget.cloud && pxt.appTarget.cloud.sharing;
+        var reportAbuse = pxt.appTarget.cloud && pxt.appTarget.cloud.sharing && pxt.appTarget.cloud.publishing && pxt.appTarget.cloud.importing;
         var compile = pxt.appTarget.compile;
         var compileBtn = compile.hasHex;
         var simOpts = pxt.appTarget.simulator;
@@ -1222,47 +1433,58 @@ var ProjectView = (function (_super) {
         var fullscreenTooltip = this.state.fullscreen ? lf("Exit fullscreen mode") : lf("Launch in fullscreen");
         var muteTooltip = this.state.mute ? lf("Unmute audio") : lf("Mute audio");
         var isBlocks = !this.editor.isVisible || this.getPreferredEditor() == pxt.BLOCKS_PROJECT_NAME;
-        var sideDocs = !(sandbox || pxt.options.light || targetTheme.hideSideDocs);
-        var inTutorial = !!this.state.tutorial;
-        var tutorialName = this.state.tutorialName;
+        var sideDocs = !(sandbox || targetTheme.hideSideDocs);
+        var tutorialOptions = this.state.tutorialOptions;
+        var inTutorial = !!tutorialOptions && !!tutorialOptions.tutorial;
         var docMenu = targetTheme.docMenu && targetTheme.docMenu.length && !sandbox && !inTutorial;
         var gettingStarted = !sandbox && !inTutorial && !this.state.sideDocsLoadUrl && targetTheme && targetTheme.sideDoc && isBlocks;
         var gettingStartedTooltip = lf("Open beginner tutorial");
         var run = true; // !compileBtn || !pxt.appTarget.simulator.autoRun || !isBlocks;
         var restart = run && !simOpts.hideRestart;
-        var fullscreen = run && !simOpts.hideFullscreen;
-        var showMenuBar = !targetTheme.layoutOptions || !targetTheme.layoutOptions.hideMenuBar;
+        var trace = run && simOpts.enableTrace;
+        var fullscreen = run && !inTutorial && !simOpts.hideFullscreen;
+        var audio = run && !inTutorial && targetTheme.hasAudio;
+        var useModulator = compile.useModulator;
+        var hideMenuBar = targetTheme.hideMenuBar, hideEditorToolbar = targetTheme.hideEditorToolbar;
+        var isHeadless = simOpts.headless;
         var cookieKey = "cookieconsent";
-        var cookieConsented = !!pxt.storage.getLocal(cookieKey) || electron.isElectron;
+        var cookieConsented = targetTheme.hideCookieNotice || electron.isElectron || pxt.winrt.isWinRT() || !!pxt.storage.getLocal(cookieKey);
+        var simActive = this.state.embedSimView;
         var blockActive = this.isBlocksActive();
         var javascriptActive = this.isJavaScriptActive();
+        var traceTooltip = this.state.tracing ? lf("Disable Slow-Mo") : lf("Slow-Mo");
+        var selectLanguage = targetTheme.selectLanguage;
+        var betaUrl = targetTheme.betaUrl;
         var consentCookie = function () {
             pxt.storage.setLocal(cookieKey, "1");
             _this.forceUpdate();
         };
+        var showSideDoc = sideDocs && this.state.sideDocsLoadUrl && !this.state.sideDocsCollapsed;
         // update window title
         document.title = this.state.header ? this.state.header.name + " - " + pxt.appTarget.name : pxt.appTarget.name;
         var rootClasses = sui.cx([
-            this.state.hideEditorFloats || this.state.collapseEditorTools ? " hideEditorFloats" : '',
-            this.state.collapseEditorTools ? " collapsedEditorTools" : '',
+            (this.state.hideEditorFloats || this.state.collapseEditorTools) && !inTutorial ? " hideEditorFloats" : '',
+            this.state.collapseEditorTools && !inTutorial ? " collapsedEditorTools" : '',
             this.state.fullscreen ? 'fullscreensim' : '',
-            !sideDocs || !this.state.sideDocsLoadUrl || this.state.sideDocsCollapsed ? '' : 'sideDocs',
+            showSideDoc ? 'sideDocs' : '',
             pxt.shell.layoutTypeClass(),
             inTutorial ? 'tutorial' : '',
             pxt.options.light ? 'light' : '',
             pxt.BrowserUtils.isTouchEnabled() ? 'has-touch' : '',
-            showMenuBar ? '' : 'hideMenuBar',
+            hideMenuBar ? 'hideMenuBar' : '',
+            hideEditorToolbar ? 'hideEditorToolbar' : '',
+            sandbox && simActive ? 'simView' : '',
             'full-abs'
         ]);
-        return (React.createElement("div", {id: 'root', className: rootClasses}, showMenuBar ?
+        return (React.createElement("div", {id: 'root', className: rootClasses}, useModulator ? React.createElement("audio", {id: "modulatorAudioOutput", controls: true}) : undefined, useModulator ? React.createElement("div", {id: "modulatorWrapper"}, React.createElement("div", {id: "modulatorBubble"}, React.createElement("canvas", {id: "modulatorWavStrip"}))) : undefined, hideMenuBar ? undefined :
             React.createElement("div", {id: "menubar", role: "banner"}, React.createElement("div", {className: "ui borderless fixed " + (targetTheme.invertedMenu ? "inverted" : '') + " menu", role: "menubar"}, !sandbox ? React.createElement("div", {className: "left menu"}, React.createElement("span", {id: "logo", className: "ui item logo"}, targetTheme.logo || targetTheme.portraitLogo
-                ? React.createElement("a", {className: "ui image", target: "_blank", href: targetTheme.logoUrl}, React.createElement("img", {className: "ui logo " + (targetTheme.portraitLogo ? " portrait hide" : ''), src: Util.toDataUri(targetTheme.logo || targetTheme.portraitLogo)}))
-                : React.createElement("span", {className: "name"}, targetTheme.name), targetTheme.portraitLogo ? (React.createElement("a", {className: "ui", target: "_blank", href: targetTheme.logoUrl}, React.createElement("img", {className: 'ui mini image portrait only', src: Util.toDataUri(targetTheme.portraitLogo)}))) : null), !inTutorial ? React.createElement(sui.Item, {class: "openproject", role: "menuitem", textClass: "landscape only", icon: "folder open large", text: lf("Projects"), onClick: function () { return _this.openProject(); }}) : null, !inTutorial && this.state.header && sharingEnabled ? React.createElement(sui.Item, {class: "shareproject", role: "menuitem", textClass: "widedesktop only", text: lf("Share"), icon: "share alternate large", onClick: function () { return _this.embed(); }}) : null, inTutorial ? React.createElement(sui.Item, {class: "tutorialname", role: "menuitem", textClass: "landscape only", text: tutorialName}) : null) : undefined, !inTutorial && !targetTheme.blocksOnly ? React.createElement(sui.Item, {class: "editor-menuitem"}, React.createElement(sui.Item, {class: "blocks-menuitem", textClass: "landscape only", text: lf("Blocks"), icon: "puzzle", active: blockActive, onClick: function () { return _this.openBlocks(); }, title: lf("Convert code to Blocks")}), React.createElement(sui.Item, {class: "javascript-menuitem", textClass: "landscape only", text: lf("JavaScript"), icon: "align left", active: javascriptActive, onClick: function () { return _this.openJavaScript(); }, title: lf("Convert code to JavaScript")})) : undefined, inTutorial ? React.createElement(tutorial.TutorialMenuItem, {parent: this}) : undefined, React.createElement("div", {className: "right menu"}, docMenu ? React.createElement(container.DocsMenuItem, {parent: this}) : undefined, sandbox || inTutorial ? undefined :
-                React.createElement(sui.DropdownMenuItem, {icon: 'setting large', title: lf("More..."), class: "more-dropdown-menuitem"}, this.state.header ? React.createElement(sui.Item, {role: "menuitem", icon: "options", text: lf("Project Settings"), onClick: function () { return _this.setFile(pkg.mainEditorPkg().lookupFile("this/pxt.json")); }}) : undefined, this.state.header && packages ? React.createElement(sui.Item, {role: "menuitem", icon: "disk outline", text: lf("Add Package..."), onClick: function () { return _this.addPackage(); }}) : undefined, this.state.header ? React.createElement(sui.Item, {role: "menuitem", icon: "trash", text: lf("Delete Project"), onClick: function () { return _this.removeProject(); }}) : undefined, React.createElement("div", {className: "ui divider"}), React.createElement("a", {className: "ui item thin only", href: "/docs", role: "menuitem", target: "_blank"}, React.createElement("i", {className: "help icon"}), lf("Help")), React.createElement(sui.Item, {role: "menuitem", icon: 'sign out', text: lf("Reset"), onClick: function () { return _this.reset(); }}), React.createElement("div", {className: "ui divider"}), targetTheme.privacyUrl ? React.createElement("a", {className: "ui item", href: targetTheme.privacyUrl, role: "menuitem", title: lf("Privacy & Cookies"), target: "_blank"}, lf("Privacy & Cookies")) : undefined, targetTheme.termsOfUseUrl ? React.createElement("a", {className: "ui item", href: targetTheme.termsOfUseUrl, role: "menuitem", title: lf("Terms Of Use"), target: "_blank"}, lf("Terms Of Use")) : undefined, React.createElement(sui.Item, {role: "menuitem", text: lf("About..."), onClick: function () { return _this.about(); }}), electron.isElectron ? React.createElement(sui.Item, {role: "menuitem", text: lf("Check for updates..."), onClick: function () { return electron.checkForUpdate(); }}) : undefined), sandbox ? React.createElement(sui.Item, {role: "menuitem", icon: "external", text: lf("Edit"), onClick: function () { return _this.launchFullEditor(); }}) : undefined, sandbox ? React.createElement("span", {className: "ui item logo"}, React.createElement("img", {className: "ui mini image", src: Util.toDataUri(rightLogo)})) : undefined, !sandbox && gettingStarted ? React.createElement("span", {className: "ui item tablet only"}, React.createElement(sui.Button, {class: "small getting-started-btn", title: gettingStartedTooltip, text: lf("Getting Started"), onClick: function () { return _this.gettingStarted(); }})) : undefined, inTutorial ? React.createElement(sui.Item, {role: "menuitem", icon: "external", text: lf("Exit tutorial"), textClass: "landscape only", onClick: function () { return _this.exitTutorial(); }}) : undefined, !sandbox ? React.createElement("span", {id: "organization", className: "ui item logo"}, targetTheme.organizationWideLogo || targetTheme.organizationLogo
-                ? React.createElement("img", {className: "ui logo " + (targetTheme.portraitLogo ? " portrait hide" : ''), src: Util.toDataUri(targetTheme.organizationWideLogo || targetTheme.organizationLogo)})
-                : React.createElement("span", {className: "name"}, targetTheme.organization), targetTheme.organizationLogo ? (React.createElement("img", {className: 'ui mini image portrait only', src: Util.toDataUri(targetTheme.organizationLogo)})) : null) : undefined))) : undefined, gettingStarted ?
+                ? React.createElement("a", {className: "ui image", target: "_blank", href: targetTheme.logoUrl}, React.createElement("img", {className: "ui logo " + (targetTheme.portraitLogo ? " portrait hide" : ''), src: Util.toDataUri(targetTheme.logo || targetTheme.portraitLogo), alt: targetTheme.boardName + " Logo"}))
+                : React.createElement("span", {className: "name"}, targetTheme.name), targetTheme.portraitLogo ? (React.createElement("a", {className: "ui", target: "_blank", href: targetTheme.logoUrl}, React.createElement("img", {className: 'ui mini image portrait only', src: Util.toDataUri(targetTheme.portraitLogo), alt: targetTheme.boardName + " Logo"}))) : null), !inTutorial ? React.createElement(sui.Item, {class: "openproject", role: "menuitem", textClass: "landscape only", icon: "folder open large", text: lf("Projects"), onClick: function () { return _this.openProject(); }}) : null, !inTutorial && this.state.header && sharingEnabled ? React.createElement(sui.Item, {class: "shareproject", role: "menuitem", textClass: "widedesktop only", text: lf("Share"), icon: "share alternate large", onClick: function () { return _this.embed(); }}) : null, inTutorial ? React.createElement(sui.Item, {class: "tutorialname", role: "menuitem", textClass: "landscape only", text: tutorialOptions.tutorialName}) : null) : React.createElement("div", {className: "left menu"}, React.createElement("span", {id: "logo", className: "ui item logo"}, React.createElement("img", {className: "ui mini image", src: Util.toDataUri(rightLogo), onClick: function () { return _this.launchFullEditor(); }, alt: targetTheme.boardName + " Logo"}))), !inTutorial && !targetTheme.blocksOnly ? React.createElement(sui.Item, {class: "editor-menuitem"}, sandbox ? React.createElement(sui.Item, {class: "sim-menuitem thin portrait only", textClass: "landscape only", text: lf("Simulator"), icon: simActive && this.state.running ? "stop" : "play", active: simActive, onClick: function () { return _this.openSimView(); }, title: !simActive ? lf("Show Simulator") : runTooltip}) : undefined, React.createElement(sui.Item, {class: "blocks-menuitem", textClass: "landscape only", text: lf("Blocks"), icon: "xicon blocks", active: blockActive, onClick: function () { return _this.openBlocks(); }, title: lf("Convert code to Blocks")}), React.createElement(sui.Item, {class: "javascript-menuitem", textClass: "landscape only", text: lf("JavaScript"), icon: "xicon js", active: javascriptActive, onClick: function () { return _this.openJavaScript(); }, title: lf("Convert code to JavaScript")})) : undefined, inTutorial ? React.createElement(tutorial.TutorialMenuItem, {parent: this}) : undefined, React.createElement("div", {className: "right menu"}, docMenu ? React.createElement(container.DocsMenuItem, {parent: this}) : undefined, sandbox || inTutorial ? undefined :
+                React.createElement(sui.DropdownMenuItem, {icon: 'setting large', title: lf("More..."), class: "more-dropdown-menuitem"}, this.state.header ? React.createElement(sui.Item, {role: "menuitem", icon: "options", text: lf("Project Settings"), onClick: function () { return _this.setFile(pkg.mainEditorPkg().lookupFile("this/pxt.json")); }}) : undefined, this.state.header && packages ? React.createElement(sui.Item, {role: "menuitem", icon: "disk outline", text: lf("Add Package..."), onClick: function () { return _this.addPackage(); }}) : undefined, this.state.header ? React.createElement(sui.Item, {role: "menuitem", icon: "trash", text: lf("Delete Project"), onClick: function () { return _this.removeProject(); }}) : undefined, reportAbuse ? React.createElement(sui.Item, {role: "menuitem", icon: "warning circle", text: lf("Report Abuse..."), onClick: function () { return _this.showReportAbuse(); }}) : undefined, React.createElement("div", {className: "ui divider"}), selectLanguage ? React.createElement(sui.Item, {icon: "xicon globe", role: "menuitem", text: lf("Language"), onClick: function () { return _this.selectLang(); }}) : undefined, targetTheme.highContrast ? React.createElement(sui.Item, {role: "menuitem", text: this.state.highContrast ? lf("High Contrast Off") : lf("High Contrast On"), onClick: function () { return _this.toggleHighContrast(); }}) : undefined, React.createElement(sui.Item, {role: "menuitem", icon: 'sign out', text: lf("Reset"), onClick: function () { return _this.reset(); }}), React.createElement("div", {className: "ui divider"}), targetTheme.privacyUrl ? React.createElement("a", {className: "ui item", href: targetTheme.privacyUrl, role: "menuitem", title: lf("Privacy & Cookies"), target: "_blank"}, lf("Privacy & Cookies")) : undefined, targetTheme.termsOfUseUrl ? React.createElement("a", {className: "ui item", href: targetTheme.termsOfUseUrl, role: "menuitem", title: lf("Terms Of Use"), target: "_blank"}, lf("Terms Of Use")) : undefined, React.createElement(sui.Item, {role: "menuitem", text: lf("About..."), onClick: function () { return _this.about(); }}), electron.isElectron ? React.createElement(sui.Item, {role: "menuitem", text: lf("Check for updates..."), onClick: function () { return electron.checkForUpdate(); }}) : undefined, targetTheme.feedbackUrl ? React.createElement("div", {className: "ui divider"}) : undefined, targetTheme.feedbackUrl ? React.createElement("a", {className: "ui item", href: targetTheme.feedbackUrl, role: "menuitem", title: lf("Give Feedback"), target: "_blank"}, lf("Give Feedback")) : undefined), sandbox && !targetTheme.hideEmbedEdit ? React.createElement(sui.Item, {role: "menuitem", icon: "external", textClass: "mobile hide", text: lf("Edit"), onClick: function () { return _this.launchFullEditor(); }}) : undefined, !sandbox && gettingStarted ? React.createElement("span", {className: "ui item tablet only"}, React.createElement(sui.Button, {class: "small getting-started-btn", title: gettingStartedTooltip, text: lf("Getting Started"), onClick: function () { return _this.gettingStarted(); }})) : undefined, inTutorial ? React.createElement(sui.ButtonMenuItem, {class: "exit-tutorial-btn", role: "menuitem", icon: "external", text: lf("Exit tutorial"), textClass: "landscape only", onClick: function () { return _this.exitTutorial(true); }}) : undefined, !sandbox ? React.createElement("a", {id: "organization", href: targetTheme.organizationUrl, target: "blank", className: "ui item logo", onClick: function () { return pxt.tickEvent("menu.org"); }}, targetTheme.organizationWideLogo || targetTheme.organizationLogo
+                ? React.createElement("img", {className: "ui logo " + (targetTheme.organizationWideLogo ? " portrait hide" : ''), src: Util.toDataUri(targetTheme.organizationWideLogo || targetTheme.organizationLogo), alt: targetTheme.organization + " Logo"})
+                : React.createElement("span", {className: "name"}, targetTheme.organization), targetTheme.organizationLogo ? (React.createElement("img", {className: 'ui mini image portrait only', src: Util.toDataUri(targetTheme.organizationLogo), alt: targetTheme.organization + " Logo"})) : null) : undefined, betaUrl ? React.createElement("a", {href: "" + betaUrl, className: "ui red mini corner top left attached label betalabel"}, lf("Beta")) : undefined))), gettingStarted ?
             React.createElement("div", {id: "getting-started-btn"}, React.createElement(sui.Button, {class: "portrait hide bottom attached small getting-started-btn", title: gettingStartedTooltip, text: lf("Getting Started"), onClick: function () { return _this.gettingStarted(); }}))
-            : undefined, React.createElement("div", {id: "simulator"}, React.createElement("div", {id: "filelist", className: "ui items", role: "complementary"}, React.createElement("div", {id: "boardview", className: "ui vertical editorFloat"}), React.createElement("div", {className: "ui item grid centered portrait hide simtoolbar"}, React.createElement("div", {className: "ui icon buttons " + (this.state.fullscreen ? 'massive' : ''), style: { padding: "0" }}, make ? React.createElement(sui.Button, {icon: 'configure', class: "fluid sixty secondary", text: lf("Make"), title: makeTooltip, onClick: function () { return _this.openInstructions(); }}) : undefined, run ? React.createElement(sui.Button, {key: 'runbtn', class: "play-button", icon: this.state.running ? "stop" : "play", title: runTooltip, onClick: function () { return _this.startStopSimulator(); }}) : undefined, restart ? React.createElement(sui.Button, {key: 'restartbtn', class: "restart-button", icon: "refresh", title: restartTooltip, onClick: function () { return _this.restartSimulator(); }}) : undefined), React.createElement("div", {className: "ui icon buttons " + (this.state.fullscreen ? 'massive' : ''), style: { padding: "0" }}, run && targetTheme.hasAudio ? React.createElement(sui.Button, {key: 'mutebtn', class: "mute-button", icon: "" + (this.state.mute ? 'volume off' : 'volume up'), title: muteTooltip, onClick: function () { return _this.toggleMute(); }}) : undefined, fullscreen ? React.createElement(sui.Button, {key: 'fullscreenbtn', class: "fullscreen-button", icon: "" + (this.state.fullscreen ? 'compress' : 'maximize'), title: fullscreenTooltip, onClick: function () { return _this.toggleSimulatorFullscreen(); }}) : undefined)), React.createElement("div", {className: "ui item portrait hide"}, pxt.options.debug && !this.state.running ? React.createElement(sui.Button, {key: 'debugbtn', class: 'teal', icon: "xicon bug", text: "Sim Debug", onClick: function () { return _this.runSimulator({ debug: true }); }}) : '', pxt.options.debug ? React.createElement(sui.Button, {key: 'hwdebugbtn', class: 'teal', icon: "xicon chip", text: "Dev Debug", onClick: function () { return _this.hwDebug(); }}) : ''), React.createElement("div", {className: "ui editorFloat portrait hide"}, React.createElement(logview.LogView, {ref: "logs"})), sandbox || isBlocks ? undefined : React.createElement(filelist.FileList, {parent: this}))), React.createElement("div", {id: "maineditor", className: sandbox ? "sandbox" : "", role: "main"}, inTutorial ? React.createElement(tutorial.TutorialCard, {ref: "tutorialcard", parent: this}) : undefined, this.allEditors.map(function (e) { return e.displayOuter(); })), React.createElement("div", {id: "editortools", role: "complementary"}, React.createElement(editortoolbar.EditorToolbar, {ref: "editortools", parent: this})), sideDocs ? React.createElement(container.SideDocs, {ref: "sidedoc", parent: this}) : undefined, sandbox ? undefined : React.createElement(scriptsearch.ScriptSearch, {parent: this, ref: function (v) { return _this.scriptSearch = v; }}), sandbox ? undefined : React.createElement(projects.Projects, {parent: this, ref: function (v) { return _this.projects = v; }}), sandbox || !sharingEnabled ? undefined : React.createElement(share.ShareEditor, {parent: this, ref: function (v) { return _this.shareEditor = v; }}), sandbox ? React.createElement("div", {className: "ui horizontal small divided link list sandboxfooter"}, targetTheme.organizationUrl && targetTheme.organization ? React.createElement("a", {className: "item", target: "_blank", href: targetTheme.organizationUrl}, lf("Powered by {0}", targetTheme.organization)) : undefined, React.createElement("a", {target: "_blank", className: "item", href: targetTheme.termsOfUseUrl}, lf("Terms of Use")), React.createElement("a", {target: "_blank", className: "item", href: targetTheme.privacyUrl}, lf("Privacy"))) : undefined, cookieConsented ? undefined : React.createElement("div", {id: 'cookiemsg', className: "ui teal inverted black segment"}, React.createElement("button", {"arial-label": lf("Ok"), className: "ui right floated icon button", onClick: consentCookie}, React.createElement("i", {className: "remove icon"})), lf("By using this site you agree to the use of cookies for analytics."), React.createElement("a", {target: "_blank", className: "ui link", href: pxt.appTarget.appTheme.privacyUrl}, lf("Learn more")))));
+            : undefined, React.createElement("div", {id: "simulator"}, React.createElement("div", {id: "filelist", className: "ui items", role: "complementary"}, React.createElement("div", {id: "boardview", className: "ui vertical editorFloat"}), !isHeadless ? React.createElement("div", {className: "ui item grid centered portrait hide simtoolbar"}, React.createElement("div", {className: "ui icon buttons " + (this.state.fullscreen ? 'massive' : ''), style: { padding: "0" }}, make ? React.createElement(sui.Button, {icon: 'configure', class: "fluid sixty secondary", text: lf("Make"), title: makeTooltip, onClick: function () { return _this.openInstructions(); }}) : undefined, run ? React.createElement(sui.Button, {key: 'runbtn', class: "play-button " + (this.state.running ? "stop" : "play"), icon: this.state.running ? "stop" : "play", title: runTooltip, onClick: function () { return _this.startStopSimulator(); }}) : undefined, restart ? React.createElement(sui.Button, {key: 'restartbtn', class: "restart-button", icon: "refresh", title: restartTooltip, onClick: function () { return _this.restartSimulator(); }}) : undefined, trace ? React.createElement(sui.Button, {key: 'debug', class: "trace-button " + (this.state.tracing ? 'orange' : ''), icon: "xicon turtle", title: traceTooltip, onClick: function () { return _this.toggleTrace(); }}) : undefined), React.createElement("div", {className: "ui icon buttons " + (this.state.fullscreen ? 'massive' : ''), style: { padding: "0" }}, audio ? React.createElement(sui.Button, {key: 'mutebtn', class: "mute-button " + (this.state.mute ? 'red' : ''), icon: "" + (this.state.mute ? 'volume off' : 'volume up'), title: muteTooltip, onClick: function () { return _this.toggleMute(); }}) : undefined, fullscreen ? React.createElement(sui.Button, {key: 'fullscreenbtn', class: "fullscreen-button", icon: "" + (this.state.fullscreen ? 'compress' : 'maximize'), title: fullscreenTooltip, onClick: function () { return _this.toggleSimulatorFullscreen(); }}) : undefined)) : undefined, React.createElement("div", {className: "ui item portrait hide"}, pxt.options.debug && !this.state.running ? React.createElement(sui.Button, {key: 'debugbtn', class: 'teal', icon: "xicon bug", text: "Sim Debug", onClick: function () { return _this.runSimulator({ debug: true }); }}) : '', pxt.options.debug ? React.createElement(sui.Button, {key: 'hwdebugbtn', class: 'teal', icon: "xicon chip", text: "Dev Debug", onClick: function () { return _this.hwDebug(); }}) : ''), React.createElement("div", {className: "ui editorFloat portrait hide"}, React.createElement(logview.LogView, {ref: "logs"})), sandbox || isBlocks ? undefined : React.createElement(filelist.FileList, {parent: this}))), React.createElement("div", {id: "maineditor", className: sandbox ? "sandbox" : "", role: "main"}, inTutorial ? React.createElement(tutorial.TutorialCard, {ref: "tutorialcard", parent: this}) : undefined, this.allEditors.map(function (e) { return e.displayOuter(); })), inTutorial ? React.createElement(tutorial.TutorialHint, {ref: "tutorialhint", parent: this}) : undefined, inTutorial ? React.createElement(tutorial.TutorialContent, {ref: "tutorialcontent", parent: this}) : undefined, hideEditorToolbar ? undefined : React.createElement("div", {id: "editortools", role: "complementary"}, React.createElement(editortoolbar.EditorToolbar, {ref: "editortools", parent: this})), sideDocs ? React.createElement(container.SideDocs, {ref: "sidedoc", parent: this}) : undefined, sandbox ? undefined : React.createElement(scriptsearch.ScriptSearch, {parent: this, ref: function (v) { return _this.scriptSearch = v; }}), sandbox ? undefined : React.createElement(projects.Projects, {parent: this, ref: function (v) { return _this.projects = v; }}), sandbox || !sharingEnabled ? undefined : React.createElement(share.ShareEditor, {parent: this, ref: function (v) { return _this.shareEditor = v; }}), selectLanguage ? React.createElement(lang.LanguagePicker, {parent: this, ref: function (v) { return _this.languagePicker = v; }}) : undefined, inTutorial ? React.createElement(tutorial.TutorialComplete, {parent: this, ref: function (v) { return _this.tutorialComplete = v; }}) : undefined, sandbox ? React.createElement("div", {className: "ui horizontal small divided link list sandboxfooter"}, targetTheme.organizationUrl && targetTheme.organization ? React.createElement("a", {className: "item", target: "_blank", href: targetTheme.organizationUrl}, targetTheme.organization) : undefined, React.createElement("a", {target: "_blank", className: "item", href: targetTheme.termsOfUseUrl}, lf("Terms of Use")), React.createElement("a", {target: "_blank", className: "item", href: targetTheme.privacyUrl}, lf("Privacy")), React.createElement("span", {className: "item"}, React.createElement("a", {className: "ui thin portrait only", title: compileTooltip, onClick: function () { return _this.compile(); }}, React.createElement("i", {className: "icon " + (pxt.appTarget.appTheme.downloadIcon || 'download')}), pxt.appTarget.appTheme.useUploadMessage ? lf("Upload") : lf("Download")))) : undefined, cookieConsented ? undefined : React.createElement("div", {id: 'cookiemsg', className: "ui teal inverted black segment"}, React.createElement("button", {"arial-label": lf("Ok"), className: "ui right floated icon button clear inverted", onClick: consentCookie}, React.createElement("i", {className: "remove icon"})), lf("By using this site you agree to the use of cookies for analytics."), React.createElement("a", {target: "_blank", className: "ui link", href: pxt.appTarget.appTheme.privacyUrl}, lf("Learn more")))));
     };
     return ProjectView;
 }(data.Component));
@@ -1283,7 +1505,7 @@ function isTypescriptFile(filename) {
     return /\.ts$/i.test(filename);
 }
 function isProjectFile(filename) {
-    return /\.pxt$/i.test(filename);
+    return /\.(pxt|mkcd)$/i.test(filename);
 }
 function fileReadAsBufferAsync(f) {
     if (!f)
@@ -1378,7 +1600,7 @@ function initScreenshots() {
         if (msg && msg.type == "screenshot") {
             pxt.tickEvent("sim.screenshot");
             var scmsg = msg;
-            console.log('received screenshot');
+            pxt.debug('received screenshot');
             screenshot.saveAsync(theEditor.state.header, scmsg.data)
                 .done(function () { pxt.debug('screenshot saved'); });
         }
@@ -1387,6 +1609,7 @@ function initScreenshots() {
 }
 function enableAnalytics() {
     pxt.analytics.enable();
+    pxt.editor.enableControllerAnalytics();
     var stats = {};
     if (typeof window !== "undefined") {
         var screen_1 = window.screen;
@@ -1436,7 +1659,6 @@ var myexports = {
     sim: simulator,
     apiAsync: core.apiAsync,
     showIcons: showIcons,
-    hwdbg: hwdbg,
     assembleCurrent: assembleCurrent,
     log: log
 };
@@ -1450,19 +1672,36 @@ function initTheme() {
         document.getElementsByTagName('head')[0].appendChild(style);
     }
     // RTL languages
-    if (/^ar/i.test(Util.userLanguage())) {
+    if (Util.isUserLanguageRtl()) {
         pxt.debug("rtl layout");
         pxsim.U.addClass(document.body, "rtl");
         document.body.style.direction = "rtl";
+        // replace semantic.css with rtlsemantic.css
+        var links = Util.toArray(document.head.getElementsByTagName("link"));
+        var semanticLink = links.filter(function (l) { return Util.endsWith(l.getAttribute("href"), "semantic.css"); })[0];
+        var semanticHref = semanticLink.getAttribute("data-rtl");
+        if (semanticHref) {
+            pxt.debug("swapping to " + semanticHref);
+            semanticLink.setAttribute("href", semanticHref);
+        }
     }
     function patchCdn(url) {
         if (!url)
             return url;
-        return url.replace("@pxtCdnUrl@", pxt.getOnlineCdnUrl())
-            .replace("@cdnUrl@", pxt.getOnlineCdnUrl());
+        return url.replace("@cdnUrl@", pxt.getOnlineCdnUrl());
     }
     theme.appLogo = patchCdn(theme.appLogo);
     theme.cardLogo = patchCdn(theme.cardLogo);
+    if (pxt.appTarget.simulator
+        && pxt.appTarget.simulator.boardDefinition
+        && pxt.appTarget.simulator.boardDefinition.visual) {
+        var boardDef = pxt.appTarget.simulator.boardDefinition.visual;
+        if (boardDef.image) {
+            boardDef.image = patchCdn(boardDef.image);
+            if (boardDef.outlineImage)
+                boardDef.outlineImage = patchCdn(boardDef.outlineImage);
+        }
+    }
 }
 function parseHash() {
     var hashCmd = "";
@@ -1482,7 +1721,7 @@ function handleHash(hash) {
     switch (hash.cmd) {
         case "doc":
             pxt.tickEvent("hash.doc");
-            editor.setSideDoc(hash.arg);
+            editor.setSideDoc(hash.arg, editor == this.blockEditor);
             break;
         case "follow":
             pxt.tickEvent("hash.follow");
@@ -1511,19 +1750,19 @@ function handleHash(hash) {
         case "tutorial":
             pxt.tickEvent("hash.tutorial");
             editor.startTutorial(hash.arg);
+            window.location.hash = "";
+            return true;
+        case "projects":
+            pxt.tickEvent("hash.projects");
+            editor.openProject(hash.arg);
+            window.location.hash = "";
             return true;
         case "sandbox":
         case "pub":
         case "edit":
             pxt.tickEvent("hash." + hash.cmd);
-            var existing = workspace.getHeaders()
-                .filter(function (h) { return h.pubCurrent && h.pubId == hash.arg; })[0];
-            core.showLoading(lf("loading project..."));
-            (existing
-                ? theEditor.loadHeaderAsync(existing)
-                : workspace.installByIdAsync(hash.arg)
-                    .then(function (hd) { return theEditor.loadHeaderAsync(hd); }))
-                .done(function () { return core.hideLoading(); });
+            window.location.hash = "";
+            loadHeaderBySharedId(hash.arg);
             return true;
         case "sandboxproject":
         case "project":
@@ -1537,9 +1776,46 @@ function handleHash(hash) {
     }
     return false;
 }
+function loadHeaderBySharedId(id) {
+    var existing = workspace.getHeaders()
+        .filter(function (h) { return h.pubCurrent && h.pubId == id; })[0];
+    core.showLoading(lf("loading project..."));
+    (existing
+        ? theEditor.loadHeaderAsync(existing, null)
+        : workspace.installByIdAsync(id)
+            .then(function (hd) { return theEditor.loadHeaderAsync(hd, null); }))
+        .catch(core.handleNetworkError)
+        .finally(function () { return core.hideLoading(); });
+}
 function initHashchange() {
     window.addEventListener("hashchange", function (e) {
         handleHash(parseHash());
+    });
+}
+function initExtensionsAsync() {
+    if (!pxt.appTarget.appTheme || !pxt.appTarget.appTheme.extendEditor)
+        return Promise.resolve();
+    pxt.debug('loading editor extensions...');
+    var opts = {};
+    return pxt.BrowserUtils.loadScriptAsync(pxt.webConfig.commitCdnUrl + "editor.js")
+        .then(function () { return pxt.editor.initExtensionsAsync(opts); })
+        .then(function (res) {
+        if (res.hexFileImporters)
+            res.hexFileImporters.forEach(function (fi) {
+                pxt.debug("\tadded hex importer " + fi.id);
+                theEditor.hexFileImporters.push(fi);
+            });
+        if (res.deployCoreAsync) {
+            pxt.debug("\tadded custom deploy core async");
+            pxt.commands.deployCoreAsync = res.deployCoreAsync;
+        }
+        if (res.beforeCompile) {
+            theEditor.beforeCompile = res.beforeCompile;
+        }
+        if (res.fieldEditors)
+            res.fieldEditors.forEach(function (fi) {
+                pxt.blocks.registerFieldEditor(fi.selector, fi.editor, fi.validator);
+            });
     });
 }
 $(document).ready(function () {
@@ -1547,7 +1823,7 @@ $(document).ready(function () {
     var config = pxt.webConfig;
     pxt.options.debug = /dbg=1/i.test(window.location.href);
     pxt.options.light = /light=1/i.test(window.location.href) || pxt.BrowserUtils.isARM() || pxt.BrowserUtils.isIE();
-    var wsPortMatch = /ws=(\d+)/i.exec(window.location.href);
+    var wsPortMatch = /wsport=(\d+)/i.exec(window.location.href);
     if (wsPortMatch) {
         pxt.options.wsPort = parseInt(wsPortMatch[1]) || 3233;
         window.location.hash = window.location.hash.replace(wsPortMatch[0], "");
@@ -1555,54 +1831,64 @@ $(document).ready(function () {
     else {
         pxt.options.wsPort = 3233;
     }
+    pkg.setupAppTarget(window.pxtTargetBundle);
     enableAnalytics();
-    appcache.init();
+    if (!pxt.BrowserUtils.isBrowserSupported() && !/skipbrowsercheck=1/i.exec(window.location.href)) {
+        pxt.tickEvent("unsupported");
+        window.location.href = "/browsers";
+        core.showLoading(lf("Sorry, this browser is not supported."));
+        return;
+    }
     initLogin();
     var hash = parseHash();
+    appcache.init(hash);
+    pxt.docs.requireMarked = function () { return require("marked"); };
+    var ih = function (hex) { return theEditor.importHex(hex); };
     var hm = /^(https:\/\/[^/]+)/.exec(window.location.href);
     if (hm)
         Cloud.apiRoot = hm[1] + "/api/";
     var ws = /ws=(\w+)/.exec(window.location.href);
     if (ws)
         workspace.setupWorkspace(ws[1]);
+    else if (pxt.appTarget.appTheme.allowParentController)
+        workspace.setupWorkspace("iframe");
     else if (pxt.shell.isSandboxMode() || pxt.shell.isReadOnly())
         workspace.setupWorkspace("mem");
+    else if (pxt.winrt.isWinRT())
+        workspace.setupWorkspace("uwp");
     else if (Cloud.isLocalHost())
         workspace.setupWorkspace("fs");
-    pxt.docs.requireMarked = function () { return require("marked"); };
-    var ih = function (hex) { return theEditor.importHex(hex); };
-    var cfg = pxt.webConfig;
-    pkg.setupAppTarget(window.pxtTargetBundle);
-    if (!pxt.BrowserUtils.isBrowserSupported()) {
-        pxt.tickEvent("unsupported");
-        var redirect = pxt.BrowserUtils.suggestedBrowserPath();
-        if (redirect) {
-            window.location.href = redirect;
-        }
-    }
     Promise.resolve()
         .then(function () {
         var mlang = /(live)?lang=([a-z]{2,}(-[A-Z]+)?)/i.exec(window.location.href);
-        var lang = mlang ? mlang[2] : (pxt.appTarget.appTheme.defaultLocale || navigator.userLanguage || navigator.language);
-        var live = mlang && !!mlang[1];
-        if (lang)
-            pxt.tickEvent("locale." + lang + (live ? ".live" : ""));
-        return Util.updateLocalizationAsync(cfg.pxtCdnUrl, lang, live);
+        if (mlang && window.location.hash.indexOf(mlang[0]) >= 0) {
+            lang.setCookieLang(mlang[2]);
+            window.location.hash = window.location.hash.replace(mlang[0], "");
+        }
+        var useLang = mlang ? mlang[2] : (lang.getCookieLang() || pxt.appTarget.appTheme.defaultLocale || navigator.userLanguage || navigator.language);
+        var live = !pxt.appTarget.appTheme.disableLiveTranslations || (mlang && !!mlang[1]);
+        if (useLang)
+            pxt.tickEvent("locale." + useLang + (live ? ".live" : ""));
+        lang.initialLang = useLang;
+        return Util.updateLocalizationAsync(config.commitCdnUrl, useLang, pxt.appTarget.versions.pxtCrowdinBranch, live);
     })
         .then(function () { return initTheme(); })
         .then(function () { return cmds.initCommandsAsync(); })
         .then(function () { return compiler.init(); })
         .then(function () { return workspace.initAsync(); })
-        .then(function () {
+        .then(function (state) {
         $("#loading").remove();
         render();
         return workspace.syncAsync();
     })
+        .then(function (state) { return state ? theEditor.setState(state) : undefined; })
         .then(function () {
         initSerial();
         initScreenshots();
         initHashchange();
-    }).then(function () { return pxt.winrt.initAsync(ih); })
+    })
+        .then(function () { return pxt.winrt.initAsync(ih); })
+        .then(function () { return initExtensionsAsync(); })
         .then(function () {
         electron.init();
         if (hash.cmd && handleHash(hash))
@@ -1613,11 +1899,12 @@ $(document).ready(function () {
         if (ent)
             hd = workspace.getHeader(ent.id);
         if (hd)
-            return theEditor.loadHeaderAsync(hd);
+            return theEditor.loadHeaderAsync(hd, null);
         else
             theEditor.newProject();
         return Promise.resolve();
-    }).done(function () { });
+    }).then(function () { return workspace.importLegacyScriptsAsync(); })
+        .done(function () { });
     document.addEventListener("visibilitychange", function (ev) {
         if (theEditor)
             theEditor.updateVisibility();
@@ -1654,7 +1941,7 @@ $(document).ready(function () {
             else if (window.parent && window != window.parent)
                 window.parent.postMessage(ev.data, "*");
         }
-        if (m.type == "tutorial") {
+        if (m.type == "tutorial" || m.type == "popoutcomplete") {
             if (theEditor && theEditor.editor)
                 theEditor.handleMessage(m);
         }
@@ -1671,19 +1958,71 @@ $(document).ready(function () {
     }, false);
 });
 
-},{"./appcache":2,"./blocks":3,"./cmds":6,"./compiler":8,"./container":9,"./core":10,"./data":11,"./draganddrop":13,"./editortoolbar":14,"./electron":15,"./filelist":16,"./hidbridge":19,"./hwdbg":20,"./logview":21,"./monaco":23,"./package":24,"./projects":25,"./pxtjson":26,"./screenshot":27,"./scriptsearch":28,"./share":29,"./simulator":30,"./sui":32,"./tdlegacy":33,"./tutorial":35,"./workspace":37,"marked":69,"react":315,"react-dom":159}],2:[function(require,module,exports){
+},{"./appcache":2,"./blocks":4,"./cmds":7,"./compiler":9,"./container":10,"./core":11,"./data":12,"./draganddrop":14,"./editortoolbar":15,"./electron":16,"./filelist":17,"./hidbridge":20,"./lang":22,"./logview":23,"./make":24,"./monaco":26,"./package":28,"./projects":29,"./pxtjson":30,"./screenshot":31,"./scriptsearch":32,"./share":33,"./simulator":34,"./sounds":35,"./sui":37,"./tdlegacy":38,"./tutorial":40,"./workspace":41,"marked":55,"react":302,"react-dom":146}],2:[function(require,module,exports){
 "use strict";
 var core = require("./core");
-function init() {
+function init(hash) {
     var appCache = window.applicationCache;
     appCache.addEventListener('updateready', function () {
-        core.infoNotification(lf("Update download complete. Reloading..."));
-        setTimeout(function () { return location.reload(); }, 3000);
+        core.infoNotification(lf("Update download complete. Reloading... "));
+        setTimeout(function () {
+            // On embedded pages, preserve the loaded project
+            if (pxt.BrowserUtils.isIFrame() && hash.cmd === "pub") {
+                location.replace(location.origin + ("/#pub:" + hash.arg));
+            }
+            else {
+                location.reload();
+            }
+        }, 3000);
     }, false);
 }
 exports.init = init;
 
-},{"./core":10}],3:[function(require,module,exports){
+},{"./core":11}],3:[function(require,module,exports){
+"use strict";
+var _context; // AudioContext
+function context() {
+    if (!_context)
+        _context = freshContext();
+    return _context;
+}
+function freshContext() {
+    window.AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (window.AudioContext) {
+        try {
+            // this call might crash.
+            // SyntaxError: audio resources unavailable for AudioContext construction
+            return new window.AudioContext();
+        }
+        catch (e) { }
+    }
+    return undefined;
+}
+function play(buffer, volume) {
+    if (volume === void 0) { volume = 1; }
+    if (!buffer)
+        return;
+    var ctx = context();
+    if (!ctx)
+        return;
+    var source = ctx.createBufferSource();
+    source.buffer = buffer;
+    var gain = ctx.createGain();
+    gain.gain.value = volume;
+    source.connect(gain);
+    gain.connect(ctx.destination);
+    source.start(0);
+}
+exports.play = play;
+function loadAsync(buffer) {
+    var ctx = context();
+    return new Promise(function (resolve, reject) {
+        ctx.decodeAudioData(buffer, function (b) { return resolve(b); }, function () { resolve(undefined); });
+    });
+}
+exports.loadAsync = loadAsync;
+
+},{}],4:[function(require,module,exports){
 /// <reference path="../../localtypings/blockly.d.ts" />
 /// <reference path="../../typings/globals/jquery/index.d.ts" />
 "use strict";
@@ -1693,18 +2032,21 @@ var __extends = (this && this.__extends) || function (d, b) {
     d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
 };
 var React = require("react");
+var pkg = require("./package");
 var core = require("./core");
 var srceditor = require("./srceditor");
 var compiler = require("./compiler");
 var toolbox_1 = require("./toolbox");
+var CategoryMode = pxt.blocks.CategoryMode;
 var Util = pxt.Util;
 var lf = Util.lf;
+var iface;
 var Editor = (function (_super) {
     __extends(Editor, _super);
     function Editor() {
         _super.apply(this, arguments);
         this.isFirstBlocklyLoad = true;
-        this.showToolboxCategories = true;
+        this.showToolboxCategories = CategoryMode.Basic;
     }
     Editor.prototype.setVisible = function (v) {
         _super.prototype.setVisible.call(this, v);
@@ -1719,17 +2061,26 @@ var Editor = (function (_super) {
             $(classes).hide();
     };
     Editor.prototype.saveToTypeScript = function () {
+        var _this = this;
         if (!this.typeScriptSaveable)
-            return undefined;
+            return Promise.resolve('');
         try {
-            this.compilationResult = pxt.blocks.compile(this.editor, this.blockInfo);
-            return this.compilationResult.source;
+            return pxt.blocks.compileAsync(this.editor, this.blockInfo)
+                .then(function (compilationResult) {
+                _this.compilationResult = compilationResult;
+                pxt.tickActivity("blocks.compile");
+                return _this.compilationResult.source;
+            });
         }
         catch (e) {
             pxt.reportException(e);
             core.errorNotification(lf("Sorry, we were not able to convert this program."));
-            return undefined;
+            return Promise.resolve('');
         }
+    };
+    Editor.prototype.updateBlocksInfo = function (bi) {
+        this.blockInfo = bi;
+        this.refreshToolbox();
     };
     Editor.prototype.domUpdate = function () {
         var _this = this;
@@ -1746,15 +2097,20 @@ var Editor = (function (_super) {
                 .finally(function () { _this.loadingXml = false; })
                 .then(function (bi) {
                 _this.blockInfo = bi;
-                var showCategories = _this.showToolboxCategories;
                 var showSearch = true;
-                var toolbox = _this.getDefaultToolbox(showCategories);
-                var tb = pxt.blocks.initBlocks(_this.blockInfo, toolbox, showCategories, _this.blockSubset);
-                _this.updateToolbox(tb, showCategories);
-                if (showCategories && showSearch) {
-                    pxt.blocks.initSearch(_this.editor, tb, function (searchFor) { return compiler.apiSearchAsync(searchFor)
-                        .then(function (fns) { return fns; }); }, function (searchTb) { return _this.updateToolbox(searchTb, showCategories); });
+                var toolbox = _this.getDefaultToolbox(_this.showToolboxCategories);
+                // Search needs a toolbox with ALL blocks
+                var tbAll;
+                if (_this.showToolboxCategories !== CategoryMode.All) {
+                    tbAll = pxt.blocks.initBlocks(_this.blockInfo, toolbox, CategoryMode.All, _this.filters);
                 }
+                var tb = pxt.blocks.initBlocks(_this.blockInfo, toolbox, _this.showToolboxCategories, _this.filters);
+                _this.updateToolbox(tb, _this.showToolboxCategories);
+                if (_this.showToolboxCategories !== CategoryMode.None && showSearch) {
+                    pxt.blocks.initSearch(_this.editor, tb, tbAll || tb, function (searchFor) { return compiler.apiSearchAsync(searchFor)
+                        .then(function (fns) { return fns; }); }, function (searchTb) { return _this.updateToolbox(searchTb, _this.showToolboxCategories, true); });
+                }
+                pxt.blocks.initFlyouts(_this.editor);
                 var xml = _this.delayLoadXml;
                 _this.delayLoadXml = undefined;
                 _this.loadBlockly(xml);
@@ -1816,13 +2172,31 @@ var Editor = (function (_super) {
         return true;
     };
     Editor.prototype.initLayout = function () {
-        // layout on first load if no data info
-        var needsLayout = this.editor.getTopBlocks(false).some(function (b) {
+        var minX;
+        var minY;
+        var needsLayout = false;
+        this.editor.getTopBlocks(false).forEach(function (b) {
             var tp = b.getBoundingRectangle().topLeft;
-            return b.type != ts.pxtc.ON_START_TYPE && tp.x == 0 && tp.y == 0;
+            if (minX === undefined || tp.x < minX) {
+                minX = tp.x;
+            }
+            if (minY === undefined || tp.y < minY) {
+                minY = tp.y;
+            }
+            needsLayout = needsLayout || (b.type != ts.pxtc.ON_START_TYPE && tp.x == 0 && tp.y == 0);
         });
-        if (needsLayout)
+        if (needsLayout) {
+            // If the blocks file has no location info (e.g. it's from the decompiler), format the code
             pxt.blocks.layout.flow(this.editor);
+        }
+        else {
+            // Otherwise translate the blocks so that they are positioned on the top left
+            this.editor.getTopBlocks(false).forEach(function (b) { return b.moveBy(-minX, -minY); });
+            this.editor.scrollX = 10;
+            this.editor.scrollY = 10;
+            // Forces scroll to take effect
+            this.editor.resizeContents();
+        }
     };
     Editor.prototype.initPrompts = function () {
         // Overriding blockly prompts to use semantic modals
@@ -1862,7 +2236,7 @@ var Editor = (function (_super) {
                 disagreeIcon: "checkmark",
                 size: "small"
             }).then(function (b) {
-                callback(b == 0);
+                callback(b == 1);
             });
         };
         /**
@@ -1968,12 +2342,31 @@ var Editor = (function (_super) {
         return this.editor ? this.editor.isDragging() : false;
     };
     Editor.prototype.prepare = function () {
+        var _this = this;
+        pxt.blocks.openHelpUrl = function (url) {
+            pxt.tickEvent("blocks.help", { url: url });
+            var m = /^\/pkg\/([^#]+)#(.+)$/.exec(url);
+            if (m) {
+                var dep = pkg.mainPkg.deps[m[1]];
+                if (dep && dep.verProtocol() == "github") {
+                    // rewrite url to point to current endpoint
+                    url = "/pkg/" + dep.verArgument().replace(/#.*$/, '') + "#" + m[2];
+                    window.open(url, m[1]);
+                    return; // TODO support serving package docs in docs frame.
+                }
+            }
+            ;
+            if (/^\//.test(url))
+                _this.parent.setSideDoc(url);
+            else
+                window.open(url, 'docs');
+        };
         this.prepareBlockly();
         this.isReady = true;
     };
     Editor.prototype.prepareBlockly = function (showCategories) {
         var _this = this;
-        if (showCategories === void 0) { showCategories = true; }
+        if (showCategories === void 0) { showCategories = this.showToolboxCategories; }
         var blocklyDiv = document.getElementById('blocksEditor');
         blocklyDiv.innerHTML = '';
         var blocklyOptions = this.getBlocklyOptions(showCategories);
@@ -1994,7 +2387,7 @@ var Editor = (function (_super) {
                         : 'unknown')
                     : 'flyout';
                 var blockId = ev.xml.getAttribute('type');
-                pxt.tickEvent("blocks.create", { category: lastCategory, block: blockId });
+                pxt.tickActivity("blocks.create", "blocks.create." + blockId);
                 if (ev.xml.tagName == 'SHADOW')
                     _this.cleanUpShadowBlocks();
             }
@@ -2005,6 +2398,15 @@ var Editor = (function (_super) {
                     if (ev.newValue == lf("{id:category}Add Package")) {
                         _this.editor.toolbox_.clearSelection();
                         _this.parent.addPackage();
+                    }
+                    else if (ev.newValue == lf("{id:category}Advanced")) {
+                        if (_this.showToolboxCategories === CategoryMode.All) {
+                            _this.showToolboxCategories = CategoryMode.Basic;
+                        }
+                        else if (_this.showToolboxCategories === CategoryMode.Basic) {
+                            _this.showToolboxCategories = CategoryMode.All;
+                        }
+                        _this.refreshToolbox();
                     }
                 }
                 else if (ev.element == 'commentOpen'
@@ -2110,6 +2512,12 @@ var Editor = (function (_super) {
         if (this.currFile && this.currFile != file) {
             this.filterToolbox(null);
         }
+        if (this.parent.state.filters) {
+            this.filterToolbox(this.parent.state.filters);
+        }
+        else {
+            this.filters = null;
+        }
         this.currFile = file;
         return Promise.resolve();
     };
@@ -2128,14 +2536,14 @@ var Editor = (function (_super) {
         if (!tsfile || !tsfile.diagnostics)
             return;
         // only show errors
-        var diags = tsfile.diagnostics.filter(function (d) { return d.category == ts.DiagnosticCategory.Error; });
+        var diags = tsfile.diagnostics.filter(function (d) { return d.category == ts.pxtc.DiagnosticCategory.Error; });
         var sourceMap = this.compilationResult.sourceMap;
-        diags.filter(function (diag) { return diag.category == ts.DiagnosticCategory.Error; }).forEach(function (diag) {
-            var bid = pxt.blocks.findBlockId(sourceMap, diag);
+        diags.filter(function (diag) { return diag.category == ts.pxtc.DiagnosticCategory.Error; }).forEach(function (diag) {
+            var bid = pxt.blocks.findBlockId(sourceMap, { start: diag.line, length: diag.endLine - diag.line });
             if (bid) {
                 var b = _this.editor.getBlockById(bid);
                 if (b) {
-                    var txt = ts.flattenDiagnosticMessageText(diag.messageText, "\n");
+                    var txt = ts.pxtc.flattenDiagnosticMessageText(diag.messageText, "\n");
                     b.setWarningText(txt);
                 }
             }
@@ -2144,8 +2552,15 @@ var Editor = (function (_super) {
     Editor.prototype.highlightStatement = function (brk) {
         if (!this.compilationResult || this.delayLoadXml || this.loadingXml)
             return;
-        var bid = pxt.blocks.findBlockId(this.compilationResult.sourceMap, brk);
-        this.editor.highlightBlock(bid);
+        if (brk) {
+            var bid = pxt.blocks.findBlockId(this.compilationResult.sourceMap, { start: brk.line, length: brk.endLine - brk.line });
+            if (bid) {
+                this.editor.highlightBlock(bid);
+            }
+        }
+    };
+    Editor.prototype.clearHighlightedStatements = function () {
+        this.editor.highlightBlock(null);
     };
     Editor.prototype.openTypeScript = function () {
         pxt.tickEvent("blocks.showjavascript");
@@ -2156,70 +2571,88 @@ var Editor = (function (_super) {
         blocks.filter(function (b) { return b.isShadow_; }).forEach(function (b) { return b.dispose(false); });
     };
     Editor.prototype.getBlocklyOptions = function (showCategories) {
-        if (showCategories === void 0) { showCategories = true; }
+        if (showCategories === void 0) { showCategories = this.showToolboxCategories; }
         var readOnly = pxt.shell.isReadOnly();
-        var toolbox = showCategories ?
+        var toolbox = showCategories !== CategoryMode.None ?
             document.getElementById('blocklyToolboxDefinitionCategory')
             : document.getElementById('blocklyToolboxDefinitionFlyout');
         var blocklyOptions = {
             toolbox: readOnly ? undefined : toolbox,
             scrollbars: true,
-            media: pxt.webConfig.pxtCdnUrl + "blockly/media/",
+            media: pxt.webConfig.commitCdnUrl + "blockly/media/",
             sound: true,
             trashcan: false,
             collapse: false,
             comments: true,
             disable: false,
             readOnly: readOnly,
-            toolboxType: pxt.appTarget.appTheme.coloredToolbox ? 'coloured' : pxt.appTarget.appTheme.invertedToolbox ? 'inverted' : 'normal',
+            toolboxOptions: {
+                colour: pxt.appTarget.appTheme.coloredToolbox,
+                inverted: pxt.appTarget.appTheme.invertedToolbox
+            },
             zoom: {
                 enabled: false,
                 controls: false,
-                /* wheel: true, wheel as a zoom is confusing and incosistent with monaco */
+                wheel: true,
                 maxScale: 2.5,
                 minScale: .2,
                 scaleSpeed: 1.05
             },
-            rtl: Util.userLanguageRtl()
+            rtl: Util.isUserLanguageRtl()
         };
         return blocklyOptions;
     };
     Editor.prototype.getDefaultToolbox = function (showCategories) {
-        if (showCategories === void 0) { showCategories = true; }
-        return showCategories ?
+        if (showCategories === void 0) { showCategories = this.showToolboxCategories; }
+        return showCategories !== CategoryMode.None ?
             toolbox_1.default.documentElement
             : new DOMParser().parseFromString("<xml id=\"blocklyToolboxDefinition\" style=\"display: none\"></xml>", "text/xml").documentElement;
     };
-    Editor.prototype.filterToolbox = function (blockSubset, showCategories) {
-        if (showCategories === void 0) { showCategories = true; }
-        this.blockSubset = blockSubset;
+    Editor.prototype.filterToolbox = function (filters, showCategories) {
+        if (showCategories === void 0) { showCategories = this.showToolboxCategories; }
+        this.filters = filters;
         this.showToolboxCategories = showCategories;
-        var toolbox = this.getDefaultToolbox(showCategories);
+        return this.refreshToolbox();
+    };
+    Editor.prototype.refreshToolbox = function () {
         if (!this.blockInfo)
-            return;
-        var tb = pxt.blocks.createToolbox(this.blockInfo, toolbox, showCategories, blockSubset);
-        this.updateToolbox(tb, showCategories);
+            return undefined;
+        var toolbox = this.getDefaultToolbox(this.showToolboxCategories);
+        var tbAll;
+        if (this.showToolboxCategories !== CategoryMode.All) {
+            tbAll = pxt.blocks.createToolbox(this.blockInfo, toolbox, CategoryMode.All, this.filters);
+        }
+        var tb = pxt.blocks.createToolbox(this.blockInfo, toolbox, this.showToolboxCategories, this.filters);
+        this.updateToolbox(tb, this.showToolboxCategories);
         pxt.blocks.cachedSearchTb = tb;
+        pxt.blocks.cachedSearchTbAll = tbAll || tb;
         return tb;
     };
-    Editor.prototype.updateToolbox = function (tb, showCategories) {
-        if (showCategories === void 0) { showCategories = true; }
+    Editor.prototype.updateToolbox = function (tb, showCategories, search) {
+        if (showCategories === void 0) { showCategories = this.showToolboxCategories; }
+        if (search === void 0) { search = false; }
         // no toolbox when readonly
         if (pxt.shell.isReadOnly())
             return;
         pxt.debug('updating toolbox');
-        if ((this.editor.toolbox_ && showCategories) || (this.editor.flyout_ && !showCategories)) {
+        var editor_ = this.editor;
+        if ((editor_.toolbox_ && showCategories !== CategoryMode.None) || (editor_.flyout_ && showCategories === CategoryMode.None)) {
             // Toolbox is consistent with current mode, safe to update
             var tbString = new XMLSerializer().serializeToString(tb);
             if (tbString == this.cachedToolbox)
                 return;
             this.cachedToolbox = tbString;
             this.editor.updateToolbox(tb);
+            // We need to set the toolbox's selected item to null so that it doesn't
+            // try to send key events to a category that no longer exists (exception)
+            if (!search && editor_.toolbox_ && editor_.toolbox_.tree_) {
+                editor_.toolbox_.tree_.setSelectedItem(null);
+            }
         }
         else {
             // Toolbox mode is different, need to refresh.
-            this.editor = undefined;
             this.delayLoadXml = this.getCurrentSource();
+            this.editor = undefined;
             this.loadingXml = false;
             if (this.loadingXmlPromise) {
                 this.loadingXmlPromise.cancel();
@@ -2234,7 +2667,7 @@ var Editor = (function (_super) {
 }(srceditor.Editor));
 exports.Editor = Editor;
 
-},{"./compiler":8,"./core":10,"./srceditor":31,"./toolbox":34,"react":315}],4:[function(require,module,exports){
+},{"./compiler":9,"./core":11,"./package":28,"./srceditor":36,"./toolbox":39,"react":302}],5:[function(require,module,exports){
 /// <reference path="../../typings/globals/jquery/index.d.ts" />
 "use strict";
 var __extends = (this && this.__extends) || function (d, b) {
@@ -2269,7 +2702,7 @@ var BlocksPreview = (function (_super) {
 }(React.Component));
 exports.BlocksPreview = BlocksPreview;
 
-},{"react":315,"react-dom":159}],5:[function(require,module,exports){
+},{"react":302,"react-dom":146}],6:[function(require,module,exports){
 "use strict";
 var db = require("./db");
 var core = require("./core");
@@ -2439,7 +2872,7 @@ function syncAsync() {
     var blobConatiner = "";
     var updated = {};
     if (!Cloud.hasAccessToken())
-        return Promise.resolve();
+        return Promise.resolve(undefined);
     function uninstallAsync(h) {
         pxt.debug("uninstall local " + h.id);
         var e = lookup(h.id);
@@ -2580,6 +3013,7 @@ function syncAsync() {
     })
         .then(function () { return progressMsg(lf("Syncing done")); })
         .then(function () { return pkg.notifySyncDone(updated); })
+        .then(function () { return undefined; })
         .catch(core.handleNetworkError);
 }
 function resetAsync() {
@@ -2588,6 +3022,61 @@ function resetAsync() {
         pxt.storage.clearLocal();
         data.clearCache();
     });
+}
+function importLegacyScriptsAsync() {
+    var key = 'legacyScriptsImported';
+    var domain = pxt.appTarget.appTheme.legacyDomain;
+    if (!domain || !pxt.webConfig.targetUrl || !!pxt.storage.getLocal(key))
+        return Promise.resolve();
+    var targetDomain = pxt.webConfig.targetUrl.replace(/^https:\/\//, '');
+    if (domain == targetDomain)
+        return Promise.resolve(); // nothing to do
+    pxt.debug('injecting import iframe');
+    var frame = document.createElement("iframe");
+    function clean() {
+        if (frame) {
+            pxt.debug('cleaning import iframe');
+            window.removeEventListener('message', receiveMessage, false);
+            frame.contentWindow.postMessage({
+                type: "transfer",
+                action: "clear"
+            }, "https://" + domain);
+            var temp_1 = frame;
+            setTimeout(function () { return document.documentElement.removeChild(temp_1); }, 2000);
+            frame = undefined;
+        }
+    }
+    function pushProject(dbdata) {
+        if (!dbdata.header.length) {
+            pxt.log('done importing scripts');
+            pxt.storage.setLocal(key, '1');
+            clean();
+            return;
+        }
+        var hd = dbdata.header.pop();
+        var td = dbdata.text.pop();
+        delete hd._id;
+        delete hd._rev;
+        delete hd.id;
+        pxt.debug("importing " + hd.name);
+        installAsync(hd, td)
+            .done(function () { return pushProject(dbdata); });
+    }
+    function receiveMessage(ev) {
+        if (ev.data && ev.data.type == 'transfer' && ev.data.action == 'export' && ev.data.data) {
+            var dbdata = ev.data.data;
+            pxt.debug("received " + dbdata.header.length + " projects");
+            pushProject(dbdata);
+        }
+    }
+    window.addEventListener('message', receiveMessage, false);
+    frame.setAttribute("style", "position:absolute; width:1px; height:1px; right:0em; bottom:0em;");
+    var url = "https://" + domain + "/api/transfer/" + targetDomain + "?storageid=" + pxt.storage.storageId();
+    pxt.debug('transfer from ' + url);
+    frame.src = url;
+    frame.onerror = clean;
+    document.documentElement.appendChild(frame);
+    return Promise.resolve();
 }
 exports.provider = {
     getHeaders: getHeaders,
@@ -2598,10 +3087,11 @@ exports.provider = {
     installAsync: installAsync,
     saveToCloudAsync: saveToCloudAsync,
     syncAsync: syncAsync,
-    resetAsync: resetAsync
+    resetAsync: resetAsync,
+    importLegacyScriptsAsync: importLegacyScriptsAsync
 };
 
-},{"./core":10,"./data":11,"./db":12,"./package":24,"./workspace":37}],6:[function(require,module,exports){
+},{"./core":11,"./data":12,"./db":13,"./package":28,"./workspace":41}],7:[function(require,module,exports){
 "use strict";
 /// <reference path="../../built/pxtlib.d.ts"/>
 var core = require("./core");
@@ -2609,7 +3099,7 @@ var pkg = require("./package");
 var hidbridge = require("./hidbridge");
 var Cloud = pxt.Cloud;
 function browserDownloadAsync(text, name, contentType) {
-    var url = pxt.BrowserUtils.browserDownloadBinText(text, name, contentType, function (e) { return core.errorNotification(lf("saving file failed...")); });
+    var url = pxt.BrowserUtils.browserDownloadBinText(text, name, contentType, undefined, function (e) { return core.errorNotification(lf("saving file failed...")); });
     return Promise.resolve();
 }
 function browserDownloadDeployCoreAsync(resp) {
@@ -2619,13 +3109,13 @@ function browserDownloadDeployCoreAsync(resp) {
         var uf2 = resp.outfiles[pxtc.BINARY_UF2];
         fn = pkg.genFileName(".uf2");
         pxt.debug('saving ' + fn);
-        url = pxt.BrowserUtils.browserDownloadBase64(uf2, fn, "application/x-uf2", function (e) { return core.errorNotification(lf("saving file failed...")); });
+        url = pxt.BrowserUtils.browserDownloadBase64(uf2, fn, "application/x-uf2", resp.userContextWindow, function (e) { return core.errorNotification(lf("saving file failed...")); });
     }
     else {
         var hex = resp.outfiles[pxtc.BINARY_HEX];
         fn = pkg.genFileName(".hex");
         pxt.debug('saving ' + fn);
-        url = pxt.BrowserUtils.browserDownloadBinText(hex, fn, pxt.appTarget.compile.hexMimeType, function (e) { return core.errorNotification(lf("saving file failed...")); });
+        url = pxt.BrowserUtils.browserDownloadBinText(hex, fn, pxt.appTarget.compile.hexMimeType, resp.userContextWindow, function (e) { return core.errorNotification(lf("saving file failed...")); });
     }
     if (!resp.success) {
         return core.confirmAsync({
@@ -2643,26 +3133,36 @@ function browserDownloadDeployCoreAsync(resp) {
 exports.browserDownloadDeployCoreAsync = browserDownloadDeployCoreAsync;
 function showUploadInstructionsAsync(fn, url) {
     var boardName = pxt.appTarget.appTheme.boardName || "???";
-    var boardDriveName = pxt.appTarget.compile.driveName || "???";
+    var boardDriveName = pxt.appTarget.appTheme.driveDisplayName || pxt.appTarget.compile.driveName || "???";
+    // https://msdn.microsoft.com/en-us/library/cc848897.aspx
+    // "For security reasons, data URIs are restricted to downloaded resources. 
+    // Data URIs cannot be used for navigation, for scripting, or to populate frame or iframe elements"
+    var downloadAgain = !pxt.BrowserUtils.isIE() && !pxt.BrowserUtils.isEdge();
     var docUrl = pxt.appTarget.appTheme.usbDocs;
+    var saveAs = pxt.BrowserUtils.hasSaveAs();
+    var useUF2 = pxt.appTarget.compile.useUF2;
+    var body = saveAs ? lf("Click 'Save As' and save the {0} file to the {1} drive to transfer the code into your {2}.", useUF2 ? ".uf2" : ".hex", boardDriveName, boardName)
+        : lf("Move the {0} file to the {1} drive to transfer the code into your {2}.", pxt.appTarget.compile.useUF2 ? ".uf2" : ".hex", boardDriveName, boardName);
+    if (useUF2)
+        body = lf("Press the `reset` button once on the {0}.", boardName) + " " + body;
     return core.confirmAsync({
         header: lf("Download completed..."),
-        body: lf("Move the {0} file to the {1} drive to transfer the code into your {2}.", pxt.appTarget.compile.useUF2 ? ".uf2" : ".hex", boardDriveName, boardName),
+        body: body,
         hideCancel: true,
-        agreeLbl: lf("Done!"),
-        buttons: [{
-                label: lf("Download again"),
+        hideAgree: true,
+        buttons: [downloadAgain ? {
+                label: fn,
                 icon: "download",
                 class: "lightgrey",
                 url: url,
                 fileName: fn
-            }, !docUrl ? undefined : {
+            } : undefined, docUrl ? {
                 label: lf("Help"),
                 icon: "help",
                 class: "lightgrey",
                 url: docUrl
-            }],
-        timeout: 7000
+            } : undefined],
+        timeout: 10000
     }).then(function () { });
 }
 function webusbDeployCoreAsync(resp) {
@@ -2723,7 +3223,7 @@ function initCommandsAsync() {
 }
 exports.initCommandsAsync = initCommandsAsync;
 
-},{"./core":10,"./hidbridge":19,"./package":24}],7:[function(require,module,exports){
+},{"./core":11,"./hidbridge":20,"./package":28}],8:[function(require,module,exports){
 "use strict";
 var __extends = (this && this.__extends) || function (d, b) {
     for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
@@ -2758,7 +3258,7 @@ var CodeCardView = (function (_super) {
         var sideUrl = url && /^\//.test(url) ? "#doc:" + url : url;
         var className = card.className;
         var cardDiv = React.createElement("div", {className: "ui card " + color + " " + (card.onClick ? "link" : '') + " " + (className ? className : ''), title: card.title, onClick: function (e) { return card.onClick ? card.onClick(e) : undefined; }}, card.header || card.blocks || card.javascript || card.hardware || card.software || card.any ?
-            React.createElement("div", {key: "header", className: "ui content " + (card.responsive ? " tall desktop only" : "")}, React.createElement("div", {className: "right floated meta"}, card.any ? (React.createElement("i", {key: "costany", className: "ui grey circular label tiny"}, card.any > 0 ? card.any : null)) : null, repeat(card.blocks, function (k) { return React.createElement("i", {key: "costblocks" + k, className: "puzzle orange icon"}); }), repeat(card.javascript, function (k) { return React.createElement("i", {key: "costjs" + k, className: "align left blue icon"}); }), repeat(card.hardware, function (k) { return React.createElement("i", {key: "costhardware" + k, className: "certificate black icon"}); }), repeat(card.software, function (k) { return React.createElement("i", {key: "costsoftware" + k, className: "square teal icon"}); })), card.header) : null, React.createElement("div", {className: "ui image"}, card.blocksXml ? React.createElement(blockspreview.BlocksPreview, {key: "promoblocks", xml: card.blocksXml}) : null, card.typeScript ? React.createElement("pre", {key: "promots"}, card.typeScript) : null, card.imageUrl ? React.createElement("img", {src: card.imageUrl, className: "ui image"}) : null), card.icon ?
+            React.createElement("div", {key: "header", className: "ui content " + (card.responsive ? " tall desktop only" : "")}, React.createElement("div", {className: "right floated meta"}, card.any ? (React.createElement("i", {key: "costany", className: "ui grey circular label tiny"}, card.any > 0 ? card.any : null)) : null, repeat(card.blocks, function (k) { return React.createElement("i", {key: "costblocks" + k, className: "puzzle orange icon"}); }), repeat(card.javascript, function (k) { return React.createElement("i", {key: "costjs" + k, className: "align left blue icon"}); }), repeat(card.hardware, function (k) { return React.createElement("i", {key: "costhardware" + k, className: "certificate black icon"}); }), repeat(card.software, function (k) { return React.createElement("i", {key: "costsoftware" + k, className: "square teal icon"}); })), card.header) : null, React.createElement("div", {className: "ui image"}, card.label ? React.createElement("label", {className: "ui orange right ribbon label"}, card.label) : undefined, card.blocksXml ? React.createElement(blockspreview.BlocksPreview, {key: "promoblocks", xml: card.blocksXml}) : undefined, card.typeScript ? React.createElement("pre", {key: "promots"}, card.typeScript) : undefined, card.imageUrl ? React.createElement("div", {className: "ui cardimage", style: { backgroundImage: "url(\"" + card.imageUrl + "\")" }}) : undefined, card.youTubeId ? React.createElement("div", {className: "ui cardimage", style: { backgroundImage: "url(\"https://img.youtube.com/vi/" + card.youTubeId + "/maxresdefault.jpg\")" }}) : undefined), card.icon ?
             React.createElement("div", {className: "" + ('ui button massive ' + card.iconColor)}, " ", React.createElement("i", {className: "" + ('icon ' + card.icon)}), " ") : null, card.shortName || card.name || card.description ?
             React.createElement("div", {className: "content"}, card.shortName || card.name ? React.createElement("div", {className: "header"}, card.shortName || card.name) : null, card.time ? React.createElement("div", {className: "meta tall"}, card.time ? React.createElement("span", {key: "date", className: "date"}, pxt.Util.timeSince(card.time)) : null) : undefined, card.description ? React.createElement("div", {className: "description tall"}, renderMd(card.description)) : null) : undefined);
         if (!card.onClick && url) {
@@ -2772,16 +3272,15 @@ var CodeCardView = (function (_super) {
 }(React.Component));
 exports.CodeCardView = CodeCardView;
 
-},{"./blockspreview":4,"react":315}],8:[function(require,module,exports){
+},{"./blockspreview":5,"react":302}],9:[function(require,module,exports){
 "use strict";
 var pkg = require("./package");
 var core = require("./core");
-var workeriface = require("./workeriface");
 var U = pxt.Util;
 var iface;
 function init() {
     if (!iface) {
-        iface = workeriface.makeWebWorker(pxt.webConfig.workerjs);
+        iface = pxt.worker.makeWebWorker(pxt.webConfig.workerjs);
     }
 }
 exports.init = init;
@@ -2791,13 +3290,13 @@ function setDiagnostics(diagnostics) {
     var output = "";
     var _loop_1 = function(diagnostic) {
         if (diagnostic.fileName) {
-            output += (diagnostic.category == ts.DiagnosticCategory.Error ? lf("error") : diagnostic.category == ts.DiagnosticCategory.Warning ? lf("warning") : lf("message")) + ": " + diagnostic.fileName + "(" + (diagnostic.line + 1) + "," + (diagnostic.column + 1) + "): ";
+            output += (diagnostic.category == ts.pxtc.DiagnosticCategory.Error ? lf("error") : diagnostic.category == ts.pxtc.DiagnosticCategory.Warning ? lf("warning") : lf("message")) + ": " + diagnostic.fileName + "(" + (diagnostic.line + 1) + "," + (diagnostic.column + 1) + "): ";
             var f_1 = mainPkg.filterFiles(function (f) { return f.getTypeScriptName() == diagnostic.fileName; })[0];
             if (f_1)
                 f_1.diagnostics.push(diagnostic);
         }
-        var category = ts.DiagnosticCategory[diagnostic.category].toLowerCase();
-        output += category + " TS" + diagnostic.code + ": " + ts.flattenDiagnosticMessageText(diagnostic.messageText, "\n") + "\n";
+        var category = ts.pxtc.DiagnosticCategory[diagnostic.category].toLowerCase();
+        output += category + " TS" + diagnostic.code + ": " + ts.pxtc.flattenDiagnosticMessageText(diagnostic.messageText, "\n") + "\n";
     };
     for (var _i = 0, diagnostics_1 = diagnostics; _i < diagnostics_1.length; _i++) {
         var diagnostic = diagnostics_1[_i];
@@ -2807,7 +3306,7 @@ function setDiagnostics(diagnostics) {
         output = U.lf("Everything seems fine!\n");
     var f = mainPkg.outputPkg.setFile("output.txt", output);
     // display total number of errors on the output file
-    f.numDiagnosticsOverride = diagnostics.filter(function (d) { return d.category == ts.DiagnosticCategory.Error; }).length;
+    f.numDiagnosticsOverride = diagnostics.filter(function (d) { return d.category == ts.pxtc.DiagnosticCategory.Error; }).length;
 }
 var hang = new Promise(function () { });
 function catchUserErrorAndSetDiags(r) {
@@ -2833,6 +3332,11 @@ function compileAsync(options) {
         if (options.debug) {
             opts.breakpoints = true;
             opts.justMyCode = true;
+        }
+        if (options.trace) {
+            opts.breakpoints = true;
+            opts.justMyCode = true;
+            opts.trace = true;
         }
         opts.computeUsedSymbols = true;
         if (options.forceEmit)
@@ -2903,6 +3407,23 @@ function decompileAsync(fileName, blockInfo, oldWorkspace, blockFile) {
     });
 }
 exports.decompileAsync = decompileAsync;
+function decompileSnippetAsync(code, blockInfo) {
+    var snippetTs = "___snippet.ts";
+    var snippetBlocks = "___snippet.blocks";
+    var trg = pkg.mainPkg.getTargetOptions();
+    return pkg.mainPkg.getCompileOptionsAsync(trg)
+        .then(function (opts) {
+        opts.fileSystem[snippetTs] = code;
+        opts.fileSystem[snippetBlocks] = "";
+        opts.sourceFiles.push(snippetTs);
+        opts.sourceFiles.push(snippetBlocks);
+        opts.ast = true;
+        return decompileCoreAsync(opts, snippetTs);
+    }).then(function (resp) {
+        return resp.outfiles[snippetBlocks];
+    });
+}
+exports.decompileSnippetAsync = decompileSnippetAsync;
 function decompileCoreAsync(opts, fileName) {
     return workerOpAsync("decompile", { options: opts, fileName: fileName });
 }
@@ -2935,9 +3456,17 @@ function ensureApisInfoAsync() {
 }
 function apiSearchAsync(searchFor) {
     return ensureApisInfoAsync()
-        .then(function () { return workerOpAsync("apiSearch", { search: searchFor }); });
+        .then(function () {
+        searchFor.localizedApis = cachedApis;
+        searchFor.localizedStrings = Util.getLocalizedStrings();
+        return workerOpAsync("apiSearch", { search: searchFor });
+    });
 }
 exports.apiSearchAsync = apiSearchAsync;
+function formatAsync(input, pos) {
+    return workerOpAsync("format", { format: { input: input, pos: pos } });
+}
+exports.formatAsync = formatAsync;
 function typecheckAsync() {
     var p = pkg.mainPkg.getCompileOptionsAsync()
         .then(function (opts) {
@@ -2972,7 +3501,7 @@ function newProject() {
 }
 exports.newProject = newProject;
 
-},{"./core":10,"./package":24,"./workeriface":36}],9:[function(require,module,exports){
+},{"./core":11,"./package":28}],10:[function(require,module,exports){
 /// <reference path="../../typings/globals/react/index.d.ts" />
 /// <reference path="../../typings/globals/react-dom/index.d.ts" />
 /// <reference path="../../built/pxtlib.d.ts" />
@@ -2990,15 +3519,22 @@ var DocsMenuItem = (function (_super) {
     function DocsMenuItem(props) {
         _super.call(this, props);
     }
-    DocsMenuItem.prototype.openDoc = function (path) {
+    DocsMenuItem.prototype.openTutorial = function (path) {
+        pxt.tickEvent("docstutorial", { path: path });
+        this.props.parent.startTutorial(path);
+    };
+    DocsMenuItem.prototype.openDocs = function (path) {
         pxt.tickEvent("docs", { path: path });
         this.props.parent.setSideDoc(path);
     };
     DocsMenuItem.prototype.render = function () {
         var _this = this;
         var targetTheme = pxt.appTarget.appTheme;
-        var sideDocs = !(pxt.shell.isSandboxMode() || pxt.options.light || targetTheme.hideSideDocs);
-        return React.createElement(sui.DropdownMenuItem, {icon: "help circle large", class: "help-dropdown-menuitem", textClass: "landscape only", title: lf("Reference, lessons, ...")}, targetTheme.docMenu.map(function (m) { return React.createElement("a", {href: m.path, target: "docs", key: "docsmenu" + m.path, role: "menuitem", title: m.name, className: "ui item " + (sideDocs && !/^https?:/i.test(m.path) ? "widedesktop hide" : "")}, m.name); }), sideDocs ? targetTheme.docMenu.filter(function (m) { return !/^https?:/i.test(m.path); }).map(function (m) { return React.createElement(sui.Item, {key: "docsmenuwide" + m.path, role: "menuitem", text: m.name, class: "widedesktop only", onClick: function () { return _this.openDoc(m.path); }}); }) : undefined);
+        return React.createElement(sui.DropdownMenuItem, {icon: "help circle large", class: "help-dropdown-menuitem", textClass: "landscape only", title: lf("Reference, lessons, ...")}, targetTheme.docMenu.map(function (m) {
+            return !/^\//.test(m.path) ? React.createElement("a", {key: "docsmenulink" + m.path, role: "menuitem", className: "ui item link", href: m.path, target: "docs"}, m.name)
+                : !m.tutorial ? React.createElement(sui.Item, {key: "docsmenu" + m.path, role: "menuitem", text: m.name, class: "", onClick: function () { return _this.openDocs(m.path); }})
+                    : React.createElement(sui.Item, {key: "docsmenututorial" + m.path, role: "menuitem", text: m.name, class: "", onClick: function () { return _this.openTutorial(m.path); }});
+        }));
     };
     return DocsMenuItem;
 }(data.Component));
@@ -3007,15 +3543,16 @@ var SideDocs = (function (_super) {
     __extends(SideDocs, _super);
     function SideDocs(props) {
         _super.call(this, props);
+        this.firstLoad = true;
     }
     SideDocs.notify = function (message) {
-        var sd = document.getElementById("sidedocs");
+        var sd = document.getElementById("sidedocsframe");
         if (sd && sd.contentWindow)
             sd.contentWindow.postMessage(message, "*");
     };
-    SideDocs.prototype.setPath = function (path) {
+    SideDocs.prototype.setPath = function (path, blocksEditor) {
         var docsUrl = pxt.webConfig.docsUrl || '/--docs';
-        var mode = this.props.parent.isBlocksEditor() ? "blocks" : "js";
+        var mode = blocksEditor ? "blocks" : "js";
         var url = docsUrl + "#doc:" + path + ":" + mode + ":" + pxt.Util.localeInfo();
         this.setUrl(url);
     };
@@ -3026,12 +3563,14 @@ var SideDocs = (function (_super) {
         this.setUrl(url);
     };
     SideDocs.prototype.setUrl = function (url) {
-        var el = document.getElementById("sidedocs");
+        var el = document.getElementById("sidedocsframe");
         if (el)
             el.src = url;
         else
             this.props.parent.setState({ sideDocsLoadUrl: url });
-        this.props.parent.setState({ sideDocsCollapsed: false });
+        var sideDocsCollapsed = this.firstLoad && (pxt.BrowserUtils.isMobile() || pxt.options.light);
+        this.props.parent.setState({ sideDocsCollapsed: sideDocsCollapsed });
+        this.firstLoad = false;
     };
     SideDocs.prototype.collapse = function () {
         this.props.parent.setState({ sideDocsCollapsed: true });
@@ -3054,14 +3593,13 @@ var SideDocs = (function (_super) {
         var docsUrl = state.sideDocsLoadUrl;
         if (!docsUrl)
             return null;
-        var icon = !docsUrl || state.sideDocsCollapsed ? "expand" : "compress";
-        return React.createElement("div", null, React.createElement("iframe", {id: "sidedocs", src: docsUrl, role: "complementary", sandbox: "allow-scripts allow-same-origin allow-popups"}), React.createElement("button", {id: "sidedocspopout", role: "button", title: lf("Open documentation in new tab"), className: "circular ui icon button " + (state.sideDocsCollapsed ? "hidden" : ""), onClick: function () { return _this.popOut(); }}, React.createElement("i", {className: "external icon"})), React.createElement("button", {id: "sidedocsexpand", role: "button", title: lf("Show/Hide side documentation"), className: "circular ui icon button", onClick: function () { return _this.toggleVisibility(); }}, React.createElement("i", {className: icon + " icon"})));
+        return React.createElement("div", null, React.createElement("button", {id: "sidedocstoggle", role: "button", className: "ui icon button", onClick: function () { return _this.toggleVisibility(); }}, React.createElement("i", {className: "icon large inverted " + (state.sideDocsCollapsed ? 'book' : 'chevron right')}), state.sideDocsCollapsed ? React.createElement("i", {className: "icon large inverted chevron left hover"}) : undefined), React.createElement("div", {id: "sidedocs"}, React.createElement("div", {id: "sidedocsbar"}, React.createElement("h3", null, React.createElement("a", {className: "ui icon link", "data-content": lf("Open documentation in new tab"), title: lf("Open documentation in new tab"), onClick: function () { return _this.popOut(); }}, React.createElement("i", {className: "external icon"})))), React.createElement("iframe", {id: "sidedocsframe", src: docsUrl, role: "complementary", sandbox: "allow-scripts allow-same-origin allow-forms allow-popups"})));
     };
     return SideDocs;
 }(data.Component));
 exports.SideDocs = SideDocs;
 
-},{"./data":11,"./sui":32,"react":315}],10:[function(require,module,exports){
+},{"./data":12,"./sui":37,"react":302}],11:[function(require,module,exports){
 /// <reference path="../../typings/globals/react/index.d.ts" />
 /// <reference path="../../typings/globals/react-dom/index.d.ts" />
 /// <reference path="../../built/pxtlib.d.ts" />
@@ -3070,20 +3608,33 @@ var ReactDOM = require("react-dom");
 var Cloud = pxt.Cloud;
 var Util = pxt.Util;
 var lf = Util.lf;
+var dimmerInitialized = false;
+function isLoading() {
+    return !!$('.ui.page.dimmer .loadingcontent')[0];
+}
+exports.isLoading = isLoading;
 function hideLoading() {
     $('.ui.page.dimmer .loadingcontent').remove();
+    $('body.main').dimmer('hide');
+    if (!dimmerInitialized) {
+        initializeDimmer();
+    }
     $('body.main').dimmer('hide');
 }
 exports.hideLoading = hideLoading;
 function showLoading(msg) {
-    $('body.main').dimmer({
-        closable: false
-    });
+    initializeDimmer();
     $('body.main').dimmer('show');
     $('.ui.page.dimmer').html("\n  <div class=\"content loadingcontent\">\n    <div class=\"ui text large loader msg\">{lf(\"Please wait\")}</div>\n  </div>\n");
     $('.ui.page.dimmer .msg').text(msg);
 }
 exports.showLoading = showLoading;
+function initializeDimmer() {
+    $('body.main').dimmer({
+        closable: false
+    });
+    dimmerInitialized = true;
+}
 var asyncLoadingTimeout;
 function showLoadingAsync(msg, operation, delay) {
     if (delay === void 0) { delay = 700; }
@@ -3167,7 +3718,7 @@ function dialogAsync(options) {
         .filter(function (logo) { return !!logo; })
         .map(function (logo) { return ("<img class=\"ui logo\" src=\"" + Util.toDataUri(logo) + "\" />"); })
         .join(' ');
-    var html = "\n  <div class=\"ui " + (options.size || "small") + " modal\">\n    <div class=\"header\">\n        " + Util.htmlEscape(options.header) + "\n    </div>\n    <div class=\"content\">\n      " + (options.body ? "<p>" + Util.htmlEscape(options.body) + "</p>" : "") + "\n      " + (options.htmlBody || "") + "\n      " + (options.copyable ? "<div class=\"ui fluid action input\">\n         <input class=\"linkinput\" readonly spellcheck=\"false\" type=\"text\" value=\"" + Util.htmlEscape(options.copyable) + "\">\n         <button class=\"ui teal right labeled icon button copybtn\" data-content=\"" + lf("Copied!") + "\">\n            " + lf("Copy") + "\n            <i class=\"copy icon\"></i>\n         </button>\n      </div>" : "") + "\n    </div>";
+    var html = "\n  <div class=\"ui " + (options.size || "small") + " modal\">\n    <div class=\"header\">\n        " + Util.htmlEscape(options.header) + "\n    </div>\n    <div class=\"content\">\n      " + (options.body ? "<p>" + Util.htmlEscape(options.body) + "</p>" : "") + "\n      " + (options.htmlBody || "") + "\n      " + (options.input ? "<div class=\"ui fluid action input\">\n         <input class=\"userinput\" spellcheck=\"false\" placeholder=\"" + Util.htmlEscape(options.input) + "\" type=\"text\">\n         </div>" : "") + "\n      " + (options.copyable ? "<div class=\"ui fluid action input\">\n         <input class=\"linkinput\" readonly spellcheck=\"false\" type=\"text\" value=\"" + Util.htmlEscape(options.copyable) + "\">\n         <button class=\"ui teal right labeled icon button copybtn\" data-content=\"" + lf("Copied!") + "\">\n            " + lf("Copy") + "\n            <i class=\"copy icon\"></i>\n         </button>\n      </div>" : "") + "\n    </div>";
     html += "<div class=\"actions\">";
     html += logos;
     if (!options.hideCancel) {
@@ -3187,6 +3738,10 @@ function dialogAsync(options) {
     var modal = $(html);
     if (options.copyable)
         enableCopyable(modal);
+    if (options.input) {
+        var ip_1 = modal.find('.userinput');
+        ip_1.on('change', function (e) { return options.inputValue = ip_1.val(); });
+    }
     var done = false;
     $('#root').append(modal);
     if (options.onLoaded)
@@ -3388,7 +3943,7 @@ function apiAsync(path, data) {
 }
 exports.apiAsync = apiAsync;
 
-},{"react-dom":159}],11:[function(require,module,exports){
+},{"react-dom":146}],12:[function(require,module,exports){
 "use strict";
 var __extends = (this && this.__extends) || function (d, b) {
     for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
@@ -3618,9 +4173,33 @@ var Component = (function (_super) {
     return Component;
 }(React.Component));
 exports.Component = Component;
+function wrapWorkspace(ws) {
+    return {
+        initAsync: ws.initAsync,
+        resetAsync: function () { return ws.resetAsync().then(function () {
+            clearCache();
+        }); },
+        getHeaders: ws.getHeaders,
+        getHeader: ws.getHeader,
+        syncAsync: function () { return ws.syncAsync().then(function (state) {
+            invalidate("header:*");
+            invalidate("text:*");
+            return state;
+        }); },
+        getTextAsync: ws.getTextAsync,
+        saveAsync: function (h, t) { return ws.saveAsync(h, t).then(function () {
+            invalidate("header:" + h.id);
+            invalidate("text:" + h.id);
+        }); },
+        saveToCloudAsync: ws.saveToCloudAsync,
+        saveScreenshotAsync: ws.saveScreenshotAsync,
+        installAsync: ws.installAsync
+    };
+}
+exports.wrapWorkspace = wrapWorkspace;
 loadCache();
 
-},{"./core":10,"./gallery":18,"react":315}],12:[function(require,module,exports){
+},{"./core":11,"./gallery":19,"react":302}],13:[function(require,module,exports){
 "use strict";
 var Promise = require("bluebird");
 window.Promise = Promise;
@@ -3703,7 +4282,7 @@ var Table = (function () {
 }());
 exports.Table = Table;
 
-},{"bluebird":38,"pouchdb":72,"pouchdb/extras/memory":70}],13:[function(require,module,exports){
+},{"bluebird":43,"pouchdb":58,"pouchdb/extras/memory":56}],14:[function(require,module,exports){
 "use strict";
 function setupDragAndDrop(r, filter, dragged) {
     var dragAndDrop = document && document.createElement && 'draggable' in document.createElement('span');
@@ -3755,7 +4334,7 @@ function setupDragAndDrop(r, filter, dragged) {
 }
 exports.setupDragAndDrop = setupDragAndDrop;
 
-},{}],14:[function(require,module,exports){
+},{}],15:[function(require,module,exports){
 /// <reference path="../../typings/globals/react/index.d.ts" />
 /// <reference path="../../typings/globals/react-dom/index.d.ts" />
 /// <reference path="../../built/pxtlib.d.ts" />
@@ -3809,6 +4388,10 @@ var EditorToolbar = (function (_super) {
         pxt.tickEvent("editortools.restart", { view: view, collapsed: this.getCollapsedState(), headless: this.getHeadlessState() });
         this.props.parent.restartSimulator();
     };
+    EditorToolbar.prototype.toggleTrace = function (view) {
+        pxt.tickEvent("editortools.trace", { view: view, collapsed: this.getCollapsedState(), headless: this.getHeadlessState() });
+        this.props.parent.toggleTrace();
+    };
     EditorToolbar.prototype.toggleCollapse = function (view) {
         pxt.tickEvent("editortools.toggleCollapse", { view: view, collapsedTo: '' + !this.props.parent.state.collapseEditorTools });
         this.props.parent.toggleSimulatorCollapse();
@@ -3821,11 +4404,11 @@ var EditorToolbar = (function (_super) {
     };
     EditorToolbar.prototype.render = function () {
         var _this = this;
-        var state = this.props.parent.state;
+        var _a = this.props.parent.state, tutorialOptions = _a.tutorialOptions, hideEditorFloats = _a.hideEditorFloats, collapseEditorTools = _a.collapseEditorTools, projectName = _a.projectName, showParts = _a.showParts, compiling = _a.compiling, running = _a.running;
         var sandbox = pxt.shell.isSandboxMode();
         var readOnly = pxt.shell.isReadOnly();
-        var hideEditorFloats = state.hideEditorFloats;
-        var collapsed = state.hideEditorFloats || state.collapseEditorTools;
+        var tutorial = tutorialOptions ? tutorialOptions.tutorial : false;
+        var collapsed = (hideEditorFloats || collapseEditorTools) && !tutorial;
         var isEditor = this.props.parent.isBlocksEditor() || this.props.parent.isTextEditor();
         if (!isEditor)
             return React.createElement("div", null);
@@ -3833,41 +4416,58 @@ var EditorToolbar = (function (_super) {
         var compile = pxt.appTarget.compile;
         var compileBtn = compile.hasHex;
         var simOpts = pxt.appTarget.simulator;
-        var make = !sandbox && state.showParts && simOpts && (simOpts.instructions || (simOpts.parts && pxt.options.debug));
+        var make = !sandbox && showParts && simOpts && (simOpts.instructions || (simOpts.parts && pxt.options.debug));
         var compileTooltip = lf("Download your code to the {0}", targetTheme.boardName);
-        var compileLoading = !!state.compiling;
-        var runTooltip = state.running ? lf("Stop the simulator") : lf("Start the simulator");
+        var compileLoading = !!compiling;
+        var runTooltip = running ? lf("Stop the simulator") : lf("Start the simulator");
         var makeTooltip = lf("Open assembly instructions");
         var restartTooltip = lf("Restart the simulator");
         var collapseTooltip = collapsed ? lf("Show the simulator") : lf("Hide the simulator");
-        var headless = pxt.appTarget.simulator.headless;
+        var headless = simOpts.headless;
         var hasUndo = this.props.parent.editor.hasUndo();
         var hasRedo = this.props.parent.editor.hasRedo();
+        var showCollapsed = !tutorial;
+        var showProjectRename = !tutorial && !readOnly;
+        var showUndoRedo = !tutorial && !readOnly;
+        var showZoomControls = !tutorial;
         var run = true;
         var restart = run && !simOpts.hideRestart;
+        var trace = run && simOpts.enableTrace;
+        var tracing = this.props.parent.state.tracing;
+        var traceTooltip = tracing ? lf("Disable Slow-Mo") : lf("Slow-Mo");
+        var downloadIcon = pxt.appTarget.appTheme.downloadIcon || "download";
+        var downloadText = pxt.appTarget.appTheme.useUploadMessage ? lf("Upload") : lf("Download");
         return React.createElement("div", {className: "ui equal width grid right aligned padded"}, React.createElement("div", {className: "column mobile only"}, collapsed ?
-            React.createElement("div", {className: "ui equal width grid"}, React.createElement("div", {className: "left aligned column"}, React.createElement("div", {className: "ui icon small buttons"}, React.createElement(sui.Button, {icon: "" + (collapsed ? 'toggle up' : 'toggle down'), class: "collapse-button " + (hideEditorFloats ? 'disabled' : ''), title: collapseTooltip, onClick: function () { return _this.toggleCollapse('mobile'); }}), headless && run ? React.createElement(sui.Button, {class: "", key: 'runmenubtn', icon: state.running ? "stop" : "play", title: runTooltip, onClick: function () { return _this.startStopSimulator('mobile'); }}) : undefined, headless && restart ? React.createElement(sui.Button, {key: 'restartbtn', class: "restart-button", icon: "refresh", title: restartTooltip, onClick: function () { return _this.restartSimulator('mobile'); }}) : undefined, compileBtn ? React.createElement(sui.Button, {class: "primary download-button download-button-full " + (compileLoading ? 'loading' : ''), icon: "download", title: compileTooltip, onClick: function () { return _this.compile('mobile'); }}) : undefined)), readOnly ? undefined :
-                React.createElement("div", {className: "right aligned column"}, React.createElement("div", {className: "ui icon small buttons"}, React.createElement(sui.Button, {icon: 'save', class: "editortools-btn save-editortools-btn", title: lf("Save"), onClick: function () { return _this.saveFile('mobile'); }}), React.createElement(sui.Button, {icon: 'undo', class: "editortools-btn undo-editortools-btn} " + (!hasUndo ? 'disabled' : ''), title: lf("Undo"), onClick: function () { return _this.undo('mobile'); }}))), React.createElement("div", {className: "right aligned column"}, React.createElement("div", {className: "ui icon small buttons"}, React.createElement(sui.Button, {icon: 'zoom', class: "editortools-btn zoomin-editortools-btn", title: lf("Zoom In"), onClick: function () { return _this.zoomIn('mobile'); }}), React.createElement(sui.Button, {icon: 'zoom out', class: "editortools-btn zoomout-editortools-btn", title: lf("Zoom Out"), onClick: function () { return _this.zoomOut('mobile'); }})))) :
-            React.createElement("div", {className: "ui equal width grid"}, React.createElement("div", {className: "left aligned two wide column"}, React.createElement("div", {className: "ui vertical icon small buttons"}, run ? React.createElement(sui.Button, {class: "", key: 'runmenubtn', icon: state.running ? "stop" : "play", title: runTooltip, onClick: function () { return _this.startStopSimulator('mobile'); }}) : undefined, restart ? React.createElement(sui.Button, {key: 'restartbtn', class: "restart-button", icon: "refresh", title: restartTooltip, onClick: function () { return _this.restartSimulator('mobile'); }}) : undefined), React.createElement("div", {className: "row", style: { paddingTop: "1rem" }}, React.createElement("div", {className: "ui vertical icon small buttons"}, React.createElement(sui.Button, {icon: "" + (collapsed ? 'toggle up' : 'toggle down'), class: "collapse-button", title: collapseTooltip, onClick: function () { return _this.toggleCollapse('mobile'); }})))), React.createElement("div", {className: "three wide column"}), React.createElement("div", {className: "ui grid column"}, readOnly ? undefined :
-                React.createElement("div", {className: "row"}, React.createElement("div", {className: "column"}, React.createElement("div", {className: "ui icon large buttons"}, React.createElement(sui.Button, {icon: 'undo', class: "editortools-btn undo-editortools-btn} " + (!hasUndo ? 'disabled' : ''), title: lf("Undo"), onClick: function () { return _this.undo('mobile'); }})))), React.createElement("div", {className: "row", style: readOnly ? undefined : { paddingTop: 0 }}, React.createElement("div", {className: "column"}, React.createElement("div", {className: "ui icon large buttons"}, compileBtn ? React.createElement(sui.Button, {class: "primary download-button download-button-full " + (compileLoading ? 'loading' : ''), icon: "download", title: compileTooltip, onClick: function () { return _this.compile('mobile'); }}) : undefined)))))), React.createElement("div", {className: "column tablet only"}, collapsed ?
+            React.createElement("div", {className: "ui equal width grid"}, React.createElement("div", {className: "left aligned column"}, React.createElement("div", {className: "ui icon small buttons"}, React.createElement(sui.Button, {icon: "" + (collapsed ? 'toggle up' : 'toggle down'), class: "collapse-button " + (collapsed ? 'collapsed' : '') + " " + (hideEditorFloats ? 'disabled' : ''), title: collapseTooltip, onClick: function () { return _this.toggleCollapse('mobile'); }}), headless && run ? React.createElement(sui.Button, {class: "play-button " + (running ? "stop" : "play"), key: 'runmenubtn', icon: running ? "stop" : "play", title: runTooltip, onClick: function () { return _this.startStopSimulator('mobile'); }}) : undefined, headless && restart ? React.createElement(sui.Button, {key: 'restartbtn', class: "restart-button", icon: "refresh", title: restartTooltip, onClick: function () { return _this.restartSimulator('mobile'); }}) : undefined, headless && trace ? React.createElement(sui.Button, {key: 'tracebtn', class: "trace-button " + (tracing ? 'orange' : ''), icon: "xicon turtle", title: traceTooltip, onClick: function () { return _this.toggleTrace('mobile'); }}) : undefined, compileBtn ? React.createElement(sui.Button, {class: "primary download-button download-button-full " + (compileLoading ? 'loading' : ''), icon: downloadIcon, title: compileTooltip, onClick: function () { return _this.compile('mobile'); }}) : undefined)), React.createElement("div", {className: "right aligned column"}, !readOnly ?
+                React.createElement("div", {className: "ui icon small buttons"}, React.createElement(sui.Button, {icon: 'save', class: "editortools-btn save-editortools-btn", title: lf("Save"), onClick: function () { return _this.saveFile('mobile'); }}), showUndoRedo ? React.createElement(sui.Button, {icon: 'xicon undo', class: "editortools-btn undo-editortools-btn} " + (!hasUndo ? 'disabled' : ''), title: lf("Undo"), onClick: function () { return _this.undo('mobile'); }}) : undefined) : undefined), React.createElement("div", {className: "right aligned column"}, showZoomControls ?
+                React.createElement("div", {className: "ui icon small buttons"}, React.createElement(sui.Button, {icon: 'plus circle', class: "editortools-btn zoomin-editortools-btn", title: lf("Zoom In"), onClick: function () { return _this.zoomIn('mobile'); }}), React.createElement(sui.Button, {icon: 'minus circle', class: "editortools-btn zoomout-editortools-btn", title: lf("Zoom Out"), onClick: function () { return _this.zoomOut('mobile'); }})) : undefined)) :
+            React.createElement("div", {className: "ui equal width grid"}, React.createElement("div", {className: "left aligned two wide column"}, React.createElement("div", {className: "ui vertical icon small buttons"}, run ? React.createElement(sui.Button, {class: "play-button " + (running ? "stop" : "play"), key: 'runmenubtn', icon: running ? "stop" : "play", title: runTooltip, onClick: function () { return _this.startStopSimulator('mobile'); }}) : undefined, restart ? React.createElement(sui.Button, {key: 'restartbtn', class: "restart-button", icon: "refresh", title: restartTooltip, onClick: function () { return _this.restartSimulator('mobile'); }}) : undefined), showCollapsed ?
+                React.createElement("div", {className: "row", style: { paddingTop: "1rem" }}, React.createElement("div", {className: "ui vertical icon small buttons"}, React.createElement(sui.Button, {icon: "" + (collapsed ? 'toggle up' : 'toggle down'), class: "collapse-button " + (collapsed ? 'collapsed' : ''), title: collapseTooltip, onClick: function () { return _this.toggleCollapse('mobile'); }}))) : undefined), React.createElement("div", {className: "three wide column"}), React.createElement("div", {className: "ui grid column"}, readOnly || !showUndoRedo ? undefined :
+                React.createElement("div", {className: "row"}, React.createElement("div", {className: "column"}, React.createElement("div", {className: "ui icon large buttons"}, React.createElement(sui.Button, {icon: 'xicon undo', class: "editortools-btn undo-editortools-btn} " + (!hasUndo ? 'disabled' : ''), title: lf("Undo"), onClick: function () { return _this.undo('mobile'); }})))), React.createElement("div", {className: "row", style: readOnly || !showUndoRedo ? undefined : { paddingTop: 0 }}, React.createElement("div", {className: "column"}, React.createElement("div", {className: "ui icon large buttons"}, trace ? React.createElement(sui.Button, {key: 'tracebtn', class: "trace-button " + (tracing ? 'orange' : ''), icon: "xicon turtle", title: traceTooltip, onClick: function () { return _this.toggleTrace('mobile'); }}) : undefined, compileBtn ? React.createElement(sui.Button, {class: "primary download-button download-button-full " + (compileLoading ? 'loading' : ''), icon: downloadIcon, title: compileTooltip, onClick: function () { return _this.compile('mobile'); }}) : undefined)))))), React.createElement("div", {className: "column tablet only"}, collapsed ?
             React.createElement("div", {className: "ui grid seven column"}, headless ?
-                React.createElement("div", {className: "left aligned six wide column"}, React.createElement("div", {className: "ui icon large buttons"}, React.createElement(sui.Button, {icon: "" + (collapsed ? 'toggle up' : 'toggle down'), class: "large collapse-button " + (hideEditorFloats ? 'disabled' : ''), title: collapseTooltip, onClick: function () { return _this.toggleCollapse('tablet'); }}), run ? React.createElement(sui.Button, {role: "menuitem", class: "large", key: 'runmenubtn', icon: state.running ? "stop" : "play", title: runTooltip, onClick: function () { return _this.startStopSimulator('tablet'); }}) : undefined, restart ? React.createElement(sui.Button, {key: 'restartbtn', class: "large restart-button", icon: "refresh", title: restartTooltip, onClick: function () { return _this.restartSimulator('tablet'); }}) : undefined, compileBtn ? React.createElement(sui.Button, {class: "primary large download-button download-button-full " + (compileLoading ? 'loading' : ''), icon: "download", title: compileTooltip, onClick: function () { return _this.compile('tablet'); }}) : undefined)) :
-                React.createElement("div", {className: "left aligned six wide column"}, React.createElement(sui.Button, {icon: "" + (collapsed ? 'toggle up' : 'toggle down'), class: "large collapse-button " + (hideEditorFloats ? 'disabled' : ''), title: collapseTooltip, onClick: function () { return _this.toggleCollapse('tablet'); }}), compileBtn ? React.createElement(sui.Button, {class: "primary large download-button download-button-full " + (compileLoading ? 'loading' : ''), icon: "download", text: lf("Download"), title: compileTooltip, onClick: function () { return _this.compile('tablet'); }}) : undefined), readOnly ? undefined :
-                React.createElement("div", {className: "column four wide"}, React.createElement(sui.Button, {icon: 'save', class: "large editortools-btn save-editortools-btn", title: lf("Save"), onClick: function () { return _this.saveFile('tablet'); }})), React.createElement("div", {className: "column six wide right aligned"}, readOnly ? undefined :
-                React.createElement("div", {className: "ui icon large buttons"}, React.createElement(sui.Button, {icon: 'undo', class: "editortools-btn undo-editortools-btn} " + (!hasUndo ? 'disabled' : ''), title: lf("Undo"), onClick: function () { return _this.undo('tablet'); }}), React.createElement(sui.Button, {icon: 'repeat', class: "editortools-btn redo-editortools-btn} " + (!hasRedo ? 'disabled' : ''), title: lf("Redo"), onClick: function () { return _this.redo('tablet'); }})), React.createElement("div", {className: "ui icon large buttons"}, React.createElement(sui.Button, {icon: 'zoom', class: "editortools-btn zoomin-editortools-btn", title: lf("Zoom In"), onClick: function () { return _this.zoomIn('tablet'); }}), React.createElement(sui.Button, {icon: 'zoom out', class: "editortools-btn zoomout-editortools-btn", title: lf("Zoom Out"), onClick: function () { return _this.zoomOut('tablet'); }}))))
-            : React.createElement("div", {className: "ui grid"}, React.createElement("div", {className: "left aligned two wide column"}, React.createElement("div", {className: "ui vertical icon small buttons"}, run ? React.createElement(sui.Button, {role: "menuitem", class: "", key: 'runmenubtn', icon: state.running ? "stop" : "play", title: runTooltip, onClick: function () { return _this.startStopSimulator('tablet'); }}) : undefined, restart ? React.createElement(sui.Button, {key: 'restartbtn', class: "restart-button", icon: "refresh", title: restartTooltip, onClick: function () { return _this.restartSimulator('tablet'); }}) : undefined), React.createElement("div", {className: "row", style: { paddingTop: "1rem" }}, React.createElement("div", {className: "ui vertical icon small buttons"}, React.createElement(sui.Button, {icon: "" + (collapsed ? 'toggle up' : 'toggle down'), class: "collapse-button", title: collapseTooltip, onClick: function () { return _this.toggleCollapse('tablet'); }})))), React.createElement("div", {className: "three wide column"}), React.createElement("div", {className: "five wide column"}, React.createElement("div", {className: "ui grid right aligned"}, compileBtn ? React.createElement("div", {className: "row"}, React.createElement("div", {className: "column"}, React.createElement(sui.Button, {role: "menuitem", class: "primary large fluid download-button download-button-full " + (compileLoading ? 'loading' : ''), icon: "download", text: lf("Download"), title: compileTooltip, onClick: function () { return _this.compile('tablet'); }}))) : undefined, readOnly ? undefined :
-                React.createElement("div", {className: "row", style: compileBtn ? { paddingTop: 0 } : {}}, React.createElement("div", {className: "column"}, React.createElement("div", {className: "ui item large right labeled fluid input projectname-input projectname-tablet", title: lf("Pick a name for your project")}, React.createElement("input", {id: "fileNameInput", type: "text", placeholder: lf("Pick a name..."), value: state.projectName || '', onChange: function (e) { return _this.saveProjectName(e.target.value, 'tablet'); }}), React.createElement(sui.Button, {icon: 'save', class: "large right attached editortools-btn save-editortools-btn", title: lf("Save"), onClick: function () { return _this.saveFile('tablet'); }})))))), React.createElement("div", {className: "six wide column right aligned"}, readOnly ? undefined :
-                React.createElement("div", {className: "ui icon large buttons"}, React.createElement(sui.Button, {icon: 'undo', class: "editortools-btn undo-editortools-btn} " + (!hasUndo ? 'disabled' : ''), title: lf("Undo"), onClick: function () { return _this.undo(); }}), React.createElement(sui.Button, {icon: 'repeat', class: "editortools-btn redo-editortools-btn} " + (!hasRedo ? 'disabled' : ''), title: lf("Redo"), onClick: function () { return _this.redo(); }})), React.createElement("div", {className: "ui icon large buttons"}, React.createElement(sui.Button, {icon: 'zoom', class: "editortools-btn zoomin-editortools-btn", title: lf("Zoom In"), onClick: function () { return _this.zoomIn(); }}), React.createElement(sui.Button, {icon: 'zoom out', class: "editortools-btn zoomout-editortools-btn", title: lf("Zoom Out"), onClick: function () { return _this.zoomOut(); }}))))), React.createElement("div", {className: "column computer only"}, React.createElement("div", {className: "ui grid equal width"}, React.createElement("div", {id: "downloadArea", className: "ui column items"}, headless && collapsed ?
-            React.createElement("div", {className: "ui item"}, React.createElement("div", {className: "ui icon large buttons"}, React.createElement(sui.Button, {icon: "" + (state.collapseEditorTools ? 'toggle right' : 'toggle left'), class: "large collapse-button", title: collapseTooltip, onClick: function () { return _this.toggleCollapse('computer'); }}), run ? React.createElement(sui.Button, {role: "menuitem", class: "large", key: 'runmenubtn', icon: state.running ? "stop" : "play", title: runTooltip, onClick: function () { return _this.startStopSimulator('tablet'); }}) : undefined, restart ? React.createElement(sui.Button, {key: 'restartbtn', class: "large restart-button", icon: "refresh", title: restartTooltip, onClick: function () { return _this.restartSimulator('tablet'); }}) : undefined, compileBtn ? React.createElement(sui.Button, {icon: 'icon download', class: "primary large download-button " + (compileLoading ? 'loading' : ''), title: compileTooltip, onClick: function () { return _this.compile('computer'); }}) : undefined)) :
-            React.createElement("div", {className: "ui item"}, React.createElement(sui.Button, {icon: "" + (state.collapseEditorTools ? 'toggle right' : 'toggle left'), class: "large collapse-button", title: collapseTooltip, onClick: function () { return _this.toggleCollapse('computer'); }}), compileBtn ? React.createElement(sui.Button, {icon: 'icon download', class: "primary huge fluid download-button " + (compileLoading ? 'loading' : ''), text: lf("Download"), title: compileTooltip, onClick: function () { return _this.compile('computer'); }}) : undefined)), readOnly ? undefined :
-            React.createElement("div", {className: "column left aligned"}, React.createElement("div", {className: "ui large right labeled input projectname-input projectname-computer", title: lf("Pick a name for your project")}, React.createElement("input", {id: "fileNameInput", type: "text", placeholder: lf("Pick a name..."), value: state.projectName || '', onChange: function (e) { return _this.saveProjectName(e.target.value, 'computer'); }}), React.createElement(sui.Button, {icon: 'save', class: "small right attached editortools-btn save-editortools-btn", title: lf("Save"), onClick: function () { return _this.saveFile('computer'); }}))), React.createElement("div", {className: "column right aligned"}, readOnly ? undefined :
-            React.createElement("div", {className: "ui icon small buttons"}, React.createElement(sui.Button, {icon: 'undo', class: "editortools-btn undo-editortools-btn} " + (!hasUndo ? 'disabled' : ''), title: lf("Undo"), onClick: function () { return _this.undo('computer'); }}), React.createElement(sui.Button, {icon: 'repeat', class: "editortools-btn redo-editortools-btn} " + (!hasRedo ? 'disabled' : ''), title: lf("Redo"), onClick: function () { return _this.redo('computer'); }})), React.createElement("div", {className: "ui icon small buttons"}, React.createElement(sui.Button, {icon: 'zoom', class: "editortools-btn zoomin-editortools-btn", title: lf("Zoom In"), onClick: function () { return _this.zoomIn('computer'); }}), React.createElement(sui.Button, {icon: 'zoom out', class: "editortools-btn zoomout-editortools-btn", title: lf("Zoom Out"), onClick: function () { return _this.zoomOut('computer'); }}))))));
+                React.createElement("div", {className: "left aligned six wide column"}, React.createElement("div", {className: "ui icon buttons"}, React.createElement(sui.Button, {icon: "" + (collapsed ? 'toggle up' : 'toggle down'), class: "collapse-button " + (collapsed ? 'collapsed' : '') + " " + (hideEditorFloats ? 'disabled' : ''), title: collapseTooltip, onClick: function () { return _this.toggleCollapse('tablet'); }}), run ? React.createElement(sui.Button, {role: "menuitem", class: "play-button " + (running ? "stop" : "play"), key: 'runmenubtn', icon: running ? "stop" : "play", title: runTooltip, onClick: function () { return _this.startStopSimulator('tablet'); }}) : undefined, restart ? React.createElement(sui.Button, {key: 'restartbtn', class: "restart-button", icon: "refresh", title: restartTooltip, onClick: function () { return _this.restartSimulator('tablet'); }}) : undefined, trace ? React.createElement(sui.Button, {key: 'tracebtn', class: "trace-button " + (tracing ? 'orange' : ''), icon: "xicon turtle", title: traceTooltip, onClick: function () { return _this.toggleTrace('tablet'); }}) : undefined, compileBtn ? React.createElement(sui.Button, {class: "primary download-button download-button-full " + (compileLoading ? 'loading' : ''), icon: downloadIcon, title: compileTooltip, onClick: function () { return _this.compile('tablet'); }}) : undefined)) :
+                React.createElement("div", {className: "left aligned six wide column"}, React.createElement("div", {className: "ui icon buttons"}, React.createElement(sui.Button, {icon: "" + (collapsed ? 'toggle up' : 'toggle down'), class: "collapse-button " + (collapsed ? 'collapsed' : '') + " " + (hideEditorFloats ? 'disabled' : ''), title: collapseTooltip, onClick: function () { return _this.toggleCollapse('tablet'); }}), compileBtn ? React.createElement(sui.Button, {class: "primary download-button download-button-full " + (compileLoading ? 'loading' : ''), icon: downloadIcon, text: downloadText, title: compileTooltip, onClick: function () { return _this.compile('tablet'); }}) : undefined)), React.createElement("div", {className: "column four wide"}, readOnly ? undefined :
+                React.createElement(sui.Button, {icon: 'save', class: "small editortools-btn save-editortools-btn", title: lf("Save"), onClick: function () { return _this.saveFile('tablet'); }})), React.createElement("div", {className: "column six wide right aligned"}, showUndoRedo ?
+                React.createElement("div", {className: "ui icon small buttons"}, React.createElement(sui.Button, {icon: 'xicon undo', class: "editortools-btn undo-editortools-btn} " + (!hasUndo ? 'disabled' : ''), title: lf("Undo"), onClick: function () { return _this.undo('tablet'); }}), React.createElement(sui.Button, {icon: 'xicon redo', class: "editortools-btn redo-editortools-btn} " + (!hasRedo ? 'disabled' : ''), title: lf("Redo"), onClick: function () { return _this.redo('tablet'); }})) : undefined, showZoomControls ?
+                React.createElement("div", {className: "ui icon small buttons"}, React.createElement(sui.Button, {icon: 'plus circle', class: "editortools-btn zoomin-editortools-btn", title: lf("Zoom In"), onClick: function () { return _this.zoomIn('tablet'); }}), React.createElement(sui.Button, {icon: 'minus circle', class: "editortools-btn zoomout-editortools-btn", title: lf("Zoom Out"), onClick: function () { return _this.zoomOut('tablet'); }})) : undefined))
+            : React.createElement("div", {className: "ui grid"}, React.createElement("div", {className: "left aligned two wide column"}, React.createElement("div", {className: "ui vertical icon small buttons"}, run ? React.createElement(sui.Button, {role: "menuitem", class: "play-button " + (running ? "stop" : "play"), key: 'runmenubtn', icon: running ? "stop" : "play", title: runTooltip, onClick: function () { return _this.startStopSimulator('tablet'); }}) : undefined, restart ? React.createElement(sui.Button, {key: 'restartbtn', class: "restart-button", icon: "refresh", title: restartTooltip, onClick: function () { return _this.restartSimulator('tablet'); }}) : undefined), showCollapsed ?
+                React.createElement("div", {className: "row", style: { paddingTop: "1rem" }}, React.createElement("div", {className: "ui vertical icon small buttons"}, React.createElement(sui.Button, {icon: "" + (collapsed ? 'toggle up' : 'toggle down'), class: "collapse-button " + (collapsed ? 'collapsed' : ''), title: collapseTooltip, onClick: function () { return _this.toggleCollapse('tablet'); }}))) : undefined), React.createElement("div", {className: "three wide column"}), React.createElement("div", {className: "five wide column"}, React.createElement("div", {className: "ui grid right aligned"}, compileBtn ? React.createElement("div", {className: "row"}, React.createElement("div", {className: "column"}, React.createElement(sui.Button, {role: "menuitem", class: "primary large fluid download-button download-button-full " + (compileLoading ? 'loading' : ''), icon: downloadIcon, text: downloadText, title: compileTooltip, onClick: function () { return _this.compile('tablet'); }}))) : undefined, showProjectRename ?
+                React.createElement("div", {className: "row", style: compileBtn ? { paddingTop: 0 } : {}}, React.createElement("div", {className: "column"}, React.createElement("div", {className: "ui item large right labeled fluid input projectname-input projectname-tablet", title: lf("Pick a name for your project")}, React.createElement("input", {id: "fileNameInput", type: "text", placeholder: lf("Pick a name..."), value: projectName || '', onChange: function (e) { return _this.saveProjectName(e.target.value, 'tablet'); }}), React.createElement(sui.Button, {icon: 'save', class: "large right attached editortools-btn save-editortools-btn", title: lf("Save"), onClick: function () { return _this.saveFile('tablet'); }})))) : undefined)), React.createElement("div", {className: "six wide column right aligned"}, React.createElement("div", {className: "ui grid right aligned"}, showUndoRedo || showZoomControls ?
+                React.createElement("div", {className: "row"}, React.createElement("div", {className: "column"}, showUndoRedo ?
+                    React.createElement("div", {className: "ui icon large buttons"}, React.createElement(sui.Button, {icon: 'xicon undo', class: "editortools-btn undo-editortools-btn} " + (!hasUndo ? 'disabled' : ''), title: lf("Undo"), onClick: function () { return _this.undo(); }}), React.createElement(sui.Button, {icon: 'xicon redo', class: "editortools-btn redo-editortools-btn} " + (!hasRedo ? 'disabled' : ''), title: lf("Redo"), onClick: function () { return _this.redo(); }})) : undefined, showZoomControls ?
+                    React.createElement("div", {className: "ui icon large buttons"}, React.createElement(sui.Button, {icon: 'plus circle', class: "editortools-btn zoomin-editortools-btn", title: lf("Zoom In"), onClick: function () { return _this.zoomIn(); }}), React.createElement(sui.Button, {icon: 'minus circle', class: "editortools-btn zoomout-editortools-btn", title: lf("Zoom Out"), onClick: function () { return _this.zoomOut(); }})) : undefined)) : undefined, trace ?
+                React.createElement("div", {className: "row", style: showUndoRedo || showZoomControls ? { paddingTop: 0 } : {}}, React.createElement("div", {className: "column"}, React.createElement(sui.Button, {key: 'tracebtn', class: "large trace-button " + (tracing ? 'orange' : ''), icon: "xicon turtle", title: traceTooltip, onClick: function () { return _this.toggleTrace('tablet'); }}))) : undefined)))), React.createElement("div", {className: "column computer only"}, React.createElement("div", {className: "ui grid equal width"}, React.createElement("div", {id: "downloadArea", className: "ui column items"}, headless ?
+            React.createElement("div", {className: "ui item"}, React.createElement("div", {className: "ui icon large buttons"}, showCollapsed ? React.createElement(sui.Button, {icon: "" + (collapseEditorTools ? 'toggle right' : 'toggle left'), class: "large collapse-button " + (collapsed ? 'collapsed' : ''), title: collapseTooltip, onClick: function () { return _this.toggleCollapse('computer'); }}) : undefined, run ? React.createElement(sui.Button, {role: "menuitem", class: "large play-button " + (running ? "stop" : "play"), key: 'runmenubtn', icon: running ? "stop" : "play", title: runTooltip, onClick: function () { return _this.startStopSimulator('computer'); }}) : undefined, restart ? React.createElement(sui.Button, {key: 'restartbtn', class: "large restart-button", icon: "refresh", title: restartTooltip, onClick: function () { return _this.restartSimulator('computer'); }}) : undefined, trace ? React.createElement(sui.Button, {key: 'tracebtn', class: "large trace-button " + (tracing ? 'orange' : ''), icon: "xicon turtle", title: traceTooltip, onClick: function () { return _this.toggleTrace('computer'); }}) : undefined, compileBtn ? React.createElement(sui.Button, {icon: downloadIcon, class: "primary large download-button " + (compileLoading ? 'loading' : ''), title: compileTooltip, onClick: function () { return _this.compile('computer'); }}) : undefined)) :
+            React.createElement("div", {className: "ui item"}, showCollapsed ? React.createElement(sui.Button, {icon: "" + (collapseEditorTools ? 'toggle right' : 'toggle left'), class: "large collapse-button " + (collapsed ? 'collapsed' : ''), title: collapseTooltip, onClick: function () { return _this.toggleCollapse('computer'); }}) : undefined, compileBtn ? React.createElement(sui.Button, {icon: downloadIcon, class: "primary huge fluid download-button " + (compileLoading ? 'loading' : ''), text: downloadText, title: compileTooltip, onClick: function () { return _this.compile('computer'); }}) : undefined)), showProjectRename ?
+            React.createElement("div", {className: "column left aligned"}, React.createElement("div", {className: "ui right labeled input projectname-input projectname-computer", title: lf("Pick a name for your project")}, React.createElement("input", {id: "fileNameInput", type: "text", placeholder: lf("Pick a name..."), value: projectName || '', onChange: function (e) { return _this.saveProjectName(e.target.value, 'computer'); }}), React.createElement(sui.Button, {icon: 'save', class: "small right attached editortools-btn save-editortools-btn", title: lf("Save"), onClick: function () { return _this.saveFile('computer'); }}))) : undefined, React.createElement("div", {className: "column right aligned"}, showUndoRedo ?
+            React.createElement("div", {className: "ui icon small buttons"}, React.createElement(sui.Button, {icon: 'xicon undo', class: "editortools-btn undo-editortools-btn} " + (!hasUndo ? 'disabled' : ''), title: lf("Undo"), onClick: function () { return _this.undo('computer'); }}), React.createElement(sui.Button, {icon: 'xicon redo', class: "editortools-btn redo-editortools-btn} " + (!hasRedo ? 'disabled' : ''), title: lf("Redo"), onClick: function () { return _this.redo('computer'); }})) : undefined, showZoomControls ?
+            React.createElement("div", {className: "ui icon small buttons"}, React.createElement(sui.Button, {icon: 'plus circle', class: "editortools-btn zoomin-editortools-btn", title: lf("Zoom In"), onClick: function () { return _this.zoomIn('computer'); }}), React.createElement(sui.Button, {icon: 'minus circle', class: "editortools-btn zoomout-editortools-btn", title: lf("Zoom Out"), onClick: function () { return _this.zoomOut('computer'); }})) : undefined))));
     };
     return EditorToolbar;
 }(data.Component));
 exports.EditorToolbar = EditorToolbar;
 
-},{"./data":11,"./sui":32,"react":315}],15:[function(require,module,exports){
+},{"./data":12,"./sui":37,"react":302}],16:[function(require,module,exports){
 "use strict";
 var core = require("./core");
 var Cloud = pxt.Cloud;
@@ -4058,7 +4658,7 @@ function checkForUpdate() {
 }
 exports.checkForUpdate = checkForUpdate;
 
-},{"./core":10}],16:[function(require,module,exports){
+},{"./core":11}],17:[function(require,module,exports){
 /// <reference path="../../typings/globals/react/index.d.ts" />
 /// <reference path="../../typings/globals/react-dom/index.d.ts" />
 /// <reference path="../../built/pxtlib.d.ts" />
@@ -4073,6 +4673,7 @@ var data = require("./data");
 var sui = require("./sui");
 var pkg = require("./package");
 var core = require("./core");
+var customFile = "custom.ts";
 var FileList = (function (_super) {
     __extends(FileList, _super);
     function FileList(props) {
@@ -4121,7 +4722,9 @@ var FileList = (function (_super) {
     FileList.prototype.packageOf = function (p) {
         var _this = this;
         var expands = this.state.expands;
-        var del = p.getPkgId() != pxt.appTarget.id && p.getPkgId() != "built";
+        var del = p.getPkgId() != pxt.appTarget.id
+            && p.getPkgId() != "built"
+            && p.getPkgId() != pxt.appTarget.corepkg;
         var upd = p.getKsPkg() && p.getKsPkg().verProtocol() == "github";
         return [React.createElement("div", {key: "hd-" + p.getPkgId(), className: "header link item", onClick: function () { return _this.togglePkg(p); }}, React.createElement("i", {className: "chevron " + (expands[p.getPkgId()] ? "down" : "right") + " icon"}), upd ? React.createElement(sui.Button, {class: "primary label", icon: "refresh", onClick: function (e) { return _this.updatePkg(e, p); }}) : '', del ? React.createElement(sui.Button, {class: "primary label", icon: "trash", onClick: function (e) { return _this.removePkg(e, p); }}) : '', p.getPkgId())
         ].concat(expands[p.getPkgId()] ? this.filesOf(p) : []);
@@ -4137,17 +4740,34 @@ var FileList = (function (_super) {
     FileList.prototype.toggleVisibility = function () {
         this.props.parent.setState({ showFiles: !this.props.parent.state.showFiles });
     };
+    FileList.prototype.addCustomBlocksFile = function () {
+        var _this = this;
+        core.confirmAsync({
+            header: lf("Add custom blocks?"),
+            body: lf("A new JavaScript file, custom.ts, will be added to your project. You can define custom functions and blocks in that file.")
+        }).then(function (v) {
+            if (!v)
+                return;
+            var p = pkg.mainEditorPkg();
+            p.setFile(customFile, "\n/**\n * " + lf("Use this file to define custom functions and blocks.") + "\n * " + lf("Read more at {0}", pxt.appTarget.appTheme.homeUrl + 'blocks/custom') + "\n */\n\nenum MyEnum {\n    //% block=\"one\"\n    One,\n    //% block=\"two\"\n    Two\n}\n\n/**\n * " + lf("Custom blocks") + "\n */\n//% weight=100 color=#0fbc11 icon=\"\uF0C3\"\nnamespace custom {\n    /**\n     * TODO: " + lf("describe your function here") + "\n     * @param n " + lf("describe parameter here") + ", eg: 5\n     * @param s " + lf("describe parameter here") + ", eg: \"Hello\"\n     * @param e " + lf("describe parameter here") + "\n     */    \n    //% block\n    export function foo(n: number, s: string, e: MyEnum): void {\n        // Add code here\n    }\n\n    /**\n     * TODO: " + lf("describe your function here") + "\n     * @param value " + lf("describe value here") + ", eg: 5\n     */    \n    //% block\n    export function fib(value: number): number {\n        return value <= 1 ? value : fib(value -1) + fib(value - 2);\n    }\n}\n");
+            return p.updateConfigAsync(function (cfg) { return cfg.files.push(customFile); })
+                .then(function () { return _this.props.parent.setFile(p.lookupFile("this/" + customFile)); })
+                .then(function () { return p.savePkgAsync(); })
+                .then(function () { return _this.props.parent.reloadHeaderAsync(); });
+        });
+    };
     FileList.prototype.renderCore = function () {
         var _this = this;
         var show = !!this.props.parent.state.showFiles;
         var targetTheme = pxt.appTarget.appTheme;
-        return React.createElement("div", {className: "ui tiny vertical " + (targetTheme.invertedMenu ? "inverted" : '') + " menu filemenu landscape only"}, React.createElement("div", {key: "projectheader", className: "link item", onClick: function () { return _this.toggleVisibility(); }}, lf("Explorer"), React.createElement("i", {className: "chevron " + (show ? "down" : "right") + " icon"})), show ? Util.concat(pkg.allEditorPkgs().map(function (p) { return _this.filesWithHeader(p); })) : undefined);
+        var plus = show && !pkg.mainEditorPkg().files[customFile];
+        return React.createElement("div", {className: "ui tiny vertical " + (targetTheme.invertedMenu ? "inverted" : '') + " menu filemenu landscape only"}, React.createElement("div", {key: "projectheader", className: "link item", onClick: function () { return _this.toggleVisibility(); }}, lf("Explorer"), React.createElement("i", {className: "chevron " + (show ? "down" : "right") + " icon"}), plus ? React.createElement(sui.Button, {class: "primary label", icon: "plus", onClick: function (e) { return _this.addCustomBlocksFile(); }}) : undefined), show ? Util.concat(pkg.allEditorPkgs().map(function (p) { return _this.filesWithHeader(p); })) : undefined);
     };
     return FileList;
 }(data.Component));
 exports.FileList = FileList;
 
-},{"./core":10,"./data":11,"./package":24,"./sui":32,"react":315}],17:[function(require,module,exports){
+},{"./core":11,"./data":12,"./package":28,"./sui":37,"react":302}],18:[function(require,module,exports){
 "use strict";
 var db = require("./db");
 var core = require("./core");
@@ -4223,7 +4843,7 @@ function initAsync(target) {
     allScripts = [];
     currentTarget = target;
     // TODO check that target is correct.
-    return syncAsync();
+    return syncAsync().then(function () { });
 }
 function fetchTextAsync(e) {
     return apiAsync("pkg/" + e.id)
@@ -4328,10 +4948,9 @@ function saveToCloudAsync(h) {
 function syncAsync() {
     return apiAsync("list").then(function (h) {
         h.pkgs.forEach(mergeFsPkg);
-    })
-        .then(function () {
         data.invalidate("header:");
         data.invalidate("text:");
+        return undefined;
     });
 }
 function saveScreenshotAsync(h, screenshot, icon) {
@@ -4358,19 +4977,19 @@ exports.provider = {
     saveScreenshotAsync: saveScreenshotAsync
 };
 
-},{"./core":10,"./data":11,"./db":12}],18:[function(require,module,exports){
+},{"./core":11,"./data":12,"./db":13}],19:[function(require,module,exports){
 "use strict";
 function parseExampleMarkdown(name, md) {
     if (!md)
         return undefined;
-    var m = /```blocks\s*((.|\s)+?)\s*```/i.exec(md);
+    var m = /```(blocks?|typescript)\s*((.|\s)+?)\s*```/i.exec(md);
     if (!m)
         return undefined;
     return {
         name: name,
         filesOverride: {
             "main.blocks": "",
-            "main.ts": m[1]
+            "main.ts": m[2]
         }
     };
 }
@@ -4423,14 +5042,13 @@ function loadExampleAsync(name, path) {
 }
 exports.loadExampleAsync = loadExampleAsync;
 
-},{}],19:[function(require,module,exports){
+},{}],20:[function(require,module,exports){
 "use strict";
 var __extends = (this && this.__extends) || function (d, b) {
     for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
     function __() { this.constructor = d; }
     d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
 };
-var workeriface = require("./workeriface");
 var Cloud = pxt.Cloud;
 var U = pxt.Util;
 var iface;
@@ -4459,7 +5077,7 @@ function init() {
         if (!Cloud.isLocalHost() || !Cloud.localToken)
             return;
         pxt.debug('initializing hid pipe');
-        iface = workeriface.makeWebSocket("ws://localhost:" + pxt.options.wsPort + "/" + Cloud.localToken + "/hid", onOOB);
+        iface = pxt.worker.makeWebSocket("ws://localhost:" + pxt.options.wsPort + "/" + Cloud.localToken + "/hid", onOOB);
     }
 }
 function shouldUse() {
@@ -4468,27 +5086,24 @@ function shouldUse() {
 exports.shouldUse = shouldUse;
 function mkBridgeAsync() {
     init();
-    return iface.opAsync("list", {})
-        .then(function (devs) {
-        var d0 = devs.devices.filter(function (d) { return (d.release & 0xff00) == 0x4200; })[0];
-        if (d0)
-            return new BridgeIO(d0);
-        else
-            throw new Error("No device connected");
-    })
-        .then(function (b) { return b.initAsync().then(function () { return b; }); });
+    var b = new BridgeIO();
+    return b.initAsync()
+        .then(function () { return b; });
 }
 exports.mkBridgeAsync = mkBridgeAsync;
 var BridgeIO = (function () {
-    function BridgeIO(dev) {
-        this.dev = dev;
+    function BridgeIO() {
         this.onData = function (v) { };
+        this.onEvent = function (v) { };
         this.onError = function (e) { };
         this.onSerial = function (v, isErr) { };
     }
     BridgeIO.prototype.onOOB = function (v) {
         if (v.op == "serial") {
             this.onSerial(U.fromHex(v.result.data), v.result.isError);
+        }
+        else if (v.op = "event") {
+            this.onEvent(U.fromHex(v.result.data));
         }
     };
     BridgeIO.prototype.talksAsync = function (cmds) {
@@ -4506,6 +5121,11 @@ var BridgeIO = (function () {
     BridgeIO.prototype.reconnectAsync = function () {
         return this.initAsync();
     };
+    BridgeIO.prototype.disconnectAsync = function () {
+        return iface.opAsync("disconnect", {
+            path: this.dev.path
+        });
+    };
     BridgeIO.prototype.sendPacketAsync = function (pkt) {
         throw new Error("should use talksAsync()!");
     };
@@ -4517,10 +5137,22 @@ var BridgeIO = (function () {
         });
     };
     BridgeIO.prototype.initAsync = function () {
-        bridgeByPath[this.dev.path] = this;
-        return iface.opAsync("init", {
-            path: this.dev.path
-        });
+        var _this = this;
+        return iface.opAsync("list", {})
+            .then(function (devs) {
+            var d0 = devs.devices.filter(function (d) { return (d.release & 0xff00) == 0x4200; })[0];
+            if (d0) {
+                if (_this.dev)
+                    delete bridgeByPath[_this.dev.path];
+                _this.dev = d0;
+                bridgeByPath[_this.dev.path] = _this;
+            }
+            else
+                throw new Error("No device connected");
+        })
+            .then(function () { return iface.opAsync("init", {
+            path: _this.dev.path
+        }); });
     };
     return BridgeIO;
 }());
@@ -4544,319 +5176,195 @@ function initAsync() {
 }
 exports.initAsync = initAsync;
 
-},{"./workeriface":36}],20:[function(require,module,exports){
+},{}],21:[function(require,module,exports){
 "use strict";
-var compiler = require("./compiler");
-var workeriface = require("./workeriface");
-var Cloud = pxt.Cloud;
-var U = pxt.Util;
-var iface;
-var isHalted = false;
-var lastCompileResult;
-var haltCheckRunning = false;
-var onHalted = Promise.resolve();
-var haltHandler;
-var cachedStateInfo;
-var nextBreakpoints = [];
-var currBreakpoint;
-var lastDebugStatus;
-var callInfos;
-function init() {
-    if (!iface) {
-        if (!Cloud.isLocalHost() || !Cloud.localToken)
-            return;
-        pxt.debug('initializing debug pipe');
-        iface = workeriface.makeWebSocket("ws://localhost:" + pxt.options.wsPort + "/" + Cloud.localToken + "/debug");
-    }
+var data = require("./data");
+var mem = require("./memoryworkspace");
+function getHeaders() {
+    return mem.provider.getHeaders();
 }
-function readMemAsync(addr, numwords) {
-    return workerOpAsync("mem", { addr: addr, words: numwords })
-        .then(function (resp) { return resp.data; });
+function getHeader(id) {
+    return mem.provider.getHeader(id);
 }
-exports.readMemAsync = readMemAsync;
-function writeMemAsync(addr, words) {
-    return workerOpAsync("wrmem", { addr: addr, words: words })
-        .then(function () { });
+function getTextAsync(id) {
+    return mem.provider.getTextAsync(id);
 }
-exports.writeMemAsync = writeMemAsync;
-var asm = "";
-function callAndPush(prc) {
-    var idx = asm.length;
-    asm += "\n    ldr r4, .proc" + idx + "\n    blx r4\n    push {r0}\n    b .next" + idx + "\n    .balign 4\n.proc" + idx + ":\n    .word " + prc + "|1\n.next" + idx + ":\n";
+function initAsync(trg) {
+    return mem.provider.initAsync(trg);
 }
-var stateProcs = [
-    "pxt::getNumGlobals/numGlobals",
-    "pxtrt::getGlobalsPtr/globalsPtr",
-];
-function callForStateAsync(st) {
-    if (cachedStateInfo)
-        return Promise.resolve(cachedStateInfo);
-    asm = "";
-    for (var _i = 0, stateProcs_1 = stateProcs; _i < stateProcs_1.length; _i++) {
-        var p = stateProcs_1[_i];
-        callAndPush(p.replace(/\/.*/, ""));
-    }
-    asm += "\n    bkpt 42\n    @nostackcheck\n";
-    return compiler.assembleAsync(asm)
-        .then(function (res) { return workerOpAsync("exec", { code: res.words, args: [] }); })
-        .then(function () { return snapshotAsync(); })
-        .then(function (st) {
-        var fields = stateProcs.map(function (s) { return s.replace(/.*\//, ""); });
-        fields.reverse();
-        var r = {};
-        fields.forEach(function (f, i) {
-            r[f] = st.stack[i];
-        });
-        cachedStateInfo = r;
-    })
-        .then(function () { return restoreAsync(st); })
-        .then(function () { return cachedStateInfo; });
+function saveAsync(header, text) {
+    return mem.provider.saveAsync(header, text)
+        .then(function () { return pxt.editor.postHostMessageAsync({
+        type: "pxthost",
+        action: "workspacesave",
+        project: { header: header, text: text },
+        response: false
+    }); }).then(function () { });
 }
-function clearAsync() {
-    isHalted = false;
-    lastCompileResult = null;
-    cachedStateInfo = null;
-    lastDebugStatus = null;
-    return Promise.resolve();
+function installAsync(h0, text) {
+    return mem.provider.installAsync(h0, text);
 }
-function coreHalted() {
-    return getHwStateAsync()
-        .then(function (st) {
-        nextBreakpoints = [];
-        var globals = {};
-        st.globals.slice(1).forEach(function (v, i) {
-            var loc = lastCompileResult.procDebugInfo[0].locals[i];
-            if (loc)
-                globals[loc.name] = v;
-            else
-                globals["?" + i] = v;
-        });
-        var pc = st.machineState.registers[15];
-        var final = function () { return Promise.resolve(); };
-        var stepInBkp = lastCompileResult.procDebugInfo.filter(function (p) { return p.bkptLoc == pc; })[0];
-        if (stepInBkp) {
-            pc = stepInBkp.codeStartLoc;
-            st.machineState.registers[15] = pc;
-            final = function () { return restoreAsync(st.machineState); };
-        }
-        var bb = lastCompileResult.breakpoints;
-        var brkMatch = bb[0];
-        var bestDelta = Infinity;
-        for (var _i = 0, bb_1 = bb; _i < bb_1.length; _i++) {
-            var b = bb_1[_i];
-            var delta = pc - b.binAddr;
-            if (delta >= 0 && delta < bestDelta) {
-                bestDelta = delta;
-                brkMatch = b;
-            }
-        }
-        currBreakpoint = brkMatch;
-        var msg = {
-            type: 'debugger',
-            subtype: 'breakpoint',
-            breakpointId: brkMatch.id,
-            globals: globals,
-            stackframes: []
-        };
-        exports.postMessage(msg);
-        return final();
-    })
-        .then(haltHandler);
+function saveToCloudAsync(h) {
+    return mem.provider.saveToCloudAsync(h);
 }
-function haltCheckAsync() {
-    if (isHalted)
-        return Promise.delay(100).then(haltCheckAsync);
-    return workerOpAsync("status")
-        .then(function (res) {
-        if (res.isHalted) {
-            isHalted = true;
-            coreHalted();
-        }
-        return Promise.delay(300);
-    })
-        .then(haltCheckAsync);
-}
-function clearHalted() {
-    isHalted = false;
-    onHalted = new Promise(function (resolve, reject) {
-        haltHandler = resolve;
+function syncAsync() {
+    return pxt.editor.postHostMessageAsync({
+        type: "pxthost",
+        action: "workspacesync",
+        response: true
+    }).then(function (msg) {
+        (msg.projects || []).forEach(mem.merge);
+        data.invalidate("header:");
+        data.invalidate("text:");
+        return msg.editor;
     });
-    if (!haltCheckRunning) {
-        haltCheckRunning = true;
-        haltCheckAsync();
-    }
 }
-function writeDebugStatusAsync(v) {
-    if (v === lastDebugStatus)
-        return Promise.resolve();
-    lastDebugStatus = v;
-    return writeMemAsync(cachedStateInfo.globalsPtr, [v]);
+function resetAsync() {
+    return mem.provider.resetAsync()
+        .then(function () { return pxt.editor.postHostMessageAsync({
+        type: "pxthost",
+        action: "workspacereset",
+        response: true
+    }); }).then(function () { });
 }
-function setBreakpointsAsync(addrs) {
-    return workerOpAsync("breakpoints", { addrs: addrs });
+exports.provider = {
+    getHeaders: getHeaders,
+    getHeader: getHeader,
+    getTextAsync: getTextAsync,
+    initAsync: initAsync,
+    saveAsync: saveAsync,
+    installAsync: installAsync,
+    saveToCloudAsync: saveToCloudAsync,
+    syncAsync: syncAsync,
+    resetAsync: resetAsync
+};
+
+},{"./data":12,"./memoryworkspace":25}],22:[function(require,module,exports){
+"use strict";
+var __extends = (this && this.__extends) || function (d, b) {
+    for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
+    function __() { this.constructor = d; }
+    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+};
+var React = require("react");
+var sui = require("./sui");
+var codecard = require("./codecard");
+var lf = pxt.Util.lf;
+var allLanguages = {
+    "af": { englishName: "Afrikaans", localizedName: "Afrikaans" },
+    "ar": { englishName: "Arabic", localizedName: "العربية" },
+    "ca": { englishName: "Catalan", localizedName: "Català" },
+    "cs": { englishName: "Czech", localizedName: "Čeština" },
+    "da": { englishName: "Danish", localizedName: "Dansk" },
+    "de": { englishName: "German", localizedName: "Deutsch" },
+    "el": { englishName: "Greek", localizedName: "Ελληνικά" },
+    "en": { englishName: "English", localizedName: "English" },
+    "es-ES": { englishName: "Spanish (Spain)", localizedName: "Español (España)" },
+    "fi": { englishName: "Finnish", localizedName: "Suomi" },
+    "fr": { englishName: "French", localizedName: "Français" },
+    "he": { englishName: "Hebrew", localizedName: "עברית" },
+    "hu": { englishName: "Hungarian", localizedName: "Magyar" },
+    "it": { englishName: "Italian", localizedName: "Italiano" },
+    "ja": { englishName: "Japanese", localizedName: "日本語" },
+    "ko": { englishName: "Korean", localizedName: "한국어" },
+    "nl": { englishName: "Dutch", localizedName: "Nederlands" },
+    "no": { englishName: "Norwegian", localizedName: "Norsk" },
+    "pl": { englishName: "Polish", localizedName: "Polski" },
+    "pt-BR": { englishName: "Portuguese (Brazil)", localizedName: "Português (Brasil)" },
+    "pt-PT": { englishName: "Portuguese (Portugal)", localizedName: "Português (Portugal)" },
+    "ro": { englishName: "Romanian", localizedName: "Română" },
+    "ru": { englishName: "Russian", localizedName: "Русский" },
+    "si-LK": { englishName: "Sinhala (Sri Lanka)", localizedName: "සිංහල (ශ්රී ලංකා)" },
+    "sr": { englishName: "Serbian", localizedName: "Srpski" },
+    "sv-SE": { englishName: "Swedish (Sweden)", localizedName: "Svenska (Sverige)" },
+    "tr": { englishName: "Turkish", localizedName: "Türkçe" },
+    "uk": { englishName: "Ukrainian", localizedName: "Українська" },
+    "vi": { englishName: "Vietnamese", localizedName: "Tiếng việt" },
+    "zh-CN": { englishName: "Chinese (Simplified, China)", localizedName: "简体中文 (中国)" },
+    "zh-TW": { englishName: "Chinese (Traditional, Taiwan)", localizedName: "中文 (台湾)" },
+};
+var pxtLangCookieId = "PXT_LANG";
+var langCookieExpirationDays = 30;
+var defaultLanguages = ["en"];
+function getCookieLang() {
+    var cookiePropRegex = new RegExp(pxt.Util.escapeForRegex(pxtLangCookieId) + "=(.*?)(?:;|$)");
+    var cookieValue = cookiePropRegex.exec(document.cookie);
+    return cookieValue && cookieValue[1] || null;
 }
-function startDebugAsync() {
-    return clearAsync()
-        .then(function () { return compiler.compileAsync({ native: true }); })
-        .then(function (res) {
-        lastCompileResult = res;
-        callInfos = {};
-        var procLookup = [];
-        for (var _i = 0, _a = res.procDebugInfo; _i < _a.length; _i++) {
-            var pdi = _a[_i];
-            procLookup[pdi.idx] = pdi;
-        }
-        for (var _b = 0, _c = res.procDebugInfo; _b < _c.length; _b++) {
-            var pdi = _c[_b];
-            for (var _d = 0, _e = pdi.calls; _d < _e.length; _d++) {
-                var ci = _e[_d];
-                callInfos[ci.addr + ""] = {
-                    from: pdi,
-                    to: procLookup[ci.procIndex],
-                    stack: ci.stack
-                };
-            }
-        }
-        var bb = lastCompileResult.breakpoints;
-        var entry = bb[1];
-        for (var _f = 0, bb_2 = bb; _f < bb_2.length; _f++) {
-            var b = bb_2[_f];
-            if (b.binAddr && b.binAddr < entry.binAddr)
-                entry = b;
-        }
-        return setBreakpointsAsync([entry.binAddr]);
-    })
-        .then(function () { return workerOpAsync("reset"); })
-        .then(clearHalted)
-        .then(waitForHaltAsync)
-        .then(function (res) { return writeDebugStatusAsync(1).then(function () { return res; }); });
-}
-exports.startDebugAsync = startDebugAsync;
-function handleMessage(msg) {
-    console.log("HWDBGMSG", msg);
-    if (msg.type != "debugger")
+exports.getCookieLang = getCookieLang;
+function setCookieLang(langId) {
+    if (!allLanguages[langId]) {
         return;
-    var stepInto = false;
-    switch (msg.subtype) {
-        case 'stepinto':
-            stepInto = true;
-        case 'stepover':
-            nextBreakpoints = currBreakpoint.successors.map(function (id) { return lastCompileResult.breakpoints[id].binAddr; });
-            resumeAsync(stepInto);
-            break;
+    }
+    if (langId !== getCookieLang()) {
+        pxt.tickEvent("menu.lang.setcookielang." + langId);
+        var expiration = new Date();
+        expiration.setTime(expiration.getTime() + (langCookieExpirationDays * 24 * 60 * 60 * 1000));
+        document.cookie = pxtLangCookieId + "=" + langId + "; expires=" + expiration.toUTCString();
     }
 }
-exports.handleMessage = handleMessage;
-function snapshotAsync() {
-    return workerOpAsync("snapshot")
-        .then(function (r) { return r.state; });
-}
-exports.snapshotAsync = snapshotAsync;
-function restoreAsync(st) {
-    return workerOpAsync("restore", { state: st })
-        .then(function () { });
-}
-exports.restoreAsync = restoreAsync;
-function resumeAsync(into) {
-    if (into === void 0) { into = false; }
-    return Promise.resolve()
-        .then(function () { return writeDebugStatusAsync(into ? 3 : 1); })
-        .then(function () { return setBreakpointsAsync(nextBreakpoints); })
-        .then(function () { return workerOpAsync("resume"); })
-        .then(clearHalted);
-}
-exports.resumeAsync = resumeAsync;
-function waitForHaltAsync() {
-    U.assert(haltCheckRunning);
-    return onHalted;
-}
-exports.waitForHaltAsync = waitForHaltAsync;
-function getHwStateAsync() {
-    var res = {
-        machineState: null,
-        globals: []
-    };
-    return snapshotAsync()
-        .then(function (v) {
-        res.machineState = v;
-        return callForStateAsync(v);
-    })
-        .then(function (info) { return readMemAsync(info.globalsPtr, info.numGlobals); })
-        .then(function (g) {
-        res.globals = g;
-        return res;
-    });
-}
-exports.getHwStateAsync = getHwStateAsync;
-var devPath;
-function workerOpAsync(op, arg) {
-    if (arg === void 0) { arg = {}; }
-    init();
-    if (!devPath)
-        devPath = iface.opAsync("list", {})
-            .then(function (devs) {
-            var d0 = devs.devices[0];
-            if (d0)
-                return d0.path;
-            else
-                throw new Error("No device connected");
+exports.setCookieLang = setCookieLang;
+var LanguagePicker = (function (_super) {
+    __extends(LanguagePicker, _super);
+    function LanguagePicker(props) {
+        _super.call(this, props);
+        this.state = {
+            visible: false,
+            supportedLanguages: null
+        };
+    }
+    LanguagePicker.prototype.fetchSupportedLanguagesAsync = function () {
+        var _this = this;
+        if (this.state.supportedLanguages || !pxt.appTarget.appTheme.selectLanguage) {
+            return Promise.resolve();
+        }
+        return pxt.targetConfigAsync()
+            .then(function (targetCfg) {
+            if (targetCfg && targetCfg.languages) {
+                _this.setState({ visible: _this.state.visible, supportedLanguages: targetCfg.languages });
+            }
+        })
+            .catch(function (e) {
+            pxt.log("Error fetching supported languages: " + e.message || e);
+            pxt.tickEvent("menu.lang.langfetcherror");
         });
-    return devPath
-        .then(function (path) {
-        arg["path"] = path;
-        return iface.opAsync(op, arg);
-    });
-}
-exports.workerOpAsync = workerOpAsync;
-function flashDeviceAsync(startAddr, words) {
-    var cfg = {
-        flashWords: words,
-        flashCode: [],
-        bufferAddr: 0x20000400,
-        numBuffers: 2,
-        flashAddr: startAddr
     };
-    return compiler.assembleAsync(nrfFlashAsm)
-        .then(function (res) { cfg.flashCode = res.words; })
-        .then(function (res) { return workerOpAsync("wrpages", cfg); });
-}
-exports.flashDeviceAsync = flashDeviceAsync;
-/*
-#define PAGE_SIZE 0x400
-#define SIZE_IN_WORDS (PAGE_SIZE/4)
+    LanguagePicker.prototype.changeLanguage = function (langId) {
+        if (!allLanguages[langId]) {
+            return;
+        }
+        setCookieLang(langId);
+        if (langId !== exports.initialLang) {
+            pxt.tickEvent("menu.lang.changelang." + langId);
+            window.location.reload();
+        }
+        else {
+            pxt.tickEvent("menu.lang.samelang." + langId);
+            this.hide();
+        }
+    };
+    LanguagePicker.prototype.hide = function () {
+        this.setState({ visible: false, supportedLanguages: this.state.supportedLanguages });
+    };
+    LanguagePicker.prototype.show = function () {
+        this.setState({ visible: true, supportedLanguages: this.state.supportedLanguages });
+    };
+    LanguagePicker.prototype.render = function () {
+        var _this = this;
+        this.fetchSupportedLanguagesAsync();
+        var targetTheme = pxt.appTarget.appTheme;
+        var fetchedLangs = this.state.supportedLanguages;
+        var languagesToShow = fetchedLangs && fetchedLangs.length ? fetchedLangs : defaultLanguages;
+        var modalSize = languagesToShow.length > 4 ? "large" : "small";
+        return (React.createElement(sui.Modal, {open: this.state.visible, header: lf("Select Language"), size: modalSize, onClose: function () { return _this.setState({ visible: false, supportedLanguages: _this.state.supportedLanguages }); }, dimmer: true, closeIcon: true, closeOnDimmerClick: true, closeOnDocumentClick: true}, React.createElement("div", {className: "group"}, React.createElement("div", {className: "ui cards centered"}, languagesToShow.map(function (langId) {
+            return React.createElement(codecard.CodeCardView, {className: "card-selected", key: langId, name: allLanguages[langId].localizedName, description: allLanguages[langId].englishName, onClick: function () { return _this.changeLanguage(langId); }});
+        }))), React.createElement("p", null, React.createElement("br", null), React.createElement("br", null), React.createElement("a", {href: "https://crowdin.com/project/" + targetTheme.crowdinProject, target: "_blank"}, lf("Help us translate")))));
+    };
+    return LanguagePicker;
+}(React.Component));
+exports.LanguagePicker = LanguagePicker;
 
-void setConfig(uint32_t v) {
-    NRF_NVMC->CONFIG = v;
-    while (NRF_NVMC->READY == NVMC_READY_READY_Busy);
-}
-
-void overwriteFlashPage(uint32_t* to, uint32_t* from)
-{
-    // Turn on flash erase enable and wait until the NVMC is ready:
-    setConfig(NVMC_CONFIG_WEN_Een << NVMC_CONFIG_WEN_Pos);
-
-    // Erase page:
-    NRF_NVMC->ERASEPAGE = (uint32_t)to;
-    while (NRF_NVMC->READY == NVMC_READY_READY_Busy);
-
-    // Turn off flash erase enable and wait until the NVMC is ready:
-    setConfig(NVMC_CONFIG_WEN_Ren << NVMC_CONFIG_WEN_Pos);
-
-    // Turn on flash write enable and wait until the NVMC is ready:
-    setConfig(NVMC_CONFIG_WEN_Wen << NVMC_CONFIG_WEN_Pos);
-
-    for(int i = 0; i <= (SIZE_IN_WORDS - 1); i++) {
-        *(to + i) = *(from + i);
-        while (NRF_NVMC->READY == NVMC_READY_READY_Busy);
-    }
-
-    // Turn off flash write enable and wait until the NVMC is ready:
-    setConfig(NVMC_CONFIG_WEN_Ren << NVMC_CONFIG_WEN_Pos);
-}
-*/
-var nrfFlashAsm = "\noverwriteFlashPage:\n        cpsid i\n        push    {r4, r5, r6, lr}\n        movs    r5, r0\n        movs    r0, #2\n        movs    r6, r1\n        bl      .setConfig\n        movs    r3, #161        ; 0xa1\n        movs    r2, #128        ; 0x80\n        ldr     r4, .NRF_NVMC\n        lsls    r3, r3, #3\n        str     r5, [r4, r3]\n        lsls    r2, r2, #3\n.overLoop:\n        ldr     r3, [r4, r2]\n        cmp     r3, #0\n        beq     .overLoop\n        movs    r0, #0\n        bl      .setConfig\n        movs    r0, #1\n        bl      .setConfig\n        movs    r2, #128\n        lsls    r2, r2, #3\n        movs    r3, #0\n        movs    r1, r2\n.overOuterLoop:\n        ldr     r0, [r6, r3]\n        str     r0, [r5, r3]\n.overLoop2:\n        ldr     r0, [r4, r2]\n        cmp     r0, #0\n        beq     .overLoop2\n        adds    r3, #4\n        cmp     r3, r1\n        bne     .overOuterLoop\n        movs    r0, #0\n        bl      .setConfig\n        pop     {r4, r5, r6, pc}\n\n.setConfig:\n        movs    r1, #128\n        ldr     r3, .NRF_NVMC\n        ldr     r2, .v504\n        lsls    r1, r1, #3\n        str     r0, [r3, r2]\n.cfgLoop:\n        ldr     r2, [r3, r1]\n        cmp     r2, #0\n        beq     .cfgLoop\n        bx      lr\n\n\n                .balign 4\n.NRF_NVMC:      .word   0x4001e000\n.v504:          .word   0x504\n";
-
-},{"./compiler":8,"./workeriface":36}],21:[function(require,module,exports){
+},{"./codecard":8,"./sui":37,"react":302}],23:[function(require,module,exports){
 /// <reference path="../../built/pxtsim.d.ts" />
 "use strict";
 var __extends = (this && this.__extends) || function (d, b) {
@@ -5000,28 +5508,92 @@ var LogView = (function (_super) {
 }(React.Component));
 exports.LogView = LogView;
 
-},{"./core":10,"react":315,"react-dom":159}],22:[function(require,module,exports){
+},{"./core":11,"react":302,"react-dom":146}],24:[function(require,module,exports){
+"use strict";
+var pkg = require("./package");
+var core = require("./core");
+var compiler = require("./compiler");
+function makeAsync() {
+    return compiler.compileAsync({ native: true })
+        .then(function (resp) {
+        var p = pkg.mainEditorPkg();
+        var code = p.files["main.ts"];
+        var data = {
+            name: p.header.name || lf("Untitled"),
+            code: code ? code.content : "basic.showString(\"Hi!\");",
+            board: JSON.stringify(pxt.appTarget.simulator.boardDefinition)
+        };
+        var parts = ts.pxtc.computeUsedParts(resp);
+        if (parts.length) {
+            data.parts = parts.join(" ");
+            data.partdefs = JSON.stringify(pkg.mainPkg.computePartDefinitions(parts));
+        }
+        var fnArgs = resp.usedArguments;
+        if (fnArgs)
+            data.fnArgs = JSON.stringify(fnArgs);
+        data.package = Util.values(pkg.mainPkg.deps).filter(function (p) { return p.id != "this"; }).map(function (p) { return (p.id + "=" + p._verspec); }).join('\n');
+        var urlData = Object.keys(data).map(function (k) { return (k + "=" + encodeURIComponent(data[k])); }).join('&');
+        var url = pxt.webConfig.partsUrl + "?" + urlData;
+        return core.dialogAsync({
+            hideCancel: true,
+            header: lf("Make"),
+            size: "large",
+            htmlBody: "\n        <div class=\"ui container\">\n            <div style=\"position:relative;height:0;padding-bottom:40%;overflow:hidden;\">\n                <iframe style=\"position:absolute;top:0;left:0;width:100%;height:100%;\" src=\"" + url + "\" sandbox=\"allow-popups allow-forms allow-scripts allow-same-origin\"\n                    frameborder=\"0\"></iframe>\n            </div>\n        </div>",
+            buttons: [{
+                    label: lf("Open"),
+                    url: url,
+                    icon: "external"
+                }]
+        });
+    }).then(function (r) {
+    });
+}
+exports.makeAsync = makeAsync;
+
+},{"./compiler":9,"./core":11,"./package":28}],25:[function(require,module,exports){
 "use strict";
 var U = pxt.Util;
-var projects = {};
+exports.projects = {};
 var target = "";
+function merge(prj) {
+    var h = prj.header;
+    if (!h) {
+        prj.header = h = {
+            id: U.guidGen(),
+            recentUse: U.nowSeconds(),
+            modificationTime: U.nowSeconds(),
+            target: target,
+            _rev: undefined,
+            blobId: undefined,
+            blobCurrent: undefined,
+            isDeleted: false,
+            name: lf("Untitled"),
+            meta: {},
+            editor: pxt.BLOCKS_PROJECT_NAME,
+            pubId: undefined,
+            pubCurrent: undefined
+        };
+    }
+    exports.projects[prj.header.id] = prj;
+}
+exports.merge = merge;
 function getHeaders() {
-    return Util.values(projects).map(function (p) { return p.header; });
+    return Util.values(exports.projects).map(function (p) { return p.header; });
 }
 function getHeader(id) {
-    var p = projects[id];
+    var p = exports.projects[id];
     return p ? p.header : undefined;
 }
 function getTextAsync(id) {
-    var p = projects[id];
+    var p = exports.projects[id];
     return Promise.resolve(p ? p.text : undefined);
 }
 function initAsync(trg) {
-    target = target;
+    target = trg;
     return Promise.resolve();
 }
 function saveAsync(h, text) {
-    projects[h.id] = {
+    exports.projects[h.id] = {
         header: h,
         text: text
     };
@@ -5039,10 +5611,10 @@ function saveToCloudAsync(h) {
     return Promise.resolve();
 }
 function syncAsync() {
-    return Promise.resolve();
+    return Promise.resolve(undefined);
 }
 function resetAsync() {
-    projects = {};
+    exports.projects = {};
     target = "";
     return Promise.resolve();
 }
@@ -5058,7 +5630,7 @@ exports.provider = {
     resetAsync: resetAsync
 };
 
-},{}],23:[function(require,module,exports){
+},{}],26:[function(require,module,exports){
 /// <reference path="../../localtypings/monaco.d.ts" />
 /// <reference path="../../built/pxteditor.d.ts" />
 "use strict";
@@ -5072,6 +5644,7 @@ var pkg = require("./package");
 var core = require("./core");
 var srceditor = require("./srceditor");
 var compiler = require("./compiler");
+var snippets = require("./monacoSnippets");
 var Util = pxt.Util;
 var lf = Util.lf;
 var MIN_EDITOR_FONT_SIZE = 10;
@@ -5138,13 +5711,31 @@ var Editor = (function (_super) {
                 pxt.blocks.initBlocks(blocksInfo);
                 var oldWorkspace = pxt.blocks.loadWorkspaceXml(mainPkg.files[blockFile].content);
                 if (oldWorkspace) {
-                    var oldJs = pxt.blocks.compile(oldWorkspace, blocksInfo).source;
-                    if (pxtc.format(oldJs, 0).formatted == pxtc.format(_this.editor.getValue(), 0).formatted) {
-                        pxt.debug('js not changed, skipping decompile');
-                        pxt.tickEvent("typescript.noChanges");
-                        return _this.parent.setFile(mainPkg.files[blockFile]);
-                    }
+                    return pxt.blocks.compileAsync(oldWorkspace, blocksInfo).then(function (compilationResult) {
+                        var oldJs = compilationResult.source;
+                        return compiler.formatAsync(oldJs, 0).then(function (oldFormatted) {
+                            return compiler.formatAsync(_this.editor.getValue(), 0).then(function (newFormatted) {
+                                if (oldFormatted.formatted == newFormatted.formatted) {
+                                    pxt.debug('js not changed, skipping decompile');
+                                    pxt.tickEvent("typescript.noChanges");
+                                    _this.parent.setFile(mainPkg.files[blockFile]);
+                                    return [oldWorkspace, false]; // return false to indicate we don't want to decompile
+                                }
+                                else {
+                                    return [oldWorkspace, true];
+                                }
+                            });
+                        });
+                    });
                 }
+                return [oldWorkspace, true];
+            }).then(function (values) {
+                if (!values)
+                    return Promise.resolve();
+                var oldWorkspace = values[0];
+                var shouldDecompile = values[1];
+                if (!shouldDecompile)
+                    return Promise.resolve();
                 return compiler.decompileAsync(_this.currFile.name, blocksInfo, oldWorkspace, blockFile)
                     .then(function (resp) {
                     if (!resp.success) {
@@ -5184,8 +5775,10 @@ var Editor = (function (_super) {
             }
             else {
                 pxt.tickEvent("typescript.discardText");
-                _this.overrideFile(_this.parent.saveBlocksToTypeScript());
-                _this.parent.setFile(bf);
+                _this.parent.saveBlocksToTypeScriptAsync().then(function (src) {
+                    _this.overrideFile(src);
+                    _this.parent.setFile(bf);
+                });
             }
         });
     };
@@ -5197,17 +5790,18 @@ var Editor = (function (_super) {
         return (React.createElement("div", {className: 'full-abs', id: "monacoEditorArea"}, React.createElement("div", {id: 'monacoEditorToolbox', className: 'injectionDiv'}), React.createElement("div", {id: 'monacoEditorInner'})));
     };
     Editor.prototype.defineEditorTheme = function () {
+        var _this = this;
         var inverted = pxt.appTarget.appTheme.invertedMonaco;
         var invertedColorluminosityMultipler = 0.6;
-        var fnDict = this.definitions;
         var rules = [];
-        Object.keys(fnDict).forEach(function (ns) {
-            var element = fnDict[ns];
-            if (element.metaData && element.metaData.color && element.fns) {
-                var hexcolor_1 = pxt.blocks.convertColour(element.metaData.color);
+        this.getNamespaces().forEach(function (ns) {
+            var metaData = _this.getNamespaceAttrs(ns);
+            var blocks = snippets.isBuiltin(ns) ? snippets.getBuiltinCategory(ns).blocks : _this.nsMap[ns];
+            if (metaData.color && blocks) {
+                var hexcolor_1 = pxt.blocks.convertColour(metaData.color);
                 hexcolor_1 = (inverted ? Blockly.PXTUtils.fadeColour(hexcolor_1, invertedColorluminosityMultipler, true) : hexcolor_1).replace('#', '');
-                Object.keys(element.fns).forEach(function (fn) {
-                    rules.push({ token: "identifier.ts " + fn, foreground: hexcolor_1 });
+                blocks.forEach(function (fn) {
+                    rules.push({ token: "identifier.ts " + fn.name, foreground: hexcolor_1 });
                 });
                 rules.push({ token: "identifier.ts " + ns, foreground: hexcolor_1 });
             }
@@ -5225,45 +5819,7 @@ var Editor = (function (_super) {
     };
     Editor.prototype.beforeCompile = function () {
         if (this.editor)
-            this.formatCode();
-    };
-    Editor.prototype.formatCode = function (isAutomatic) {
-        if (isAutomatic === void 0) { isAutomatic = false; }
-        Util.assert(this.editor != undefined); // Guarded
-        if (this.fileType != FileType.TypeScript)
-            return;
-        function spliceStr(big, idx, deleteCount, injection) {
-            if (injection === void 0) { injection = ""; }
-            return big.slice(0, idx) + injection + big.slice(idx + deleteCount);
-        }
-        var position = this.editor.getPosition();
-        var data = this.textAndPosition(position);
-        var cursorOverride = this.editor.getModel().getOffsetAt(position);
-        if (cursorOverride >= 0) {
-            isAutomatic = false;
-            data.charNo = cursorOverride;
-        }
-        var tmp = pxtc.format(data.programText, data.charNo);
-        if (isAutomatic && tmp.formatted == data.programText)
-            return;
-        var formatted = tmp.formatted;
-        var line = 1;
-        var col = 0;
-        //console.log(data.charNo, tmp.pos)
-        for (var i = 0; i < formatted.length; ++i) {
-            var c = formatted.charCodeAt(i);
-            col++;
-            if (i >= tmp.pos)
-                break;
-            if (c == 10) {
-                line++;
-                col = 0;
-            }
-        }
-        this.editor.setValue(formatted);
-        this.editor.setScrollPosition(line);
-        this.editor.setPosition(position);
-        return formatted;
+            this.editor.getAction('editor.action.formatDocument').run();
     };
     Editor.prototype.textAndPosition = function (pos) {
         var programText = this.editor.getValue();
@@ -5288,8 +5844,9 @@ var Editor = (function (_super) {
     Editor.prototype.resize = function (e) {
         var monacoArea = document.getElementById('monacoEditorArea');
         var monacoToolbox = document.getElementById('monacoEditorToolbox');
-        if (monacoArea && monacoToolbox && this.editor)
-            this.editor.layout({ width: monacoArea.offsetWidth - monacoToolbox.offsetWidth - 1, height: monacoArea.offsetHeight });
+        if (monacoArea && monacoToolbox && this.editor) {
+            this.editor.layout({ width: monacoArea.offsetWidth - monacoToolbox.clientWidth, height: monacoArea.offsetHeight });
+        }
     };
     Editor.prototype.prepare = function () {
         this.isReady = true;
@@ -5306,8 +5863,6 @@ var Editor = (function (_super) {
             _this.editor = editor;
             _this.loadingMonaco = false;
             _this.editor.updateOptions({ fontSize: _this.parent.settings.editorFontSize });
-            _this.editor.getActions().filter(function (action) { return action.id == "editor.action.formatDocument"; })[0]
-                .run = function () { return Promise.resolve(_this.beforeCompile()); };
             _this.editor.addAction({
                 id: "save",
                 label: lf("Save"),
@@ -5351,14 +5906,6 @@ var Editor = (function (_super) {
                 label: lf("Zoom Out"),
                 keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.NUMPAD_SUBTRACT, monaco.KeyMod.CtrlCmd | monaco.KeyCode.US_MINUS],
                 run: function () { return Promise.resolve(_this.zoomOut()); }
-            });
-            _this.editor.onDidBlurEditorText(function () {
-                if (_this.isIncomplete()) {
-                    monaco.languages.typescript.typescriptDefaults._diagnosticsOptions = ({ noSyntaxValidation: true, noSemanticValidation: true });
-                }
-                else {
-                    monaco.languages.typescript.typescriptDefaults._diagnosticsOptions = ({ noSyntaxValidation: false, noSemanticValidation: false });
-                }
             });
             if (pxt.appTarget.appTheme.hasReferenceDocs) {
                 var referenceContextKey_1 = _this.editor.createContextKey("editorHasReference", false);
@@ -5439,6 +5986,7 @@ var Editor = (function (_super) {
                         forceMoveMarkers: false
                     }
                 ]);
+                _this.beforeCompile();
                 _this.editor.pushUndoStop();
                 var endPos = model.getPositionAt(cursor);
                 _this.editor.setPosition(endPos);
@@ -5491,11 +6039,11 @@ var Editor = (function (_super) {
         if (prevWordInfo && wordInfo) {
             var namespaceName = prevWordInfo.word.replace(/([A-Z]+)/g, "-$1");
             var methodName = wordInfo.word.replace(/([A-Z]+)/g, "-$1");
-            this.parent.setSideDoc("/reference/" + namespaceName + "/" + methodName);
+            this.parent.setSideDoc("/reference/" + namespaceName + "/" + methodName, false);
         }
         else if (wordInfo) {
             var methodName = wordInfo.word.replace(/([A-Z]+)/g, "-$1");
-            this.parent.setSideDoc("/reference/" + methodName);
+            this.parent.setSideDoc("/reference/" + methodName, false);
         }
     };
     Editor.prototype.setupToolbox = function (editorElement) {
@@ -5558,91 +6106,137 @@ var Editor = (function (_super) {
         var group = document.createElement('div');
         group.setAttribute('role', 'group');
         root.appendChild(group);
-        var fnDef = this.definitions;
-        Object.keys(fnDef).sort(function (f1, f2) {
-            // sort by fn weight
-            var fn1 = fnDef[f1];
-            var fn2 = fnDef[f2];
-            var w2 = (fn2.metaData ? fn2.metaData.weight || 50 : 50)
-                + (fn2.metaData && fn2.metaData.advanced ? 0 : 1000);
-            +(fn2.metaData && fn2.metaData.blockId ? 10000 : 0);
-            var w1 = (fn1.metaData ? fn1.metaData.weight || 50 : 50)
-                + (fn1.metaData && fn1.metaData.advanced ? 0 : 1000);
-            +(fn1.metaData && fn1.metaData.blockId ? 10000 : 0);
-            return w2 - w1;
-        }).filter(function (ns) { return fnDef[ns].metaData != null && fnDef[ns].metaData.color != null; }).forEach(function (ns) {
-            var metaElement = fnDef[ns];
-            var fnElement = fnDef[ns];
-            monacoEditor.addToolboxCategory(group, ns, metaElement.metaData.color, metaElement.metaData.icon, true, fnElement.fns);
+        var namespaces = this.getNamespaces().map(function (ns) { return [ns, _this.getNamespaceAttrs(ns)]; });
+        var hasAdvanced = namespaces.some(function (_a) {
+            var md = _a[1];
+            return md.advanced;
         });
-        Editor.addBuiltinCategories(group, monacoEditor);
-        // Add the toolbox buttons
-        if (pxt.appTarget.cloud && pxt.appTarget.cloud.packages) {
-            this.addToolboxCategory(group, "", "#717171", "addpackage", false, null, function () {
+        // Non-advanced categories
+        appendCategories(group, namespaces.filter(function (_a) {
+            var md = _a[1];
+            return !(md.advanced);
+        }));
+        if (hasAdvanced) {
+            // Advanced seperator
+            group.appendChild(Editor.createTreeSeperator());
+            // Advanced toggle
+            group.appendChild(this.createCategoryElement("", pxt.blocks.getNamespaceColor('advanced'), this.showAdvanced ? 'advancedexpanded' : 'advancedcollapsed', false, null, function () {
+                _this.showAdvanced = !_this.showAdvanced;
+                _this.updateToolbox();
+            }, lf("{id:category}Advanced")));
+        }
+        if (this.showAdvanced) {
+            appendCategories(group, namespaces.filter(function (_a) {
+                var md = _a[1];
+                return md.advanced;
+            }));
+        }
+        if ((!hasAdvanced || this.showAdvanced) && pxt.appTarget.cloud && pxt.appTarget.cloud.packages) {
+            if (!hasAdvanced) {
+                // Add a seperator
+                group.appendChild(Editor.createTreeSeperator());
+            }
+            // Add package button
+            group.appendChild(this.createCategoryElement("", "#717171", "addpackage", false, null, function () {
                 _this.resetFlyout();
                 _this.parent.addPackage();
-            }, lf("{id:category}Add Package"));
+            }, lf("{id:category}Add Package")));
         }
         // Inject toolbox icon css
         pxt.blocks.injectToolboxIconCss();
+        function appendCategories(group, names) {
+            return names
+                .sort(function (_a, _b) {
+                var md1 = _a[1];
+                var md2 = _b[1];
+                // sort by fn weight
+                var w2 = (md2 ? md2.weight || 50 : 50);
+                var w1 = (md1 ? md1.weight || 50 : 50);
+                return w2 - w1;
+            }).forEach(function (_a) {
+                var ns = _a[0], md = _a[1];
+                var el;
+                if (!snippets.isBuiltin(ns)) {
+                    var blocks_1 = monacoEditor.nsMap[ns].filter(function (block) { return !(block.attributes.blockHidden || block.attributes.deprecated); });
+                    var categoryName = md.block ? md.block : undefined;
+                    el = monacoEditor.createCategoryElement(ns, md.color, md.icon, true, blocks_1, undefined, categoryName);
+                }
+                else {
+                    var blocks_2 = snippets.getBuiltinCategory(ns).blocks;
+                    if (monacoEditor.nsMap[ns.toLowerCase()])
+                        blocks_2 = blocks_2.concat(monacoEditor.nsMap[ns.toLowerCase()].filter(function (block) { return !(block.attributes.blockHidden || block.attributes.deprecated); }));
+                    el = monacoEditor.createCategoryElement("", md.color, md.icon, false, blocks_2, null, ns);
+                }
+                group.appendChild(el);
+            });
+        }
     };
-    Editor.addBuiltinCategories = function (group, monacoEditor) {
-        monacoEditor.addToolboxCategory(group, "", pxt.blocks.blockColors["logic"].toString(), "logic", false, {
-            "if": {
-                sig: "",
-                snippet: "if (true) {\n\n}",
-                comment: lf("Runs code if the condition is true"),
-                metaData: {
-                    callingConvention: ts.pxtc.ir.CallingConvention.Plain,
-                    paramDefl: {}
-                }
-            }, "if ": {
-                sig: "",
-                snippet: "if (true) {\n\n} else {\n\n}",
-                comment: lf("Runs code if the condition is true; else run other code"),
-                metaData: {
-                    callingConvention: ts.pxtc.ir.CallingConvention.Plain,
-                    paramDefl: {}
-                }
-            }, "switch": {
-                sig: "",
-                snippet: "switch(item) {\n    case 0:\n        break;\n    case 1:\n        break;\n}",
-                comment: lf("Runs different code based on a value"),
-                metaData: {
-                    callingConvention: ts.pxtc.ir.CallingConvention.Plain,
-                    paramDefl: {}
-                }
-            }
-        }, null, lf("{id:category}Logic"));
-        monacoEditor.addToolboxCategory(group, "", pxt.blocks.blockColors["loops"].toString(), "loops", false, {
-            "while": {
-                sig: "while(...)",
-                snippet: "while(true) {\n\n}",
-                comment: lf("Repeat code while condition is true"),
-                metaData: {
-                    callingConvention: ts.pxtc.ir.CallingConvention.Plain,
-                    paramDefl: {}
-                }
-            },
-            "for": {
-                sig: "",
-                snippet: "for(let i = 0; i < 5; i++) {\n\n}",
-                comment: lf("Repeat code a number of times in a loop"),
-                metaData: {
-                    callingConvention: ts.pxtc.ir.CallingConvention.Plain,
-                    paramDefl: {}
-                }
-            }
-        }, null, lf("{id:category}Loops"));
+    Editor.prototype.getNamespaceAttrs = function (ns) {
+        var builtin = snippets.getBuiltinCategory(ns);
+        if (builtin) {
+            builtin.attributes.color = pxt.blocks.getNamespaceColor(builtin.nameid);
+            return builtin.attributes;
+        }
+        var info = this.blockInfo.apis.byQName[ns];
+        if (info && info.attributes.color) {
+            return info.attributes;
+        }
+        return undefined;
     };
-    Editor.prototype.addToolboxCategory = function (group, ns, metaColor, icon, injectIconClass, fns, onClick, category) {
+    Editor.prototype.getNamespaces = function () {
+        var _this = this;
+        var namespaces = Object.keys(this.nsMap).filter(function (ns) { return !snippets.isBuiltin(ns) && !!_this.getNamespaceAttrs(ns); });
+        var config = pxt.appTarget.runtime || {};
+        if (config.loopsBlocks)
+            namespaces.push(snippets.loops.nameid);
+        if (config.logicBlocks)
+            namespaces.push(snippets.logic.nameid);
+        if (config.variablesBlocks)
+            namespaces.push(snippets.variables.nameid);
+        if (config.mathBlocks)
+            namespaces.push(snippets.maths.nameid);
+        if (config.textBlocks)
+            namespaces.push(snippets.text.nameid);
+        if (config.listsBlocks)
+            namespaces.push(snippets.arrays.nameid);
+        return namespaces;
+    };
+    Editor.createTreeSeperator = function () {
+        var treeitem = Editor.createTreeItem();
+        var treeSeperator = document.createElement("div");
+        treeSeperator.setAttribute("class", "blocklyTreeSeparator");
+        treeitem.appendChild(treeSeperator);
+        return treeitem;
+    };
+    Editor.createTreeItem = function () {
+        var treeitem = document.createElement('div');
+        treeitem.setAttribute('role', 'treeitem');
+        return treeitem;
+    };
+    Editor.prototype.createCategoryElement = function (ns, metaColor, icon, injectIconClass, fns, onClick, category) {
+        var _this = this;
         if (injectIconClass === void 0) { injectIconClass = true; }
+        // Filter the toolbox
+        var filters = this.parent.state.filters;
+        var categoryState = filters ? (filters.namespaces && filters.namespaces[ns] != undefined ? filters.namespaces[ns] : filters.defaultState) : undefined;
+        var hasChild = false;
+        if (filters) {
+            Object.keys(fns).forEach(function (fn) {
+                var fnState = filters.fns && filters.fns[fn] != undefined ? filters.fns[fn] : (categoryState != undefined ? categoryState : filters.defaultState);
+                if (fnState == pxt.editor.FilterState.Disabled || fnState == pxt.editor.FilterState.Visible)
+                    hasChild = true;
+            });
+        }
+        else {
+            hasChild = true;
+        }
+        if (!hasChild)
+            return;
         var appTheme = pxt.appTarget.appTheme;
         var monacoEditor = this;
         // Create a tree item
-        var treeitem = document.createElement('div');
+        var treeitem = Editor.createTreeItem();
         var treerow = document.createElement('div');
-        treeitem.setAttribute('role', 'treeitem');
         var color = pxt.blocks.convertColour(metaColor);
         treeitem.onclick = function (ev) {
             pxt.tickEvent("monaco.toolbox.click");
@@ -5684,32 +6278,56 @@ var Editor = (function (_super) {
             }
             else {
                 // Create a flyout and add the category methods in there
-                Object.keys(fns).sort(function (f1, f2) {
+                fns.sort(function (f1, f2) {
                     // sort by fn weight
-                    var fn1 = fns[f1];
-                    var fn2 = fns[f2];
-                    var w2 = (fn2.metaData ? fn2.metaData.weight || 50 : 50)
-                        + (fn2.metaData && fn2.metaData.advanced ? 0 : 1000);
-                    +(fn2.metaData && fn2.metaData.blockId ? 10000 : 0);
-                    var w1 = (fn1.metaData ? fn1.metaData.weight || 50 : 50)
-                        + (fn1.metaData && fn1.metaData.advanced ? 0 : 1000);
-                    +(fn1.metaData && fn1.metaData.blockId ? 10000 : 0);
+                    var w2 = (f2.attributes.weight || 50) + (f2.attributes.advanced ? 0 : 1000);
+                    var w1 = (f1.attributes.weight || 50) + (f1.attributes.advanced ? 0 : 1000);
                     return w2 - w1;
-                }).forEach(function (fn) {
+                })
+                    .forEach(function (fn) {
+                    var monacoBlockDisabled = false;
+                    var fnState = filters ? (filters.fns && filters.fns[fn.name] != undefined ? filters.fns[fn.name] : (categoryState != undefined ? categoryState : filters.defaultState)) : undefined;
+                    monacoBlockDisabled = fnState == pxt.editor.FilterState.Disabled;
+                    if (fnState == pxt.editor.FilterState.Hidden)
+                        return;
+                    var monacoBlockArea = document.createElement('div');
                     var monacoBlock = document.createElement('div');
                     monacoBlock.className = 'monacoDraggableBlock';
                     monacoBlock.style.fontSize = monacoEditor.parent.settings.editorFontSize + "px";
-                    monacoBlock.style.backgroundColor = "" + color;
+                    monacoBlock.style.backgroundColor = monacoBlockDisabled ?
+                        "" + Blockly.PXTUtils.fadeColour(color || '#ddd', 0.8, false) :
+                        "" + color;
                     monacoBlock.style.borderColor = "" + color;
-                    monacoBlock.draggable = true;
-                    var elem = fns[fn];
-                    var snippet = elem.snippet;
-                    var comment = elem.comment;
-                    var metaData = elem.metaData;
-                    var methodToken = document.createElement('span');
-                    methodToken.innerText = fn;
+                    var snippet = fn.snippet;
+                    var comment = fn.attributes.jsDoc;
+                    var snippetPrefix = ns;
+                    var element = fn;
+                    if (element.attributes.block) {
+                        if (element.attributes.defaultInstance) {
+                            snippetPrefix = element.attributes.defaultInstance;
+                        }
+                        else {
+                            var nsInfo_1 = _this.blockInfo.apis.byQName[element.namespace];
+                            if (nsInfo_1.kind === pxtc.SymbolKind.Class) {
+                                return;
+                            }
+                            else if (nsInfo_1.attributes.fixedInstances) {
+                                var instances = Util.values(_this.blockInfo.apis.byQName).filter(function (value) {
+                                    return value.kind === pxtc.SymbolKind.Variable &&
+                                        value.attributes.fixedInstance &&
+                                        value.retType === nsInfo_1.name;
+                                })
+                                    .sort(function (v1, v2) { return v1.name.localeCompare(v2.name); });
+                                if (instances.length) {
+                                    snippetPrefix = instances[0].namespace + "." + instances[0].name;
+                                }
+                            }
+                        }
+                    }
                     var sigToken = document.createElement('span');
-                    sigToken.className = 'sig';
+                    if (!fn.snippetOnly) {
+                        sigToken.className = 'sig';
+                    }
                     // completion is a bit busted but looks better
                     sigToken.innerText = snippet
                         .replace(/^[^(]*\(/, '(')
@@ -5717,58 +6335,66 @@ var Editor = (function (_super) {
                         .replace(/\{\n\}/g, '{}')
                         .replace(/(?:\{\{)|(?:\}\})/g, '');
                     monacoBlock.title = comment;
-                    monacoBlock.onclick = function (ev2) {
-                        pxt.tickEvent("monaco.toolbox.itemclick");
-                        monacoEditor.resetFlyout(true);
-                        var model = monacoEditor.editor.getModel();
-                        var currPos = monacoEditor.editor.getPosition();
-                        var cursor = model.getOffsetAt(currPos);
-                        var insertText = ns ? ns + "." + snippet : snippet;
-                        insertText = (currPos.column > 1) ? '\n' + insertText :
-                            model.getWordUntilPosition(currPos) != undefined && model.getWordUntilPosition(currPos).word != '' ?
-                                insertText + '\n' : insertText;
-                        if (insertText.indexOf('{{}}') > -1) {
-                            cursor += (insertText.indexOf('{{}}'));
-                            insertText = insertText.replace('{{}}', '');
-                        }
-                        else
-                            cursor += (insertText.length);
-                        insertText = insertText.replace(/(?:\{\{)|(?:\}\})/g, '');
-                        monacoEditor.editor.pushUndoStop();
-                        monacoEditor.editor.executeEdits("", [
-                            {
-                                identifier: { major: 0, minor: 0 },
-                                range: new monaco.Range(currPos.lineNumber, currPos.column, currPos.lineNumber, currPos.column),
-                                text: insertText,
-                                forceMoveMarkers: false
+                    if (!monacoBlockDisabled) {
+                        monacoBlock.draggable = true;
+                        monacoBlock.onclick = function (ev2) {
+                            pxt.tickEvent("monaco.toolbox.itemclick");
+                            monacoEditor.resetFlyout(true);
+                            var model = monacoEditor.editor.getModel();
+                            var currPos = monacoEditor.editor.getPosition();
+                            var cursor = model.getOffsetAt(currPos);
+                            var insertText = snippetPrefix ? snippetPrefix + "." + snippet : snippet;
+                            insertText = (currPos.column > 1) ? '\n' + insertText :
+                                model.getWordUntilPosition(currPos) != undefined && model.getWordUntilPosition(currPos).word != '' ?
+                                    insertText + '\n' : insertText;
+                            if (insertText.indexOf('{{}}') > -1) {
+                                cursor += (insertText.indexOf('{{}}'));
+                                insertText = insertText.replace('{{}}', '');
                             }
-                        ]);
-                        monacoEditor.editor.pushUndoStop();
-                        var endPos = model.getPositionAt(cursor);
-                        monacoEditor.editor.setPosition(endPos);
-                        monacoEditor.editor.focus();
-                        //monacoEditor.editor.setSelection(new monaco.Range(currPos.lineNumber, currPos.column, endPos.lineNumber, endPos.column));
-                    };
-                    monacoBlock.ondragstart = function (ev2) {
-                        pxt.tickEvent("monaco.toolbox.itemdrag");
-                        var clone = monacoBlock.cloneNode(true);
-                        setTimeout(function () {
-                            monacoFlyout.style.transform = "translateX(-9999px)";
-                        });
-                        var insertText = ns ? ns + "." + snippet : snippet;
-                        ev2.dataTransfer.setData('text', insertText); // IE11 only supports text
-                    };
-                    monacoBlock.ondragend = function (ev2) {
-                        monacoFlyout.style.transform = "none";
-                        monacoEditor.resetFlyout(true);
-                    };
-                    monacoBlock.appendChild(methodToken);
+                            else
+                                cursor += (insertText.length);
+                            insertText = insertText.replace(/(?:\{\{)|(?:\}\})/g, '');
+                            monacoEditor.editor.pushUndoStop();
+                            monacoEditor.editor.executeEdits("", [
+                                {
+                                    identifier: { major: 0, minor: 0 },
+                                    range: new monaco.Range(currPos.lineNumber, currPos.column, currPos.lineNumber, currPos.column),
+                                    text: insertText,
+                                    forceMoveMarkers: false
+                                }
+                            ]);
+                            monacoEditor.beforeCompile();
+                            monacoEditor.editor.pushUndoStop();
+                            var endPos = model.getPositionAt(cursor);
+                            monacoEditor.editor.setPosition(endPos);
+                            monacoEditor.editor.focus();
+                            //monacoEditor.editor.setSelection(new monaco.Range(currPos.lineNumber, currPos.column, endPos.lineNumber, endPos.column));
+                        };
+                        monacoBlock.ondragstart = function (ev2) {
+                            pxt.tickEvent("monaco.toolbox.itemdrag");
+                            var clone = monacoBlock.cloneNode(true);
+                            setTimeout(function () {
+                                monacoFlyout.style.transform = "translateX(-9999px)";
+                            });
+                            var insertText = snippetPrefix ? snippetPrefix + "." + snippet : snippet;
+                            ev2.dataTransfer.setData('text', insertText); // IE11 only supports text
+                        };
+                        monacoBlock.ondragend = function (ev2) {
+                            monacoFlyout.style.transform = "none";
+                            monacoEditor.resetFlyout(true);
+                        };
+                    }
+                    if (!fn.snippetOnly) {
+                        var methodToken = document.createElement('span');
+                        methodToken.innerText = fn.name;
+                        monacoBlock.appendChild(methodToken);
+                    }
                     monacoBlock.appendChild(sigToken);
-                    monacoFlyout.appendChild(monacoBlock);
+                    monacoBlockArea.appendChild(monacoBlock);
+                    monacoFlyout.appendChild(monacoBlockArea);
                 });
             }
         };
-        group.appendChild(treeitem);
         treerow.className = 'blocklyTreeRow';
         treeitem.appendChild(treerow);
         var iconBlank = document.createElement('span');
@@ -5812,7 +6438,8 @@ var Editor = (function (_super) {
             pxt.blocks.appendToolboxIconCss(iconClass, icon);
         }
         treerow.style.paddingLeft = '0px';
-        label.innerText = "" + Util.capitalize(category || ns);
+        label.innerText = category ? category : "" + Util.capitalize(ns);
+        return treeitem;
     };
     Editor.prototype.getId = function () {
         return "monacoEditor";
@@ -5889,8 +6516,7 @@ var Editor = (function (_super) {
             if (!file.isReadonly()) {
                 model.onDidChangeContent(function (e) {
                     // Remove any Highlighted lines
-                    if (_this.highlightDecorations)
-                        _this.editor.deltaDecorations(_this.highlightDecorations, []);
+                    _this.clearHighlightedStatements();
                     // Remove any current error shown, as a change has been made.
                     var viewZones = _this.editorViewZones || [];
                     _this.editor.changeViewZones(function (changeAccessor) {
@@ -5920,9 +6546,10 @@ var Editor = (function (_super) {
     };
     Editor.prototype.beginLoadToolbox = function (file) {
         var _this = this;
-        pxt.vs.syncModels(pkg.mainPkg, this.extraLibs, file.getName(), file.isReadonly())
-            .then(function (definitions) {
-            _this.definitions = definitions;
+        compiler.getBlocksAsync().then(function (bi) {
+            _this.blockInfo = bi;
+            _this.nsMap = _this.partitionBlocks();
+            pxt.vs.syncModels(pkg.mainPkg, _this.extraLibs, file.getName(), file.isReadonly());
             _this.defineEditorTheme();
             _this.updateToolbox();
             _this.resize();
@@ -5971,78 +6598,458 @@ var Editor = (function (_super) {
         if (this.fileType != FileType.TypeScript)
             return;
         var file = this.currFile;
-        var lines = this.editor.getModel().getLinesContent();
-        var fontSize = this.parent.settings.editorFontSize - 3;
-        var lineHeight = this.editor.getConfiguration().lineHeight;
-        var borderSize = lineHeight / 10;
-        var viewZones = this.editorViewZones || [];
-        this.annotationLines = [];
-        this.editor.changeViewZones(function (changeAccessor) {
-            viewZones.forEach(function (id) {
-                changeAccessor.removeZone(id);
-            });
-        });
-        this.editorViewZones = [];
-        this.errorLines = [];
+        var monacoErrors = [];
         if (file && file.diagnostics) {
+            var model = monaco.editor.getModel(monaco.Uri.parse("pkg:" + file.getName()));
             var _loop_1 = function(d) {
-                if (this_1.errorLines.filter(function (lineNumber) { return lineNumber == d.line; }).length > 0 || this_1.errorLines.length > 0)
-                    return "continue";
-                var viewZoneId = null;
-                this_1.editor.changeViewZones(function (changeAccessor) {
-                    var wrapper = document.createElement('div');
-                    wrapper.className = "zone-widget error-view-zone";
-                    var container = document.createElement('div');
-                    container.className = "zone-widget-container marker-widget";
-                    container.setAttribute('role', 'tooltip');
-                    container.style.setProperty("border", "solid " + borderSize + "px rgb(255, 90, 90)");
-                    container.style.setProperty("border", "solid " + borderSize + "px rgb(255, 90, 90)");
-                    container.style.setProperty("top", "" + lineHeight / 4);
-                    var domNode = document.createElement('div');
-                    domNode.className = "block descriptioncontainer";
-                    domNode.style.setProperty("font-size", fontSize.toString() + "px");
-                    domNode.style.setProperty("line-height", lineHeight.toString() + "px");
-                    domNode.innerText = ts.flattenDiagnosticMessageText(d.messageText, "\n");
-                    container.appendChild(domNode);
-                    wrapper.appendChild(container);
-                    viewZoneId = changeAccessor.addZone({
-                        afterLineNumber: d.line + 1,
-                        heightInLines: 1,
-                        domNode: wrapper
+                var endPos = model.getPositionAt(d.start + d.length);
+                if (typeof d.messageText === 'string') {
+                    addErrorMessage(d.messageText);
+                }
+                else {
+                    var curr = d.messageText;
+                    while (curr.next != undefined) {
+                        addErrorMessage(curr.messageText);
+                        curr = curr.next;
+                    }
+                }
+                function addErrorMessage(message) {
+                    monacoErrors.push({
+                        severity: monaco.Severity.Error,
+                        message: message,
+                        startLineNumber: d.line,
+                        startColumn: d.column,
+                        endLineNumber: d.endLine || endPos.lineNumber,
+                        endColumn: d.endColumn || endPos.column
                     });
-                });
-                this_1.editorViewZones.push(viewZoneId);
-                this_1.errorLines.push(d.line);
-                if (lines[d.line] === this_1.diagSnapshot[d.line]) {
-                    this_1.annotationLines.push(d.line);
                 }
             };
-            var this_1 = this;
             for (var _i = 0, _a = file.diagnostics; _i < _a.length; _i++) {
                 var d = _a[_i];
-                var state_1 = _loop_1(d);
-                if (state_1 === "continue") continue;
+                _loop_1(d);
             }
+            monaco.editor.setModelMarkers(model, 'typescript', monacoErrors);
         }
     };
     Editor.prototype.highlightStatement = function (brk) {
         if (!brk || !this.currFile || this.currFile.name != brk.fileName || !this.editor)
             return;
         var position = this.editor.getModel().getPositionAt(brk.start);
-        if (!position)
+        var end = this.editor.getModel().getPositionAt(brk.start + brk.length);
+        if (!position || !end)
             return;
         this.highlightDecorations = this.editor.deltaDecorations(this.highlightDecorations, [
             {
-                range: new monaco.Range(position.lineNumber, position.column, position.lineNumber, position.column + brk.length),
+                range: new monaco.Range(position.lineNumber, position.column, end.lineNumber, end.column),
                 options: { inlineClassName: 'highlight-statement' }
             },
         ]);
+    };
+    Editor.prototype.clearHighlightedStatements = function () {
+        if (this.highlightDecorations)
+            this.editor.deltaDecorations(this.highlightDecorations, []);
+    };
+    Editor.prototype.partitionBlocks = function () {
+        var res = {};
+        this.blockInfo.blocks.forEach(function (fn) {
+            var ns = (fn.attributes.blockNamespace || fn.namespace).split('.')[0];
+            if (!res[ns]) {
+                res[ns] = [];
+            }
+            res[ns].push(fn);
+        });
+        return res;
     };
     return Editor;
 }(srceditor.Editor));
 exports.Editor = Editor;
 
-},{"./compiler":8,"./core":10,"./package":24,"./srceditor":31,"react":315}],24:[function(require,module,exports){
+},{"./compiler":9,"./core":11,"./monacoSnippets":27,"./package":28,"./srceditor":36,"react":302}],27:[function(require,module,exports){
+"use strict";
+exports.loops = {
+    name: lf("{id:category}Loops"),
+    nameid: 'loops',
+    blocks: [
+        {
+            name: "while",
+            snippet: "while(true) {\n\n}",
+            attributes: {
+                jsDoc: lf("Repeat code while condition is true")
+            }
+        },
+        {
+            name: "for",
+            snippet: "for(let i = 0; i < 5; i++) {\n\n}",
+            attributes: {
+                jsDoc: lf("Repeat code a number of times in a loop")
+            }
+        },
+    ],
+    attributes: {
+        callingConvention: ts.pxtc.ir.CallingConvention.Plain,
+        icon: "loops",
+        weight: 50.09,
+        paramDefl: {}
+    }
+};
+exports.logic = {
+    name: lf("{id:category}Logic"),
+    nameid: 'logic',
+    blocks: [
+        {
+            name: "if",
+            snippet: "if (true) {\n\n}",
+            attributes: {
+                jsDoc: lf("Runs code if the condition is true")
+            }
+        },
+        {
+            name: "if",
+            snippet: "if (true) {\n\n} else {\n\n}",
+            attributes: {
+                jsDoc: lf("Runs code if the condition is true; else run other code")
+            }
+        },
+        {
+            name: "switch",
+            snippet: "switch(item) {\n    case 0:\n        break;\n    case 1:\n        break;\n}",
+            attributes: {
+                jsDoc: lf("Runs different code based on a value")
+            }
+        },
+    ],
+    attributes: {
+        callingConvention: ts.pxtc.ir.CallingConvention.Plain,
+        weight: 50.08,
+        icon: "logic",
+        paramDefl: {}
+    }
+};
+exports.variables = {
+    name: lf("{id:category}Variables"),
+    nameid: 'variables',
+    blocks: [
+        {
+            name: "let",
+            snippet: "let item: number",
+            snippetOnly: true,
+            attributes: {
+                jsDoc: lf("Declares a variable named 'item'")
+            }
+        },
+        {
+            name: "equals",
+            snippet: "item = 0",
+            snippetOnly: true,
+            attributes: {
+                jsDoc: lf("Assigns a value to a variable")
+            }
+        },
+        {
+            name: "change",
+            snippet: "item += 1",
+            snippetOnly: true,
+            attributes: {
+                jsDoc: lf("Changes the value of item by 1")
+            }
+        },
+    ],
+    attributes: {
+        callingConvention: ts.pxtc.ir.CallingConvention.Plain,
+        weight: 50.07,
+        icon: "variables",
+        paramDefl: {}
+    }
+};
+exports.maths = {
+    name: lf("{id:category}Math"),
+    nameid: 'math',
+    blocks: [
+        {
+            name: "plus",
+            snippet: "1 + 1",
+            snippetOnly: true,
+            attributes: {
+                jsDoc: lf("Adds two numbers together")
+            }
+        },
+        {
+            name: "minus",
+            snippet: "1 - 1",
+            snippetOnly: true,
+            attributes: {
+                jsDoc: lf("Subtracts the value of one number from another")
+            }
+        },
+        {
+            name: "multiply",
+            snippet: "1 * 1",
+            snippetOnly: true,
+            attributes: {
+                jsDoc: lf("Multiplies two numbers together")
+            }
+        },
+        {
+            name: "divide",
+            snippet: "1 / 1",
+            snippetOnly: true,
+            attributes: {
+                jsDoc: lf("Returns the remainder of one number divided by another")
+            }
+        },
+        {
+            name: "remainder",
+            snippet: "1 % 2",
+            snippetOnly: true,
+            attributes: {
+                jsDoc: lf("Returns the remainder of one number divided by another")
+            }
+        },
+        {
+            name: "max",
+            snippet: "Math.max(1, 2)",
+            attributes: {
+                jsDoc: lf("Returns the largest of two numbers")
+            }
+        },
+        {
+            name: "min",
+            snippet: "Math.min(1, 2)",
+            attributes: {
+                jsDoc: lf("Returns the smallest of two numbers")
+            }
+        },
+        {
+            name: "abs",
+            snippet: "Math.abs(-1)",
+            attributes: {
+                jsDoc: lf("Returns the absolute value of a number")
+            }
+        },
+        {
+            name: "random",
+            snippet: "Math.random(4)",
+            attributes: {
+                jsDoc: lf("Returns a random number between 0 and an upper bound")
+            }
+        },
+        {
+            name: "randomBoolean",
+            snippet: "Math.randomBoolean()",
+            attributes: {
+                jsDoc: lf("Randomly returns either true or false")
+            }
+        },
+    ],
+    attributes: {
+        callingConvention: ts.pxtc.ir.CallingConvention.Plain,
+        weight: 50.06,
+        icon: "math",
+        paramDefl: {}
+    }
+};
+exports.text = {
+    name: lf("{id:category}Text"),
+    nameid: 'text',
+    blocks: [
+        {
+            name: "length",
+            snippet: "\"\".length",
+            snippetOnly: true,
+            attributes: {
+                jsDoc: lf("Returns the number of characters in a string")
+            }
+        },
+        {
+            name: "concat",
+            snippet: "\"\" + 5",
+            snippetOnly: true,
+            attributes: {
+                jsDoc: lf("Combines a string with a number, boolean, string, or other object into one string")
+            }
+        },
+        {
+            name: "compare",
+            snippet: "\"\".compare(\"\")",
+            attributes: {
+                jsDoc: lf("Compares one string against another alphabetically and returns a number")
+            }
+        },
+        {
+            name: "parseInt",
+            snippet: "parseInt(\"5\")",
+            attributes: {
+                jsDoc: lf("Converts a number written as text into a number")
+            }
+        },
+        {
+            name: "substr",
+            snippet: "\"\".substr(0, 0)",
+            attributes: {
+                jsDoc: lf("Returns the part of a string starting at a given index with the given length")
+            }
+        },
+        {
+            name: "charAt",
+            snippet: "\"\".charAt(0)",
+            attributes: {
+                jsDoc: lf("Returns the character at the given index")
+            }
+        },
+    ],
+    attributes: {
+        advanced: true,
+        icon: "text",
+        callingConvention: ts.pxtc.ir.CallingConvention.Plain,
+        paramDefl: {}
+    }
+};
+exports.arrays = {
+    name: lf("{id:category}Arrays"),
+    nameid: "arrays",
+    blocks: [
+        {
+            name: "create",
+            snippet: "let " + lf("{id:snippets}list") + " = [1, 2, 3];",
+            snippetOnly: true,
+            attributes: {
+                weight: 100,
+                jsDoc: lf("Creates a new Array")
+            }
+        },
+        {
+            name: "length",
+            snippet: lf("{id:snippets}list") + ".length",
+            snippetOnly: true,
+            attributes: {
+                weight: 99,
+                jsDoc: lf("Returns the number of values in an Array")
+            }
+        },
+        {
+            name: "get",
+            snippet: lf("{id:snippets}list") + "[0]",
+            snippetOnly: true,
+            attributes: {
+                weight: 98,
+                jsDoc: lf("Returns the value in the Array at the given index")
+            }
+        },
+        {
+            name: "set",
+            snippet: lf("{id:snippets}list") + "[0] = 1",
+            snippetOnly: true,
+            attributes: {
+                weight: 97,
+                jsDoc: lf("Overwrites the value in an Array at the given index")
+            }
+        },
+        {
+            name: "push",
+            snippet: lf("{id:snippets}list") + ".push(1)",
+            attributes: {
+                weight: 96,
+                jsDoc: lf("Adds a value to the end of an Array")
+            }
+        },
+        {
+            name: "pop",
+            snippet: lf("{id:snippets}list") + ".pop()",
+            attributes: {
+                weight: 95,
+                jsDoc: lf("Removes and returns the value at the end of an Array")
+            }
+        },
+        {
+            name: "insertAt",
+            snippet: lf("{id:snippets}list") + ".insertAt(0, 0)",
+            attributes: {
+                weight: 50,
+                jsDoc: lf("Inserts a value into the Array at the given index"),
+                advanced: true
+            }
+        },
+        {
+            name: "removeAt",
+            snippet: lf("{id:snippets}list") + ".removeAt(0)",
+            attributes: {
+                weight: 49,
+                jsDoc: lf("Removes a value from the Array at the given index and returns it"),
+                advanced: true
+            }
+        },
+        {
+            name: "shift",
+            snippet: lf("{id:snippets}list") + ".shift()",
+            attributes: {
+                weight: 48,
+                jsDoc: lf("Removes and returns the value at the front of an Array"),
+                advanced: true
+            }
+        },
+        {
+            name: "unshift",
+            snippet: lf("{id:snippets}list") + ".unshift(0)",
+            attributes: {
+                weight: 47,
+                jsDoc: lf("Inserts a value at the beginning of an Array"),
+                advanced: true
+            }
+        },
+        {
+            name: "indexOf",
+            snippet: "[\"A\", \"B\", \"C\"].indexOf(\"B\")",
+            attributes: {
+                weight: 46,
+                jsDoc: lf("Returns the first index in the Array that contains the given value or -1 if it does not exist in the Array"),
+                advanced: true
+            }
+        },
+        {
+            name: "reverse",
+            snippet: lf("{id:snippets}list") + ".reverse()",
+            attributes: {
+                weight: 45,
+                jsDoc: lf("Reverses the contents of an Array"),
+                advanced: true
+            }
+        },
+    ],
+    attributes: {
+        advanced: true,
+        color: pxt.blocks.blockColors["arrays"].toString(),
+        icon: "arrays",
+        callingConvention: ts.pxtc.ir.CallingConvention.Plain,
+        paramDefl: {}
+    }
+};
+function getBuiltinCategory(ns) {
+    switch (ns) {
+        case exports.loops.nameid: return exports.loops;
+        case exports.logic.nameid: return exports.logic;
+        case exports.variables.nameid: return exports.variables;
+        case exports.maths.nameid: return exports.maths;
+        case exports.text.nameid: return exports.text;
+        case exports.arrays.nameid: return exports.arrays;
+    }
+    return undefined;
+}
+exports.getBuiltinCategory = getBuiltinCategory;
+function isBuiltin(ns) {
+    switch (ns) {
+        case exports.loops.nameid:
+        case exports.logic.nameid:
+        case exports.variables.nameid:
+        case exports.maths.nameid:
+        case exports.text.nameid:
+        case exports.arrays.nameid:
+            return true;
+    }
+    return false;
+}
+exports.isBuiltin = isBuiltin;
+
+},{}],28:[function(require,module,exports){
 "use strict";
 var workspace = require("./workspace");
 var data = require("./data");
@@ -6452,7 +7459,7 @@ data.mountVirtualApi("pkg-status", {
     },
 });
 
-},{"./core":10,"./data":11,"./db":12,"./workspace":37}],25:[function(require,module,exports){
+},{"./core":11,"./data":12,"./db":13,"./workspace":41}],29:[function(require,module,exports){
 /// <reference path="../../typings/globals/react/index.d.ts" />
 /// <reference path="../../typings/globals/react-dom/index.d.ts" />
 /// <reference path="../../built/pxtlib.d.ts" />
@@ -6471,46 +7478,38 @@ var pkg = require("./package");
 var core = require("./core");
 var codecard = require("./codecard");
 var gallery = require("./gallery");
-var ProjectsTab;
-(function (ProjectsTab) {
-    ProjectsTab[ProjectsTab["MyStuff"] = 0] = "MyStuff";
-    ProjectsTab[ProjectsTab["Make"] = 1] = "Make";
-    ProjectsTab[ProjectsTab["Code"] = 2] = "Code";
-})(ProjectsTab || (ProjectsTab = {}));
+var MYSTUFF = "__mystuff";
 var Projects = (function (_super) {
     __extends(Projects, _super);
     function Projects(props) {
         _super.call(this, props);
         this.prevGhData = [];
         this.prevUrlData = [];
-        this.prevMakes = [];
-        this.prevCodes = [];
+        this.prevGalleries = {};
         this.state = {
             visible: false,
-            tab: ProjectsTab.MyStuff
+            tab: MYSTUFF
         };
     }
     Projects.prototype.hide = function () {
         this.setState({ visible: false });
     };
-    Projects.prototype.showOpenProject = function () {
-        this.setState({ visible: true, tab: ProjectsTab.MyStuff });
+    Projects.prototype.showOpenProject = function (tab) {
+        var gals = pxt.appTarget.appTheme.galleries || {};
+        tab = (!tab || !gals[tab]) ? MYSTUFF : tab;
+        this.setState({ visible: true, tab: tab || MYSTUFF });
     };
-    Projects.prototype.fetchMakes = function () {
-        if (this.state.tab != ProjectsTab.Make)
-            return [];
-        var res = this.getData("gallery:" + encodeURIComponent(pxt.appTarget.appTheme.projectGallery));
-        if (res)
-            this.prevMakes = Util.concat(res.map(function (g) { return g.cards; }));
-        return this.prevMakes;
+    Projects.prototype.showOpenTutorials = function () {
+        var gals = Object.keys(pxt.appTarget.appTheme.galleries || {});
+        this.setState({ visible: true, tab: gals[0] || MYSTUFF });
     };
-    Projects.prototype.fetchCodes = function () {
-        if (this.state.tab != ProjectsTab.Code)
+    Projects.prototype.fetchGallery = function (tab, path) {
+        if (this.state.tab != tab)
             return [];
-        var res = this.getData("gallery:" + encodeURIComponent(pxt.appTarget.appTheme.exampleGallery));
+        var res = this.getData("gallery:" + encodeURIComponent(path));
         if (res)
-            this.prevCodes = Util.concat(res.map(function (g) { return g.cards; }));
-        return this.prevCodes;
+            this.prevGalleries[path] = Util.concat(res.map(function (g) { return g.cards; }));
+        return this.prevGalleries[path] || [];
     };
     Projects.prototype.fetchUrlData = function () {
         var scriptid = pxt.Cloud.parseScriptId(this.state.searchFor);
@@ -6529,7 +7528,7 @@ var Projects = (function (_super) {
     };
     Projects.prototype.fetchLocalData = function () {
         var _this = this;
-        if (this.state.tab != ProjectsTab.MyStuff)
+        if (this.state.tab != MYSTUFF)
             return [];
         var headers = this.getData("header:*");
         if (this.state.searchFor)
@@ -6548,28 +7547,41 @@ var Projects = (function (_super) {
     Projects.prototype.renderCore = function () {
         var _this = this;
         var _a = this.state, visible = _a.visible, tab = _a.tab;
-        var tabNames = [
-            lf("My Stuff"),
-            lf("Make"),
-            lf("Code")
-        ];
+        var theme = pxt.appTarget.appTheme;
+        var galleries = theme.galleries || {};
+        var tabs = [MYSTUFF].concat(Object.keys(galleries));
+        // lf("Make")
+        // lf("Code")
+        // lf("Projects")
+        // lf("Examples")
+        // lf("Tutorials")
         var headers = this.fetchLocalData();
         var urldata = this.fetchUrlData();
-        var makes = this.fetchMakes();
-        var codes = this.fetchCodes();
+        var gals = Util.mapMap(galleries, function (k) { return _this.fetchGallery(k, galleries[k]); });
         var chgHeader = function (hdr) {
             pxt.tickEvent("projects.header");
             _this.hide();
             _this.props.parent.loadHeaderAsync(hdr);
         };
-        var chgMake = function (scr) {
+        var chgGallery = function (scr) {
             pxt.tickEvent("projects.gallery", { name: scr.name });
             _this.hide();
-            _this.props.parent.newEmptyProject(scr.name.toLowerCase(), scr.url);
+            switch (scr.cardType) {
+                case "example":
+                    chgCode(scr);
+                    break;
+                case "tutorial":
+                    _this.props.parent.startTutorial(scr.url);
+                    break;
+                default:
+                    var m = /^\/#tutorial:([a-z0A-Z0-9\-\/]+)$/.exec(scr.url);
+                    if (m)
+                        _this.props.parent.startTutorial(m[1]);
+                    else
+                        _this.props.parent.newEmptyProject(scr.name.toLowerCase(), scr.url);
+            }
         };
         var chgCode = function (scr) {
-            pxt.tickEvent("projects.example", { name: scr.name });
-            _this.hide();
             core.showLoading(lf("Loading..."));
             gallery.loadExampleAsync(scr.name.toLowerCase(), scr.url)
                 .done(function (opts) {
@@ -6598,15 +7610,15 @@ var Projects = (function (_super) {
             _this.hide();
             _this.props.parent.importFileDialog();
         };
+        var importUrl = function () {
+            pxt.tickEvent("projects.importurl");
+            _this.hide();
+            _this.props.parent.importUrlDialog();
+        };
         var newProject = function () {
             pxt.tickEvent("projects.new");
             _this.hide();
             _this.props.parent.newProject();
-        };
-        var saveProject = function () {
-            pxt.tickEvent("projects.save");
-            _this.hide();
-            _this.props.parent.saveAndCompile();
         };
         var renameProject = function () {
             pxt.tickEvent("projects.rename");
@@ -6623,11 +7635,6 @@ var Projects = (function (_super) {
             return false;
         };
         var targetTheme = pxt.appTarget.appTheme;
-        var tabs = [ProjectsTab.MyStuff];
-        if (pxt.appTarget.appTheme.projectGallery)
-            tabs.push(ProjectsTab.Make);
-        if (pxt.appTarget.appTheme.exampleGallery)
-            tabs.push(ProjectsTab.Code);
         var headersToday = headers.filter(function (h) { var days = _this.numDaysOld(h.modificationTime); return days == 0; });
         var headersYesterday = headers.filter(function (h) { var days = _this.numDaysOld(h.modificationTime); return days == 1; });
         var headersThisWeek = headers.filter(function (h) { var days = _this.numDaysOld(h.modificationTime); return days > 1 && days <= 7; });
@@ -6642,22 +7649,22 @@ var Projects = (function (_super) {
             { name: lf("This Month"), headers: headersThisMonth },
             { name: lf("Older"), headers: headersOlder },
         ];
-        var isLoading = (tab == ProjectsTab.Make && makes.length == 0) ||
-            (tab == ProjectsTab.Code && codes.length == 0);
+        var isLoading = tab != MYSTUFF && !gals[tab].length;
         var tabClasses = sui.cx([
             isLoading ? 'loading' : '',
             'ui segment bottom attached tab active tabsegment'
         ]);
-        return (React.createElement(sui.Modal, {open: visible, className: "projectsdialog", size: "fullscreen", closeIcon: true, onClose: function () { return _this.setState({ visible: false }); }, dimmer: true, closeOnDimmerClick: true, closeOnDocumentClick: true}, React.createElement(sui.Segment, {inverted: targetTheme.invertedMenu, attached: "top"}, React.createElement(sui.Menu, {inverted: targetTheme.invertedMenu, secondary: true}, tabs.map(function (t) {
-            return React.createElement(sui.MenuItem, {key: "tab" + t, active: tab == t, name: tabNames[t], onClick: function () { return _this.setState({ tab: t }); }});
-        }), React.createElement("div", {className: "right menu"}, React.createElement(sui.Button, {icon: 'close', class: "clear " + (targetTheme.invertedMenu ? 'inverted' : ''), onClick: function () { return _this.setState({ visible: false }); }})))), tab == ProjectsTab.MyStuff ? React.createElement("div", {className: tabClasses}, React.createElement("div", {className: "group"}, React.createElement("div", {className: "ui cards"}, React.createElement(codecard.CodeCardView, {key: 'newproject', icon: "file outline", iconColor: "primary", name: lf("New Project..."), description: lf("Creates a new empty project"), onClick: function () { return newProject(); }}), pxt.appTarget.compile ?
-            React.createElement(codecard.CodeCardView, {key: 'import', icon: "upload", iconColor: "secondary", name: lf("Import File..."), description: lf("Open files from your computer"), onClick: function () { return importHex(); }}) : undefined)), headersGrouped.filter(function (g) { return g.headers.length != 0; }).map(function (headerGroup) {
+        return (React.createElement(sui.Modal, {open: visible, className: "projectsdialog", size: "fullscreen", closeIcon: false, onClose: function () { return _this.setState({ visible: false }); }, dimmer: true, closeOnDimmerClick: true, closeOnDocumentClick: true}, React.createElement(sui.Segment, {inverted: targetTheme.invertedMenu, attached: "top"}, React.createElement(sui.Menu, {inverted: targetTheme.invertedMenu, secondary: true}, tabs.map(function (t) {
+            return React.createElement(sui.MenuItem, {key: "tab" + t, active: tab == t, name: t == MYSTUFF ? lf("My Stuff") : Util.rlf(t), onClick: function () { return _this.setState({ tab: t }); }});
+        }), React.createElement("div", {className: "right menu"}, React.createElement(sui.Button, {icon: 'close', class: "huge clear " + (targetTheme.invertedMenu ? 'inverted' : ''), onClick: function () { return _this.setState({ visible: false }); }})))), tab == MYSTUFF ? React.createElement("div", {className: tabClasses}, React.createElement("div", {className: "group"}, React.createElement("div", {className: "ui cards"}, React.createElement(codecard.CodeCardView, {key: 'newproject', icon: "file outline", iconColor: "primary", name: lf("New Project..."), description: lf("Creates a new empty project"), onClick: function () { return newProject(); }}), pxt.appTarget.compile ?
+            React.createElement(codecard.CodeCardView, {key: 'import', icon: "upload", iconColor: "secondary", name: lf("Import File..."), description: lf("Open files from your computer"), onClick: function () { return importHex(); }}) : undefined, pxt.appTarget.cloud && pxt.appTarget.cloud.sharing && pxt.appTarget.cloud.publishing && pxt.appTarget.cloud.importing ?
+            React.createElement(codecard.CodeCardView, {key: 'importurl', icon: "cloud download", iconColor: "secondary", name: lf("Import URL..."), description: lf("Open a shared project URL"), onClick: function () { return importUrl(); }}) : undefined)), headersGrouped.filter(function (g) { return g.headers.length != 0; }).map(function (headerGroup) {
             return React.createElement("div", {key: 'localgroup' + headerGroup.name, className: "group"}, React.createElement("h3", {className: "ui dividing header disabled"}, headerGroup.name), React.createElement("div", {className: "ui cards"}, headerGroup.headers.map(function (scr) {
                 return React.createElement(codecard.CodeCardView, {key: 'local' + scr.id, name: scr.name, time: scr.recentUse, imageUrl: scr.icon, url: scr.pubId && scr.pubCurrent ? "/" + scr.pubId : "", onClick: function () { return chgHeader(scr); }});
             })));
         }), React.createElement("div", {className: "group"}, React.createElement("div", {className: "ui cards"}, urldata.map(function (scr) {
             return React.createElement(codecard.CodeCardView, {name: scr.name, time: scr.time, header: '/' + scr.id, description: scr.description, key: 'cloud' + scr.id, onClick: function () { return installScript(scr); }, url: '/' + scr.id, color: "blue"});
-        })))) : undefined, tab == ProjectsTab.Make ? React.createElement("div", {className: tabClasses}, React.createElement("div", {className: "ui cards"}, makes.map(function (scr) { return React.createElement(codecard.CodeCardView, {key: 'make' + scr.name, name: scr.name, description: scr.description, url: scr.url, imageUrl: scr.imageUrl, onClick: function () { return chgMake(scr); }}); }))) : undefined, tab == ProjectsTab.Code ? React.createElement("div", {className: tabClasses}, React.createElement("div", {className: "ui cards"}, codes.map(function (scr) { return React.createElement(codecard.CodeCardView, {key: 'code' + scr.name, name: scr.name, description: scr.description, url: scr.url, imageUrl: scr.imageUrl, onClick: function () { return chgCode(scr); }}); }))) : undefined, isEmpty() ?
+        })))) : undefined, tab != MYSTUFF ? React.createElement("div", {className: tabClasses}, React.createElement("div", {className: "ui cards centered"}, gals[tab].map(function (scr) { return React.createElement(codecard.CodeCardView, {key: tab + scr.name, name: scr.name, description: scr.description, url: scr.url, imageUrl: scr.imageUrl, youTubeId: scr.youTubeId, onClick: function () { return chgGallery(scr); }}); }))) : undefined, isEmpty() ?
             React.createElement("div", {className: "ui items"}, React.createElement("div", {className: "ui item"}, lf("We couldn't find any projects matching '{0}'", this.state.searchFor)))
             : undefined));
     };
@@ -6665,7 +7672,7 @@ var Projects = (function (_super) {
 }(data.Component));
 exports.Projects = Projects;
 
-},{"./codecard":7,"./core":10,"./data":11,"./gallery":18,"./package":24,"./sui":32,"./workspace":37,"react":315,"react-dom":159}],26:[function(require,module,exports){
+},{"./codecard":8,"./core":11,"./data":12,"./gallery":19,"./package":28,"./sui":37,"./workspace":41,"react":302,"react-dom":146}],30:[function(require,module,exports){
 "use strict";
 var __extends = (this && this.__extends) || function (d, b) {
     for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
@@ -6704,6 +7711,8 @@ var Editor = (function (_super) {
                 Util.nextTick(_this.changeCallback);
                 _this.isSaving = false;
                 _this.changeMade = true;
+                // switch to previous coding experience
+                _this.parent.openPreviousEditor();
             });
         };
         var setFileName = function (v) {
@@ -6796,18 +7805,10 @@ var Editor = (function (_super) {
 }(srceditor.Editor));
 exports.Editor = Editor;
 
-},{"./package":24,"./srceditor":31,"./sui":32,"react":315}],27:[function(require,module,exports){
+},{"./package":28,"./srceditor":36,"./sui":37,"react":302}],31:[function(require,module,exports){
 "use strict";
 var workspace = require("./workspace");
 var data = require("./data");
-function loadImageAsync(data) {
-    var img = document.createElement("img");
-    return new Promise(function (resolve, reject) {
-        img.onload = function () { return resolve(img); };
-        img.onerror = function () { return resolve(undefined); };
-        img.src = data;
-    });
-}
 function renderIcon(img) {
     var icon = null;
     if (img && img.width > 0 && img.height > 0) {
@@ -6837,7 +7838,7 @@ function renderIcon(img) {
     return icon;
 }
 function saveAsync(header, screenshot) {
-    return loadImageAsync(screenshot)
+    return pxt.BrowserUtils.loadImageAsync(screenshot)
         .then(function (img) {
         var icon = renderIcon(img);
         return workspace.saveScreenshotAsync(header, screenshot, icon)
@@ -6849,7 +7850,7 @@ function saveAsync(header, screenshot) {
 }
 exports.saveAsync = saveAsync;
 
-},{"./data":11,"./workspace":37}],28:[function(require,module,exports){
+},{"./data":12,"./workspace":41}],32:[function(require,module,exports){
 /// <reference path="../../typings/globals/react/index.d.ts" />
 /// <reference path="../../typings/globals/react-dom/index.d.ts" />
 /// <reference path="../../built/pxtlib.d.ts" />
@@ -6884,6 +7885,24 @@ var ScriptSearch = (function (_super) {
     ScriptSearch.prototype.showAddPackages = function () {
         this.setState({ visible: true, searchFor: '' });
     };
+    ScriptSearch.prototype.fetchUrlData = function () {
+        if (!this.state.searchFor)
+            return [];
+        var scriptid = pxt.Cloud.parseScriptId(this.state.searchFor);
+        if (scriptid) {
+            var res = this.getData("cloud-search:" + scriptid);
+            if (res) {
+                if (res.statusCode !== 404)
+                    this.prevUrlData = [res];
+                else
+                    this.prevUrlData = [];
+            }
+        }
+        else {
+            this.prevUrlData = [];
+        }
+        return this.prevUrlData;
+    };
     ScriptSearch.prototype.fetchGhData = function () {
         var cloud = pxt.appTarget.cloud || {};
         if (!cloud.packages)
@@ -6897,11 +7916,12 @@ var ScriptSearch = (function (_super) {
         return this.prevGhData || [];
     };
     ScriptSearch.prototype.fetchBundled = function () {
-        if (!!this.state.searchFor)
-            return [];
+        var query = this.state.searchFor;
         var bundled = pxt.appTarget.bundledpkgs;
         return Object.keys(bundled).filter(function (k) { return !/prj$/.test(k); })
-            .map(function (k) { return JSON.parse(bundled[k]["pxt.json"]); });
+            .map(function (k) { return JSON.parse(bundled[k]["pxt.json"]); })
+            .filter(function (pk) { return !query || pk.name.toLowerCase().indexOf(query.toLowerCase()) > -1; }) // search filter
+            .filter(function (pk) { return !pkg.mainPkg.deps[pk.name]; }); // don't show package already referenced
     };
     ScriptSearch.prototype.shouldComponentUpdate = function (nextProps, nextState, nextContext) {
         return this.state.visible != nextState.visible
@@ -6909,23 +7929,21 @@ var ScriptSearch = (function (_super) {
     };
     ScriptSearch.prototype.renderCore = function () {
         var _this = this;
+        var targetTheme = pxt.appTarget.appTheme;
         var bundles = this.fetchBundled();
         var ghdata = this.fetchGhData();
-        var chgHeader = function (hdr) {
-            pxt.tickEvent("projects.header");
+        var urldata = this.fetchUrlData();
+        var addUrl = function (scr) {
             _this.hide();
-            _this.props.parent.loadHeaderAsync(hdr);
+            var p = pkg.mainEditorPkg();
+            return p.addDepAsync(scr.name, "pub:" + scr.id)
+                .then(function () { return _this.props.parent.reloadHeaderAsync(); });
         };
-        var chgBundle = function (scr) {
+        var addBundle = function (scr) {
             pxt.tickEvent("packages.bundled", { name: scr.name });
             _this.hide();
             addDepIfNoConflict(scr, "*")
                 .done();
-        };
-        var chgGallery = function (scr) {
-            pxt.tickEvent("projects.gallery", { name: scr.name });
-            _this.hide();
-            _this.props.parent.newEmptyProject(scr.name.toLowerCase(), scr.url);
         };
         var upd = function (v) {
             var str = ReactDOM.findDOMNode(_this.refs["searchInput"]).value;
@@ -7001,20 +8019,21 @@ var ScriptSearch = (function (_super) {
         };
         var isEmpty = function () {
             if (_this.state.searchFor) {
-                if (bundles.length > 0
-                    || ghdata.length > 0)
+                if (bundles.length || ghdata.length || urldata.length)
                     return false;
                 return true;
             }
             return false;
         };
         var headerText = lf("Add Package...");
-        return (React.createElement(sui.Modal, {open: this.state.visible, dimmer: true, header: headerText, className: "searchdialog", size: "large", onClose: function () { return _this.setState({ visible: false }); }, closeIcon: true, closeOnDimmerClick: true}, React.createElement("div", {className: "ui vertical segment"}, React.createElement("div", {className: "ui search"}, React.createElement("div", {className: "ui fluid action input", role: "search"}, React.createElement("input", {ref: "searchInput", type: "text", placeholder: lf("Search..."), onKeyUp: kupd}), React.createElement("button", {title: lf("Search"), className: "ui right icon button", onClick: upd}, React.createElement("i", {className: "search icon"})))), React.createElement("div", {className: "ui cards"}, bundles.map(function (scr) {
-            return React.createElement(codecard.CodeCardView, {key: 'bundled' + scr.name, name: scr.name, description: scr.description, url: "/" + scr.installedVersion, onClick: function () { return chgBundle(scr); }});
+        return (React.createElement(sui.Modal, {open: this.state.visible, dimmer: true, header: headerText, className: "searchdialog", size: "large", onClose: function () { return _this.setState({ visible: false }); }, closeIcon: true, helpUrl: "/packages", closeOnDimmerClick: true}, React.createElement("div", {className: "ui vertical segment"}, React.createElement("div", {className: "ui search"}, React.createElement("div", {className: "ui fluid action input", role: "search"}, React.createElement("input", {ref: "searchInput", type: "text", placeholder: lf("Search or enter project URL..."), onKeyUp: kupd}), React.createElement("button", {title: lf("Search"), className: "ui right icon button", onClick: upd}, React.createElement("i", {className: "search icon"})))), React.createElement("div", {className: "ui cards"}, urldata.map(function (scr) {
+            return React.createElement(codecard.CodeCardView, {key: 'url' + scr.id, name: scr.name, description: scr.description, url: "/" + scr.id, onClick: function () { return addUrl(scr); }, color: "red"});
+        }), bundles.map(function (scr) {
+            return React.createElement(codecard.CodeCardView, {key: 'bundled' + scr.name, name: scr.name, description: scr.description, url: "/" + scr.installedVersion, imageUrl: scr.icon, onClick: function () { return addBundle(scr); }});
         }), ghdata.filter(function (repo) { return repo.status == pxt.github.GitRepoStatus.Approved; }).map(function (scr) {
-            return React.createElement(codecard.CodeCardView, {name: scr.name.replace(/^pxt-/, ""), header: scr.fullName, description: scr.description, key: 'gh' + scr.fullName, onClick: function () { return installGh(scr); }, url: 'github:' + scr.fullName, color: "blue"});
+            return React.createElement(codecard.CodeCardView, {name: scr.name.replace(/^pxt-/, ""), description: scr.description, key: 'gha' + scr.fullName, onClick: function () { return installGh(scr); }, url: 'github:' + scr.fullName, color: "blue", imageUrl: pxt.github.repoIconUrl(scr), label: /\bbeta\b/i.test(scr.description) ? lf("Beta") : undefined});
         }), ghdata.filter(function (repo) { return repo.status != pxt.github.GitRepoStatus.Approved; }).map(function (scr) {
-            return React.createElement(codecard.CodeCardView, {name: scr.name.replace(/^pxt-/, ""), header: scr.fullName, description: scr.description, key: 'gh' + scr.fullName, onClick: function () { return installGh(scr); }, url: 'github:' + scr.fullName, color: "red"});
+            return React.createElement(codecard.CodeCardView, {name: scr.name.replace(/^pxt-/, ""), description: lf("User provided package, not endorsed by Microsoft.") + (scr.description || ""), key: 'ghd' + scr.fullName, onClick: function () { return installGh(scr); }, url: 'github:' + scr.fullName, color: "red"});
         })), isEmpty() ?
             React.createElement("div", {className: "ui items"}, React.createElement("div", {className: "ui item"}, lf("We couldn't find any packages matching '{0}'", this.state.searchFor)))
             : undefined)));
@@ -7023,7 +8042,7 @@ var ScriptSearch = (function (_super) {
 }(data.Component));
 exports.ScriptSearch = ScriptSearch;
 
-},{"./codecard":7,"./core":10,"./data":11,"./package":24,"./sui":32,"react":315,"react-dom":159}],29:[function(require,module,exports){
+},{"./codecard":8,"./core":11,"./data":12,"./package":28,"./sui":37,"react":302,"react-dom":146}],33:[function(require,module,exports){
 "use strict";
 var __extends = (this && this.__extends) || function (d, b) {
     for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
@@ -7070,6 +8089,7 @@ var ShareEditor = (function (_super) {
     ShareEditor.prototype.renderCore = function () {
         var _this = this;
         var visible = this.state.visible;
+        var targetTheme = pxt.appTarget.appTheme;
         var cloud = pxt.appTarget.cloud || {};
         var embedding = !!cloud.embedding;
         var header = this.props.parent.state.header;
@@ -7080,6 +8100,9 @@ var ShareEditor = (function (_super) {
         var embed = '';
         var help = lf("Copy this HTML to your website or blog.");
         if (header) {
+            var shareUrl = pxt.appTarget.appTheme.shareUrl || "https://makecode.com/";
+            if (!/\/$/.test(shareUrl))
+                shareUrl += '/';
             var rootUrl = pxt.appTarget.appTheme.embedUrl;
             if (!/\/$/.test(rootUrl))
                 rootUrl += '/';
@@ -7088,7 +8111,7 @@ var ShareEditor = (function (_super) {
             var currentPubId_1 = (header ? header.pubId : undefined) || this.state.currentPubId;
             ready = (!!currentPubId_1 && header.pubCurrent);
             if (ready) {
-                url = "" + rootUrl + header.pubId;
+                url = "" + shareUrl + currentPubId_1;
                 var editUrl = rootUrl + "#pub:" + currentPubId_1;
                 switch (mode) {
                     case ShareMode.Cli:
@@ -7110,7 +8133,7 @@ var ShareEditor = (function (_super) {
                         embed = editUrl;
                         break;
                     default:
-                        if (isBlocks) {
+                        if (isBlocks && pxt.blocks.layout.screenshotEnabled()) {
                             // Render screenshot
                             if (this.state.screenshotId == currentPubId_1) {
                                 if (this.state.screenshotUri)
@@ -7135,7 +8158,10 @@ var ShareEditor = (function (_super) {
                                 file = main.lookupFile("this/" + file.getVirtualFileName()) || file;
                             if (pkg.File.tsFileNameRx.test(file.getName())) {
                                 var fileContents = file.content;
-                                var mdContent = pxt.docs.renderMarkdown("@body@", "```javascript\n" + fileContents + "\n```");
+                                var mdContent = pxt.docs.renderMarkdown({
+                                    template: "@body@",
+                                    markdown: "```javascript\n" + fileContents + "\n```"
+                                });
                                 embed = "<a style=\"text-decoration: none;\" href=\"" + editUrl + "\">" + mdContent + "</a>";
                             }
                         }
@@ -7158,7 +8184,7 @@ var ShareEditor = (function (_super) {
         var action = !ready ? lf("Publish project") : undefined;
         var actionLoading = this.props.parent.state.publishing;
         return (React.createElement(sui.Modal, {open: this.state.visible, className: "sharedialog", header: lf("Share Project"), size: "small", onClose: function () { return _this.setState({ visible: false }); }, dimmer: true, action: action, actionClick: publish, actionLoading: actionLoading, closeIcon: true, closeOnDimmerClick: true, closeOnDocumentClick: true}, React.createElement("div", {className: "ui form"}, action ?
-            React.createElement("p", null, lf("You need to publish your project to share it or embed it in other web pages.") +
+            React.createElement("p", null, lf("You need to publish your project to share it or embed it in other web pages.") + " " +
                 lf("You acknowledge having consent to publish this project."))
             : undefined, url && ready ? React.createElement("div", null, React.createElement("p", null, lf("Your project is ready! Use the address below to share your projects.")), React.createElement(sui.Input, {class: "mini", readOnly: true, lines: 1, value: url, copy: true}))
             : undefined, ready ? React.createElement("div", null, React.createElement("div", {className: "ui divider"}), React.createElement(sui.Button, {class: "labeled", icon: "chevron " + (advancedMenu ? "down" : "right"), text: lf("Embed"), onClick: function () { return _this.setState({ advancedMenu: !advancedMenu }); }}), advancedMenu ?
@@ -7171,16 +8197,19 @@ var ShareEditor = (function (_super) {
 }(data.Component));
 exports.ShareEditor = ShareEditor;
 
-},{"./data":11,"./package":24,"./sui":32,"react":315}],30:[function(require,module,exports){
+},{"./data":12,"./package":28,"./sui":37,"react":302}],34:[function(require,module,exports){
 /// <reference path="../../built/pxtsim.d.ts" />
 /// <reference path="../../localtypings/pxtparts.d.ts" />
 "use strict";
 var core = require("./core");
 var U = pxt.U;
+exports.FAST_TRACE_INTERVAL = 100;
+exports.SLOW_TRACE_INTERVAL = 500;
 var nextFrameId = 0;
 var themes = ["blue", "red", "green", "yellow"];
 var config;
 var lastCompileResult;
+var tutorialMode;
 var $debugger;
 function init(root, cfg) {
     $(root).html("\n        <div id=\"simulators\" class='simulator'>\n        </div>\n        <div id=\"debugger\" class=\"ui item landscape only\">\n        </div>\n        ");
@@ -7224,6 +8253,11 @@ function init(root, cfg) {
             if (brk.exceptionMessage) {
                 core.errorNotification(lf("Program Error: {0}", brk.exceptionMessage));
             }
+            postSimEditorEvent("stopped", brk.exceptionMessage);
+        },
+        onTraceMessage: function (msg) {
+            var brkInfo = lastCompileResult.breakpoints[msg.breakpointId];
+            config.highlightStatement(brkInfo);
         },
         onDebuggerWarning: function (wrn) {
             for (var _i = 0, _a = wrn.breakpointIds; _i < _a.length; _i++) {
@@ -7238,6 +8272,7 @@ function init(root, cfg) {
             }
         },
         onDebuggerResume: function () {
+            postSimEditorEvent("resumed");
             config.highlightStatement(null);
             updateDebuggerButtons();
         },
@@ -7251,16 +8286,35 @@ function init(root, cfg) {
                     break;
                 case "modal":
                     stop();
-                    core.confirmAsync({
-                        header: msg.header,
-                        body: msg.body,
-                        size: "large",
-                        copyable: msg.copyable,
-                        hideAgree: true,
-                        disagreeLbl: lf("Close")
-                    }).done();
+                    if (!tutorialMode && !pxt.shell.isSandboxMode()) {
+                        var modalOpts = {
+                            header: msg.header,
+                            body: msg.body,
+                            size: "large",
+                            copyable: msg.copyable,
+                            disagreeLbl: lf("Close")
+                        };
+                        var trustedSimUrls = pxt.appTarget.simulator.trustedUrls;
+                        var hasTrustedLink_1 = msg.linkButtonHref && trustedSimUrls && trustedSimUrls.indexOf(msg.linkButtonHref) !== -1;
+                        if (hasTrustedLink_1) {
+                            modalOpts.agreeLbl = msg.linkButtonLabel;
+                        }
+                        else {
+                            modalOpts.hideAgree = true;
+                        }
+                        core.confirmAsync(modalOpts)
+                            .then(function (selection) {
+                            if (hasTrustedLink_1 && selection == 1) {
+                                window.open(msg.linkButtonHref, '_blank');
+                            }
+                        })
+                            .done();
+                    }
                     break;
             }
+        },
+        onTopLevelCodeEnd: function () {
+            postSimEditorEvent("toplevelfinished");
         }
     };
     exports.driver = new pxsim.SimulatorDriver($('#simulators')[0], options);
@@ -7268,12 +8322,23 @@ function init(root, cfg) {
     updateDebuggerButtons();
 }
 exports.init = init;
-function setState(editor) {
+function postSimEditorEvent(subtype, exception) {
+    if (pxt.appTarget.appTheme.allowParentController && pxt.BrowserUtils.isIFrame()) {
+        pxt.editor.postHostMessageAsync({
+            type: "pxthost",
+            action: "simevent",
+            subtype: subtype,
+            exception: exception
+        });
+    }
+}
+function setState(editor, tutMode) {
     if (config.editor != editor) {
         config.editor = editor;
         config.highlightStatement(null);
         updateDebuggerButtons();
     }
+    tutorialMode = tutMode;
 }
 exports.setState = setState;
 function makeDirty() {
@@ -7284,7 +8349,7 @@ function isDirty() {
     return /sepia/.test(exports.driver.container.className);
 }
 exports.isDirty = isDirty;
-function run(pkg, debug, res, mute) {
+function run(pkg, debug, res, mute, highContrast) {
     pxsim.U.removeClass(exports.driver.container, "sepia");
     var js = res.outfiles[pxtc.BINARY_JS];
     var boardDefinition = pxt.appTarget.simulator.boardDefinition;
@@ -7297,9 +8362,11 @@ function run(pkg, debug, res, mute) {
         parts: parts,
         debug: debug,
         fnArgs: fnArgs,
+        highContrast: highContrast,
         aspectRatio: parts.length ? pxt.appTarget.simulator.partsAspectRatio : pxt.appTarget.simulator.aspectRatio,
         partDefinitions: pkg.computePartDefinitions(parts)
     };
+    postSimEditorEvent("started");
     exports.driver.run(js, opts);
 }
 exports.run = run;
@@ -7328,6 +8395,10 @@ function unhide() {
     exports.driver.unhide();
 }
 exports.unhide = unhide;
+function setTraceInterval(intervalMs) {
+    exports.driver.setTraceInterval(intervalMs);
+}
+exports.setTraceInterval = setTraceInterval;
 function proxy(message) {
     if (!exports.driver)
         return;
@@ -7402,7 +8473,52 @@ function updateDebuggerButtons(brk) {
     $('#debugger').append(dbgView);
 }
 
-},{"./core":10}],31:[function(require,module,exports){
+},{"./core":11}],35:[function(require,module,exports){
+"use strict";
+var audio = require("./audio");
+var sounds = {};
+var volume = 0.2;
+function loadSoundAsync(id) {
+    var path = ((pxt.appTarget.appTheme.sounds) || {})[id];
+    if (pxt.options.light || !path)
+        return Promise.resolve(undefined);
+    var buffer = sounds[path];
+    if (buffer)
+        return Promise.resolve(buffer);
+    var url = pxt.webConfig.commitCdnUrl + "sounds/" + path;
+    return Util.requestAsync({
+        url: url,
+        headers: {
+            "Accept": "audio/" + path.slice(-3)
+        },
+        responseArrayBuffer: true
+    }).then(function (resp) { return audio.loadAsync(resp.buffer); })
+        .then(function (buffer) { return sounds[path] = buffer; });
+}
+function playSound(id) {
+    if (pxt.options.light)
+        return;
+    loadSoundAsync(id)
+        .done(function (buf) { return buf ? audio.play(buf, volume) : undefined; });
+}
+function tutorialStep() { playSound('tutorialStep'); }
+exports.tutorialStep = tutorialStep;
+function tutorialNext() { playSound('tutorialNext'); }
+exports.tutorialNext = tutorialNext;
+function click() { playSound('click'); }
+exports.click = click;
+function initTutorial() {
+    if (pxt.options.light)
+        return;
+    Promise.all([
+        loadSoundAsync('tutorialStep'),
+        loadSoundAsync('tutorialNext'),
+        loadSoundAsync('click')
+    ]).done();
+}
+exports.initTutorial = initTutorial;
+
+},{"./audio":3}],36:[function(require,module,exports){
 "use strict";
 var React = require("react");
 var Editor = (function () {
@@ -7472,19 +8588,19 @@ var Editor = (function () {
     Editor.prototype.setDiagnostics = function (file, snapshot) { };
     Editor.prototype.setViewState = function (view) { };
     Editor.prototype.saveToTypeScript = function () {
-        return null;
+        return Promise.resolve('');
     };
     Editor.prototype.highlightStatement = function (brk) { };
-    Editor.prototype.filterToolbox = function (blockSubset, showCategories, showToolboxButtons) {
-        if (showCategories === void 0) { showCategories = true; }
-        if (showToolboxButtons === void 0) { showToolboxButtons = true; }
+    Editor.prototype.clearHighlightedStatements = function () { };
+    Editor.prototype.filterToolbox = function (filters, showCategories) {
+        if (showCategories === void 0) { showCategories = pxt.blocks.CategoryMode.All; }
         return null;
     };
     return Editor;
 }());
 exports.Editor = Editor;
 
-},{"react":315}],32:[function(require,module,exports){
+},{"react":302}],37:[function(require,module,exports){
 "use strict";
 var __extends = (this && this.__extends) || function (d, b) {
     for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
@@ -7570,18 +8686,29 @@ var Item = (function (_super) {
         _super.apply(this, arguments);
     }
     Item.prototype.renderCore = function () {
-        return (React.createElement("div", {className: genericClassName("ui item link", this.props, true) + (" " + (this.props.active ? 'active' : '')), role: this.props.role, title: this.props.title, key: this.props.value, "data-value": this.props.value, onClick: this.props.onClick}, genericContent(this.props), this.props.children));
+        return (React.createElement("div", {className: genericClassName("ui item link", this.props, true) + (" " + (this.props.active ? 'active' : '')), role: this.props.role, title: this.props.title || this.props.text, key: this.props.value, "data-value": this.props.value, onClick: this.props.onClick}, genericContent(this.props), this.props.children));
     };
     return Item;
 }(data.Component));
 exports.Item = Item;
+var ButtonMenuItem = (function (_super) {
+    __extends(ButtonMenuItem, _super);
+    function ButtonMenuItem() {
+        _super.apply(this, arguments);
+    }
+    ButtonMenuItem.prototype.renderCore = function () {
+        return (React.createElement("div", {className: genericClassName("ui item link", this.props, true) + (" " + (this.props.active ? 'active' : '')), role: this.props.role, title: this.props.title || this.props.text, key: this.props.value, "data-value": this.props.value, onClick: this.props.onClick}, React.createElement("div", {className: genericClassName("ui button", this.props)}, genericContent(this.props), this.props.children)));
+    };
+    return ButtonMenuItem;
+}(UiElement));
+exports.ButtonMenuItem = ButtonMenuItem;
 var Button = (function (_super) {
     __extends(Button, _super);
     function Button() {
         _super.apply(this, arguments);
     }
     Button.prototype.renderCore = function () {
-        return (React.createElement("button", {className: genericClassName("ui button", this.props) + " " + (this.props.disabled ? "disabled" : ""), role: this.props.role, title: this.props.title, onClick: this.props.onClick}, genericContent(this.props), this.props.children));
+        return (React.createElement("button", {className: genericClassName("ui button", this.props) + " " + (this.props.disabled ? "disabled" : ""), role: this.props.role, title: this.props.title, "aria-label": this.props.title || this.props.text, onClick: this.props.onClick}, genericContent(this.props), this.props.children));
     };
     return Button;
 }(UiElement));
@@ -7794,7 +8921,14 @@ var Modal = (function (_super) {
         this.setPosition = function () {
             if (_this.ref) {
                 var mountNode = _this.getMountNode();
-                var height = _this.ref.getBoundingClientRect().height;
+                var height = void 0;
+                // Check to make sure the ref is actually in the DOM or else IE11 throws an exception
+                if (_this.ref.parentElement) {
+                    height = _this.ref.getBoundingClientRect().height;
+                }
+                else {
+                    height = 0;
+                }
                 var marginTop = -Math.round(height / 2);
                 var scrolling = height >= window.innerHeight;
                 var newState = {};
@@ -7867,9 +9001,9 @@ var Modal = (function (_super) {
             className,
         ]);
         var closeIconName = closeIcon === true ? 'close' : closeIcon;
-        var modalJSX = (React.createElement("div", {className: classes, style: { marginTop: marginTop }, ref: this.handleRef, role: "dialog", "aria-labelledby": this.id + 'title', "aria-describedby": this.id + 'desc'}, this.props.header ? React.createElement("div", {id: this.id + 'title', className: "header " + (this.props.headerClass || "")}, this.props.header, this.props.closeIcon ? React.createElement(Button, {icon: closeIconName, class: "clear right floated", onClick: function () { return _this.handleClose(null); }}) : undefined, this.props.helpUrl ?
-            React.createElement("a", {className: "ui button icon-and-text right floated labeled", href: this.props.helpUrl, target: "_docs"}, React.createElement("i", {className: "help icon"}), lf("Help"))
-            : undefined) : undefined, React.createElement("div", {id: this.id + 'desc', className: "content"}, children), this.props.action && this.props.actionClick ?
+        var modalJSX = (React.createElement("div", {className: classes, style: { marginTop: marginTop }, ref: this.handleRef, role: "dialog", "aria-labelledby": this.id + 'title', "aria-describedby": this.id + 'desc'}, this.props.closeIcon ? React.createElement(Button, {icon: closeIconName, class: "huge clear right floated", onClick: function () { return _this.handleClose(null); }}) : undefined, this.props.helpUrl ?
+            React.createElement("a", {className: "ui button huge icon clear right floated", href: this.props.helpUrl, target: "_docs"}, React.createElement("i", {className: "help icon"}))
+            : undefined, this.props.header ? React.createElement("div", {id: this.id + 'title', className: "header " + (this.props.headerClass || "")}, this.props.header) : undefined, React.createElement("div", {id: this.id + 'desc', className: "content"}, children), this.props.action && this.props.actionClick ?
             React.createElement("div", {className: "actions"}, React.createElement(Button, {text: this.props.action, class: "approve primary " + (this.props.actionLoading ? "loading" : ""), onClick: function () {
                 _this.props.actionClick();
             }})) : undefined));
@@ -7982,19 +9116,20 @@ var Portal = (function (_super) {
 }(data.Component));
 exports.Portal = Portal;
 
-},{"./data":11,"react":315,"react-dom":159}],33:[function(require,module,exports){
+},{"./data":12,"react":302,"react-dom":146}],38:[function(require,module,exports){
 "use strict";
-var workeriface = require("./workeriface");
 var pkg = require("./package");
+var compiler = require("./compiler");
 var iface;
 function td2tsAsync(td) {
     if (!iface)
-        iface = workeriface.makeWebWorker(pxt.webConfig.tdworkerjs);
+        iface = pxt.worker.makeWebWorker(pxt.webConfig.tdworkerjs);
     return pkg.mainPkg.getCompileOptionsAsync()
         .then(function (opts) {
         opts.ast = true;
-        var res = pxtc.compile(opts);
-        var apiinfo = pxtc.getApiInfo(res.ast, true);
+        return compiler.workerOpAsync("compileTd", { options: opts });
+    })
+        .then(function (apiinfo) {
         var arg = {
             text: td,
             useExtensions: true,
@@ -8009,12 +9144,12 @@ function td2tsAsync(td) {
 }
 exports.td2tsAsync = td2tsAsync;
 
-},{"./package":24,"./workeriface":36}],34:[function(require,module,exports){
+},{"./compiler":9,"./package":28}],39:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.default = new DOMParser().parseFromString("<xml id=\"blocklyToolboxDefinition\" style=\"display: none\">\n        <category name=\"Loops\" nameid=\"loops\" colour=\"#107c10\" category=\"50\" iconclass=\"blocklyTreeIconloops\">\n            <block type=\"controls_repeat_ext\">\n                <value name=\"TIMES\">\n                    <shadow type=\"math_number\">\n                        <field name=\"NUM\">4</field>\n                    </shadow>\n                </value>\n            </block>\n            <block type=\"device_while\">\n                <value name=\"COND\">\n                    <shadow type=\"logic_boolean\"></shadow>\n                </value>\n            </block>\n            <block type=\"controls_simple_for\">\n                <value name=\"TO\">\n                    <shadow type=\"math_number\">\n                        <field name=\"NUM\">4</field>\n                    </shadow>\n                </value>\n            </block>\n        </category>\n        <category name=\"Logic\" nameid=\"logic\" colour=\"#006970\" category=\"49\" iconclass=\"blocklyTreeIconlogic\">\n            <block type=\"controls_if\" gap=\"8\">\n                <value name=\"IF0\">\n                    <shadow type=\"logic_boolean\">\n                        <field name=\"BOOL\">TRUE</field>\n                    </shadow>\n                </value>\n            </block>\n            <block type=\"controls_if\" gap=\"8\">\n                <mutation else=\"1\"></mutation>\n                <value name=\"IF0\">\n                    <shadow type=\"logic_boolean\">\n                        <field name=\"BOOL\">TRUE</field>\n                    </shadow>\n                </value>\n            </block>\n            <block type=\"logic_compare\" gap=\"8\">\n                <value name=\"A\">\n                    <shadow type=\"math_number\">\n                        <field name=\"NUM\">0</field>\n                    </shadow>\n                </value>\n                <value name=\"B\">\n                    <shadow type=\"math_number\">\n                        <field name=\"NUM\">0</field>\n                    </shadow>\n                </value>\n            </block>\n            <block type=\"logic_compare\">\n                <field name=\"OP\">LT</field>\n                <value name=\"A\">\n                    <shadow type=\"math_number\">\n                        <field name=\"NUM\">0</field>\n                    </shadow>\n                </value>\n                <value name=\"B\">\n                    <shadow type=\"math_number\">\n                        <field name=\"NUM\">0</field>\n                    </shadow>\n                </value>\n            </block>\n            <block type=\"logic_operation\" gap=\"8\"></block>\n            <block type=\"logic_operation\" gap=\"8\">\n                <field name=\"OP\">OR</field>\n            </block>\n            <block type=\"logic_negate\"></block>\n            <block type=\"logic_boolean\" gap=\"8\"></block>\n            <block type=\"logic_boolean\">\n                <field name=\"BOOL\">FALSE</field>\n            </block>\n        </category>\n        <category name=\"Variables\" nameid=\"variables\" colour=\"#A80000\" custom=\"VARIABLE\" category=\"48\" iconclass=\"blocklyTreeIconvariables\">\n        </category>\n        <category name=\"Math\" nameid=\"math\" colour=\"#712672\" category=\"47\" iconclass=\"blocklyTreeIconmath\" expandedclass=\"blocklyTreeIconmath\">\n            <block type=\"math_arithmetic\" gap=\"8\">\n                <value name=\"A\">\n                    <shadow type=\"math_number\">\n                        <field name=\"NUM\">0</field>\n                    </shadow>\n                </value>\n                <value name=\"B\">\n                    <shadow type=\"math_number\">\n                        <field name=\"NUM\">0</field>\n                    </shadow>\n                </value>\n            </block>\n            <block type=\"math_arithmetic\" gap=\"8\">\n                <value name=\"A\">\n                    <shadow type=\"math_number\">\n                        <field name=\"NUM\">0</field>\n                    </shadow>\n                </value>\n                <value name=\"B\">\n                    <shadow type=\"math_number\">\n                        <field name=\"NUM\">0</field>\n                    </shadow>\n                </value>\n                <field name=\"OP\">MINUS</field>\n            </block>\n            <block type=\"math_arithmetic\" gap=\"8\">\n                <value name=\"A\">\n                    <shadow type=\"math_number\">\n                        <field name=\"NUM\">0</field>\n                    </shadow>\n                </value>\n                <value name=\"B\">\n                    <shadow type=\"math_number\">\n                        <field name=\"NUM\">0</field>\n                    </shadow>\n                </value>\n                <field name=\"OP\">MULTIPLY</field>\n            </block>\n            <block type=\"math_arithmetic\" gap=\"8\">\n                <value name=\"A\">\n                    <shadow type=\"math_number\">\n                        <field name=\"NUM\">0</field>\n                    </shadow>\n                </value>\n                <value name=\"B\">\n                    <shadow type=\"math_number\">\n                        <field name=\"NUM\">0</field>\n                    </shadow>\n                </value>\n                <field name=\"OP\">DIVIDE</field>\n            </block>\n            <block type=\"math_number\" gap=\"8\">\n                <field name=\"NUM\">0</field>\n            </block>\n            <block type=\"device_random\" gap=\"8\">\n                <value name=\"limit\">\n                    <shadow type=\"math_number\">\n                        <field name=\"NUM\">4</field>\n                    </shadow>\n                </value>\n            </block>\n            <category colour=\"#712672\" name=\"More\" nameid=\"more\" iconclass=\"blocklyTreeIconmore\" expandedclass=\"blocklyTreeIconmore\">\n                <block type=\"math_modulo\">\n                    <value name=\"DIVIDEND\">\n                        <shadow type=\"math_number\">\n                            <field name=\"NUM\">0</field>\n                        </shadow>\n                    </value>\n                    <value name=\"DIVISOR\">\n                        <shadow type=\"math_number\">\n                            <field name=\"NUM\">1</field>\n                        </shadow>\n                    </value>\n                </block>\n                <block type=\"math_op2\" gap=\"8\">\n                    <value name=\"x\">\n                        <shadow type=\"math_number\">\n                            <field name=\"NUM\">0</field>\n                        </shadow>\n                    </value>\n                    <value name=\"y\">\n                        <shadow type=\"math_number\">\n                            <field name=\"NUM\">0</field>\n                        </shadow>\n                    </value>\n                </block>\n                <block type=\"math_op2\" gap=\"8\">\n                    <value name=\"x\">\n                        <shadow type=\"math_number\">\n                            <field name=\"NUM\">0</field>\n                        </shadow>\n                    </value>\n                    <value name=\"y\">\n                        <shadow type=\"math_number\">\n                            <field name=\"NUM\">0</field>\n                        </shadow>\n                    </value>\n                    <field name=\"op\">max</field>\n                </block>\n                <block type=\"math_op3\">\n                    <value name=\"x\">\n                        <shadow type=\"math_number\">\n                            <field name=\"NUM\">0</field>\n                        </shadow>\n                    </value>\n                </block>\n            </category>\n        </category>\n        <category name=\"Advanced\" nameid=\"advanced\" colour=\"#3c3c3c\" weight=\"1\" iconclass=\"blocklyTreeIconadvanced\" expandedclass=\"blocklyTreeIconadvanced\">\n            <category colour=\"#D83B01\" name=\"Lists\" nameid=\"lists\" category=\"45\" iconclass=\"blocklyTreeIconlists\">\n                <block type=\"lists_create_with\">\n                    <mutation items=\"1\"></mutation>\n                    <value name=\"ADD0\">\n                        <shadow type=\"math_number\">\n                            <field name=\"NUM\">0</field>\n                        </shadow>\n                    </value>\n                </block>\n                <block type=\"lists_length\"></block>\n            </category>\n            <category colour=\"#996600\" name=\"Text\" nameid=\"text\" category=\"46\" iconclass=\"blocklyTreeIcontext\">\n                <block type=\"text\"></block>\n                <block type=\"text_length\">\n                    <value name=\"VALUE\">\n                        <shadow type=\"text\">\n                            <field name=\"TEXT\">abc</field>\n                        </shadow>\n                    </value>\n                </block>\n                <block type=\"text_join\">\n                    <mutation items=\"2\"></mutation>\n                    <value name=\"ADD0\">\n                        <shadow type=\"text\">\n                            <field name=\"TEXT\"></field>\n                        </shadow>\n                    </value>\n                    <value name=\"ADD1\">\n                        <shadow type=\"text\">\n                            <field name=\"TEXT\"></field>\n                        </shadow>\n                    </value>\n                </block>\n            </category>\n        </category>\n    </xml>", "text/xml");
+exports.default = new DOMParser().parseFromString("<xml id=\"blocklyToolboxDefinition\" style=\"display: none\">\n        <category name=\"Loops\" nameid=\"loops\" colour=\"#107c10\" category=\"50\" iconclass=\"blocklyTreeIconloops\">\n            <block type=\"controls_repeat_ext\">\n                <value name=\"TIMES\">\n                    <shadow type=\"math_number\">\n                        <field name=\"NUM\">4</field>\n                    </shadow>\n                </value>\n            </block>\n            <block type=\"device_while\">\n                <value name=\"COND\">\n                    <shadow type=\"logic_boolean\"></shadow>\n                </value>\n            </block>\n            <block type=\"controls_simple_for\">\n                <value name=\"TO\">\n                    <shadow type=\"math_number\">\n                        <field name=\"NUM\">4</field>\n                    </shadow>\n                </value>\n            </block>\n            <block type=\"controls_for_of\">\n                <value name=\"LIST\">\n                    <shadow type=\"variables_get\">\n                        <field name=\"VAR\">list</field>\n                    </shadow>\n                </value>\n            </block>\n        </category>\n        <category name=\"Logic\" nameid=\"logic\" colour=\"#006970\" category=\"49\" iconclass=\"blocklyTreeIconlogic\">\n            <block type=\"controls_if\" gap=\"8\">\n                <value name=\"IF0\">\n                    <shadow type=\"logic_boolean\">\n                        <field name=\"BOOL\">TRUE</field>\n                    </shadow>\n                </value>\n            </block>\n            <block type=\"controls_if\" gap=\"8\">\n                <mutation else=\"1\"></mutation>\n                <value name=\"IF0\">\n                    <shadow type=\"logic_boolean\">\n                        <field name=\"BOOL\">TRUE</field>\n                    </shadow>\n                </value>\n            </block>\n            <block type=\"logic_compare\" gap=\"8\">\n                <value name=\"A\">\n                    <shadow type=\"math_number\">\n                        <field name=\"NUM\">0</field>\n                    </shadow>\n                </value>\n                <value name=\"B\">\n                    <shadow type=\"math_number\">\n                        <field name=\"NUM\">0</field>\n                    </shadow>\n                </value>\n            </block>\n            <block type=\"logic_compare\">\n                <field name=\"OP\">LT</field>\n                <value name=\"A\">\n                    <shadow type=\"math_number\">\n                        <field name=\"NUM\">0</field>\n                    </shadow>\n                </value>\n                <value name=\"B\">\n                    <shadow type=\"math_number\">\n                        <field name=\"NUM\">0</field>\n                    </shadow>\n                </value>\n            </block>\n            <block type=\"logic_operation\" gap=\"8\"></block>\n            <block type=\"logic_operation\" gap=\"8\">\n                <field name=\"OP\">OR</field>\n            </block>\n            <block type=\"logic_negate\"></block>\n            <block type=\"logic_boolean\" gap=\"8\"></block>\n            <block type=\"logic_boolean\">\n                <field name=\"BOOL\">FALSE</field>\n            </block>\n        </category>\n        <category name=\"Variables\" nameid=\"variables\" colour=\"#A80000\" custom=\"VARIABLE\" category=\"48\" iconclass=\"blocklyTreeIconvariables\">\n        </category>\n        <category name=\"Math\" nameid=\"math\" colour=\"#712672\" category=\"47\" iconclass=\"blocklyTreeIconmath\" expandedclass=\"blocklyTreeIconmath\">\n            <block type=\"math_arithmetic\" gap=\"8\">\n                <value name=\"A\">\n                    <shadow type=\"math_number\">\n                        <field name=\"NUM\">0</field>\n                    </shadow>\n                </value>\n                <value name=\"B\">\n                    <shadow type=\"math_number\">\n                        <field name=\"NUM\">0</field>\n                    </shadow>\n                </value>\n            </block>\n            <block type=\"math_arithmetic\" gap=\"8\">\n                <value name=\"A\">\n                    <shadow type=\"math_number\">\n                        <field name=\"NUM\">0</field>\n                    </shadow>\n                </value>\n                <value name=\"B\">\n                    <shadow type=\"math_number\">\n                        <field name=\"NUM\">0</field>\n                    </shadow>\n                </value>\n                <field name=\"OP\">MINUS</field>\n            </block>\n            <block type=\"math_arithmetic\" gap=\"8\">\n                <value name=\"A\">\n                    <shadow type=\"math_number\">\n                        <field name=\"NUM\">0</field>\n                    </shadow>\n                </value>\n                <value name=\"B\">\n                    <shadow type=\"math_number\">\n                        <field name=\"NUM\">0</field>\n                    </shadow>\n                </value>\n                <field name=\"OP\">MULTIPLY</field>\n            </block>\n            <block type=\"math_arithmetic\" gap=\"8\">\n                <value name=\"A\">\n                    <shadow type=\"math_number\">\n                        <field name=\"NUM\">0</field>\n                    </shadow>\n                </value>\n                <value name=\"B\">\n                    <shadow type=\"math_number\">\n                        <field name=\"NUM\">0</field>\n                    </shadow>\n                </value>\n                <field name=\"OP\">DIVIDE</field>\n            </block>\n            <block type=\"math_number\" gap=\"8\">\n                <field name=\"NUM\">0</field>\n            </block>\n            <block type=\"device_random\" gap=\"8\">\n                <value name=\"limit\">\n                    <shadow type=\"math_number\">\n                        <field name=\"NUM\">4</field>\n                    </shadow>\n                </value>\n            </block>\n            <category colour=\"#712672\" name=\"More\" nameid=\"more\" iconclass=\"blocklyTreeIconmore\" expandedclass=\"blocklyTreeIconmore\">\n                <block type=\"math_modulo\">\n                    <value name=\"DIVIDEND\">\n                        <shadow type=\"math_number\">\n                            <field name=\"NUM\">0</field>\n                        </shadow>\n                    </value>\n                    <value name=\"DIVISOR\">\n                        <shadow type=\"math_number\">\n                            <field name=\"NUM\">1</field>\n                        </shadow>\n                    </value>\n                </block>\n                <block type=\"math_op2\" gap=\"8\">\n                    <value name=\"x\">\n                        <shadow type=\"math_number\">\n                            <field name=\"NUM\">0</field>\n                        </shadow>\n                    </value>\n                    <value name=\"y\">\n                        <shadow type=\"math_number\">\n                            <field name=\"NUM\">0</field>\n                        </shadow>\n                    </value>\n                </block>\n                <block type=\"math_op2\" gap=\"8\">\n                    <value name=\"x\">\n                        <shadow type=\"math_number\">\n                            <field name=\"NUM\">0</field>\n                        </shadow>\n                    </value>\n                    <value name=\"y\">\n                        <shadow type=\"math_number\">\n                            <field name=\"NUM\">0</field>\n                        </shadow>\n                    </value>\n                    <field name=\"op\">max</field>\n                </block>\n                <block type=\"math_op3\">\n                    <value name=\"x\">\n                        <shadow type=\"math_number\">\n                            <field name=\"NUM\">0</field>\n                        </shadow>\n                    </value>\n                </block>\n            </category>\n        </category>\n        <category colour=\"#66672C\" name=\"Arrays\" nameid=\"arrays\" category=\"45\" iconclass=\"blocklyTreeIconarrays\" expandedclass=\"blocklyTreeIconarrays\" advanced=\"true\">\n            <block type=\"lists_create_with\">\n                <mutation items=\"1\"></mutation>\n                <value name=\"ADD0\">\n                    <shadow type=\"math_number\">\n                        <field name=\"NUM\">0</field>\n                    </shadow>\n                </value>\n            </block>\n            <block type=\"lists_create_with\">\n                <mutation items=\"2\"></mutation>\n                <value name=\"ADD0\">\n                    <shadow type=\"text\">\n                        <field name=\"TEXT\"></field>\n                    </shadow>\n                </value>\n                <value name=\"ADD1\">\n                    <shadow type=\"text\">\n                        <field name=\"TEXT\"></field>\n                    </shadow>\n                </value>\n            </block>\n            <block type=\"lists_length\"></block>\n            <block type=\"lists_index_get\">\n                <value name=\"LIST\">\n                    <block type=\"variables_get\">\n                        <field name=\"VAR\">list</field>\n                    </block>\n                </value>\n                <value name=\"INDEX\">\n                    <shadow type=\"math_number\">\n                        <field name=\"NUM\">0</field>\n                    </shadow>\n                </value>\n            </block>\n            <block type=\"lists_index_set\">\n                <value name=\"LIST\">\n                    <block type=\"variables_get\">\n                        <field name=\"VAR\">list</field>\n                    </block>\n                </value>\n                <value name=\"INDEX\">\n                    <shadow type=\"math_number\">\n                        <field name=\"NUM\">0</field>\n                    </shadow>\n                </value>\n            </block>\n        </category>\n        <category colour=\"#996600\" name=\"Text\" nameid=\"text\" category=\"46\" iconclass=\"blocklyTreeIcontext\" expandedclass=\"blocklyTreeIcontext\" advanced=\"true\">\n            <block type=\"text\"></block>\n            <block type=\"text_length\">\n                <value name=\"VALUE\">\n                    <shadow type=\"text\">\n                        <field name=\"TEXT\">abc</field>\n                    </shadow>\n                </value>\n            </block>\n            <block type=\"text_join\">\n                <mutation items=\"2\"></mutation>\n                <value name=\"ADD0\">\n                    <shadow type=\"text\">\n                        <field name=\"TEXT\"></field>\n                    </shadow>\n                </value>\n                <value name=\"ADD1\">\n                    <shadow type=\"text\">\n                        <field name=\"TEXT\"></field>\n                    </shadow>\n                </value>\n            </block>\n        </category>\n    </xml>", "text/xml");
 
-},{}],35:[function(require,module,exports){
+},{}],40:[function(require,module,exports){
 /// <reference path="../../typings/globals/react/index.d.ts" />
 /// <reference path="../../typings/globals/react-dom/index.d.ts" />
 /// <reference path="../../built/pxtlib.d.ts" />
@@ -8027,26 +9162,28 @@ var __extends = (this && this.__extends) || function (d, b) {
 var React = require("react");
 var data = require("./data");
 var sui = require("./sui");
+var sounds = require("./sounds");
 var TutorialMenuItem = (function (_super) {
     __extends(TutorialMenuItem, _super);
     function TutorialMenuItem(props) {
         _super.call(this, props);
     }
     TutorialMenuItem.prototype.openTutorialStep = function (step) {
-        pxt.tickEvent("tutorial.step", { tutorial: this.props.parent.state.tutorial, step: step });
-        this.props.parent.setState({ tutorialStep: step, tutorialReady: false });
+        var options = this.props.parent.state.tutorialOptions;
+        options.tutorialStep = step;
+        pxt.tickEvent("tutorial.step", { tutorial: options.tutorial, step: step });
         this.props.parent.setTutorialStep(step);
     };
     TutorialMenuItem.prototype.render = function () {
         var _this = this;
+        var _a = this.props.parent.state.tutorialOptions, tutorialReady = _a.tutorialReady, tutorialSteps = _a.tutorialSteps, tutorialStep = _a.tutorialStep, tutorialName = _a.tutorialName;
         var state = this.props.parent.state;
-        var tutorialReady = state.tutorialReady;
         var targetTheme = pxt.appTarget.appTheme;
-        var tutorialSteps = state.tutorialSteps;
-        var currentStep = state.tutorialStep;
-        var tutorialName = state.tutorialName;
+        var currentStep = tutorialStep;
         return React.createElement("div", {className: "ui item"}, React.createElement("div", {className: "ui item tutorial-menuitem"}, tutorialSteps.map(function (step, index) {
-            return React.createElement(sui.Button, {key: 'tutorialStep' + index, class: "icon circular " + (currentStep == index ? 'red selected' : 'inverted') + " " + (!tutorialReady ? 'disabled' : ''), text: " " + (index + 1) + " ", onClick: function () { return _this.openTutorialStep(index); }});
+            return (index == currentStep) ?
+                React.createElement("span", {className: "step-label", key: 'tutorialStep' + index}, React.createElement("a", {className: "ui circular label " + (currentStep == index ? 'blue selected' : 'inverted') + " " + (!tutorialReady ? 'disabled' : ''), onClick: function () { return _this.openTutorialStep(index); }}, index + 1)) :
+                React.createElement("span", {className: "step-label", key: 'tutorialStep' + index, "data-tooltip": "" + (index + 1), "data-inverted": "", "data-position": "bottom center"}, React.createElement("a", {className: "ui empty circular label " + (!tutorialReady ? 'disabled' : '') + " clear", onClick: function () { return _this.openTutorialStep(index); }}));
         })));
     };
     return TutorialMenuItem;
@@ -8073,156 +9210,145 @@ var TutorialContent = (function (_super) {
         if (el)
             el.src = url;
         else
-            this.props.parent.setState({ tutorialUrl: url });
+            this.setState({ tutorialUrl: url });
+    };
+    TutorialContent.prototype.shouldComponentUpdate = function (nextProps, nextState, nextContext) {
+        return this.state.tutorialUrl != nextState.tutorialUrl;
     };
     TutorialContent.refresh = function () {
-        var el = document.getElementById("tutorialcontent");
-        if (el && el.contentWindow) {
-            el.parentElement.style.height = "";
-            el.parentElement.style.height = el.contentWindow.document.body.scrollHeight + "px";
-        }
+        // Show light box
+        sounds.tutorialStep();
+        $('#root')
+            .dimmer({ 'closable': true })
+            .dimmer('show');
     };
     TutorialContent.prototype.renderCore = function () {
-        var state = this.props.parent.state;
-        var docsUrl = state.tutorialUrl;
-        if (!docsUrl)
+        var tutorialUrl = this.state.tutorialUrl;
+        if (!tutorialUrl)
             return null;
-        return React.createElement("iframe", {id: "tutorialcontent", onLoad: function () { return TutorialContent.refresh(); }, src: docsUrl, role: "complementary", sandbox: "allow-scripts allow-same-origin allow-popups"});
+        return React.createElement("iframe", {id: "tutorialcontent", style: { "width": "1px", "height": "1px" }, src: tutorialUrl, role: "complementary", sandbox: "allow-scripts allow-same-origin allow-popups allow-forms"});
     };
     return TutorialContent;
 }(data.Component));
 exports.TutorialContent = TutorialContent;
+var TutorialHint = (function (_super) {
+    __extends(TutorialHint, _super);
+    function TutorialHint(props) {
+        _super.call(this, props);
+    }
+    TutorialHint.prototype.showHint = function () {
+        this.setState({ visible: true });
+    };
+    TutorialHint.prototype.renderCore = function () {
+        var _this = this;
+        var visible = this.state.visible;
+        var options = this.props.parent.state.tutorialOptions;
+        var tutorialReady = options.tutorialReady, tutorialStepInfo = options.tutorialStepInfo, tutorialStep = options.tutorialStep, tutorialName = options.tutorialName;
+        if (!tutorialReady)
+            return React.createElement("div", null);
+        var tutorialHint = tutorialStepInfo[tutorialStep].content;
+        var tutorialFullscreen = tutorialStepInfo[tutorialStep].fullscreen;
+        // TODO: Use step name instead of tutorial Name in full screen mode.
+        var header = tutorialFullscreen ? tutorialName : lf("Hint");
+        return React.createElement(sui.Modal, {open: visible, className: "hintdialog", size: "small", header: header, closeIcon: true, onClose: function () { return _this.setState({ visible: false }); }, dimmer: true, closeOnDimmerClick: true, closeOnDocumentClick: true}, React.createElement("div", {className: "content"}, React.createElement("div", {dangerouslySetInnerHTML: { __html: tutorialHint }})), React.createElement("div", {className: "actions", style: { textAlign: "right" }}, React.createElement(sui.Button, {class: "green", icon: "check", text: lf("Ok"), onClick: function () { return _this.setState({ visible: false }); }})));
+    };
+    return TutorialHint;
+}(data.Component));
+exports.TutorialHint = TutorialHint;
 var TutorialCard = (function (_super) {
     __extends(TutorialCard, _super);
     function TutorialCard(props) {
         _super.call(this, props);
     }
     TutorialCard.prototype.previousTutorialStep = function () {
-        var currentStep = this.props.parent.state.tutorialStep;
+        var options = this.props.parent.state.tutorialOptions;
+        var currentStep = options.tutorialStep;
         var previousStep = currentStep - 1;
-        pxt.tickEvent("tutorial.previous", { tutorial: this.props.parent.state.tutorial, step: previousStep });
-        this.props.parent.setState({ tutorialStep: previousStep, tutorialReady: false });
+        options.tutorialStep = previousStep;
+        pxt.tickEvent("tutorial.previous", { tutorial: options.tutorial, step: previousStep });
         this.props.parent.setTutorialStep(previousStep);
     };
     TutorialCard.prototype.nextTutorialStep = function () {
-        var currentStep = this.props.parent.state.tutorialStep;
+        var options = this.props.parent.state.tutorialOptions;
+        var currentStep = options.tutorialStep;
         var nextStep = currentStep + 1;
-        pxt.tickEvent("tutorial.next", { tutorial: this.props.parent.state.tutorial, step: nextStep });
-        this.props.parent.setState({ tutorialStep: nextStep, tutorialReady: false });
+        options.tutorialStep = nextStep;
+        pxt.tickEvent("tutorial.next", { tutorial: options.tutorial, step: nextStep });
         this.props.parent.setTutorialStep(nextStep);
     };
     TutorialCard.prototype.finishTutorial = function () {
-        this.props.parent.exitTutorial();
+        this.closeLightbox();
+        this.props.parent.completeTutorial();
     };
-    TutorialCard.prototype.setPath = function (path) {
-        var tc = this.refs["tutorialcontent"];
-        if (!tc)
-            return;
-        tc.setPath(path);
+    TutorialCard.prototype.closeLightbox = function () {
+        // Hide light box
+        sounds.tutorialNext();
+        $('#root')
+            .dimmer('hide');
+    };
+    TutorialCard.prototype.componentWillUpdate = function () {
+        $('#tutorialhint')
+            .modal('attach events', '#tutorialcard .ui.button.hintbutton', 'show');
+        ;
+    };
+    TutorialCard.prototype.showHint = function () {
+        this.closeLightbox();
+        this.props.parent.showTutorialHint();
     };
     TutorialCard.prototype.render = function () {
         var _this = this;
-        var state = this.props.parent.state;
-        var tutorialReady = state.tutorialReady;
-        var currentStep = state.tutorialStep;
-        var cardLocation = state.tutorialCardLocation || 'bottom';
-        var maxSteps = state.tutorialSteps.length;
-        var hasPrevious = currentStep != 0;
-        var hasNext = currentStep != maxSteps - 1;
+        var options = this.props.parent.state.tutorialOptions;
+        var tutorialReady = options.tutorialReady, tutorialStepInfo = options.tutorialStepInfo, tutorialStep = options.tutorialStep, tutorialSteps = options.tutorialSteps;
+        if (!tutorialReady)
+            return React.createElement("div", null);
+        var tutorialHeaderContent = tutorialStepInfo[tutorialStep].headerContent;
+        var currentStep = tutorialStep;
+        var maxSteps = tutorialSteps.length;
+        var hasPrevious = tutorialReady && currentStep != 0;
+        var hasNext = tutorialReady && currentStep != maxSteps - 1;
         var hasFinish = currentStep == maxSteps - 1;
-        return React.createElement("div", {id: "tutorialcard", className: "ui " + (pxt.options.light ? "" : "transition fly in") + " " + cardLocation + " visible active"}, React.createElement("div", {className: "ui raised fluid card"}, React.createElement("div", {className: "ui"}, React.createElement(TutorialContent, {ref: "tutorialcontent", parent: this.props.parent})), React.createElement("div", {className: "extra content"}, React.createElement("div", {className: "ui two buttons"}, hasPrevious ? React.createElement(sui.Button, {icon: "left chevron", class: "ui icon red button " + (!tutorialReady ? 'disabled' : ''), text: lf("Back"), onClick: function () { return _this.previousTutorialStep(); }}) : undefined, hasNext ? React.createElement(sui.Button, {icon: "right chevron", class: "ui icon green button " + (!tutorialReady ? 'disabled' : ''), text: lf("Next"), onClick: function () { return _this.nextTutorialStep(); }}) : undefined, hasFinish ? React.createElement(sui.Button, {icon: "left checkmark", class: "ui icon orange button " + (!tutorialReady ? 'disabled' : ''), text: lf("Finish"), onClick: function () { return _this.finishTutorial(); }}) : undefined))));
+        var hasHint = tutorialStepInfo[tutorialStep].hasHint;
+        return React.createElement("div", {id: "tutorialcard", className: "ui " + (tutorialReady ? 'tutorialReady' : '')}, React.createElement("div", {className: 'ui buttons'}, React.createElement("div", {className: "ui segment attached message"}, React.createElement("div", {className: 'avatar-image', onClick: function () { return _this.showHint(); }}), hasHint ? React.createElement(sui.Button, {class: "mini blue hintbutton hidelightbox", text: lf("Hint"), onClick: function () { return _this.showHint(); }}) : undefined, React.createElement("div", {className: 'tutorialmessage', onClick: function () { return _this.showHint(); }}, React.createElement("div", {className: "content", dangerouslySetInnerHTML: { __html: tutorialHeaderContent }})), React.createElement(sui.Button, {class: "large green okbutton showlightbox", text: lf("Ok"), onClick: function () { return _this.closeLightbox(); }})), hasNext ? React.createElement(sui.Button, {icon: "right chevron", class: "ui right icon button nextbutton right attached green " + (!hasNext ? 'disabled' : ''), text: lf("Next"), onClick: function () { return _this.nextTutorialStep(); }}) : undefined, hasFinish ? React.createElement(sui.Button, {icon: "left checkmark", class: "ui icon orange button " + (!tutorialReady ? 'disabled' : ''), text: lf("Finish"), onClick: function () { return _this.finishTutorial(); }}) : undefined));
     };
     return TutorialCard;
 }(data.Component));
 exports.TutorialCard = TutorialCard;
-
-},{"./data":11,"./sui":32,"react":315}],36:[function(require,module,exports){
-"use strict";
-var U = pxt.Util;
-function wrap(send) {
-    var pendingMsgs = {};
-    var msgId = 0;
-    var q = new U.PromiseQueue();
-    var initPromise = new Promise(function (resolve, reject) {
-        pendingMsgs["ready"] = resolve;
-    });
-    q.enqueue("main", function () { return initPromise; });
-    var recvHandler = function (data) {
-        if (pendingMsgs.hasOwnProperty(data.id)) {
-            var cb = pendingMsgs[data.id];
-            delete pendingMsgs[data.id];
-            cb(data.result);
-        }
-    };
-    function opAsync(op, arg) {
-        return q.enqueue("main", function () { return new Promise(function (resolve, reject) {
-            var id = "" + msgId++;
-            pendingMsgs[id] = function (v) {
-                if (!v) {
-                    //pxt.reportError("worker", "no response")
-                    reject(new Error("no response"));
-                }
-                else if (v.errorMessage) {
-                    //pxt.reportError("worker", v.errorMessage)
-                    reject(new Error(v.errorMessage));
-                }
-                else {
-                    resolve(v);
-                }
-            };
-            send({ id: id, op: op, arg: arg });
-        }); });
+var TutorialComplete = (function (_super) {
+    __extends(TutorialComplete, _super);
+    function TutorialComplete(props) {
+        _super.call(this, props);
+        this.state = {
+            visible: false
+        };
     }
-    return { opAsync: opAsync, recvHandler: recvHandler };
-}
-exports.wrap = wrap;
-function makeWebWorker(workerFile) {
-    var worker = new Worker(workerFile);
-    var iface = wrap(function (v) { return worker.postMessage(v); });
-    worker.onmessage = function (ev) {
-        iface.recvHandler(ev.data);
+    TutorialComplete.prototype.hide = function () {
+        this.setState({ visible: false });
     };
-    return iface;
-}
-exports.makeWebWorker = makeWebWorker;
-function makeWebSocket(url, onOOB) {
-    if (onOOB === void 0) { onOOB = null; }
-    var ws = new WebSocket(url);
-    var sendq = [];
-    var iface = wrap(function (v) {
-        var s = JSON.stringify(v);
-        if (sendq)
-            sendq.push(s);
-        else
-            ws.send(s);
-    });
-    ws.onmessage = function (ev) {
-        var js = JSON.parse(ev.data);
-        if (onOOB && js.id == null) {
-            onOOB(js);
-        }
-        else {
-            iface.recvHandler(js);
-        }
+    TutorialComplete.prototype.show = function () {
+        this.setState({ visible: true });
     };
-    ws.onopen = function (ev) {
-        pxt.debug('socket opened');
-        for (var _i = 0, sendq_1 = sendq; _i < sendq_1.length; _i++) {
-            var m = sendq_1[_i];
-            ws.send(m);
-        }
-        sendq = null;
+    TutorialComplete.prototype.moreTutorials = function () {
+        pxt.tickEvent("tutorial.completed.more");
+        this.props.parent.openTutorials();
     };
-    ws.onclose = function (ev) {
-        pxt.debug('socket closed');
+    TutorialComplete.prototype.exitTutorial = function () {
+        pxt.tickEvent("tutorial.completed.exit");
+        this.hide();
+        this.props.parent.exitTutorial(true);
     };
-    return iface;
-}
-exports.makeWebSocket = makeWebSocket;
+    TutorialComplete.prototype.renderCore = function () {
+        var _this = this;
+        var visible = this.state.visible;
+        return (React.createElement(sui.Modal, {open: this.state.visible, className: "sharedialog", header: lf("Congratulations! What's next?"), size: "small", onClose: function () { return _this.setState({ visible: false }); }, dimmer: true, closeIcon: true, closeOnDimmerClick: true, closeOnDocumentClick: true}, React.createElement("div", {className: "ui two stackable cards"}, React.createElement("div", {className: "ui grid centered link card", onClick: function () { return _this.moreTutorials(); }}, React.createElement("div", {className: "content"}, React.createElement("i", {className: "avatar-image icon huge", style: { fontSize: '100px' }})), React.createElement("div", {className: "content"}, React.createElement("div", {className: "header"}, lf("More Tutorials")))), React.createElement("div", {className: "ui grid centered link card", onClick: function () { return _this.exitTutorial(); }}, React.createElement("div", {className: "content"}, React.createElement("i", {className: "external icon huge black", style: { fontSize: '100px' }})), React.createElement("div", {className: "content"}, React.createElement("div", {className: "header"}, lf("Exit Tutorial")))))));
+    };
+    return TutorialComplete;
+}(data.Component));
+exports.TutorialComplete = TutorialComplete;
 
-},{}],37:[function(require,module,exports){
+},{"./data":12,"./sounds":35,"./sui":37,"react":302}],41:[function(require,module,exports){
 /// <reference path="../../built/pxtlib.d.ts" />
 /// <reference path="../../built/pxteditor.d.ts" />
+/// <reference path="../../built/pxtwinrt.d.ts" />
 "use strict";
 var db = require("./db");
 var core = require("./core");
@@ -8230,6 +9356,7 @@ var data = require("./data");
 var cloudworkspace = require("./cloudworkspace");
 var fileworkspace = require("./fileworkspace");
 var memoryworkspace = require("./memoryworkspace");
+var iframeworkspace = require("./iframeworkspace");
 var scripts = new db.Table("script");
 var U = pxt.Util;
 var Cloud = pxt.Cloud;
@@ -8246,6 +9373,12 @@ function setupWorkspace(id) {
         case "mem":
         case "memory":
             impl = memoryworkspace.provider;
+            break;
+        case "iframe":
+            impl = iframeworkspace.provider;
+            break;
+        case "uwp":
+            impl = data.wrapWorkspace(pxt.winrt.workspace.provider);
             break;
         case "cloud":
         default:
@@ -8272,6 +9405,11 @@ function getHeader(id) {
     return null;
 }
 exports.getHeader = getHeader;
+function importLegacyScriptsAsync() {
+    checkSession();
+    return impl.importLegacyScriptsAsync ? impl.importLegacyScriptsAsync() : Promise.resolve();
+}
+exports.importLegacyScriptsAsync = importLegacyScriptsAsync;
 var sessionID;
 function isSessionOutdated() {
     return pxt.storage.getLocal('pxt_workspace_session_id') != sessionID;
@@ -8317,10 +9455,12 @@ function anonymousPublishAsync(h, text, meta) {
     pxt.debug("publishing script; " + stext.length + " bytes");
     return Cloud.privatePostAsync("scripts", scrReq)
         .then(function (inf) {
-        h.pubId = inf.id;
+        if (inf.shortid)
+            inf.id = inf.shortid;
+        h.pubId = inf.shortid;
         h.pubCurrent = h.saveId === saveId;
         h.meta = inf.meta;
-        pxt.debug("published; id /" + inf.id);
+        pxt.debug("published; id /" + h.pubId);
         return saveAsync(h)
             .then(function () { return inf; });
     });
@@ -8444,7 +9584,123 @@ data.mountVirtualApi("text", {
     },
 });
 
-},{"./cloudworkspace":5,"./core":10,"./data":11,"./db":12,"./fileworkspace":17,"./memoryworkspace":22}],38:[function(require,module,exports){
+},{"./cloudworkspace":6,"./core":11,"./data":12,"./db":13,"./fileworkspace":18,"./iframeworkspace":21,"./memoryworkspace":25}],42:[function(require,module,exports){
+'use strict'
+
+exports.byteLength = byteLength
+exports.toByteArray = toByteArray
+exports.fromByteArray = fromByteArray
+
+var lookup = []
+var revLookup = []
+var Arr = typeof Uint8Array !== 'undefined' ? Uint8Array : Array
+
+var code = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+for (var i = 0, len = code.length; i < len; ++i) {
+  lookup[i] = code[i]
+  revLookup[code.charCodeAt(i)] = i
+}
+
+revLookup['-'.charCodeAt(0)] = 62
+revLookup['_'.charCodeAt(0)] = 63
+
+function placeHoldersCount (b64) {
+  var len = b64.length
+  if (len % 4 > 0) {
+    throw new Error('Invalid string. Length must be a multiple of 4')
+  }
+
+  // the number of equal signs (place holders)
+  // if there are two placeholders, than the two characters before it
+  // represent one byte
+  // if there is only one, then the three characters before it represent 2 bytes
+  // this is just a cheap hack to not do indexOf twice
+  return b64[len - 2] === '=' ? 2 : b64[len - 1] === '=' ? 1 : 0
+}
+
+function byteLength (b64) {
+  // base64 is 4/3 + up to two characters of the original data
+  return b64.length * 3 / 4 - placeHoldersCount(b64)
+}
+
+function toByteArray (b64) {
+  var i, j, l, tmp, placeHolders, arr
+  var len = b64.length
+  placeHolders = placeHoldersCount(b64)
+
+  arr = new Arr(len * 3 / 4 - placeHolders)
+
+  // if there are placeholders, only get up to the last complete 4 chars
+  l = placeHolders > 0 ? len - 4 : len
+
+  var L = 0
+
+  for (i = 0, j = 0; i < l; i += 4, j += 3) {
+    tmp = (revLookup[b64.charCodeAt(i)] << 18) | (revLookup[b64.charCodeAt(i + 1)] << 12) | (revLookup[b64.charCodeAt(i + 2)] << 6) | revLookup[b64.charCodeAt(i + 3)]
+    arr[L++] = (tmp >> 16) & 0xFF
+    arr[L++] = (tmp >> 8) & 0xFF
+    arr[L++] = tmp & 0xFF
+  }
+
+  if (placeHolders === 2) {
+    tmp = (revLookup[b64.charCodeAt(i)] << 2) | (revLookup[b64.charCodeAt(i + 1)] >> 4)
+    arr[L++] = tmp & 0xFF
+  } else if (placeHolders === 1) {
+    tmp = (revLookup[b64.charCodeAt(i)] << 10) | (revLookup[b64.charCodeAt(i + 1)] << 4) | (revLookup[b64.charCodeAt(i + 2)] >> 2)
+    arr[L++] = (tmp >> 8) & 0xFF
+    arr[L++] = tmp & 0xFF
+  }
+
+  return arr
+}
+
+function tripletToBase64 (num) {
+  return lookup[num >> 18 & 0x3F] + lookup[num >> 12 & 0x3F] + lookup[num >> 6 & 0x3F] + lookup[num & 0x3F]
+}
+
+function encodeChunk (uint8, start, end) {
+  var tmp
+  var output = []
+  for (var i = start; i < end; i += 3) {
+    tmp = (uint8[i] << 16) + (uint8[i + 1] << 8) + (uint8[i + 2])
+    output.push(tripletToBase64(tmp))
+  }
+  return output.join('')
+}
+
+function fromByteArray (uint8) {
+  var tmp
+  var len = uint8.length
+  var extraBytes = len % 3 // if we have 1 byte left, pad 2 bytes
+  var output = ''
+  var parts = []
+  var maxChunkLength = 16383 // must be multiple of 3
+
+  // go through the array every three bytes, we'll deal with trailing stuff later
+  for (var i = 0, len2 = len - extraBytes; i < len2; i += maxChunkLength) {
+    parts.push(encodeChunk(uint8, i, (i + maxChunkLength) > len2 ? len2 : (i + maxChunkLength)))
+  }
+
+  // pad the end with zeros, but make sure to not forget the extra bytes
+  if (extraBytes === 1) {
+    tmp = uint8[len - 1]
+    output += lookup[tmp >> 2]
+    output += lookup[(tmp << 4) & 0x3F]
+    output += '=='
+  } else if (extraBytes === 2) {
+    tmp = (uint8[len - 2] << 8) + (uint8[len - 1])
+    output += lookup[tmp >> 10]
+    output += lookup[(tmp >> 4) & 0x3F]
+    output += lookup[(tmp << 2) & 0x3F]
+    output += '='
+  }
+
+  parts.push(output)
+
+  return parts.join('')
+}
+
+},{}],43:[function(require,module,exports){
 (function (process,global){
 /* @preserve
  * The MIT License (MIT)
@@ -13993,9 +15249,9 @@ module.exports = ret;
 },{"./es5":13}]},{},[4])(4)
 });                    ;if (typeof window !== 'undefined' && window !== null) {                               window.P = window.Promise;                                                     } else if (typeof self !== 'undefined' && self !== null) {                             self.P = self.Promise;                                                         }
 }).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"_process":47}],39:[function(require,module,exports){
+},{"_process":46}],44:[function(require,module,exports){
 
-},{}],40:[function(require,module,exports){
+},{}],45:[function(require,module,exports){
 (function (global){
 /*!
  * The buffer module from node.js, for the browser.
@@ -15788,211 +17044,392 @@ function isnan (val) {
 }
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"base64-js":41,"ieee754":42,"isarray":43}],41:[function(require,module,exports){
-'use strict'
+},{"base64-js":42,"ieee754":50,"isarray":54}],46:[function(require,module,exports){
+// shim for using process in browser
+var process = module.exports = {};
 
-exports.toByteArray = toByteArray
-exports.fromByteArray = fromByteArray
+// cached from whatever global is present so that test runners that stub it
+// don't break things.  But we need to wrap it in a try catch in case it is
+// wrapped in strict mode code which doesn't define any globals.  It's inside a
+// function because try/catches deoptimize in certain engines.
 
-var lookup = []
-var revLookup = []
-var Arr = typeof Uint8Array !== 'undefined' ? Uint8Array : Array
+var cachedSetTimeout;
+var cachedClearTimeout;
 
-function init () {
-  var code = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
-  for (var i = 0, len = code.length; i < len; ++i) {
-    lookup[i] = code[i]
-    revLookup[code.charCodeAt(i)] = i
-  }
-
-  revLookup['-'.charCodeAt(0)] = 62
-  revLookup['_'.charCodeAt(0)] = 63
-}
-
-init()
-
-function toByteArray (b64) {
-  var i, j, l, tmp, placeHolders, arr
-  var len = b64.length
-
-  if (len % 4 > 0) {
-    throw new Error('Invalid string. Length must be a multiple of 4')
-  }
-
-  // the number of equal signs (place holders)
-  // if there are two placeholders, than the two characters before it
-  // represent one byte
-  // if there is only one, then the three characters before it represent 2 bytes
-  // this is just a cheap hack to not do indexOf twice
-  placeHolders = b64[len - 2] === '=' ? 2 : b64[len - 1] === '=' ? 1 : 0
-
-  // base64 is 4/3 + up to two characters of the original data
-  arr = new Arr(len * 3 / 4 - placeHolders)
-
-  // if there are placeholders, only get up to the last complete 4 chars
-  l = placeHolders > 0 ? len - 4 : len
-
-  var L = 0
-
-  for (i = 0, j = 0; i < l; i += 4, j += 3) {
-    tmp = (revLookup[b64.charCodeAt(i)] << 18) | (revLookup[b64.charCodeAt(i + 1)] << 12) | (revLookup[b64.charCodeAt(i + 2)] << 6) | revLookup[b64.charCodeAt(i + 3)]
-    arr[L++] = (tmp >> 16) & 0xFF
-    arr[L++] = (tmp >> 8) & 0xFF
-    arr[L++] = tmp & 0xFF
-  }
-
-  if (placeHolders === 2) {
-    tmp = (revLookup[b64.charCodeAt(i)] << 2) | (revLookup[b64.charCodeAt(i + 1)] >> 4)
-    arr[L++] = tmp & 0xFF
-  } else if (placeHolders === 1) {
-    tmp = (revLookup[b64.charCodeAt(i)] << 10) | (revLookup[b64.charCodeAt(i + 1)] << 4) | (revLookup[b64.charCodeAt(i + 2)] >> 2)
-    arr[L++] = (tmp >> 8) & 0xFF
-    arr[L++] = tmp & 0xFF
-  }
-
-  return arr
-}
-
-function tripletToBase64 (num) {
-  return lookup[num >> 18 & 0x3F] + lookup[num >> 12 & 0x3F] + lookup[num >> 6 & 0x3F] + lookup[num & 0x3F]
-}
-
-function encodeChunk (uint8, start, end) {
-  var tmp
-  var output = []
-  for (var i = start; i < end; i += 3) {
-    tmp = (uint8[i] << 16) + (uint8[i + 1] << 8) + (uint8[i + 2])
-    output.push(tripletToBase64(tmp))
-  }
-  return output.join('')
-}
-
-function fromByteArray (uint8) {
-  var tmp
-  var len = uint8.length
-  var extraBytes = len % 3 // if we have 1 byte left, pad 2 bytes
-  var output = ''
-  var parts = []
-  var maxChunkLength = 16383 // must be multiple of 3
-
-  // go through the array every three bytes, we'll deal with trailing stuff later
-  for (var i = 0, len2 = len - extraBytes; i < len2; i += maxChunkLength) {
-    parts.push(encodeChunk(uint8, i, (i + maxChunkLength) > len2 ? len2 : (i + maxChunkLength)))
-  }
-
-  // pad the end with zeros, but make sure to not forget the extra bytes
-  if (extraBytes === 1) {
-    tmp = uint8[len - 1]
-    output += lookup[tmp >> 2]
-    output += lookup[(tmp << 4) & 0x3F]
-    output += '=='
-  } else if (extraBytes === 2) {
-    tmp = (uint8[len - 2] << 8) + (uint8[len - 1])
-    output += lookup[tmp >> 10]
-    output += lookup[(tmp >> 4) & 0x3F]
-    output += lookup[(tmp << 2) & 0x3F]
-    output += '='
-  }
-
-  parts.push(output)
-
-  return parts.join('')
-}
-
-},{}],42:[function(require,module,exports){
-exports.read = function (buffer, offset, isLE, mLen, nBytes) {
-  var e, m
-  var eLen = nBytes * 8 - mLen - 1
-  var eMax = (1 << eLen) - 1
-  var eBias = eMax >> 1
-  var nBits = -7
-  var i = isLE ? (nBytes - 1) : 0
-  var d = isLE ? -1 : 1
-  var s = buffer[offset + i]
-
-  i += d
-
-  e = s & ((1 << (-nBits)) - 1)
-  s >>= (-nBits)
-  nBits += eLen
-  for (; nBits > 0; e = e * 256 + buffer[offset + i], i += d, nBits -= 8) {}
-
-  m = e & ((1 << (-nBits)) - 1)
-  e >>= (-nBits)
-  nBits += mLen
-  for (; nBits > 0; m = m * 256 + buffer[offset + i], i += d, nBits -= 8) {}
-
-  if (e === 0) {
-    e = 1 - eBias
-  } else if (e === eMax) {
-    return m ? NaN : ((s ? -1 : 1) * Infinity)
-  } else {
-    m = m + Math.pow(2, mLen)
-    e = e - eBias
-  }
-  return (s ? -1 : 1) * m * Math.pow(2, e - mLen)
-}
-
-exports.write = function (buffer, value, offset, isLE, mLen, nBytes) {
-  var e, m, c
-  var eLen = nBytes * 8 - mLen - 1
-  var eMax = (1 << eLen) - 1
-  var eBias = eMax >> 1
-  var rt = (mLen === 23 ? Math.pow(2, -24) - Math.pow(2, -77) : 0)
-  var i = isLE ? 0 : (nBytes - 1)
-  var d = isLE ? 1 : -1
-  var s = value < 0 || (value === 0 && 1 / value < 0) ? 1 : 0
-
-  value = Math.abs(value)
-
-  if (isNaN(value) || value === Infinity) {
-    m = isNaN(value) ? 1 : 0
-    e = eMax
-  } else {
-    e = Math.floor(Math.log(value) / Math.LN2)
-    if (value * (c = Math.pow(2, -e)) < 1) {
-      e--
-      c *= 2
+(function () {
+    try {
+        cachedSetTimeout = setTimeout;
+    } catch (e) {
+        cachedSetTimeout = function () {
+            throw new Error('setTimeout is not defined');
+        }
     }
-    if (e + eBias >= 1) {
-      value += rt / c
+    try {
+        cachedClearTimeout = clearTimeout;
+    } catch (e) {
+        cachedClearTimeout = function () {
+            throw new Error('clearTimeout is not defined');
+        }
+    }
+} ())
+function runTimeout(fun) {
+    if (cachedSetTimeout === setTimeout) {
+        //normal enviroments in sane situations
+        return setTimeout(fun, 0);
+    }
+    try {
+        // when when somebody has screwed with setTimeout but no I.E. maddness
+        return cachedSetTimeout(fun, 0);
+    } catch(e){
+        try {
+            // When we are in I.E. but the script has been evaled so I.E. doesn't trust the global object when called normally
+            return cachedSetTimeout.call(null, fun, 0);
+        } catch(e){
+            // same as above but when it's a version of I.E. that must have the global object for 'this', hopfully our context correct otherwise it will throw a global error
+            return cachedSetTimeout.call(this, fun, 0);
+        }
+    }
+
+
+}
+function runClearTimeout(marker) {
+    if (cachedClearTimeout === clearTimeout) {
+        //normal enviroments in sane situations
+        return clearTimeout(marker);
+    }
+    try {
+        // when when somebody has screwed with setTimeout but no I.E. maddness
+        return cachedClearTimeout(marker);
+    } catch (e){
+        try {
+            // When we are in I.E. but the script has been evaled so I.E. doesn't  trust the global object when called normally
+            return cachedClearTimeout.call(null, marker);
+        } catch (e){
+            // same as above but when it's a version of I.E. that must have the global object for 'this', hopfully our context correct otherwise it will throw a global error.
+            // Some versions of I.E. have different rules for clearTimeout vs setTimeout
+            return cachedClearTimeout.call(this, marker);
+        }
+    }
+
+
+
+}
+var queue = [];
+var draining = false;
+var currentQueue;
+var queueIndex = -1;
+
+function cleanUpNextTick() {
+    if (!draining || !currentQueue) {
+        return;
+    }
+    draining = false;
+    if (currentQueue.length) {
+        queue = currentQueue.concat(queue);
     } else {
-      value += rt * Math.pow(2, 1 - eBias)
+        queueIndex = -1;
     }
-    if (value * c >= 2) {
-      e++
-      c /= 2
+    if (queue.length) {
+        drainQueue();
     }
-
-    if (e + eBias >= eMax) {
-      m = 0
-      e = eMax
-    } else if (e + eBias >= 1) {
-      m = (value * c - 1) * Math.pow(2, mLen)
-      e = e + eBias
-    } else {
-      m = value * Math.pow(2, eBias - 1) * Math.pow(2, mLen)
-      e = 0
-    }
-  }
-
-  for (; mLen >= 8; buffer[offset + i] = m & 0xff, i += d, m /= 256, mLen -= 8) {}
-
-  e = (e << mLen) | m
-  eLen += mLen
-  for (; eLen > 0; buffer[offset + i] = e & 0xff, i += d, e /= 256, eLen -= 8) {}
-
-  buffer[offset + i - d] |= s * 128
 }
 
-},{}],43:[function(require,module,exports){
-var toString = {}.toString;
+function drainQueue() {
+    if (draining) {
+        return;
+    }
+    var timeout = runTimeout(cleanUpNextTick);
+    draining = true;
 
-module.exports = Array.isArray || function (arr) {
-  return toString.call(arr) == '[object Array]';
+    var len = queue.length;
+    while(len) {
+        currentQueue = queue;
+        queue = [];
+        while (++queueIndex < len) {
+            if (currentQueue) {
+                currentQueue[queueIndex].run();
+            }
+        }
+        queueIndex = -1;
+        len = queue.length;
+    }
+    currentQueue = null;
+    draining = false;
+    runClearTimeout(timeout);
+}
+
+process.nextTick = function (fun) {
+    var args = new Array(arguments.length - 1);
+    if (arguments.length > 1) {
+        for (var i = 1; i < arguments.length; i++) {
+            args[i - 1] = arguments[i];
+        }
+    }
+    queue.push(new Item(fun, args));
+    if (queue.length === 1 && !draining) {
+        runTimeout(drainQueue);
+    }
 };
 
-},{}],44:[function(require,module,exports){
+// v8 likes predictible objects
+function Item(fun, array) {
+    this.fun = fun;
+    this.array = array;
+}
+Item.prototype.run = function () {
+    this.fun.apply(null, this.array);
+};
+process.title = 'browser';
+process.browser = true;
+process.env = {};
+process.argv = [];
+process.version = ''; // empty string to avoid regexp issues
+process.versions = {};
+
+function noop() {}
+
+process.on = noop;
+process.addListener = noop;
+process.once = noop;
+process.off = noop;
+process.removeListener = noop;
+process.removeAllListeners = noop;
+process.emit = noop;
+
+process.binding = function (name) {
+    throw new Error('process.binding is not supported');
+};
+
+process.cwd = function () { return '/' };
+process.chdir = function (dir) {
+    throw new Error('process.chdir is not supported');
+};
+process.umask = function() { return 0; };
+
+},{}],47:[function(require,module,exports){
+(function (global){
+'use strict';
+
+var buffer = require('buffer');
+var Buffer = buffer.Buffer;
+var SlowBuffer = buffer.SlowBuffer;
+var MAX_LEN = buffer.kMaxLength || 2147483647;
+exports.alloc = function alloc(size, fill, encoding) {
+  if (typeof Buffer.alloc === 'function') {
+    return Buffer.alloc(size, fill, encoding);
+  }
+  if (typeof encoding === 'number') {
+    throw new TypeError('encoding must not be number');
+  }
+  if (typeof size !== 'number') {
+    throw new TypeError('size must be a number');
+  }
+  if (size > MAX_LEN) {
+    throw new RangeError('size is too large');
+  }
+  var enc = encoding;
+  var _fill = fill;
+  if (_fill === undefined) {
+    enc = undefined;
+    _fill = 0;
+  }
+  var buf = new Buffer(size);
+  if (typeof _fill === 'string') {
+    var fillBuf = new Buffer(_fill, enc);
+    var flen = fillBuf.length;
+    var i = -1;
+    while (++i < size) {
+      buf[i] = fillBuf[i % flen];
+    }
+  } else {
+    buf.fill(_fill);
+  }
+  return buf;
+}
+exports.allocUnsafe = function allocUnsafe(size) {
+  if (typeof Buffer.allocUnsafe === 'function') {
+    return Buffer.allocUnsafe(size);
+  }
+  if (typeof size !== 'number') {
+    throw new TypeError('size must be a number');
+  }
+  if (size > MAX_LEN) {
+    throw new RangeError('size is too large');
+  }
+  return new Buffer(size);
+}
+exports.from = function from(value, encodingOrOffset, length) {
+  if (typeof Buffer.from === 'function' && (!global.Uint8Array || Uint8Array.from !== Buffer.from)) {
+    return Buffer.from(value, encodingOrOffset, length);
+  }
+  if (typeof value === 'number') {
+    throw new TypeError('"value" argument must not be a number');
+  }
+  if (typeof value === 'string') {
+    return new Buffer(value, encodingOrOffset);
+  }
+  if (typeof ArrayBuffer !== 'undefined' && value instanceof ArrayBuffer) {
+    var offset = encodingOrOffset;
+    if (arguments.length === 1) {
+      return new Buffer(value);
+    }
+    if (typeof offset === 'undefined') {
+      offset = 0;
+    }
+    var len = length;
+    if (typeof len === 'undefined') {
+      len = value.byteLength - offset;
+    }
+    if (offset >= value.byteLength) {
+      throw new RangeError('\'offset\' is out of bounds');
+    }
+    if (len > value.byteLength - offset) {
+      throw new RangeError('\'length\' is out of bounds');
+    }
+    return new Buffer(value.slice(offset, offset + len));
+  }
+  if (Buffer.isBuffer(value)) {
+    var out = new Buffer(value.length);
+    value.copy(out, 0, 0, value.length);
+    return out;
+  }
+  if (value) {
+    if (Array.isArray(value) || (typeof ArrayBuffer !== 'undefined' && value.buffer instanceof ArrayBuffer) || 'length' in value) {
+      return new Buffer(value);
+    }
+    if (value.type === 'Buffer' && Array.isArray(value.data)) {
+      return new Buffer(value.data);
+    }
+  }
+
+  throw new TypeError('First argument must be a string, Buffer, ' + 'ArrayBuffer, Array, or array-like object.');
+}
+exports.allocUnsafeSlow = function allocUnsafeSlow(size) {
+  if (typeof Buffer.allocUnsafeSlow === 'function') {
+    return Buffer.allocUnsafeSlow(size);
+  }
+  if (typeof size !== 'number') {
+    throw new TypeError('size must be a number');
+  }
+  if (size >= MAX_LEN) {
+    throw new RangeError('size is too large');
+  }
+  return new SlowBuffer(size);
+}
+
+}).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
+},{"buffer":45}],48:[function(require,module,exports){
+(function (Buffer){
+// Copyright Joyent, Inc. and other Node contributors.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a
+// copy of this software and associated documentation files (the
+// "Software"), to deal in the Software without restriction, including
+// without limitation the rights to use, copy, modify, merge, publish,
+// distribute, sublicense, and/or sell copies of the Software, and to permit
+// persons to whom the Software is furnished to do so, subject to the
+// following conditions:
+//
+// The above copyright notice and this permission notice shall be included
+// in all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
+// NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+// DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+// OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+// USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+// NOTE: These type checking functions intentionally don't use `instanceof`
+// because it is fragile and can be easily faked with `Object.create()`.
+
+function isArray(arg) {
+  if (Array.isArray) {
+    return Array.isArray(arg);
+  }
+  return objectToString(arg) === '[object Array]';
+}
+exports.isArray = isArray;
+
+function isBoolean(arg) {
+  return typeof arg === 'boolean';
+}
+exports.isBoolean = isBoolean;
+
+function isNull(arg) {
+  return arg === null;
+}
+exports.isNull = isNull;
+
+function isNullOrUndefined(arg) {
+  return arg == null;
+}
+exports.isNullOrUndefined = isNullOrUndefined;
+
+function isNumber(arg) {
+  return typeof arg === 'number';
+}
+exports.isNumber = isNumber;
+
+function isString(arg) {
+  return typeof arg === 'string';
+}
+exports.isString = isString;
+
+function isSymbol(arg) {
+  return typeof arg === 'symbol';
+}
+exports.isSymbol = isSymbol;
+
+function isUndefined(arg) {
+  return arg === void 0;
+}
+exports.isUndefined = isUndefined;
+
+function isRegExp(re) {
+  return objectToString(re) === '[object RegExp]';
+}
+exports.isRegExp = isRegExp;
+
+function isObject(arg) {
+  return typeof arg === 'object' && arg !== null;
+}
+exports.isObject = isObject;
+
+function isDate(d) {
+  return objectToString(d) === '[object Date]';
+}
+exports.isDate = isDate;
+
+function isError(e) {
+  return (objectToString(e) === '[object Error]' || e instanceof Error);
+}
+exports.isError = isError;
+
+function isFunction(arg) {
+  return typeof arg === 'function';
+}
+exports.isFunction = isFunction;
+
+function isPrimitive(arg) {
+  return arg === null ||
+         typeof arg === 'boolean' ||
+         typeof arg === 'number' ||
+         typeof arg === 'string' ||
+         typeof arg === 'symbol' ||  // ES6 symbol
+         typeof arg === 'undefined';
+}
+exports.isPrimitive = isPrimitive;
+
+exports.isBuffer = Buffer.isBuffer;
+
+function objectToString(o) {
+  return Object.prototype.toString.call(o);
+}
+
+}).call(this,{"isBuffer":require("../../is-buffer/index.js")})
+},{"../../is-buffer/index.js":53}],49:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -16296,3359 +17733,93 @@ function isUndefined(arg) {
   return arg === void 0;
 }
 
-},{}],45:[function(require,module,exports){
-if (typeof Object.create === 'function') {
-  // implementation from standard node.js 'util' module
-  module.exports = function inherits(ctor, superCtor) {
-    ctor.super_ = superCtor
-    ctor.prototype = Object.create(superCtor.prototype, {
-      constructor: {
-        value: ctor,
-        enumerable: false,
-        writable: true,
-        configurable: true
-      }
-    });
-  };
-} else {
-  // old school shim for old browsers
-  module.exports = function inherits(ctor, superCtor) {
-    ctor.super_ = superCtor
-    var TempCtor = function () {}
-    TempCtor.prototype = superCtor.prototype
-    ctor.prototype = new TempCtor()
-    ctor.prototype.constructor = ctor
-  }
-}
-
-},{}],46:[function(require,module,exports){
-/*!
- * Determine if an object is a Buffer
- *
- * @author   Feross Aboukhadijeh <feross@feross.org> <http://feross.org>
- * @license  MIT
- */
-
-// The _isBuffer check is for Safari 5-7 support, because it's missing
-// Object.prototype.constructor. Remove this eventually
-module.exports = function (obj) {
-  return obj != null && (isBuffer(obj) || isSlowBuffer(obj) || !!obj._isBuffer)
-}
-
-function isBuffer (obj) {
-  return !!obj.constructor && typeof obj.constructor.isBuffer === 'function' && obj.constructor.isBuffer(obj)
-}
-
-// For Node v0.10 support. Remove this eventually.
-function isSlowBuffer (obj) {
-  return typeof obj.readFloatLE === 'function' && typeof obj.slice === 'function' && isBuffer(obj.slice(0, 0))
-}
-
-},{}],47:[function(require,module,exports){
-// shim for using process in browser
-var process = module.exports = {};
-
-// cached from whatever global is present so that test runners that stub it
-// don't break things.  But we need to wrap it in a try catch in case it is
-// wrapped in strict mode code which doesn't define any globals.  It's inside a
-// function because try/catches deoptimize in certain engines.
-
-var cachedSetTimeout;
-var cachedClearTimeout;
-
-(function () {
-    try {
-        cachedSetTimeout = setTimeout;
-    } catch (e) {
-        cachedSetTimeout = function () {
-            throw new Error('setTimeout is not defined');
-        }
-    }
-    try {
-        cachedClearTimeout = clearTimeout;
-    } catch (e) {
-        cachedClearTimeout = function () {
-            throw new Error('clearTimeout is not defined');
-        }
-    }
-} ())
-function runTimeout(fun) {
-    if (cachedSetTimeout === setTimeout) {
-        //normal enviroments in sane situations
-        return setTimeout(fun, 0);
-    }
-    try {
-        // when when somebody has screwed with setTimeout but no I.E. maddness
-        return cachedSetTimeout(fun, 0);
-    } catch(e){
-        try {
-            // When we are in I.E. but the script has been evaled so I.E. doesn't trust the global object when called normally
-            return cachedSetTimeout.call(null, fun, 0);
-        } catch(e){
-            // same as above but when it's a version of I.E. that must have the global object for 'this', hopfully our context correct otherwise it will throw a global error
-            return cachedSetTimeout.call(this, fun, 0);
-        }
-    }
-
-
-}
-function runClearTimeout(marker) {
-    if (cachedClearTimeout === clearTimeout) {
-        //normal enviroments in sane situations
-        return clearTimeout(marker);
-    }
-    try {
-        // when when somebody has screwed with setTimeout but no I.E. maddness
-        return cachedClearTimeout(marker);
-    } catch (e){
-        try {
-            // When we are in I.E. but the script has been evaled so I.E. doesn't  trust the global object when called normally
-            return cachedClearTimeout.call(null, marker);
-        } catch (e){
-            // same as above but when it's a version of I.E. that must have the global object for 'this', hopfully our context correct otherwise it will throw a global error.
-            // Some versions of I.E. have different rules for clearTimeout vs setTimeout
-            return cachedClearTimeout.call(this, marker);
-        }
-    }
-
-
-
-}
-var queue = [];
-var draining = false;
-var currentQueue;
-var queueIndex = -1;
-
-function cleanUpNextTick() {
-    if (!draining || !currentQueue) {
-        return;
-    }
-    draining = false;
-    if (currentQueue.length) {
-        queue = currentQueue.concat(queue);
-    } else {
-        queueIndex = -1;
-    }
-    if (queue.length) {
-        drainQueue();
-    }
-}
-
-function drainQueue() {
-    if (draining) {
-        return;
-    }
-    var timeout = runTimeout(cleanUpNextTick);
-    draining = true;
-
-    var len = queue.length;
-    while(len) {
-        currentQueue = queue;
-        queue = [];
-        while (++queueIndex < len) {
-            if (currentQueue) {
-                currentQueue[queueIndex].run();
-            }
-        }
-        queueIndex = -1;
-        len = queue.length;
-    }
-    currentQueue = null;
-    draining = false;
-    runClearTimeout(timeout);
-}
-
-process.nextTick = function (fun) {
-    var args = new Array(arguments.length - 1);
-    if (arguments.length > 1) {
-        for (var i = 1; i < arguments.length; i++) {
-            args[i - 1] = arguments[i];
-        }
-    }
-    queue.push(new Item(fun, args));
-    if (queue.length === 1 && !draining) {
-        runTimeout(drainQueue);
-    }
-};
-
-// v8 likes predictible objects
-function Item(fun, array) {
-    this.fun = fun;
-    this.array = array;
-}
-Item.prototype.run = function () {
-    this.fun.apply(null, this.array);
-};
-process.title = 'browser';
-process.browser = true;
-process.env = {};
-process.argv = [];
-process.version = ''; // empty string to avoid regexp issues
-process.versions = {};
-
-function noop() {}
-
-process.on = noop;
-process.addListener = noop;
-process.once = noop;
-process.off = noop;
-process.removeListener = noop;
-process.removeAllListeners = noop;
-process.emit = noop;
-
-process.binding = function (name) {
-    throw new Error('process.binding is not supported');
-};
-
-process.cwd = function () { return '/' };
-process.chdir = function (dir) {
-    throw new Error('process.chdir is not supported');
-};
-process.umask = function() { return 0; };
-
-},{}],48:[function(require,module,exports){
-module.exports = require("./lib/_stream_duplex.js")
-
-},{"./lib/_stream_duplex.js":49}],49:[function(require,module,exports){
-// a duplex stream is just a stream that is both readable and writable.
-// Since JS doesn't have multiple prototypal inheritance, this class
-// prototypally inherits from Readable, and then parasitically from
-// Writable.
-
-'use strict';
-
-/*<replacement>*/
-
-var objectKeys = Object.keys || function (obj) {
-  var keys = [];
-  for (var key in obj) {
-    keys.push(key);
-  }return keys;
-};
-/*</replacement>*/
-
-module.exports = Duplex;
-
-/*<replacement>*/
-var processNextTick = require('process-nextick-args');
-/*</replacement>*/
-
-/*<replacement>*/
-var util = require('core-util-is');
-util.inherits = require('inherits');
-/*</replacement>*/
-
-var Readable = require('./_stream_readable');
-var Writable = require('./_stream_writable');
-
-util.inherits(Duplex, Readable);
-
-var keys = objectKeys(Writable.prototype);
-for (var v = 0; v < keys.length; v++) {
-  var method = keys[v];
-  if (!Duplex.prototype[method]) Duplex.prototype[method] = Writable.prototype[method];
-}
-
-function Duplex(options) {
-  if (!(this instanceof Duplex)) return new Duplex(options);
-
-  Readable.call(this, options);
-  Writable.call(this, options);
-
-  if (options && options.readable === false) this.readable = false;
-
-  if (options && options.writable === false) this.writable = false;
-
-  this.allowHalfOpen = true;
-  if (options && options.allowHalfOpen === false) this.allowHalfOpen = false;
-
-  this.once('end', onend);
-}
-
-// the no-half-open enforcer
-function onend() {
-  // if we allow half-open state, or if the writable side ended,
-  // then we're ok.
-  if (this.allowHalfOpen || this._writableState.ended) return;
-
-  // no more data can be written.
-  // But allow more writes to happen in this tick.
-  processNextTick(onEndNT, this);
-}
-
-function onEndNT(self) {
-  self.end();
-}
-
-function forEach(xs, f) {
-  for (var i = 0, l = xs.length; i < l; i++) {
-    f(xs[i], i);
-  }
-}
-},{"./_stream_readable":51,"./_stream_writable":53,"core-util-is":56,"inherits":45,"process-nextick-args":58}],50:[function(require,module,exports){
-// a passthrough stream.
-// basically just the most minimal sort of Transform stream.
-// Every written chunk gets output as-is.
-
-'use strict';
-
-module.exports = PassThrough;
-
-var Transform = require('./_stream_transform');
-
-/*<replacement>*/
-var util = require('core-util-is');
-util.inherits = require('inherits');
-/*</replacement>*/
-
-util.inherits(PassThrough, Transform);
-
-function PassThrough(options) {
-  if (!(this instanceof PassThrough)) return new PassThrough(options);
-
-  Transform.call(this, options);
-}
-
-PassThrough.prototype._transform = function (chunk, encoding, cb) {
-  cb(null, chunk);
-};
-},{"./_stream_transform":52,"core-util-is":56,"inherits":45}],51:[function(require,module,exports){
-(function (process){
-'use strict';
-
-module.exports = Readable;
-
-/*<replacement>*/
-var processNextTick = require('process-nextick-args');
-/*</replacement>*/
-
-/*<replacement>*/
-var isArray = require('isarray');
-/*</replacement>*/
-
-Readable.ReadableState = ReadableState;
-
-/*<replacement>*/
-var EE = require('events').EventEmitter;
-
-var EElistenerCount = function (emitter, type) {
-  return emitter.listeners(type).length;
-};
-/*</replacement>*/
-
-/*<replacement>*/
-var Stream;
-(function () {
-  try {
-    Stream = require('st' + 'ream');
-  } catch (_) {} finally {
-    if (!Stream) Stream = require('events').EventEmitter;
-  }
-})();
-/*</replacement>*/
-
-var Buffer = require('buffer').Buffer;
-/*<replacement>*/
-var bufferShim = require('buffer-shims');
-/*</replacement>*/
-
-/*<replacement>*/
-var util = require('core-util-is');
-util.inherits = require('inherits');
-/*</replacement>*/
-
-/*<replacement>*/
-var debugUtil = require('util');
-var debug = void 0;
-if (debugUtil && debugUtil.debuglog) {
-  debug = debugUtil.debuglog('stream');
-} else {
-  debug = function () {};
-}
-/*</replacement>*/
-
-var BufferList = require('./internal/streams/BufferList');
-var StringDecoder;
-
-util.inherits(Readable, Stream);
-
-function prependListener(emitter, event, fn) {
-  if (typeof emitter.prependListener === 'function') {
-    return emitter.prependListener(event, fn);
+},{}],50:[function(require,module,exports){
+exports.read = function (buffer, offset, isLE, mLen, nBytes) {
+  var e, m
+  var eLen = nBytes * 8 - mLen - 1
+  var eMax = (1 << eLen) - 1
+  var eBias = eMax >> 1
+  var nBits = -7
+  var i = isLE ? (nBytes - 1) : 0
+  var d = isLE ? -1 : 1
+  var s = buffer[offset + i]
+
+  i += d
+
+  e = s & ((1 << (-nBits)) - 1)
+  s >>= (-nBits)
+  nBits += eLen
+  for (; nBits > 0; e = e * 256 + buffer[offset + i], i += d, nBits -= 8) {}
+
+  m = e & ((1 << (-nBits)) - 1)
+  e >>= (-nBits)
+  nBits += mLen
+  for (; nBits > 0; m = m * 256 + buffer[offset + i], i += d, nBits -= 8) {}
+
+  if (e === 0) {
+    e = 1 - eBias
+  } else if (e === eMax) {
+    return m ? NaN : ((s ? -1 : 1) * Infinity)
   } else {
-    // This is a hack to make sure that our error handler is attached before any
-    // userland ones.  NEVER DO THIS. This is here only because this code needs
-    // to continue to work with older versions of Node.js that do not include
-    // the prependListener() method. The goal is to eventually remove this hack.
-    if (!emitter._events || !emitter._events[event]) emitter.on(event, fn);else if (isArray(emitter._events[event])) emitter._events[event].unshift(fn);else emitter._events[event] = [fn, emitter._events[event]];
+    m = m + Math.pow(2, mLen)
+    e = e - eBias
   }
+  return (s ? -1 : 1) * m * Math.pow(2, e - mLen)
 }
 
-var Duplex;
-function ReadableState(options, stream) {
-  Duplex = Duplex || require('./_stream_duplex');
+exports.write = function (buffer, value, offset, isLE, mLen, nBytes) {
+  var e, m, c
+  var eLen = nBytes * 8 - mLen - 1
+  var eMax = (1 << eLen) - 1
+  var eBias = eMax >> 1
+  var rt = (mLen === 23 ? Math.pow(2, -24) - Math.pow(2, -77) : 0)
+  var i = isLE ? 0 : (nBytes - 1)
+  var d = isLE ? 1 : -1
+  var s = value < 0 || (value === 0 && 1 / value < 0) ? 1 : 0
 
-  options = options || {};
+  value = Math.abs(value)
 
-  // object stream flag. Used to make read(n) ignore n and to
-  // make all the buffer merging and length checks go away
-  this.objectMode = !!options.objectMode;
-
-  if (stream instanceof Duplex) this.objectMode = this.objectMode || !!options.readableObjectMode;
-
-  // the point at which it stops calling _read() to fill the buffer
-  // Note: 0 is a valid value, means "don't call _read preemptively ever"
-  var hwm = options.highWaterMark;
-  var defaultHwm = this.objectMode ? 16 : 16 * 1024;
-  this.highWaterMark = hwm || hwm === 0 ? hwm : defaultHwm;
-
-  // cast to ints.
-  this.highWaterMark = ~ ~this.highWaterMark;
-
-  // A linked list is used to store data chunks instead of an array because the
-  // linked list can remove elements from the beginning faster than
-  // array.shift()
-  this.buffer = new BufferList();
-  this.length = 0;
-  this.pipes = null;
-  this.pipesCount = 0;
-  this.flowing = null;
-  this.ended = false;
-  this.endEmitted = false;
-  this.reading = false;
-
-  // a flag to be able to tell if the onwrite cb is called immediately,
-  // or on a later tick.  We set this to true at first, because any
-  // actions that shouldn't happen until "later" should generally also
-  // not happen before the first write call.
-  this.sync = true;
-
-  // whenever we return null, then we set a flag to say
-  // that we're awaiting a 'readable' event emission.
-  this.needReadable = false;
-  this.emittedReadable = false;
-  this.readableListening = false;
-  this.resumeScheduled = false;
-
-  // Crypto is kind of old and crusty.  Historically, its default string
-  // encoding is 'binary' so we have to make this configurable.
-  // Everything else in the universe uses 'utf8', though.
-  this.defaultEncoding = options.defaultEncoding || 'utf8';
-
-  // when piping, we only care about 'readable' events that happen
-  // after read()ing all the bytes and not getting any pushback.
-  this.ranOut = false;
-
-  // the number of writers that are awaiting a drain event in .pipe()s
-  this.awaitDrain = 0;
-
-  // if true, a maybeReadMore has been scheduled
-  this.readingMore = false;
-
-  this.decoder = null;
-  this.encoding = null;
-  if (options.encoding) {
-    if (!StringDecoder) StringDecoder = require('string_decoder/').StringDecoder;
-    this.decoder = new StringDecoder(options.encoding);
-    this.encoding = options.encoding;
-  }
-}
-
-var Duplex;
-function Readable(options) {
-  Duplex = Duplex || require('./_stream_duplex');
-
-  if (!(this instanceof Readable)) return new Readable(options);
-
-  this._readableState = new ReadableState(options, this);
-
-  // legacy
-  this.readable = true;
-
-  if (options && typeof options.read === 'function') this._read = options.read;
-
-  Stream.call(this);
-}
-
-// Manually shove something into the read() buffer.
-// This returns true if the highWaterMark has not been hit yet,
-// similar to how Writable.write() returns true if you should
-// write() some more.
-Readable.prototype.push = function (chunk, encoding) {
-  var state = this._readableState;
-
-  if (!state.objectMode && typeof chunk === 'string') {
-    encoding = encoding || state.defaultEncoding;
-    if (encoding !== state.encoding) {
-      chunk = bufferShim.from(chunk, encoding);
-      encoding = '';
-    }
-  }
-
-  return readableAddChunk(this, state, chunk, encoding, false);
-};
-
-// Unshift should *always* be something directly out of read()
-Readable.prototype.unshift = function (chunk) {
-  var state = this._readableState;
-  return readableAddChunk(this, state, chunk, '', true);
-};
-
-Readable.prototype.isPaused = function () {
-  return this._readableState.flowing === false;
-};
-
-function readableAddChunk(stream, state, chunk, encoding, addToFront) {
-  var er = chunkInvalid(state, chunk);
-  if (er) {
-    stream.emit('error', er);
-  } else if (chunk === null) {
-    state.reading = false;
-    onEofChunk(stream, state);
-  } else if (state.objectMode || chunk && chunk.length > 0) {
-    if (state.ended && !addToFront) {
-      var e = new Error('stream.push() after EOF');
-      stream.emit('error', e);
-    } else if (state.endEmitted && addToFront) {
-      var _e = new Error('stream.unshift() after end event');
-      stream.emit('error', _e);
-    } else {
-      var skipAdd;
-      if (state.decoder && !addToFront && !encoding) {
-        chunk = state.decoder.write(chunk);
-        skipAdd = !state.objectMode && chunk.length === 0;
-      }
-
-      if (!addToFront) state.reading = false;
-
-      // Don't add to the buffer if we've decoded to an empty string chunk and
-      // we're not in object mode
-      if (!skipAdd) {
-        // if we want the data now, just emit it.
-        if (state.flowing && state.length === 0 && !state.sync) {
-          stream.emit('data', chunk);
-          stream.read(0);
-        } else {
-          // update the buffer info.
-          state.length += state.objectMode ? 1 : chunk.length;
-          if (addToFront) state.buffer.unshift(chunk);else state.buffer.push(chunk);
-
-          if (state.needReadable) emitReadable(stream);
-        }
-      }
-
-      maybeReadMore(stream, state);
-    }
-  } else if (!addToFront) {
-    state.reading = false;
-  }
-
-  return needMoreData(state);
-}
-
-// if it's past the high water mark, we can push in some more.
-// Also, if we have no data yet, we can stand some
-// more bytes.  This is to work around cases where hwm=0,
-// such as the repl.  Also, if the push() triggered a
-// readable event, and the user called read(largeNumber) such that
-// needReadable was set, then we ought to push more, so that another
-// 'readable' event will be triggered.
-function needMoreData(state) {
-  return !state.ended && (state.needReadable || state.length < state.highWaterMark || state.length === 0);
-}
-
-// backwards compatibility.
-Readable.prototype.setEncoding = function (enc) {
-  if (!StringDecoder) StringDecoder = require('string_decoder/').StringDecoder;
-  this._readableState.decoder = new StringDecoder(enc);
-  this._readableState.encoding = enc;
-  return this;
-};
-
-// Don't raise the hwm > 8MB
-var MAX_HWM = 0x800000;
-function computeNewHighWaterMark(n) {
-  if (n >= MAX_HWM) {
-    n = MAX_HWM;
+  if (isNaN(value) || value === Infinity) {
+    m = isNaN(value) ? 1 : 0
+    e = eMax
   } else {
-    // Get the next highest power of 2 to prevent increasing hwm excessively in
-    // tiny amounts
-    n--;
-    n |= n >>> 1;
-    n |= n >>> 2;
-    n |= n >>> 4;
-    n |= n >>> 8;
-    n |= n >>> 16;
-    n++;
-  }
-  return n;
-}
-
-// This function is designed to be inlinable, so please take care when making
-// changes to the function body.
-function howMuchToRead(n, state) {
-  if (n <= 0 || state.length === 0 && state.ended) return 0;
-  if (state.objectMode) return 1;
-  if (n !== n) {
-    // Only flow one buffer at a time
-    if (state.flowing && state.length) return state.buffer.head.data.length;else return state.length;
-  }
-  // If we're asking for more than the current hwm, then raise the hwm.
-  if (n > state.highWaterMark) state.highWaterMark = computeNewHighWaterMark(n);
-  if (n <= state.length) return n;
-  // Don't have enough
-  if (!state.ended) {
-    state.needReadable = true;
-    return 0;
-  }
-  return state.length;
-}
-
-// you can override either this method, or the async _read(n) below.
-Readable.prototype.read = function (n) {
-  debug('read', n);
-  n = parseInt(n, 10);
-  var state = this._readableState;
-  var nOrig = n;
-
-  if (n !== 0) state.emittedReadable = false;
-
-  // if we're doing read(0) to trigger a readable event, but we
-  // already have a bunch of data in the buffer, then just trigger
-  // the 'readable' event and move on.
-  if (n === 0 && state.needReadable && (state.length >= state.highWaterMark || state.ended)) {
-    debug('read: emitReadable', state.length, state.ended);
-    if (state.length === 0 && state.ended) endReadable(this);else emitReadable(this);
-    return null;
-  }
-
-  n = howMuchToRead(n, state);
-
-  // if we've ended, and we're now clear, then finish it up.
-  if (n === 0 && state.ended) {
-    if (state.length === 0) endReadable(this);
-    return null;
-  }
-
-  // All the actual chunk generation logic needs to be
-  // *below* the call to _read.  The reason is that in certain
-  // synthetic stream cases, such as passthrough streams, _read
-  // may be a completely synchronous operation which may change
-  // the state of the read buffer, providing enough data when
-  // before there was *not* enough.
-  //
-  // So, the steps are:
-  // 1. Figure out what the state of things will be after we do
-  // a read from the buffer.
-  //
-  // 2. If that resulting state will trigger a _read, then call _read.
-  // Note that this may be asynchronous, or synchronous.  Yes, it is
-  // deeply ugly to write APIs this way, but that still doesn't mean
-  // that the Readable class should behave improperly, as streams are
-  // designed to be sync/async agnostic.
-  // Take note if the _read call is sync or async (ie, if the read call
-  // has returned yet), so that we know whether or not it's safe to emit
-  // 'readable' etc.
-  //
-  // 3. Actually pull the requested chunks out of the buffer and return.
-
-  // if we need a readable event, then we need to do some reading.
-  var doRead = state.needReadable;
-  debug('need readable', doRead);
-
-  // if we currently have less than the highWaterMark, then also read some
-  if (state.length === 0 || state.length - n < state.highWaterMark) {
-    doRead = true;
-    debug('length less than watermark', doRead);
-  }
-
-  // however, if we've ended, then there's no point, and if we're already
-  // reading, then it's unnecessary.
-  if (state.ended || state.reading) {
-    doRead = false;
-    debug('reading or ended', doRead);
-  } else if (doRead) {
-    debug('do read');
-    state.reading = true;
-    state.sync = true;
-    // if the length is currently zero, then we *need* a readable event.
-    if (state.length === 0) state.needReadable = true;
-    // call internal read method
-    this._read(state.highWaterMark);
-    state.sync = false;
-    // If _read pushed data synchronously, then `reading` will be false,
-    // and we need to re-evaluate how much data we can return to the user.
-    if (!state.reading) n = howMuchToRead(nOrig, state);
-  }
-
-  var ret;
-  if (n > 0) ret = fromList(n, state);else ret = null;
-
-  if (ret === null) {
-    state.needReadable = true;
-    n = 0;
-  } else {
-    state.length -= n;
-  }
-
-  if (state.length === 0) {
-    // If we have nothing in the buffer, then we want to know
-    // as soon as we *do* get something into the buffer.
-    if (!state.ended) state.needReadable = true;
-
-    // If we tried to read() past the EOF, then emit end on the next tick.
-    if (nOrig !== n && state.ended) endReadable(this);
-  }
-
-  if (ret !== null) this.emit('data', ret);
-
-  return ret;
-};
-
-function chunkInvalid(state, chunk) {
-  var er = null;
-  if (!Buffer.isBuffer(chunk) && typeof chunk !== 'string' && chunk !== null && chunk !== undefined && !state.objectMode) {
-    er = new TypeError('Invalid non-string/buffer chunk');
-  }
-  return er;
-}
-
-function onEofChunk(stream, state) {
-  if (state.ended) return;
-  if (state.decoder) {
-    var chunk = state.decoder.end();
-    if (chunk && chunk.length) {
-      state.buffer.push(chunk);
-      state.length += state.objectMode ? 1 : chunk.length;
+    e = Math.floor(Math.log(value) / Math.LN2)
+    if (value * (c = Math.pow(2, -e)) < 1) {
+      e--
+      c *= 2
     }
-  }
-  state.ended = true;
-
-  // emit 'readable' now to make sure it gets picked up.
-  emitReadable(stream);
-}
-
-// Don't emit readable right away in sync mode, because this can trigger
-// another read() call => stack overflow.  This way, it might trigger
-// a nextTick recursion warning, but that's not so bad.
-function emitReadable(stream) {
-  var state = stream._readableState;
-  state.needReadable = false;
-  if (!state.emittedReadable) {
-    debug('emitReadable', state.flowing);
-    state.emittedReadable = true;
-    if (state.sync) processNextTick(emitReadable_, stream);else emitReadable_(stream);
-  }
-}
-
-function emitReadable_(stream) {
-  debug('emit readable');
-  stream.emit('readable');
-  flow(stream);
-}
-
-// at this point, the user has presumably seen the 'readable' event,
-// and called read() to consume some data.  that may have triggered
-// in turn another _read(n) call, in which case reading = true if
-// it's in progress.
-// However, if we're not ended, or reading, and the length < hwm,
-// then go ahead and try to read some more preemptively.
-function maybeReadMore(stream, state) {
-  if (!state.readingMore) {
-    state.readingMore = true;
-    processNextTick(maybeReadMore_, stream, state);
-  }
-}
-
-function maybeReadMore_(stream, state) {
-  var len = state.length;
-  while (!state.reading && !state.flowing && !state.ended && state.length < state.highWaterMark) {
-    debug('maybeReadMore read 0');
-    stream.read(0);
-    if (len === state.length)
-      // didn't get any data, stop spinning.
-      break;else len = state.length;
-  }
-  state.readingMore = false;
-}
-
-// abstract method.  to be overridden in specific implementation classes.
-// call cb(er, data) where data is <= n in length.
-// for virtual (non-string, non-buffer) streams, "length" is somewhat
-// arbitrary, and perhaps not very meaningful.
-Readable.prototype._read = function (n) {
-  this.emit('error', new Error('not implemented'));
-};
-
-Readable.prototype.pipe = function (dest, pipeOpts) {
-  var src = this;
-  var state = this._readableState;
-
-  switch (state.pipesCount) {
-    case 0:
-      state.pipes = dest;
-      break;
-    case 1:
-      state.pipes = [state.pipes, dest];
-      break;
-    default:
-      state.pipes.push(dest);
-      break;
-  }
-  state.pipesCount += 1;
-  debug('pipe count=%d opts=%j', state.pipesCount, pipeOpts);
-
-  var doEnd = (!pipeOpts || pipeOpts.end !== false) && dest !== process.stdout && dest !== process.stderr;
-
-  var endFn = doEnd ? onend : cleanup;
-  if (state.endEmitted) processNextTick(endFn);else src.once('end', endFn);
-
-  dest.on('unpipe', onunpipe);
-  function onunpipe(readable) {
-    debug('onunpipe');
-    if (readable === src) {
-      cleanup();
-    }
-  }
-
-  function onend() {
-    debug('onend');
-    dest.end();
-  }
-
-  // when the dest drains, it reduces the awaitDrain counter
-  // on the source.  This would be more elegant with a .once()
-  // handler in flow(), but adding and removing repeatedly is
-  // too slow.
-  var ondrain = pipeOnDrain(src);
-  dest.on('drain', ondrain);
-
-  var cleanedUp = false;
-  function cleanup() {
-    debug('cleanup');
-    // cleanup event handlers once the pipe is broken
-    dest.removeListener('close', onclose);
-    dest.removeListener('finish', onfinish);
-    dest.removeListener('drain', ondrain);
-    dest.removeListener('error', onerror);
-    dest.removeListener('unpipe', onunpipe);
-    src.removeListener('end', onend);
-    src.removeListener('end', cleanup);
-    src.removeListener('data', ondata);
-
-    cleanedUp = true;
-
-    // if the reader is waiting for a drain event from this
-    // specific writer, then it would cause it to never start
-    // flowing again.
-    // So, if this is awaiting a drain, then we just call it now.
-    // If we don't know, then assume that we are waiting for one.
-    if (state.awaitDrain && (!dest._writableState || dest._writableState.needDrain)) ondrain();
-  }
-
-  // If the user pushes more data while we're writing to dest then we'll end up
-  // in ondata again. However, we only want to increase awaitDrain once because
-  // dest will only emit one 'drain' event for the multiple writes.
-  // => Introduce a guard on increasing awaitDrain.
-  var increasedAwaitDrain = false;
-  src.on('data', ondata);
-  function ondata(chunk) {
-    debug('ondata');
-    increasedAwaitDrain = false;
-    var ret = dest.write(chunk);
-    if (false === ret && !increasedAwaitDrain) {
-      // If the user unpiped during `dest.write()`, it is possible
-      // to get stuck in a permanently paused state if that write
-      // also returned false.
-      // => Check whether `dest` is still a piping destination.
-      if ((state.pipesCount === 1 && state.pipes === dest || state.pipesCount > 1 && indexOf(state.pipes, dest) !== -1) && !cleanedUp) {
-        debug('false write response, pause', src._readableState.awaitDrain);
-        src._readableState.awaitDrain++;
-        increasedAwaitDrain = true;
-      }
-      src.pause();
-    }
-  }
-
-  // if the dest has an error, then stop piping into it.
-  // however, don't suppress the throwing behavior for this.
-  function onerror(er) {
-    debug('onerror', er);
-    unpipe();
-    dest.removeListener('error', onerror);
-    if (EElistenerCount(dest, 'error') === 0) dest.emit('error', er);
-  }
-
-  // Make sure our error handler is attached before userland ones.
-  prependListener(dest, 'error', onerror);
-
-  // Both close and finish should trigger unpipe, but only once.
-  function onclose() {
-    dest.removeListener('finish', onfinish);
-    unpipe();
-  }
-  dest.once('close', onclose);
-  function onfinish() {
-    debug('onfinish');
-    dest.removeListener('close', onclose);
-    unpipe();
-  }
-  dest.once('finish', onfinish);
-
-  function unpipe() {
-    debug('unpipe');
-    src.unpipe(dest);
-  }
-
-  // tell the dest that it's being piped to
-  dest.emit('pipe', src);
-
-  // start the flow if it hasn't been started already.
-  if (!state.flowing) {
-    debug('pipe resume');
-    src.resume();
-  }
-
-  return dest;
-};
-
-function pipeOnDrain(src) {
-  return function () {
-    var state = src._readableState;
-    debug('pipeOnDrain', state.awaitDrain);
-    if (state.awaitDrain) state.awaitDrain--;
-    if (state.awaitDrain === 0 && EElistenerCount(src, 'data')) {
-      state.flowing = true;
-      flow(src);
-    }
-  };
-}
-
-Readable.prototype.unpipe = function (dest) {
-  var state = this._readableState;
-
-  // if we're not piping anywhere, then do nothing.
-  if (state.pipesCount === 0) return this;
-
-  // just one destination.  most common case.
-  if (state.pipesCount === 1) {
-    // passed in one, but it's not the right one.
-    if (dest && dest !== state.pipes) return this;
-
-    if (!dest) dest = state.pipes;
-
-    // got a match.
-    state.pipes = null;
-    state.pipesCount = 0;
-    state.flowing = false;
-    if (dest) dest.emit('unpipe', this);
-    return this;
-  }
-
-  // slow case. multiple pipe destinations.
-
-  if (!dest) {
-    // remove all.
-    var dests = state.pipes;
-    var len = state.pipesCount;
-    state.pipes = null;
-    state.pipesCount = 0;
-    state.flowing = false;
-
-    for (var _i = 0; _i < len; _i++) {
-      dests[_i].emit('unpipe', this);
-    }return this;
-  }
-
-  // try to find the right one.
-  var i = indexOf(state.pipes, dest);
-  if (i === -1) return this;
-
-  state.pipes.splice(i, 1);
-  state.pipesCount -= 1;
-  if (state.pipesCount === 1) state.pipes = state.pipes[0];
-
-  dest.emit('unpipe', this);
-
-  return this;
-};
-
-// set up data events if they are asked for
-// Ensure readable listeners eventually get something
-Readable.prototype.on = function (ev, fn) {
-  var res = Stream.prototype.on.call(this, ev, fn);
-
-  if (ev === 'data') {
-    // Start flowing on next tick if stream isn't explicitly paused
-    if (this._readableState.flowing !== false) this.resume();
-  } else if (ev === 'readable') {
-    var state = this._readableState;
-    if (!state.endEmitted && !state.readableListening) {
-      state.readableListening = state.needReadable = true;
-      state.emittedReadable = false;
-      if (!state.reading) {
-        processNextTick(nReadingNextTick, this);
-      } else if (state.length) {
-        emitReadable(this, state);
-      }
-    }
-  }
-
-  return res;
-};
-Readable.prototype.addListener = Readable.prototype.on;
-
-function nReadingNextTick(self) {
-  debug('readable nexttick read 0');
-  self.read(0);
-}
-
-// pause() and resume() are remnants of the legacy readable stream API
-// If the user uses them, then switch into old mode.
-Readable.prototype.resume = function () {
-  var state = this._readableState;
-  if (!state.flowing) {
-    debug('resume');
-    state.flowing = true;
-    resume(this, state);
-  }
-  return this;
-};
-
-function resume(stream, state) {
-  if (!state.resumeScheduled) {
-    state.resumeScheduled = true;
-    processNextTick(resume_, stream, state);
-  }
-}
-
-function resume_(stream, state) {
-  if (!state.reading) {
-    debug('resume read 0');
-    stream.read(0);
-  }
-
-  state.resumeScheduled = false;
-  state.awaitDrain = 0;
-  stream.emit('resume');
-  flow(stream);
-  if (state.flowing && !state.reading) stream.read(0);
-}
-
-Readable.prototype.pause = function () {
-  debug('call pause flowing=%j', this._readableState.flowing);
-  if (false !== this._readableState.flowing) {
-    debug('pause');
-    this._readableState.flowing = false;
-    this.emit('pause');
-  }
-  return this;
-};
-
-function flow(stream) {
-  var state = stream._readableState;
-  debug('flow', state.flowing);
-  while (state.flowing && stream.read() !== null) {}
-}
-
-// wrap an old-style stream as the async data source.
-// This is *not* part of the readable stream interface.
-// It is an ugly unfortunate mess of history.
-Readable.prototype.wrap = function (stream) {
-  var state = this._readableState;
-  var paused = false;
-
-  var self = this;
-  stream.on('end', function () {
-    debug('wrapped end');
-    if (state.decoder && !state.ended) {
-      var chunk = state.decoder.end();
-      if (chunk && chunk.length) self.push(chunk);
-    }
-
-    self.push(null);
-  });
-
-  stream.on('data', function (chunk) {
-    debug('wrapped data');
-    if (state.decoder) chunk = state.decoder.write(chunk);
-
-    // don't skip over falsy values in objectMode
-    if (state.objectMode && (chunk === null || chunk === undefined)) return;else if (!state.objectMode && (!chunk || !chunk.length)) return;
-
-    var ret = self.push(chunk);
-    if (!ret) {
-      paused = true;
-      stream.pause();
-    }
-  });
-
-  // proxy all the other methods.
-  // important when wrapping filters and duplexes.
-  for (var i in stream) {
-    if (this[i] === undefined && typeof stream[i] === 'function') {
-      this[i] = function (method) {
-        return function () {
-          return stream[method].apply(stream, arguments);
-        };
-      }(i);
-    }
-  }
-
-  // proxy certain important events.
-  var events = ['error', 'close', 'destroy', 'pause', 'resume'];
-  forEach(events, function (ev) {
-    stream.on(ev, self.emit.bind(self, ev));
-  });
-
-  // when we try to consume some more bytes, simply unpause the
-  // underlying stream.
-  self._read = function (n) {
-    debug('wrapped _read', n);
-    if (paused) {
-      paused = false;
-      stream.resume();
-    }
-  };
-
-  return self;
-};
-
-// exposed for testing purposes only.
-Readable._fromList = fromList;
-
-// Pluck off n bytes from an array of buffers.
-// Length is the combined lengths of all the buffers in the list.
-// This function is designed to be inlinable, so please take care when making
-// changes to the function body.
-function fromList(n, state) {
-  // nothing buffered
-  if (state.length === 0) return null;
-
-  var ret;
-  if (state.objectMode) ret = state.buffer.shift();else if (!n || n >= state.length) {
-    // read it all, truncate the list
-    if (state.decoder) ret = state.buffer.join('');else if (state.buffer.length === 1) ret = state.buffer.head.data;else ret = state.buffer.concat(state.length);
-    state.buffer.clear();
-  } else {
-    // read part of list
-    ret = fromListPartial(n, state.buffer, state.decoder);
-  }
-
-  return ret;
-}
-
-// Extracts only enough buffered data to satisfy the amount requested.
-// This function is designed to be inlinable, so please take care when making
-// changes to the function body.
-function fromListPartial(n, list, hasStrings) {
-  var ret;
-  if (n < list.head.data.length) {
-    // slice is the same for buffers and strings
-    ret = list.head.data.slice(0, n);
-    list.head.data = list.head.data.slice(n);
-  } else if (n === list.head.data.length) {
-    // first chunk is a perfect match
-    ret = list.shift();
-  } else {
-    // result spans more than one buffer
-    ret = hasStrings ? copyFromBufferString(n, list) : copyFromBuffer(n, list);
-  }
-  return ret;
-}
-
-// Copies a specified amount of characters from the list of buffered data
-// chunks.
-// This function is designed to be inlinable, so please take care when making
-// changes to the function body.
-function copyFromBufferString(n, list) {
-  var p = list.head;
-  var c = 1;
-  var ret = p.data;
-  n -= ret.length;
-  while (p = p.next) {
-    var str = p.data;
-    var nb = n > str.length ? str.length : n;
-    if (nb === str.length) ret += str;else ret += str.slice(0, n);
-    n -= nb;
-    if (n === 0) {
-      if (nb === str.length) {
-        ++c;
-        if (p.next) list.head = p.next;else list.head = list.tail = null;
-      } else {
-        list.head = p;
-        p.data = str.slice(nb);
-      }
-      break;
-    }
-    ++c;
-  }
-  list.length -= c;
-  return ret;
-}
-
-// Copies a specified amount of bytes from the list of buffered data chunks.
-// This function is designed to be inlinable, so please take care when making
-// changes to the function body.
-function copyFromBuffer(n, list) {
-  var ret = bufferShim.allocUnsafe(n);
-  var p = list.head;
-  var c = 1;
-  p.data.copy(ret);
-  n -= p.data.length;
-  while (p = p.next) {
-    var buf = p.data;
-    var nb = n > buf.length ? buf.length : n;
-    buf.copy(ret, ret.length - n, 0, nb);
-    n -= nb;
-    if (n === 0) {
-      if (nb === buf.length) {
-        ++c;
-        if (p.next) list.head = p.next;else list.head = list.tail = null;
-      } else {
-        list.head = p;
-        p.data = buf.slice(nb);
-      }
-      break;
-    }
-    ++c;
-  }
-  list.length -= c;
-  return ret;
-}
-
-function endReadable(stream) {
-  var state = stream._readableState;
-
-  // If we get here before consuming all the bytes, then that is a
-  // bug in node.  Should never happen.
-  if (state.length > 0) throw new Error('"endReadable()" called on non-empty stream');
-
-  if (!state.endEmitted) {
-    state.ended = true;
-    processNextTick(endReadableNT, state, stream);
-  }
-}
-
-function endReadableNT(state, stream) {
-  // Check that we didn't get one last unshift.
-  if (!state.endEmitted && state.length === 0) {
-    state.endEmitted = true;
-    stream.readable = false;
-    stream.emit('end');
-  }
-}
-
-function forEach(xs, f) {
-  for (var i = 0, l = xs.length; i < l; i++) {
-    f(xs[i], i);
-  }
-}
-
-function indexOf(xs, x) {
-  for (var i = 0, l = xs.length; i < l; i++) {
-    if (xs[i] === x) return i;
-  }
-  return -1;
-}
-}).call(this,require('_process'))
-},{"./_stream_duplex":49,"./internal/streams/BufferList":54,"_process":47,"buffer":40,"buffer-shims":55,"core-util-is":56,"events":44,"inherits":45,"isarray":57,"process-nextick-args":58,"string_decoder/":65,"util":39}],52:[function(require,module,exports){
-// a transform stream is a readable/writable stream where you do
-// something with the data.  Sometimes it's called a "filter",
-// but that's not a great name for it, since that implies a thing where
-// some bits pass through, and others are simply ignored.  (That would
-// be a valid example of a transform, of course.)
-//
-// While the output is causally related to the input, it's not a
-// necessarily symmetric or synchronous transformation.  For example,
-// a zlib stream might take multiple plain-text writes(), and then
-// emit a single compressed chunk some time in the future.
-//
-// Here's how this works:
-//
-// The Transform stream has all the aspects of the readable and writable
-// stream classes.  When you write(chunk), that calls _write(chunk,cb)
-// internally, and returns false if there's a lot of pending writes
-// buffered up.  When you call read(), that calls _read(n) until
-// there's enough pending readable data buffered up.
-//
-// In a transform stream, the written data is placed in a buffer.  When
-// _read(n) is called, it transforms the queued up data, calling the
-// buffered _write cb's as it consumes chunks.  If consuming a single
-// written chunk would result in multiple output chunks, then the first
-// outputted bit calls the readcb, and subsequent chunks just go into
-// the read buffer, and will cause it to emit 'readable' if necessary.
-//
-// This way, back-pressure is actually determined by the reading side,
-// since _read has to be called to start processing a new chunk.  However,
-// a pathological inflate type of transform can cause excessive buffering
-// here.  For example, imagine a stream where every byte of input is
-// interpreted as an integer from 0-255, and then results in that many
-// bytes of output.  Writing the 4 bytes {ff,ff,ff,ff} would result in
-// 1kb of data being output.  In this case, you could write a very small
-// amount of input, and end up with a very large amount of output.  In
-// such a pathological inflating mechanism, there'd be no way to tell
-// the system to stop doing the transform.  A single 4MB write could
-// cause the system to run out of memory.
-//
-// However, even in such a pathological case, only a single written chunk
-// would be consumed, and then the rest would wait (un-transformed) until
-// the results of the previous transformed chunk were consumed.
-
-'use strict';
-
-module.exports = Transform;
-
-var Duplex = require('./_stream_duplex');
-
-/*<replacement>*/
-var util = require('core-util-is');
-util.inherits = require('inherits');
-/*</replacement>*/
-
-util.inherits(Transform, Duplex);
-
-function TransformState(stream) {
-  this.afterTransform = function (er, data) {
-    return afterTransform(stream, er, data);
-  };
-
-  this.needTransform = false;
-  this.transforming = false;
-  this.writecb = null;
-  this.writechunk = null;
-  this.writeencoding = null;
-}
-
-function afterTransform(stream, er, data) {
-  var ts = stream._transformState;
-  ts.transforming = false;
-
-  var cb = ts.writecb;
-
-  if (!cb) return stream.emit('error', new Error('no writecb in Transform class'));
-
-  ts.writechunk = null;
-  ts.writecb = null;
-
-  if (data !== null && data !== undefined) stream.push(data);
-
-  cb(er);
-
-  var rs = stream._readableState;
-  rs.reading = false;
-  if (rs.needReadable || rs.length < rs.highWaterMark) {
-    stream._read(rs.highWaterMark);
-  }
-}
-
-function Transform(options) {
-  if (!(this instanceof Transform)) return new Transform(options);
-
-  Duplex.call(this, options);
-
-  this._transformState = new TransformState(this);
-
-  // when the writable side finishes, then flush out anything remaining.
-  var stream = this;
-
-  // start out asking for a readable event once data is transformed.
-  this._readableState.needReadable = true;
-
-  // we have implemented the _read method, and done the other things
-  // that Readable wants before the first _read call, so unset the
-  // sync guard flag.
-  this._readableState.sync = false;
-
-  if (options) {
-    if (typeof options.transform === 'function') this._transform = options.transform;
-
-    if (typeof options.flush === 'function') this._flush = options.flush;
-  }
-
-  this.once('prefinish', function () {
-    if (typeof this._flush === 'function') this._flush(function (er) {
-      done(stream, er);
-    });else done(stream);
-  });
-}
-
-Transform.prototype.push = function (chunk, encoding) {
-  this._transformState.needTransform = false;
-  return Duplex.prototype.push.call(this, chunk, encoding);
-};
-
-// This is the part where you do stuff!
-// override this function in implementation classes.
-// 'chunk' is an input chunk.
-//
-// Call `push(newChunk)` to pass along transformed output
-// to the readable side.  You may call 'push' zero or more times.
-//
-// Call `cb(err)` when you are done with this chunk.  If you pass
-// an error, then that'll put the hurt on the whole operation.  If you
-// never call cb(), then you'll never get another chunk.
-Transform.prototype._transform = function (chunk, encoding, cb) {
-  throw new Error('Not implemented');
-};
-
-Transform.prototype._write = function (chunk, encoding, cb) {
-  var ts = this._transformState;
-  ts.writecb = cb;
-  ts.writechunk = chunk;
-  ts.writeencoding = encoding;
-  if (!ts.transforming) {
-    var rs = this._readableState;
-    if (ts.needTransform || rs.needReadable || rs.length < rs.highWaterMark) this._read(rs.highWaterMark);
-  }
-};
-
-// Doesn't matter what the args are here.
-// _transform does all the work.
-// That we got here means that the readable side wants more data.
-Transform.prototype._read = function (n) {
-  var ts = this._transformState;
-
-  if (ts.writechunk !== null && ts.writecb && !ts.transforming) {
-    ts.transforming = true;
-    this._transform(ts.writechunk, ts.writeencoding, ts.afterTransform);
-  } else {
-    // mark that we need a transform, so that any data that comes in
-    // will get processed, now that we've asked for it.
-    ts.needTransform = true;
-  }
-};
-
-function done(stream, er) {
-  if (er) return stream.emit('error', er);
-
-  // if there's nothing in the write buffer, then that means
-  // that nothing more will ever be provided
-  var ws = stream._writableState;
-  var ts = stream._transformState;
-
-  if (ws.length) throw new Error('Calling transform done when ws.length != 0');
-
-  if (ts.transforming) throw new Error('Calling transform done when still transforming');
-
-  return stream.push(null);
-}
-},{"./_stream_duplex":49,"core-util-is":56,"inherits":45}],53:[function(require,module,exports){
-(function (process){
-// A bit simpler than readable streams.
-// Implement an async ._write(chunk, encoding, cb), and it'll handle all
-// the drain event emission and buffering.
-
-'use strict';
-
-module.exports = Writable;
-
-/*<replacement>*/
-var processNextTick = require('process-nextick-args');
-/*</replacement>*/
-
-/*<replacement>*/
-var asyncWrite = !process.browser && ['v0.10', 'v0.9.'].indexOf(process.version.slice(0, 5)) > -1 ? setImmediate : processNextTick;
-/*</replacement>*/
-
-Writable.WritableState = WritableState;
-
-/*<replacement>*/
-var util = require('core-util-is');
-util.inherits = require('inherits');
-/*</replacement>*/
-
-/*<replacement>*/
-var internalUtil = {
-  deprecate: require('util-deprecate')
-};
-/*</replacement>*/
-
-/*<replacement>*/
-var Stream;
-(function () {
-  try {
-    Stream = require('st' + 'ream');
-  } catch (_) {} finally {
-    if (!Stream) Stream = require('events').EventEmitter;
-  }
-})();
-/*</replacement>*/
-
-var Buffer = require('buffer').Buffer;
-/*<replacement>*/
-var bufferShim = require('buffer-shims');
-/*</replacement>*/
-
-util.inherits(Writable, Stream);
-
-function nop() {}
-
-function WriteReq(chunk, encoding, cb) {
-  this.chunk = chunk;
-  this.encoding = encoding;
-  this.callback = cb;
-  this.next = null;
-}
-
-var Duplex;
-function WritableState(options, stream) {
-  Duplex = Duplex || require('./_stream_duplex');
-
-  options = options || {};
-
-  // object stream flag to indicate whether or not this stream
-  // contains buffers or objects.
-  this.objectMode = !!options.objectMode;
-
-  if (stream instanceof Duplex) this.objectMode = this.objectMode || !!options.writableObjectMode;
-
-  // the point at which write() starts returning false
-  // Note: 0 is a valid value, means that we always return false if
-  // the entire buffer is not flushed immediately on write()
-  var hwm = options.highWaterMark;
-  var defaultHwm = this.objectMode ? 16 : 16 * 1024;
-  this.highWaterMark = hwm || hwm === 0 ? hwm : defaultHwm;
-
-  // cast to ints.
-  this.highWaterMark = ~ ~this.highWaterMark;
-
-  this.needDrain = false;
-  // at the start of calling end()
-  this.ending = false;
-  // when end() has been called, and returned
-  this.ended = false;
-  // when 'finish' is emitted
-  this.finished = false;
-
-  // should we decode strings into buffers before passing to _write?
-  // this is here so that some node-core streams can optimize string
-  // handling at a lower level.
-  var noDecode = options.decodeStrings === false;
-  this.decodeStrings = !noDecode;
-
-  // Crypto is kind of old and crusty.  Historically, its default string
-  // encoding is 'binary' so we have to make this configurable.
-  // Everything else in the universe uses 'utf8', though.
-  this.defaultEncoding = options.defaultEncoding || 'utf8';
-
-  // not an actual buffer we keep track of, but a measurement
-  // of how much we're waiting to get pushed to some underlying
-  // socket or file.
-  this.length = 0;
-
-  // a flag to see when we're in the middle of a write.
-  this.writing = false;
-
-  // when true all writes will be buffered until .uncork() call
-  this.corked = 0;
-
-  // a flag to be able to tell if the onwrite cb is called immediately,
-  // or on a later tick.  We set this to true at first, because any
-  // actions that shouldn't happen until "later" should generally also
-  // not happen before the first write call.
-  this.sync = true;
-
-  // a flag to know if we're processing previously buffered items, which
-  // may call the _write() callback in the same tick, so that we don't
-  // end up in an overlapped onwrite situation.
-  this.bufferProcessing = false;
-
-  // the callback that's passed to _write(chunk,cb)
-  this.onwrite = function (er) {
-    onwrite(stream, er);
-  };
-
-  // the callback that the user supplies to write(chunk,encoding,cb)
-  this.writecb = null;
-
-  // the amount that is being written when _write is called.
-  this.writelen = 0;
-
-  this.bufferedRequest = null;
-  this.lastBufferedRequest = null;
-
-  // number of pending user-supplied write callbacks
-  // this must be 0 before 'finish' can be emitted
-  this.pendingcb = 0;
-
-  // emit prefinish if the only thing we're waiting for is _write cbs
-  // This is relevant for synchronous Transform streams
-  this.prefinished = false;
-
-  // True if the error was already emitted and should not be thrown again
-  this.errorEmitted = false;
-
-  // count buffered requests
-  this.bufferedRequestCount = 0;
-
-  // allocate the first CorkedRequest, there is always
-  // one allocated and free to use, and we maintain at most two
-  this.corkedRequestsFree = new CorkedRequest(this);
-}
-
-WritableState.prototype.getBuffer = function writableStateGetBuffer() {
-  var current = this.bufferedRequest;
-  var out = [];
-  while (current) {
-    out.push(current);
-    current = current.next;
-  }
-  return out;
-};
-
-(function () {
-  try {
-    Object.defineProperty(WritableState.prototype, 'buffer', {
-      get: internalUtil.deprecate(function () {
-        return this.getBuffer();
-      }, '_writableState.buffer is deprecated. Use _writableState.getBuffer ' + 'instead.')
-    });
-  } catch (_) {}
-})();
-
-var Duplex;
-function Writable(options) {
-  Duplex = Duplex || require('./_stream_duplex');
-
-  // Writable ctor is applied to Duplexes, though they're not
-  // instanceof Writable, they're instanceof Readable.
-  if (!(this instanceof Writable) && !(this instanceof Duplex)) return new Writable(options);
-
-  this._writableState = new WritableState(options, this);
-
-  // legacy.
-  this.writable = true;
-
-  if (options) {
-    if (typeof options.write === 'function') this._write = options.write;
-
-    if (typeof options.writev === 'function') this._writev = options.writev;
-  }
-
-  Stream.call(this);
-}
-
-// Otherwise people can pipe Writable streams, which is just wrong.
-Writable.prototype.pipe = function () {
-  this.emit('error', new Error('Cannot pipe, not readable'));
-};
-
-function writeAfterEnd(stream, cb) {
-  var er = new Error('write after end');
-  // TODO: defer error events consistently everywhere, not just the cb
-  stream.emit('error', er);
-  processNextTick(cb, er);
-}
-
-// If we get something that is not a buffer, string, null, or undefined,
-// and we're not in objectMode, then that's an error.
-// Otherwise stream chunks are all considered to be of length=1, and the
-// watermarks determine how many objects to keep in the buffer, rather than
-// how many bytes or characters.
-function validChunk(stream, state, chunk, cb) {
-  var valid = true;
-  var er = false;
-  // Always throw error if a null is written
-  // if we are not in object mode then throw
-  // if it is not a buffer, string, or undefined.
-  if (chunk === null) {
-    er = new TypeError('May not write null values to stream');
-  } else if (!Buffer.isBuffer(chunk) && typeof chunk !== 'string' && chunk !== undefined && !state.objectMode) {
-    er = new TypeError('Invalid non-string/buffer chunk');
-  }
-  if (er) {
-    stream.emit('error', er);
-    processNextTick(cb, er);
-    valid = false;
-  }
-  return valid;
-}
-
-Writable.prototype.write = function (chunk, encoding, cb) {
-  var state = this._writableState;
-  var ret = false;
-
-  if (typeof encoding === 'function') {
-    cb = encoding;
-    encoding = null;
-  }
-
-  if (Buffer.isBuffer(chunk)) encoding = 'buffer';else if (!encoding) encoding = state.defaultEncoding;
-
-  if (typeof cb !== 'function') cb = nop;
-
-  if (state.ended) writeAfterEnd(this, cb);else if (validChunk(this, state, chunk, cb)) {
-    state.pendingcb++;
-    ret = writeOrBuffer(this, state, chunk, encoding, cb);
-  }
-
-  return ret;
-};
-
-Writable.prototype.cork = function () {
-  var state = this._writableState;
-
-  state.corked++;
-};
-
-Writable.prototype.uncork = function () {
-  var state = this._writableState;
-
-  if (state.corked) {
-    state.corked--;
-
-    if (!state.writing && !state.corked && !state.finished && !state.bufferProcessing && state.bufferedRequest) clearBuffer(this, state);
-  }
-};
-
-Writable.prototype.setDefaultEncoding = function setDefaultEncoding(encoding) {
-  // node::ParseEncoding() requires lower case.
-  if (typeof encoding === 'string') encoding = encoding.toLowerCase();
-  if (!(['hex', 'utf8', 'utf-8', 'ascii', 'binary', 'base64', 'ucs2', 'ucs-2', 'utf16le', 'utf-16le', 'raw'].indexOf((encoding + '').toLowerCase()) > -1)) throw new TypeError('Unknown encoding: ' + encoding);
-  this._writableState.defaultEncoding = encoding;
-  return this;
-};
-
-function decodeChunk(state, chunk, encoding) {
-  if (!state.objectMode && state.decodeStrings !== false && typeof chunk === 'string') {
-    chunk = bufferShim.from(chunk, encoding);
-  }
-  return chunk;
-}
-
-// if we're already writing something, then just put this
-// in the queue, and wait our turn.  Otherwise, call _write
-// If we return false, then we need a drain event, so set that flag.
-function writeOrBuffer(stream, state, chunk, encoding, cb) {
-  chunk = decodeChunk(state, chunk, encoding);
-
-  if (Buffer.isBuffer(chunk)) encoding = 'buffer';
-  var len = state.objectMode ? 1 : chunk.length;
-
-  state.length += len;
-
-  var ret = state.length < state.highWaterMark;
-  // we must ensure that previous needDrain will not be reset to false.
-  if (!ret) state.needDrain = true;
-
-  if (state.writing || state.corked) {
-    var last = state.lastBufferedRequest;
-    state.lastBufferedRequest = new WriteReq(chunk, encoding, cb);
-    if (last) {
-      last.next = state.lastBufferedRequest;
+    if (e + eBias >= 1) {
+      value += rt / c
     } else {
-      state.bufferedRequest = state.lastBufferedRequest;
+      value += rt * Math.pow(2, 1 - eBias)
     }
-    state.bufferedRequestCount += 1;
-  } else {
-    doWrite(stream, state, false, len, chunk, encoding, cb);
-  }
-
-  return ret;
-}
-
-function doWrite(stream, state, writev, len, chunk, encoding, cb) {
-  state.writelen = len;
-  state.writecb = cb;
-  state.writing = true;
-  state.sync = true;
-  if (writev) stream._writev(chunk, state.onwrite);else stream._write(chunk, encoding, state.onwrite);
-  state.sync = false;
-}
-
-function onwriteError(stream, state, sync, er, cb) {
-  --state.pendingcb;
-  if (sync) processNextTick(cb, er);else cb(er);
-
-  stream._writableState.errorEmitted = true;
-  stream.emit('error', er);
-}
-
-function onwriteStateUpdate(state) {
-  state.writing = false;
-  state.writecb = null;
-  state.length -= state.writelen;
-  state.writelen = 0;
-}
-
-function onwrite(stream, er) {
-  var state = stream._writableState;
-  var sync = state.sync;
-  var cb = state.writecb;
-
-  onwriteStateUpdate(state);
-
-  if (er) onwriteError(stream, state, sync, er, cb);else {
-    // Check if we're actually ready to finish, but don't emit yet
-    var finished = needFinish(state);
-
-    if (!finished && !state.corked && !state.bufferProcessing && state.bufferedRequest) {
-      clearBuffer(stream, state);
+    if (value * c >= 2) {
+      e++
+      c /= 2
     }
 
-    if (sync) {
-      /*<replacement>*/
-      asyncWrite(afterWrite, stream, state, finished, cb);
-      /*</replacement>*/
+    if (e + eBias >= eMax) {
+      m = 0
+      e = eMax
+    } else if (e + eBias >= 1) {
+      m = (value * c - 1) * Math.pow(2, mLen)
+      e = e + eBias
     } else {
-        afterWrite(stream, state, finished, cb);
-      }
-  }
-}
-
-function afterWrite(stream, state, finished, cb) {
-  if (!finished) onwriteDrain(stream, state);
-  state.pendingcb--;
-  cb();
-  finishMaybe(stream, state);
-}
-
-// Must force callback to be called on nextTick, so that we don't
-// emit 'drain' before the write() consumer gets the 'false' return
-// value, and has a chance to attach a 'drain' listener.
-function onwriteDrain(stream, state) {
-  if (state.length === 0 && state.needDrain) {
-    state.needDrain = false;
-    stream.emit('drain');
-  }
-}
-
-// if there's something in the buffer waiting, then process it
-function clearBuffer(stream, state) {
-  state.bufferProcessing = true;
-  var entry = state.bufferedRequest;
-
-  if (stream._writev && entry && entry.next) {
-    // Fast case, write everything using _writev()
-    var l = state.bufferedRequestCount;
-    var buffer = new Array(l);
-    var holder = state.corkedRequestsFree;
-    holder.entry = entry;
-
-    var count = 0;
-    while (entry) {
-      buffer[count] = entry;
-      entry = entry.next;
-      count += 1;
-    }
-
-    doWrite(stream, state, true, state.length, buffer, '', holder.finish);
-
-    // doWrite is almost always async, defer these to save a bit of time
-    // as the hot path ends with doWrite
-    state.pendingcb++;
-    state.lastBufferedRequest = null;
-    if (holder.next) {
-      state.corkedRequestsFree = holder.next;
-      holder.next = null;
-    } else {
-      state.corkedRequestsFree = new CorkedRequest(state);
-    }
-  } else {
-    // Slow case, write chunks one-by-one
-    while (entry) {
-      var chunk = entry.chunk;
-      var encoding = entry.encoding;
-      var cb = entry.callback;
-      var len = state.objectMode ? 1 : chunk.length;
-
-      doWrite(stream, state, false, len, chunk, encoding, cb);
-      entry = entry.next;
-      // if we didn't call the onwrite immediately, then
-      // it means that we need to wait until it does.
-      // also, that means that the chunk and cb are currently
-      // being processed, so move the buffer counter past them.
-      if (state.writing) {
-        break;
-      }
-    }
-
-    if (entry === null) state.lastBufferedRequest = null;
-  }
-
-  state.bufferedRequestCount = 0;
-  state.bufferedRequest = entry;
-  state.bufferProcessing = false;
-}
-
-Writable.prototype._write = function (chunk, encoding, cb) {
-  cb(new Error('not implemented'));
-};
-
-Writable.prototype._writev = null;
-
-Writable.prototype.end = function (chunk, encoding, cb) {
-  var state = this._writableState;
-
-  if (typeof chunk === 'function') {
-    cb = chunk;
-    chunk = null;
-    encoding = null;
-  } else if (typeof encoding === 'function') {
-    cb = encoding;
-    encoding = null;
-  }
-
-  if (chunk !== null && chunk !== undefined) this.write(chunk, encoding);
-
-  // .end() fully uncorks
-  if (state.corked) {
-    state.corked = 1;
-    this.uncork();
-  }
-
-  // ignore unnecessary end() calls.
-  if (!state.ending && !state.finished) endWritable(this, state, cb);
-};
-
-function needFinish(state) {
-  return state.ending && state.length === 0 && state.bufferedRequest === null && !state.finished && !state.writing;
-}
-
-function prefinish(stream, state) {
-  if (!state.prefinished) {
-    state.prefinished = true;
-    stream.emit('prefinish');
-  }
-}
-
-function finishMaybe(stream, state) {
-  var need = needFinish(state);
-  if (need) {
-    if (state.pendingcb === 0) {
-      prefinish(stream, state);
-      state.finished = true;
-      stream.emit('finish');
-    } else {
-      prefinish(stream, state);
-    }
-  }
-  return need;
-}
-
-function endWritable(stream, state, cb) {
-  state.ending = true;
-  finishMaybe(stream, state);
-  if (cb) {
-    if (state.finished) processNextTick(cb);else stream.once('finish', cb);
-  }
-  state.ended = true;
-  stream.writable = false;
-}
-
-// It seems a linked list but it is not
-// there will be only 2 of these for each stream
-function CorkedRequest(state) {
-  var _this = this;
-
-  this.next = null;
-  this.entry = null;
-
-  this.finish = function (err) {
-    var entry = _this.entry;
-    _this.entry = null;
-    while (entry) {
-      var cb = entry.callback;
-      state.pendingcb--;
-      cb(err);
-      entry = entry.next;
-    }
-    if (state.corkedRequestsFree) {
-      state.corkedRequestsFree.next = _this;
-    } else {
-      state.corkedRequestsFree = _this;
-    }
-  };
-}
-}).call(this,require('_process'))
-},{"./_stream_duplex":49,"_process":47,"buffer":40,"buffer-shims":55,"core-util-is":56,"events":44,"inherits":45,"process-nextick-args":58,"util-deprecate":59}],54:[function(require,module,exports){
-'use strict';
-
-var Buffer = require('buffer').Buffer;
-/*<replacement>*/
-var bufferShim = require('buffer-shims');
-/*</replacement>*/
-
-module.exports = BufferList;
-
-function BufferList() {
-  this.head = null;
-  this.tail = null;
-  this.length = 0;
-}
-
-BufferList.prototype.push = function (v) {
-  var entry = { data: v, next: null };
-  if (this.length > 0) this.tail.next = entry;else this.head = entry;
-  this.tail = entry;
-  ++this.length;
-};
-
-BufferList.prototype.unshift = function (v) {
-  var entry = { data: v, next: this.head };
-  if (this.length === 0) this.tail = entry;
-  this.head = entry;
-  ++this.length;
-};
-
-BufferList.prototype.shift = function () {
-  if (this.length === 0) return;
-  var ret = this.head.data;
-  if (this.length === 1) this.head = this.tail = null;else this.head = this.head.next;
-  --this.length;
-  return ret;
-};
-
-BufferList.prototype.clear = function () {
-  this.head = this.tail = null;
-  this.length = 0;
-};
-
-BufferList.prototype.join = function (s) {
-  if (this.length === 0) return '';
-  var p = this.head;
-  var ret = '' + p.data;
-  while (p = p.next) {
-    ret += s + p.data;
-  }return ret;
-};
-
-BufferList.prototype.concat = function (n) {
-  if (this.length === 0) return bufferShim.alloc(0);
-  if (this.length === 1) return this.head.data;
-  var ret = bufferShim.allocUnsafe(n >>> 0);
-  var p = this.head;
-  var i = 0;
-  while (p) {
-    p.data.copy(ret, i);
-    i += p.data.length;
-    p = p.next;
-  }
-  return ret;
-};
-},{"buffer":40,"buffer-shims":55}],55:[function(require,module,exports){
-(function (global){
-'use strict';
-
-var buffer = require('buffer');
-var Buffer = buffer.Buffer;
-var SlowBuffer = buffer.SlowBuffer;
-var MAX_LEN = buffer.kMaxLength || 2147483647;
-exports.alloc = function alloc(size, fill, encoding) {
-  if (typeof Buffer.alloc === 'function') {
-    return Buffer.alloc(size, fill, encoding);
-  }
-  if (typeof encoding === 'number') {
-    throw new TypeError('encoding must not be number');
-  }
-  if (typeof size !== 'number') {
-    throw new TypeError('size must be a number');
-  }
-  if (size > MAX_LEN) {
-    throw new RangeError('size is too large');
-  }
-  var enc = encoding;
-  var _fill = fill;
-  if (_fill === undefined) {
-    enc = undefined;
-    _fill = 0;
-  }
-  var buf = new Buffer(size);
-  if (typeof _fill === 'string') {
-    var fillBuf = new Buffer(_fill, enc);
-    var flen = fillBuf.length;
-    var i = -1;
-    while (++i < size) {
-      buf[i] = fillBuf[i % flen];
-    }
-  } else {
-    buf.fill(_fill);
-  }
-  return buf;
-}
-exports.allocUnsafe = function allocUnsafe(size) {
-  if (typeof Buffer.allocUnsafe === 'function') {
-    return Buffer.allocUnsafe(size);
-  }
-  if (typeof size !== 'number') {
-    throw new TypeError('size must be a number');
-  }
-  if (size > MAX_LEN) {
-    throw new RangeError('size is too large');
-  }
-  return new Buffer(size);
-}
-exports.from = function from(value, encodingOrOffset, length) {
-  if (typeof Buffer.from === 'function' && (!global.Uint8Array || Uint8Array.from !== Buffer.from)) {
-    return Buffer.from(value, encodingOrOffset, length);
-  }
-  if (typeof value === 'number') {
-    throw new TypeError('"value" argument must not be a number');
-  }
-  if (typeof value === 'string') {
-    return new Buffer(value, encodingOrOffset);
-  }
-  if (typeof ArrayBuffer !== 'undefined' && value instanceof ArrayBuffer) {
-    var offset = encodingOrOffset;
-    if (arguments.length === 1) {
-      return new Buffer(value);
-    }
-    if (typeof offset === 'undefined') {
-      offset = 0;
-    }
-    var len = length;
-    if (typeof len === 'undefined') {
-      len = value.byteLength - offset;
-    }
-    if (offset >= value.byteLength) {
-      throw new RangeError('\'offset\' is out of bounds');
-    }
-    if (len > value.byteLength - offset) {
-      throw new RangeError('\'length\' is out of bounds');
-    }
-    return new Buffer(value.slice(offset, offset + len));
-  }
-  if (Buffer.isBuffer(value)) {
-    var out = new Buffer(value.length);
-    value.copy(out, 0, 0, value.length);
-    return out;
-  }
-  if (value) {
-    if (Array.isArray(value) || (typeof ArrayBuffer !== 'undefined' && value.buffer instanceof ArrayBuffer) || 'length' in value) {
-      return new Buffer(value);
-    }
-    if (value.type === 'Buffer' && Array.isArray(value.data)) {
-      return new Buffer(value.data);
+      m = value * Math.pow(2, eBias - 1) * Math.pow(2, mLen)
+      e = 0
     }
   }
 
-  throw new TypeError('First argument must be a string, Buffer, ' + 'ArrayBuffer, Array, or array-like object.');
-}
-exports.allocUnsafeSlow = function allocUnsafeSlow(size) {
-  if (typeof Buffer.allocUnsafeSlow === 'function') {
-    return Buffer.allocUnsafeSlow(size);
-  }
-  if (typeof size !== 'number') {
-    throw new TypeError('size must be a number');
-  }
-  if (size >= MAX_LEN) {
-    throw new RangeError('size is too large');
-  }
-  return new SlowBuffer(size);
+  for (; mLen >= 8; buffer[offset + i] = m & 0xff, i += d, m /= 256, mLen -= 8) {}
+
+  e = (e << mLen) | m
+  eLen += mLen
+  for (; eLen > 0; buffer[offset + i] = e & 0xff, i += d, e /= 256, eLen -= 8) {}
+
+  buffer[offset + i - d] |= s * 128
 }
 
-}).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"buffer":40}],56:[function(require,module,exports){
-(function (Buffer){
-// Copyright Joyent, Inc. and other Node contributors.
-//
-// Permission is hereby granted, free of charge, to any person obtaining a
-// copy of this software and associated documentation files (the
-// "Software"), to deal in the Software without restriction, including
-// without limitation the rights to use, copy, modify, merge, publish,
-// distribute, sublicense, and/or sell copies of the Software, and to permit
-// persons to whom the Software is furnished to do so, subject to the
-// following conditions:
-//
-// The above copyright notice and this permission notice shall be included
-// in all copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
-// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
-// NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-// DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-// OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
-// USE OR OTHER DEALINGS IN THE SOFTWARE.
-
-// NOTE: These type checking functions intentionally don't use `instanceof`
-// because it is fragile and can be easily faked with `Object.create()`.
-
-function isArray(arg) {
-  if (Array.isArray) {
-    return Array.isArray(arg);
-  }
-  return objectToString(arg) === '[object Array]';
-}
-exports.isArray = isArray;
-
-function isBoolean(arg) {
-  return typeof arg === 'boolean';
-}
-exports.isBoolean = isBoolean;
-
-function isNull(arg) {
-  return arg === null;
-}
-exports.isNull = isNull;
-
-function isNullOrUndefined(arg) {
-  return arg == null;
-}
-exports.isNullOrUndefined = isNullOrUndefined;
-
-function isNumber(arg) {
-  return typeof arg === 'number';
-}
-exports.isNumber = isNumber;
-
-function isString(arg) {
-  return typeof arg === 'string';
-}
-exports.isString = isString;
-
-function isSymbol(arg) {
-  return typeof arg === 'symbol';
-}
-exports.isSymbol = isSymbol;
-
-function isUndefined(arg) {
-  return arg === void 0;
-}
-exports.isUndefined = isUndefined;
-
-function isRegExp(re) {
-  return objectToString(re) === '[object RegExp]';
-}
-exports.isRegExp = isRegExp;
-
-function isObject(arg) {
-  return typeof arg === 'object' && arg !== null;
-}
-exports.isObject = isObject;
-
-function isDate(d) {
-  return objectToString(d) === '[object Date]';
-}
-exports.isDate = isDate;
-
-function isError(e) {
-  return (objectToString(e) === '[object Error]' || e instanceof Error);
-}
-exports.isError = isError;
-
-function isFunction(arg) {
-  return typeof arg === 'function';
-}
-exports.isFunction = isFunction;
-
-function isPrimitive(arg) {
-  return arg === null ||
-         typeof arg === 'boolean' ||
-         typeof arg === 'number' ||
-         typeof arg === 'string' ||
-         typeof arg === 'symbol' ||  // ES6 symbol
-         typeof arg === 'undefined';
-}
-exports.isPrimitive = isPrimitive;
-
-exports.isBuffer = Buffer.isBuffer;
-
-function objectToString(o) {
-  return Object.prototype.toString.call(o);
-}
-
-}).call(this,{"isBuffer":require("../../../../insert-module-globals/node_modules/is-buffer/index.js")})
-},{"../../../../insert-module-globals/node_modules/is-buffer/index.js":46}],57:[function(require,module,exports){
-arguments[4][43][0].apply(exports,arguments)
-},{"dup":43}],58:[function(require,module,exports){
-(function (process){
-'use strict';
-
-if (!process.version ||
-    process.version.indexOf('v0.') === 0 ||
-    process.version.indexOf('v1.') === 0 && process.version.indexOf('v1.8.') !== 0) {
-  module.exports = nextTick;
-} else {
-  module.exports = process.nextTick;
-}
-
-function nextTick(fn, arg1, arg2, arg3) {
-  if (typeof fn !== 'function') {
-    throw new TypeError('"callback" argument must be a function');
-  }
-  var len = arguments.length;
-  var args, i;
-  switch (len) {
-  case 0:
-  case 1:
-    return process.nextTick(fn);
-  case 2:
-    return process.nextTick(function afterTickOne() {
-      fn.call(null, arg1);
-    });
-  case 3:
-    return process.nextTick(function afterTickTwo() {
-      fn.call(null, arg1, arg2);
-    });
-  case 4:
-    return process.nextTick(function afterTickThree() {
-      fn.call(null, arg1, arg2, arg3);
-    });
-  default:
-    args = new Array(len - 1);
-    i = 0;
-    while (i < args.length) {
-      args[i++] = arguments[i];
-    }
-    return process.nextTick(function afterTick() {
-      fn.apply(null, args);
-    });
-  }
-}
-
-}).call(this,require('_process'))
-},{"_process":47}],59:[function(require,module,exports){
-(function (global){
-
-/**
- * Module exports.
- */
-
-module.exports = deprecate;
-
-/**
- * Mark that a method should not be used.
- * Returns a modified function which warns once by default.
- *
- * If `localStorage.noDeprecation = true` is set, then it is a no-op.
- *
- * If `localStorage.throwDeprecation = true` is set, then deprecated functions
- * will throw an Error when invoked.
- *
- * If `localStorage.traceDeprecation = true` is set, then deprecated functions
- * will invoke `console.trace()` instead of `console.error()`.
- *
- * @param {Function} fn - the function to deprecate
- * @param {String} msg - the string to print to the console when `fn` is invoked
- * @returns {Function} a new "deprecated" version of `fn`
- * @api public
- */
-
-function deprecate (fn, msg) {
-  if (config('noDeprecation')) {
-    return fn;
-  }
-
-  var warned = false;
-  function deprecated() {
-    if (!warned) {
-      if (config('throwDeprecation')) {
-        throw new Error(msg);
-      } else if (config('traceDeprecation')) {
-        console.trace(msg);
-      } else {
-        console.warn(msg);
-      }
-      warned = true;
-    }
-    return fn.apply(this, arguments);
-  }
-
-  return deprecated;
-}
-
-/**
- * Checks `localStorage` for boolean values for the given `name`.
- *
- * @param {String} name
- * @returns {Boolean}
- * @api private
- */
-
-function config (name) {
-  // accessing global.localStorage can trigger a DOMException in sandboxed iframes
-  try {
-    if (!global.localStorage) return false;
-  } catch (_) {
-    return false;
-  }
-  var val = global.localStorage[name];
-  if (null == val) return false;
-  return String(val).toLowerCase() === 'true';
-}
-
-}).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],60:[function(require,module,exports){
-module.exports = require("./lib/_stream_passthrough.js")
-
-},{"./lib/_stream_passthrough.js":50}],61:[function(require,module,exports){
-(function (process){
-var Stream = (function (){
-  try {
-    return require('st' + 'ream'); // hack to fix a circular dependency issue when used with browserify
-  } catch(_){}
-}());
-exports = module.exports = require('./lib/_stream_readable.js');
-exports.Stream = Stream || exports;
-exports.Readable = exports;
-exports.Writable = require('./lib/_stream_writable.js');
-exports.Duplex = require('./lib/_stream_duplex.js');
-exports.Transform = require('./lib/_stream_transform.js');
-exports.PassThrough = require('./lib/_stream_passthrough.js');
-
-if (!process.browser && process.env.READABLE_STREAM === 'disable' && Stream) {
-  module.exports = Stream;
-}
-
-}).call(this,require('_process'))
-},{"./lib/_stream_duplex.js":49,"./lib/_stream_passthrough.js":50,"./lib/_stream_readable.js":51,"./lib/_stream_transform.js":52,"./lib/_stream_writable.js":53,"_process":47}],62:[function(require,module,exports){
-module.exports = require("./lib/_stream_transform.js")
-
-},{"./lib/_stream_transform.js":52}],63:[function(require,module,exports){
-module.exports = require("./lib/_stream_writable.js")
-
-},{"./lib/_stream_writable.js":53}],64:[function(require,module,exports){
-// Copyright Joyent, Inc. and other Node contributors.
-//
-// Permission is hereby granted, free of charge, to any person obtaining a
-// copy of this software and associated documentation files (the
-// "Software"), to deal in the Software without restriction, including
-// without limitation the rights to use, copy, modify, merge, publish,
-// distribute, sublicense, and/or sell copies of the Software, and to permit
-// persons to whom the Software is furnished to do so, subject to the
-// following conditions:
-//
-// The above copyright notice and this permission notice shall be included
-// in all copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
-// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
-// NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-// DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-// OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
-// USE OR OTHER DEALINGS IN THE SOFTWARE.
-
-module.exports = Stream;
-
-var EE = require('events').EventEmitter;
-var inherits = require('inherits');
-
-inherits(Stream, EE);
-Stream.Readable = require('readable-stream/readable.js');
-Stream.Writable = require('readable-stream/writable.js');
-Stream.Duplex = require('readable-stream/duplex.js');
-Stream.Transform = require('readable-stream/transform.js');
-Stream.PassThrough = require('readable-stream/passthrough.js');
-
-// Backwards-compat with node 0.4.x
-Stream.Stream = Stream;
-
-
-
-// old-style streams.  Note that the pipe method (the only relevant
-// part of this class) is overridden in the Readable class.
-
-function Stream() {
-  EE.call(this);
-}
-
-Stream.prototype.pipe = function(dest, options) {
-  var source = this;
-
-  function ondata(chunk) {
-    if (dest.writable) {
-      if (false === dest.write(chunk) && source.pause) {
-        source.pause();
-      }
-    }
-  }
-
-  source.on('data', ondata);
-
-  function ondrain() {
-    if (source.readable && source.resume) {
-      source.resume();
-    }
-  }
-
-  dest.on('drain', ondrain);
-
-  // If the 'end' option is not supplied, dest.end() will be called when
-  // source gets the 'end' or 'close' events.  Only dest.end() once.
-  if (!dest._isStdio && (!options || options.end !== false)) {
-    source.on('end', onend);
-    source.on('close', onclose);
-  }
-
-  var didOnEnd = false;
-  function onend() {
-    if (didOnEnd) return;
-    didOnEnd = true;
-
-    dest.end();
-  }
-
-
-  function onclose() {
-    if (didOnEnd) return;
-    didOnEnd = true;
-
-    if (typeof dest.destroy === 'function') dest.destroy();
-  }
-
-  // don't leave dangling pipes when there are errors.
-  function onerror(er) {
-    cleanup();
-    if (EE.listenerCount(this, 'error') === 0) {
-      throw er; // Unhandled stream error in pipe.
-    }
-  }
-
-  source.on('error', onerror);
-  dest.on('error', onerror);
-
-  // remove all the event listeners that were added.
-  function cleanup() {
-    source.removeListener('data', ondata);
-    dest.removeListener('drain', ondrain);
-
-    source.removeListener('end', onend);
-    source.removeListener('close', onclose);
-
-    source.removeListener('error', onerror);
-    dest.removeListener('error', onerror);
-
-    source.removeListener('end', cleanup);
-    source.removeListener('close', cleanup);
-
-    dest.removeListener('close', cleanup);
-  }
-
-  source.on('end', cleanup);
-  source.on('close', cleanup);
-
-  dest.on('close', cleanup);
-
-  dest.emit('pipe', source);
-
-  // Allow for unix-like usage: A.pipe(B).pipe(C)
-  return dest;
-};
-
-},{"events":44,"inherits":45,"readable-stream/duplex.js":48,"readable-stream/passthrough.js":60,"readable-stream/readable.js":61,"readable-stream/transform.js":62,"readable-stream/writable.js":63}],65:[function(require,module,exports){
-// Copyright Joyent, Inc. and other Node contributors.
-//
-// Permission is hereby granted, free of charge, to any person obtaining a
-// copy of this software and associated documentation files (the
-// "Software"), to deal in the Software without restriction, including
-// without limitation the rights to use, copy, modify, merge, publish,
-// distribute, sublicense, and/or sell copies of the Software, and to permit
-// persons to whom the Software is furnished to do so, subject to the
-// following conditions:
-//
-// The above copyright notice and this permission notice shall be included
-// in all copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
-// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
-// NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-// DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-// OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
-// USE OR OTHER DEALINGS IN THE SOFTWARE.
-
-var Buffer = require('buffer').Buffer;
-
-var isBufferEncoding = Buffer.isEncoding
-  || function(encoding) {
-       switch (encoding && encoding.toLowerCase()) {
-         case 'hex': case 'utf8': case 'utf-8': case 'ascii': case 'binary': case 'base64': case 'ucs2': case 'ucs-2': case 'utf16le': case 'utf-16le': case 'raw': return true;
-         default: return false;
-       }
-     }
-
-
-function assertEncoding(encoding) {
-  if (encoding && !isBufferEncoding(encoding)) {
-    throw new Error('Unknown encoding: ' + encoding);
-  }
-}
-
-// StringDecoder provides an interface for efficiently splitting a series of
-// buffers into a series of JS strings without breaking apart multi-byte
-// characters. CESU-8 is handled as part of the UTF-8 encoding.
-//
-// @TODO Handling all encodings inside a single object makes it very difficult
-// to reason about this code, so it should be split up in the future.
-// @TODO There should be a utf8-strict encoding that rejects invalid UTF-8 code
-// points as used by CESU-8.
-var StringDecoder = exports.StringDecoder = function(encoding) {
-  this.encoding = (encoding || 'utf8').toLowerCase().replace(/[-_]/, '');
-  assertEncoding(encoding);
-  switch (this.encoding) {
-    case 'utf8':
-      // CESU-8 represents each of Surrogate Pair by 3-bytes
-      this.surrogateSize = 3;
-      break;
-    case 'ucs2':
-    case 'utf16le':
-      // UTF-16 represents each of Surrogate Pair by 2-bytes
-      this.surrogateSize = 2;
-      this.detectIncompleteChar = utf16DetectIncompleteChar;
-      break;
-    case 'base64':
-      // Base-64 stores 3 bytes in 4 chars, and pads the remainder.
-      this.surrogateSize = 3;
-      this.detectIncompleteChar = base64DetectIncompleteChar;
-      break;
-    default:
-      this.write = passThroughWrite;
-      return;
-  }
-
-  // Enough space to store all bytes of a single character. UTF-8 needs 4
-  // bytes, but CESU-8 may require up to 6 (3 bytes per surrogate).
-  this.charBuffer = new Buffer(6);
-  // Number of bytes received for the current incomplete multi-byte character.
-  this.charReceived = 0;
-  // Number of bytes expected for the current incomplete multi-byte character.
-  this.charLength = 0;
-};
-
-
-// write decodes the given buffer and returns it as JS string that is
-// guaranteed to not contain any partial multi-byte characters. Any partial
-// character found at the end of the buffer is buffered up, and will be
-// returned when calling write again with the remaining bytes.
-//
-// Note: Converting a Buffer containing an orphan surrogate to a String
-// currently works, but converting a String to a Buffer (via `new Buffer`, or
-// Buffer#write) will replace incomplete surrogates with the unicode
-// replacement character. See https://codereview.chromium.org/121173009/ .
-StringDecoder.prototype.write = function(buffer) {
-  var charStr = '';
-  // if our last write ended with an incomplete multibyte character
-  while (this.charLength) {
-    // determine how many remaining bytes this buffer has to offer for this char
-    var available = (buffer.length >= this.charLength - this.charReceived) ?
-        this.charLength - this.charReceived :
-        buffer.length;
-
-    // add the new bytes to the char buffer
-    buffer.copy(this.charBuffer, this.charReceived, 0, available);
-    this.charReceived += available;
-
-    if (this.charReceived < this.charLength) {
-      // still not enough chars in this buffer? wait for more ...
-      return '';
-    }
-
-    // remove bytes belonging to the current character from the buffer
-    buffer = buffer.slice(available, buffer.length);
-
-    // get the character that was split
-    charStr = this.charBuffer.slice(0, this.charLength).toString(this.encoding);
-
-    // CESU-8: lead surrogate (D800-DBFF) is also the incomplete character
-    var charCode = charStr.charCodeAt(charStr.length - 1);
-    if (charCode >= 0xD800 && charCode <= 0xDBFF) {
-      this.charLength += this.surrogateSize;
-      charStr = '';
-      continue;
-    }
-    this.charReceived = this.charLength = 0;
-
-    // if there are no more bytes in this buffer, just emit our char
-    if (buffer.length === 0) {
-      return charStr;
-    }
-    break;
-  }
-
-  // determine and set charLength / charReceived
-  this.detectIncompleteChar(buffer);
-
-  var end = buffer.length;
-  if (this.charLength) {
-    // buffer the incomplete character bytes we got
-    buffer.copy(this.charBuffer, 0, buffer.length - this.charReceived, end);
-    end -= this.charReceived;
-  }
-
-  charStr += buffer.toString(this.encoding, 0, end);
-
-  var end = charStr.length - 1;
-  var charCode = charStr.charCodeAt(end);
-  // CESU-8: lead surrogate (D800-DBFF) is also the incomplete character
-  if (charCode >= 0xD800 && charCode <= 0xDBFF) {
-    var size = this.surrogateSize;
-    this.charLength += size;
-    this.charReceived += size;
-    this.charBuffer.copy(this.charBuffer, size, 0, size);
-    buffer.copy(this.charBuffer, 0, 0, size);
-    return charStr.substring(0, end);
-  }
-
-  // or just emit the charStr
-  return charStr;
-};
-
-// detectIncompleteChar determines if there is an incomplete UTF-8 character at
-// the end of the given buffer. If so, it sets this.charLength to the byte
-// length that character, and sets this.charReceived to the number of bytes
-// that are available for this character.
-StringDecoder.prototype.detectIncompleteChar = function(buffer) {
-  // determine how many bytes we have to check at the end of this buffer
-  var i = (buffer.length >= 3) ? 3 : buffer.length;
-
-  // Figure out if one of the last i bytes of our buffer announces an
-  // incomplete char.
-  for (; i > 0; i--) {
-    var c = buffer[buffer.length - i];
-
-    // See http://en.wikipedia.org/wiki/UTF-8#Description
-
-    // 110XXXXX
-    if (i == 1 && c >> 5 == 0x06) {
-      this.charLength = 2;
-      break;
-    }
-
-    // 1110XXXX
-    if (i <= 2 && c >> 4 == 0x0E) {
-      this.charLength = 3;
-      break;
-    }
-
-    // 11110XXX
-    if (i <= 3 && c >> 3 == 0x1E) {
-      this.charLength = 4;
-      break;
-    }
-  }
-  this.charReceived = i;
-};
-
-StringDecoder.prototype.end = function(buffer) {
-  var res = '';
-  if (buffer && buffer.length)
-    res = this.write(buffer);
-
-  if (this.charReceived) {
-    var cr = this.charReceived;
-    var buf = this.charBuffer;
-    var enc = this.encoding;
-    res += buf.slice(0, cr).toString(enc);
-  }
-
-  return res;
-};
-
-function passThroughWrite(buffer) {
-  return buffer.toString(this.encoding);
-}
-
-function utf16DetectIncompleteChar(buffer) {
-  this.charReceived = buffer.length % 2;
-  this.charLength = this.charReceived ? 2 : 0;
-}
-
-function base64DetectIncompleteChar(buffer) {
-  this.charReceived = buffer.length % 3;
-  this.charLength = this.charReceived ? 3 : 0;
-}
-
-},{"buffer":40}],66:[function(require,module,exports){
-module.exports = function isBuffer(arg) {
-  return arg && typeof arg === 'object'
-    && typeof arg.copy === 'function'
-    && typeof arg.fill === 'function'
-    && typeof arg.readUInt8 === 'function';
-}
-},{}],67:[function(require,module,exports){
-(function (process,global){
-// Copyright Joyent, Inc. and other Node contributors.
-//
-// Permission is hereby granted, free of charge, to any person obtaining a
-// copy of this software and associated documentation files (the
-// "Software"), to deal in the Software without restriction, including
-// without limitation the rights to use, copy, modify, merge, publish,
-// distribute, sublicense, and/or sell copies of the Software, and to permit
-// persons to whom the Software is furnished to do so, subject to the
-// following conditions:
-//
-// The above copyright notice and this permission notice shall be included
-// in all copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
-// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
-// NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-// DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-// OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
-// USE OR OTHER DEALINGS IN THE SOFTWARE.
-
-var formatRegExp = /%[sdj%]/g;
-exports.format = function(f) {
-  if (!isString(f)) {
-    var objects = [];
-    for (var i = 0; i < arguments.length; i++) {
-      objects.push(inspect(arguments[i]));
-    }
-    return objects.join(' ');
-  }
-
-  var i = 1;
-  var args = arguments;
-  var len = args.length;
-  var str = String(f).replace(formatRegExp, function(x) {
-    if (x === '%%') return '%';
-    if (i >= len) return x;
-    switch (x) {
-      case '%s': return String(args[i++]);
-      case '%d': return Number(args[i++]);
-      case '%j':
-        try {
-          return JSON.stringify(args[i++]);
-        } catch (_) {
-          return '[Circular]';
-        }
-      default:
-        return x;
-    }
-  });
-  for (var x = args[i]; i < len; x = args[++i]) {
-    if (isNull(x) || !isObject(x)) {
-      str += ' ' + x;
-    } else {
-      str += ' ' + inspect(x);
-    }
-  }
-  return str;
-};
-
-
-// Mark that a method should not be used.
-// Returns a modified function which warns once by default.
-// If --no-deprecation is set, then it is a no-op.
-exports.deprecate = function(fn, msg) {
-  // Allow for deprecating things in the process of starting up.
-  if (isUndefined(global.process)) {
-    return function() {
-      return exports.deprecate(fn, msg).apply(this, arguments);
-    };
-  }
-
-  if (process.noDeprecation === true) {
-    return fn;
-  }
-
-  var warned = false;
-  function deprecated() {
-    if (!warned) {
-      if (process.throwDeprecation) {
-        throw new Error(msg);
-      } else if (process.traceDeprecation) {
-        console.trace(msg);
-      } else {
-        console.error(msg);
-      }
-      warned = true;
-    }
-    return fn.apply(this, arguments);
-  }
-
-  return deprecated;
-};
-
-
-var debugs = {};
-var debugEnviron;
-exports.debuglog = function(set) {
-  if (isUndefined(debugEnviron))
-    debugEnviron = process.env.NODE_DEBUG || '';
-  set = set.toUpperCase();
-  if (!debugs[set]) {
-    if (new RegExp('\\b' + set + '\\b', 'i').test(debugEnviron)) {
-      var pid = process.pid;
-      debugs[set] = function() {
-        var msg = exports.format.apply(exports, arguments);
-        console.error('%s %d: %s', set, pid, msg);
-      };
-    } else {
-      debugs[set] = function() {};
-    }
-  }
-  return debugs[set];
-};
-
-
-/**
- * Echos the value of a value. Trys to print the value out
- * in the best way possible given the different types.
- *
- * @param {Object} obj The object to print out.
- * @param {Object} opts Optional options object that alters the output.
- */
-/* legacy: obj, showHidden, depth, colors*/
-function inspect(obj, opts) {
-  // default options
-  var ctx = {
-    seen: [],
-    stylize: stylizeNoColor
-  };
-  // legacy...
-  if (arguments.length >= 3) ctx.depth = arguments[2];
-  if (arguments.length >= 4) ctx.colors = arguments[3];
-  if (isBoolean(opts)) {
-    // legacy...
-    ctx.showHidden = opts;
-  } else if (opts) {
-    // got an "options" object
-    exports._extend(ctx, opts);
-  }
-  // set default options
-  if (isUndefined(ctx.showHidden)) ctx.showHidden = false;
-  if (isUndefined(ctx.depth)) ctx.depth = 2;
-  if (isUndefined(ctx.colors)) ctx.colors = false;
-  if (isUndefined(ctx.customInspect)) ctx.customInspect = true;
-  if (ctx.colors) ctx.stylize = stylizeWithColor;
-  return formatValue(ctx, obj, ctx.depth);
-}
-exports.inspect = inspect;
-
-
-// http://en.wikipedia.org/wiki/ANSI_escape_code#graphics
-inspect.colors = {
-  'bold' : [1, 22],
-  'italic' : [3, 23],
-  'underline' : [4, 24],
-  'inverse' : [7, 27],
-  'white' : [37, 39],
-  'grey' : [90, 39],
-  'black' : [30, 39],
-  'blue' : [34, 39],
-  'cyan' : [36, 39],
-  'green' : [32, 39],
-  'magenta' : [35, 39],
-  'red' : [31, 39],
-  'yellow' : [33, 39]
-};
-
-// Don't use 'blue' not visible on cmd.exe
-inspect.styles = {
-  'special': 'cyan',
-  'number': 'yellow',
-  'boolean': 'yellow',
-  'undefined': 'grey',
-  'null': 'bold',
-  'string': 'green',
-  'date': 'magenta',
-  // "name": intentionally not styling
-  'regexp': 'red'
-};
-
-
-function stylizeWithColor(str, styleType) {
-  var style = inspect.styles[styleType];
-
-  if (style) {
-    return '\u001b[' + inspect.colors[style][0] + 'm' + str +
-           '\u001b[' + inspect.colors[style][1] + 'm';
-  } else {
-    return str;
-  }
-}
-
-
-function stylizeNoColor(str, styleType) {
-  return str;
-}
-
-
-function arrayToHash(array) {
-  var hash = {};
-
-  array.forEach(function(val, idx) {
-    hash[val] = true;
-  });
-
-  return hash;
-}
-
-
-function formatValue(ctx, value, recurseTimes) {
-  // Provide a hook for user-specified inspect functions.
-  // Check that value is an object with an inspect function on it
-  if (ctx.customInspect &&
-      value &&
-      isFunction(value.inspect) &&
-      // Filter out the util module, it's inspect function is special
-      value.inspect !== exports.inspect &&
-      // Also filter out any prototype objects using the circular check.
-      !(value.constructor && value.constructor.prototype === value)) {
-    var ret = value.inspect(recurseTimes, ctx);
-    if (!isString(ret)) {
-      ret = formatValue(ctx, ret, recurseTimes);
-    }
-    return ret;
-  }
-
-  // Primitive types cannot have properties
-  var primitive = formatPrimitive(ctx, value);
-  if (primitive) {
-    return primitive;
-  }
-
-  // Look up the keys of the object.
-  var keys = Object.keys(value);
-  var visibleKeys = arrayToHash(keys);
-
-  if (ctx.showHidden) {
-    keys = Object.getOwnPropertyNames(value);
-  }
-
-  // IE doesn't make error fields non-enumerable
-  // http://msdn.microsoft.com/en-us/library/ie/dww52sbt(v=vs.94).aspx
-  if (isError(value)
-      && (keys.indexOf('message') >= 0 || keys.indexOf('description') >= 0)) {
-    return formatError(value);
-  }
-
-  // Some type of object without properties can be shortcutted.
-  if (keys.length === 0) {
-    if (isFunction(value)) {
-      var name = value.name ? ': ' + value.name : '';
-      return ctx.stylize('[Function' + name + ']', 'special');
-    }
-    if (isRegExp(value)) {
-      return ctx.stylize(RegExp.prototype.toString.call(value), 'regexp');
-    }
-    if (isDate(value)) {
-      return ctx.stylize(Date.prototype.toString.call(value), 'date');
-    }
-    if (isError(value)) {
-      return formatError(value);
-    }
-  }
-
-  var base = '', array = false, braces = ['{', '}'];
-
-  // Make Array say that they are Array
-  if (isArray(value)) {
-    array = true;
-    braces = ['[', ']'];
-  }
-
-  // Make functions say that they are functions
-  if (isFunction(value)) {
-    var n = value.name ? ': ' + value.name : '';
-    base = ' [Function' + n + ']';
-  }
-
-  // Make RegExps say that they are RegExps
-  if (isRegExp(value)) {
-    base = ' ' + RegExp.prototype.toString.call(value);
-  }
-
-  // Make dates with properties first say the date
-  if (isDate(value)) {
-    base = ' ' + Date.prototype.toUTCString.call(value);
-  }
-
-  // Make error with message first say the error
-  if (isError(value)) {
-    base = ' ' + formatError(value);
-  }
-
-  if (keys.length === 0 && (!array || value.length == 0)) {
-    return braces[0] + base + braces[1];
-  }
-
-  if (recurseTimes < 0) {
-    if (isRegExp(value)) {
-      return ctx.stylize(RegExp.prototype.toString.call(value), 'regexp');
-    } else {
-      return ctx.stylize('[Object]', 'special');
-    }
-  }
-
-  ctx.seen.push(value);
-
-  var output;
-  if (array) {
-    output = formatArray(ctx, value, recurseTimes, visibleKeys, keys);
-  } else {
-    output = keys.map(function(key) {
-      return formatProperty(ctx, value, recurseTimes, visibleKeys, key, array);
-    });
-  }
-
-  ctx.seen.pop();
-
-  return reduceToSingleString(output, base, braces);
-}
-
-
-function formatPrimitive(ctx, value) {
-  if (isUndefined(value))
-    return ctx.stylize('undefined', 'undefined');
-  if (isString(value)) {
-    var simple = '\'' + JSON.stringify(value).replace(/^"|"$/g, '')
-                                             .replace(/'/g, "\\'")
-                                             .replace(/\\"/g, '"') + '\'';
-    return ctx.stylize(simple, 'string');
-  }
-  if (isNumber(value))
-    return ctx.stylize('' + value, 'number');
-  if (isBoolean(value))
-    return ctx.stylize('' + value, 'boolean');
-  // For some reason typeof null is "object", so special case here.
-  if (isNull(value))
-    return ctx.stylize('null', 'null');
-}
-
-
-function formatError(value) {
-  return '[' + Error.prototype.toString.call(value) + ']';
-}
-
-
-function formatArray(ctx, value, recurseTimes, visibleKeys, keys) {
-  var output = [];
-  for (var i = 0, l = value.length; i < l; ++i) {
-    if (hasOwnProperty(value, String(i))) {
-      output.push(formatProperty(ctx, value, recurseTimes, visibleKeys,
-          String(i), true));
-    } else {
-      output.push('');
-    }
-  }
-  keys.forEach(function(key) {
-    if (!key.match(/^\d+$/)) {
-      output.push(formatProperty(ctx, value, recurseTimes, visibleKeys,
-          key, true));
-    }
-  });
-  return output;
-}
-
-
-function formatProperty(ctx, value, recurseTimes, visibleKeys, key, array) {
-  var name, str, desc;
-  desc = Object.getOwnPropertyDescriptor(value, key) || { value: value[key] };
-  if (desc.get) {
-    if (desc.set) {
-      str = ctx.stylize('[Getter/Setter]', 'special');
-    } else {
-      str = ctx.stylize('[Getter]', 'special');
-    }
-  } else {
-    if (desc.set) {
-      str = ctx.stylize('[Setter]', 'special');
-    }
-  }
-  if (!hasOwnProperty(visibleKeys, key)) {
-    name = '[' + key + ']';
-  }
-  if (!str) {
-    if (ctx.seen.indexOf(desc.value) < 0) {
-      if (isNull(recurseTimes)) {
-        str = formatValue(ctx, desc.value, null);
-      } else {
-        str = formatValue(ctx, desc.value, recurseTimes - 1);
-      }
-      if (str.indexOf('\n') > -1) {
-        if (array) {
-          str = str.split('\n').map(function(line) {
-            return '  ' + line;
-          }).join('\n').substr(2);
-        } else {
-          str = '\n' + str.split('\n').map(function(line) {
-            return '   ' + line;
-          }).join('\n');
-        }
-      }
-    } else {
-      str = ctx.stylize('[Circular]', 'special');
-    }
-  }
-  if (isUndefined(name)) {
-    if (array && key.match(/^\d+$/)) {
-      return str;
-    }
-    name = JSON.stringify('' + key);
-    if (name.match(/^"([a-zA-Z_][a-zA-Z_0-9]*)"$/)) {
-      name = name.substr(1, name.length - 2);
-      name = ctx.stylize(name, 'name');
-    } else {
-      name = name.replace(/'/g, "\\'")
-                 .replace(/\\"/g, '"')
-                 .replace(/(^"|"$)/g, "'");
-      name = ctx.stylize(name, 'string');
-    }
-  }
-
-  return name + ': ' + str;
-}
-
-
-function reduceToSingleString(output, base, braces) {
-  var numLinesEst = 0;
-  var length = output.reduce(function(prev, cur) {
-    numLinesEst++;
-    if (cur.indexOf('\n') >= 0) numLinesEst++;
-    return prev + cur.replace(/\u001b\[\d\d?m/g, '').length + 1;
-  }, 0);
-
-  if (length > 60) {
-    return braces[0] +
-           (base === '' ? '' : base + '\n ') +
-           ' ' +
-           output.join(',\n  ') +
-           ' ' +
-           braces[1];
-  }
-
-  return braces[0] + base + ' ' + output.join(', ') + ' ' + braces[1];
-}
-
-
-// NOTE: These type checking functions intentionally don't use `instanceof`
-// because it is fragile and can be easily faked with `Object.create()`.
-function isArray(ar) {
-  return Array.isArray(ar);
-}
-exports.isArray = isArray;
-
-function isBoolean(arg) {
-  return typeof arg === 'boolean';
-}
-exports.isBoolean = isBoolean;
-
-function isNull(arg) {
-  return arg === null;
-}
-exports.isNull = isNull;
-
-function isNullOrUndefined(arg) {
-  return arg == null;
-}
-exports.isNullOrUndefined = isNullOrUndefined;
-
-function isNumber(arg) {
-  return typeof arg === 'number';
-}
-exports.isNumber = isNumber;
-
-function isString(arg) {
-  return typeof arg === 'string';
-}
-exports.isString = isString;
-
-function isSymbol(arg) {
-  return typeof arg === 'symbol';
-}
-exports.isSymbol = isSymbol;
-
-function isUndefined(arg) {
-  return arg === void 0;
-}
-exports.isUndefined = isUndefined;
-
-function isRegExp(re) {
-  return isObject(re) && objectToString(re) === '[object RegExp]';
-}
-exports.isRegExp = isRegExp;
-
-function isObject(arg) {
-  return typeof arg === 'object' && arg !== null;
-}
-exports.isObject = isObject;
-
-function isDate(d) {
-  return isObject(d) && objectToString(d) === '[object Date]';
-}
-exports.isDate = isDate;
-
-function isError(e) {
-  return isObject(e) &&
-      (objectToString(e) === '[object Error]' || e instanceof Error);
-}
-exports.isError = isError;
-
-function isFunction(arg) {
-  return typeof arg === 'function';
-}
-exports.isFunction = isFunction;
-
-function isPrimitive(arg) {
-  return arg === null ||
-         typeof arg === 'boolean' ||
-         typeof arg === 'number' ||
-         typeof arg === 'string' ||
-         typeof arg === 'symbol' ||  // ES6 symbol
-         typeof arg === 'undefined';
-}
-exports.isPrimitive = isPrimitive;
-
-exports.isBuffer = require('./support/isBuffer');
-
-function objectToString(o) {
-  return Object.prototype.toString.call(o);
-}
-
-
-function pad(n) {
-  return n < 10 ? '0' + n.toString(10) : n.toString(10);
-}
-
-
-var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep',
-              'Oct', 'Nov', 'Dec'];
-
-// 26 Feb 16:19:34
-function timestamp() {
-  var d = new Date();
-  var time = [pad(d.getHours()),
-              pad(d.getMinutes()),
-              pad(d.getSeconds())].join(':');
-  return [d.getDate(), months[d.getMonth()], time].join(' ');
-}
-
-
-// log is just a thin wrapper to console.log that prepends a timestamp
-exports.log = function() {
-  console.log('%s - %s', timestamp(), exports.format.apply(exports, arguments));
-};
-
-
-/**
- * Inherit the prototype methods from one constructor into another.
- *
- * The Function.prototype.inherits from lang.js rewritten as a standalone
- * function (not on Function.prototype). NOTE: If this file is to be loaded
- * during bootstrapping this function needs to be rewritten using some native
- * functions as prototype setup using normal JavaScript does not work as
- * expected during bootstrapping (see mirror.js in r114903).
- *
- * @param {function} ctor Constructor function which needs to inherit the
- *     prototype.
- * @param {function} superCtor Constructor function to inherit prototype from.
- */
-exports.inherits = require('inherits');
-
-exports._extend = function(origin, add) {
-  // Don't do anything if add isn't an object
-  if (!add || !isObject(add)) return origin;
-
-  var keys = Object.keys(add);
-  var i = keys.length;
-  while (i--) {
-    origin[keys[i]] = add[keys[i]];
-  }
-  return origin;
-};
-
-function hasOwnProperty(obj, prop) {
-  return Object.prototype.hasOwnProperty.call(obj, prop);
-}
-
-}).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./support/isBuffer":66,"_process":47,"inherits":45}],68:[function(require,module,exports){
+},{}],51:[function(require,module,exports){
 (function (global){
 'use strict';
 var Mutation = global.MutationObserver || global.WebKitMutationObserver;
@@ -19721,7 +17892,62 @@ function immediate(task) {
 }
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],69:[function(require,module,exports){
+},{}],52:[function(require,module,exports){
+if (typeof Object.create === 'function') {
+  // implementation from standard node.js 'util' module
+  module.exports = function inherits(ctor, superCtor) {
+    ctor.super_ = superCtor
+    ctor.prototype = Object.create(superCtor.prototype, {
+      constructor: {
+        value: ctor,
+        enumerable: false,
+        writable: true,
+        configurable: true
+      }
+    });
+  };
+} else {
+  // old school shim for old browsers
+  module.exports = function inherits(ctor, superCtor) {
+    ctor.super_ = superCtor
+    var TempCtor = function () {}
+    TempCtor.prototype = superCtor.prototype
+    ctor.prototype = new TempCtor()
+    ctor.prototype.constructor = ctor
+  }
+}
+
+},{}],53:[function(require,module,exports){
+/*!
+ * Determine if an object is a Buffer
+ *
+ * @author   Feross Aboukhadijeh <feross@feross.org> <http://feross.org>
+ * @license  MIT
+ */
+
+// The _isBuffer check is for Safari 5-7 support, because it's missing
+// Object.prototype.constructor. Remove this eventually
+module.exports = function (obj) {
+  return obj != null && (isBuffer(obj) || isSlowBuffer(obj) || !!obj._isBuffer)
+}
+
+function isBuffer (obj) {
+  return !!obj.constructor && typeof obj.constructor.isBuffer === 'function' && obj.constructor.isBuffer(obj)
+}
+
+// For Node v0.10 support. Remove this eventually.
+function isSlowBuffer (obj) {
+  return typeof obj.readFloatLE === 'function' && typeof obj.slice === 'function' && isBuffer(obj.slice(0, 0))
+}
+
+},{}],54:[function(require,module,exports){
+var toString = {}.toString;
+
+module.exports = Array.isArray || function (arr) {
+  return toString.call(arr) == '[object Array]';
+};
+
+},{}],55:[function(require,module,exports){
 (function (global){
 /**
  * marked - a markdown parser
@@ -21011,9 +19237,9 @@ if (typeof module !== 'undefined' && typeof exports === 'object') {
 }());
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],70:[function(require,module,exports){
+},{}],56:[function(require,module,exports){
 module.exports = require('../lib/extras/memory');
-},{"../lib/extras/memory":71}],71:[function(require,module,exports){
+},{"../lib/extras/memory":57}],57:[function(require,module,exports){
 (function (process,global,Buffer){
 'use strict';
 
@@ -24088,7 +22314,7 @@ if (!PDB) {
   MemoryPouchPlugin(PDB);
 }
 }).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {},require("buffer").Buffer)
-},{"_process":47,"argsarray":73,"buffer":40,"debug":74,"double-ended-queue":77,"events":44,"inherits":79,"js-extend":80,"levelup":82,"lie":110,"memdown":111,"pouchdb":72,"pouchdb-collections":122,"spark-md5":124,"sublevel-pouchdb":127,"through2":157,"vuvuzela":158}],72:[function(require,module,exports){
+},{"_process":46,"argsarray":59,"buffer":45,"debug":60,"double-ended-queue":63,"events":49,"inherits":65,"js-extend":66,"levelup":68,"lie":96,"memdown":97,"pouchdb":58,"pouchdb-collections":108,"spark-md5":110,"sublevel-pouchdb":113,"through2":143,"vuvuzela":144}],58:[function(require,module,exports){
 (function (process,global){
 'use strict';
 
@@ -34779,7 +33005,7 @@ PouchDB.plugin(IDBPouch)
 
 module.exports = PouchDB;
 }).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"_process":47,"argsarray":73,"debug":74,"es6-promise-pool":78,"events":44,"inherits":79,"js-extend":80,"lie":110,"pouchdb-collate":120,"pouchdb-collections":122,"scope-eval":123,"spark-md5":124,"vuvuzela":158}],73:[function(require,module,exports){
+},{"_process":46,"argsarray":59,"debug":60,"es6-promise-pool":64,"events":49,"inherits":65,"js-extend":66,"lie":96,"pouchdb-collate":106,"pouchdb-collections":108,"scope-eval":109,"spark-md5":110,"vuvuzela":144}],59:[function(require,module,exports){
 'use strict';
 
 module.exports = argsArray;
@@ -34799,7 +33025,7 @@ function argsArray(fun) {
     }
   };
 }
-},{}],74:[function(require,module,exports){
+},{}],60:[function(require,module,exports){
 
 /**
  * This is the web browser implementation of `debug()`.
@@ -34969,7 +33195,7 @@ function localstorage(){
   } catch (e) {}
 }
 
-},{"./debug":75}],75:[function(require,module,exports){
+},{"./debug":61}],61:[function(require,module,exports){
 
 /**
  * This is the common logic for both the Node.js and web browser
@@ -35168,7 +33394,7 @@ function coerce(val) {
   return val;
 }
 
-},{"ms":76}],76:[function(require,module,exports){
+},{"ms":62}],62:[function(require,module,exports){
 /**
  * Helpers.
  */
@@ -35295,7 +33521,7 @@ function plural(ms, n, name) {
   return Math.ceil(ms / n) + ' ' + name + 's';
 }
 
-},{}],77:[function(require,module,exports){
+},{}],63:[function(require,module,exports){
 /**
  * Copyright (c) 2013 Petka Antonov
  * 
@@ -35584,7 +33810,7 @@ function getCapacity(capacity) {
 
 module.exports = Deque;
 
-},{}],78:[function(require,module,exports){
+},{}],64:[function(require,module,exports){
 (function (root, factory) {
   /* istanbul ignore next */
   if (typeof define === 'function' && define.amd) {
@@ -35802,9 +34028,9 @@ module.exports = Deque;
   return PromisePool
 })
 
-},{}],79:[function(require,module,exports){
-arguments[4][45][0].apply(exports,arguments)
-},{"dup":45}],80:[function(require,module,exports){
+},{}],65:[function(require,module,exports){
+arguments[4][52][0].apply(exports,arguments)
+},{"dup":52}],66:[function(require,module,exports){
 (function() { 
 
   var slice   = Array.prototype.slice,
@@ -35833,7 +34059,7 @@ arguments[4][45][0].apply(exports,arguments)
   this.extend = extend;
 
 }).call(this);
-},{}],81:[function(require,module,exports){
+},{}],67:[function(require,module,exports){
 /* Copyright (c) 2012-2016 LevelUP contributors
  * See list at <https://github.com/level/levelup#contributing>
  * MIT License
@@ -35918,7 +34144,7 @@ Batch.prototype.write = function (callback) {
 
 module.exports = Batch
 
-},{"./util":83,"level-errors":93}],82:[function(require,module,exports){
+},{"./util":69,"level-errors":79}],68:[function(require,module,exports){
 (function (process){
 /* Copyright (c) 2012-2016 LevelUP contributors
  * See list at <https://github.com/level/levelup#contributing>
@@ -36321,7 +34547,7 @@ module.exports.repair  = deprecate(
 
 
 }).call(this,require('_process'))
-},{"./batch":81,"./util":83,"_process":47,"deferred-leveldown":85,"events":44,"level-codec":91,"level-errors":93,"level-iterator-stream":97,"prr":107,"util":67,"xtend":108}],83:[function(require,module,exports){
+},{"./batch":67,"./util":69,"_process":46,"deferred-leveldown":71,"events":49,"level-codec":77,"level-errors":79,"level-iterator-stream":83,"prr":93,"util":321,"xtend":94}],69:[function(require,module,exports){
 /* Copyright (c) 2012-2016 LevelUP contributors
  * See list at <https://github.com/level/levelup#contributing>
  * MIT License
@@ -36400,7 +34626,7 @@ module.exports = {
   , isDefined       : isDefined
 }
 
-},{"../package.json":109,"level-errors":93,"leveldown":39,"leveldown/package":39,"semver":39,"util":67,"xtend":108}],84:[function(require,module,exports){
+},{"../package.json":95,"level-errors":79,"leveldown":44,"leveldown/package":44,"semver":44,"util":321,"xtend":94}],70:[function(require,module,exports){
 var util = require('util')
   , AbstractIterator = require('abstract-leveldown').AbstractIterator
 
@@ -36436,7 +34662,7 @@ DeferredIterator.prototype._operation = function (method, args) {
 
 module.exports = DeferredIterator;
 
-},{"abstract-leveldown":89,"util":67}],85:[function(require,module,exports){
+},{"abstract-leveldown":75,"util":321}],71:[function(require,module,exports){
 (function (Buffer,process){
 var util              = require('util')
   , AbstractLevelDOWN = require('abstract-leveldown').AbstractLevelDOWN
@@ -36495,8 +34721,8 @@ DeferredLevelDOWN.prototype._iterator = function (options) {
 module.exports                  = DeferredLevelDOWN
 module.exports.DeferredIterator = DeferredIterator
 
-}).call(this,{"isBuffer":require("../../../../../browserify/node_modules/insert-module-globals/node_modules/is-buffer/index.js")},require('_process'))
-},{"../../../../../browserify/node_modules/insert-module-globals/node_modules/is-buffer/index.js":46,"./deferred-iterator":84,"_process":47,"abstract-leveldown":89,"util":67}],86:[function(require,module,exports){
+}).call(this,{"isBuffer":require("../../../../../is-buffer/index.js")},require('_process'))
+},{"../../../../../is-buffer/index.js":53,"./deferred-iterator":70,"_process":46,"abstract-leveldown":75,"util":321}],72:[function(require,module,exports){
 (function (process){
 /* Copyright (c) 2013 Rod Vagg, MIT License */
 
@@ -36579,7 +34805,7 @@ AbstractChainedBatch.prototype.write = function (options, callback) {
 
 module.exports = AbstractChainedBatch
 }).call(this,require('_process'))
-},{"_process":47}],87:[function(require,module,exports){
+},{"_process":46}],73:[function(require,module,exports){
 (function (process){
 /* Copyright (c) 2013 Rod Vagg, MIT License */
 
@@ -36632,7 +34858,7 @@ AbstractIterator.prototype.end = function (callback) {
 module.exports = AbstractIterator
 
 }).call(this,require('_process'))
-},{"_process":47}],88:[function(require,module,exports){
+},{"_process":46}],74:[function(require,module,exports){
 (function (Buffer,process){
 /* Copyright (c) 2013 Rod Vagg, MIT License */
 
@@ -36907,14 +35133,14 @@ AbstractLevelDOWN.prototype._checkKey = function (obj, type) {
 
 module.exports = AbstractLevelDOWN
 
-}).call(this,{"isBuffer":require("../../../../../../../browserify/node_modules/insert-module-globals/node_modules/is-buffer/index.js")},require('_process'))
-},{"../../../../../../../browserify/node_modules/insert-module-globals/node_modules/is-buffer/index.js":46,"./abstract-chained-batch":86,"./abstract-iterator":87,"_process":47,"xtend":108}],89:[function(require,module,exports){
+}).call(this,{"isBuffer":require("../../../../../../../is-buffer/index.js")},require('_process'))
+},{"../../../../../../../is-buffer/index.js":53,"./abstract-chained-batch":72,"./abstract-iterator":73,"_process":46,"xtend":94}],75:[function(require,module,exports){
 exports.AbstractLevelDOWN    = require('./abstract-leveldown')
 exports.AbstractIterator     = require('./abstract-iterator')
 exports.AbstractChainedBatch = require('./abstract-chained-batch')
 exports.isLevelDOWN          = require('./is-leveldown')
 
-},{"./abstract-chained-batch":86,"./abstract-iterator":87,"./abstract-leveldown":88,"./is-leveldown":90}],90:[function(require,module,exports){
+},{"./abstract-chained-batch":72,"./abstract-iterator":73,"./abstract-leveldown":74,"./is-leveldown":76}],76:[function(require,module,exports){
 var AbstractLevelDOWN = require('./abstract-leveldown')
 
 function isLevelDOWN (db) {
@@ -36930,7 +35156,7 @@ function isLevelDOWN (db) {
 
 module.exports = isLevelDOWN
 
-},{"./abstract-leveldown":88}],91:[function(require,module,exports){
+},{"./abstract-leveldown":74}],77:[function(require,module,exports){
 var encodings = require('./lib/encodings');
 
 module.exports = Codec;
@@ -37038,7 +35264,7 @@ Codec.prototype.valueAsBuffer = function(opts){
 };
 
 
-},{"./lib/encodings":92}],92:[function(require,module,exports){
+},{"./lib/encodings":78}],78:[function(require,module,exports){
 (function (Buffer){
 
 exports.utf8 = exports['utf-8'] = {
@@ -37118,7 +35344,7 @@ function isBinary(data){
 
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":40}],93:[function(require,module,exports){
+},{"buffer":45}],79:[function(require,module,exports){
 /* Copyright (c) 2012-2015 LevelUP contributors
  * See list at <https://github.com/rvagg/node-levelup#contributing>
  * MIT License
@@ -37142,7 +35368,7 @@ module.exports = {
   , EncodingError       : createError('EncodingError', LevelUPError)
 }
 
-},{"errno":95}],94:[function(require,module,exports){
+},{"errno":81}],80:[function(require,module,exports){
 var prr = require('prr')
 
 function init (type, message, cause) {
@@ -37199,7 +35425,7 @@ module.exports = function (errno) {
   }
 }
 
-},{"prr":96}],95:[function(require,module,exports){
+},{"prr":82}],81:[function(require,module,exports){
 var all = module.exports.all = [
   {
     errno: -2,
@@ -37514,7 +35740,7 @@ all.forEach(function (error) {
 module.exports.custom = require('./custom')(module.exports)
 module.exports.create = module.exports.custom.createError
 
-},{"./custom":94}],96:[function(require,module,exports){
+},{"./custom":80}],82:[function(require,module,exports){
 /*!
   * prr
   * (c) 2013 Rod Vagg <rod@vagg.org>
@@ -37578,7 +35804,7 @@ module.exports.create = module.exports.custom.createError
 
   return prr
 })
-},{}],97:[function(require,module,exports){
+},{}],83:[function(require,module,exports){
 var inherits = require('inherits');
 var Readable = require('readable-stream').Readable;
 var extend = require('xtend');
@@ -37636,7 +35862,7 @@ ReadStream.prototype._cleanup = function(){
 };
 
 
-},{"inherits":79,"level-errors":93,"readable-stream":106,"xtend":108}],98:[function(require,module,exports){
+},{"inherits":65,"level-errors":79,"readable-stream":92,"xtend":94}],84:[function(require,module,exports){
 (function (process){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -37729,7 +35955,7 @@ function forEach (xs, f) {
 }
 
 }).call(this,require('_process'))
-},{"./_stream_readable":100,"./_stream_writable":102,"_process":47,"core-util-is":103,"inherits":79}],99:[function(require,module,exports){
+},{"./_stream_readable":86,"./_stream_writable":88,"_process":46,"core-util-is":89,"inherits":65}],85:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -37777,7 +36003,7 @@ PassThrough.prototype._transform = function(chunk, encoding, cb) {
   cb(null, chunk);
 };
 
-},{"./_stream_transform":101,"core-util-is":103,"inherits":79}],100:[function(require,module,exports){
+},{"./_stream_transform":87,"core-util-is":89,"inherits":65}],86:[function(require,module,exports){
 (function (process){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -38732,7 +36958,7 @@ function indexOf (xs, x) {
 }
 
 }).call(this,require('_process'))
-},{"./_stream_duplex":98,"_process":47,"buffer":40,"core-util-is":103,"events":44,"inherits":79,"isarray":104,"stream":64,"string_decoder/":105,"util":39}],101:[function(require,module,exports){
+},{"./_stream_duplex":84,"_process":46,"buffer":45,"core-util-is":89,"events":49,"inherits":65,"isarray":90,"stream":316,"string_decoder/":91,"util":44}],87:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -38943,7 +37169,7 @@ function done(stream, er) {
   return stream.push(null);
 }
 
-},{"./_stream_duplex":98,"core-util-is":103,"inherits":79}],102:[function(require,module,exports){
+},{"./_stream_duplex":84,"core-util-is":89,"inherits":65}],88:[function(require,module,exports){
 (function (process){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -39424,7 +37650,7 @@ function endWritable(stream, state, cb) {
 }
 
 }).call(this,require('_process'))
-},{"./_stream_duplex":98,"_process":47,"buffer":40,"core-util-is":103,"inherits":79,"stream":64}],103:[function(require,module,exports){
+},{"./_stream_duplex":84,"_process":46,"buffer":45,"core-util-is":89,"inherits":65,"stream":316}],89:[function(require,module,exports){
 (function (Buffer){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -39534,15 +37760,236 @@ function objectToString(o) {
   return Object.prototype.toString.call(o);
 }
 
-}).call(this,{"isBuffer":require("../../../../../../../../../../browserify/node_modules/insert-module-globals/node_modules/is-buffer/index.js")})
-},{"../../../../../../../../../../browserify/node_modules/insert-module-globals/node_modules/is-buffer/index.js":46}],104:[function(require,module,exports){
+}).call(this,{"isBuffer":require("../../../../../../../../../../is-buffer/index.js")})
+},{"../../../../../../../../../../is-buffer/index.js":53}],90:[function(require,module,exports){
 module.exports = Array.isArray || function (arr) {
   return Object.prototype.toString.call(arr) == '[object Array]';
 };
 
-},{}],105:[function(require,module,exports){
-arguments[4][65][0].apply(exports,arguments)
-},{"buffer":40,"dup":65}],106:[function(require,module,exports){
+},{}],91:[function(require,module,exports){
+// Copyright Joyent, Inc. and other Node contributors.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a
+// copy of this software and associated documentation files (the
+// "Software"), to deal in the Software without restriction, including
+// without limitation the rights to use, copy, modify, merge, publish,
+// distribute, sublicense, and/or sell copies of the Software, and to permit
+// persons to whom the Software is furnished to do so, subject to the
+// following conditions:
+//
+// The above copyright notice and this permission notice shall be included
+// in all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
+// NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+// DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+// OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+// USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+var Buffer = require('buffer').Buffer;
+
+var isBufferEncoding = Buffer.isEncoding
+  || function(encoding) {
+       switch (encoding && encoding.toLowerCase()) {
+         case 'hex': case 'utf8': case 'utf-8': case 'ascii': case 'binary': case 'base64': case 'ucs2': case 'ucs-2': case 'utf16le': case 'utf-16le': case 'raw': return true;
+         default: return false;
+       }
+     }
+
+
+function assertEncoding(encoding) {
+  if (encoding && !isBufferEncoding(encoding)) {
+    throw new Error('Unknown encoding: ' + encoding);
+  }
+}
+
+// StringDecoder provides an interface for efficiently splitting a series of
+// buffers into a series of JS strings without breaking apart multi-byte
+// characters. CESU-8 is handled as part of the UTF-8 encoding.
+//
+// @TODO Handling all encodings inside a single object makes it very difficult
+// to reason about this code, so it should be split up in the future.
+// @TODO There should be a utf8-strict encoding that rejects invalid UTF-8 code
+// points as used by CESU-8.
+var StringDecoder = exports.StringDecoder = function(encoding) {
+  this.encoding = (encoding || 'utf8').toLowerCase().replace(/[-_]/, '');
+  assertEncoding(encoding);
+  switch (this.encoding) {
+    case 'utf8':
+      // CESU-8 represents each of Surrogate Pair by 3-bytes
+      this.surrogateSize = 3;
+      break;
+    case 'ucs2':
+    case 'utf16le':
+      // UTF-16 represents each of Surrogate Pair by 2-bytes
+      this.surrogateSize = 2;
+      this.detectIncompleteChar = utf16DetectIncompleteChar;
+      break;
+    case 'base64':
+      // Base-64 stores 3 bytes in 4 chars, and pads the remainder.
+      this.surrogateSize = 3;
+      this.detectIncompleteChar = base64DetectIncompleteChar;
+      break;
+    default:
+      this.write = passThroughWrite;
+      return;
+  }
+
+  // Enough space to store all bytes of a single character. UTF-8 needs 4
+  // bytes, but CESU-8 may require up to 6 (3 bytes per surrogate).
+  this.charBuffer = new Buffer(6);
+  // Number of bytes received for the current incomplete multi-byte character.
+  this.charReceived = 0;
+  // Number of bytes expected for the current incomplete multi-byte character.
+  this.charLength = 0;
+};
+
+
+// write decodes the given buffer and returns it as JS string that is
+// guaranteed to not contain any partial multi-byte characters. Any partial
+// character found at the end of the buffer is buffered up, and will be
+// returned when calling write again with the remaining bytes.
+//
+// Note: Converting a Buffer containing an orphan surrogate to a String
+// currently works, but converting a String to a Buffer (via `new Buffer`, or
+// Buffer#write) will replace incomplete surrogates with the unicode
+// replacement character. See https://codereview.chromium.org/121173009/ .
+StringDecoder.prototype.write = function(buffer) {
+  var charStr = '';
+  // if our last write ended with an incomplete multibyte character
+  while (this.charLength) {
+    // determine how many remaining bytes this buffer has to offer for this char
+    var available = (buffer.length >= this.charLength - this.charReceived) ?
+        this.charLength - this.charReceived :
+        buffer.length;
+
+    // add the new bytes to the char buffer
+    buffer.copy(this.charBuffer, this.charReceived, 0, available);
+    this.charReceived += available;
+
+    if (this.charReceived < this.charLength) {
+      // still not enough chars in this buffer? wait for more ...
+      return '';
+    }
+
+    // remove bytes belonging to the current character from the buffer
+    buffer = buffer.slice(available, buffer.length);
+
+    // get the character that was split
+    charStr = this.charBuffer.slice(0, this.charLength).toString(this.encoding);
+
+    // CESU-8: lead surrogate (D800-DBFF) is also the incomplete character
+    var charCode = charStr.charCodeAt(charStr.length - 1);
+    if (charCode >= 0xD800 && charCode <= 0xDBFF) {
+      this.charLength += this.surrogateSize;
+      charStr = '';
+      continue;
+    }
+    this.charReceived = this.charLength = 0;
+
+    // if there are no more bytes in this buffer, just emit our char
+    if (buffer.length === 0) {
+      return charStr;
+    }
+    break;
+  }
+
+  // determine and set charLength / charReceived
+  this.detectIncompleteChar(buffer);
+
+  var end = buffer.length;
+  if (this.charLength) {
+    // buffer the incomplete character bytes we got
+    buffer.copy(this.charBuffer, 0, buffer.length - this.charReceived, end);
+    end -= this.charReceived;
+  }
+
+  charStr += buffer.toString(this.encoding, 0, end);
+
+  var end = charStr.length - 1;
+  var charCode = charStr.charCodeAt(end);
+  // CESU-8: lead surrogate (D800-DBFF) is also the incomplete character
+  if (charCode >= 0xD800 && charCode <= 0xDBFF) {
+    var size = this.surrogateSize;
+    this.charLength += size;
+    this.charReceived += size;
+    this.charBuffer.copy(this.charBuffer, size, 0, size);
+    buffer.copy(this.charBuffer, 0, 0, size);
+    return charStr.substring(0, end);
+  }
+
+  // or just emit the charStr
+  return charStr;
+};
+
+// detectIncompleteChar determines if there is an incomplete UTF-8 character at
+// the end of the given buffer. If so, it sets this.charLength to the byte
+// length that character, and sets this.charReceived to the number of bytes
+// that are available for this character.
+StringDecoder.prototype.detectIncompleteChar = function(buffer) {
+  // determine how many bytes we have to check at the end of this buffer
+  var i = (buffer.length >= 3) ? 3 : buffer.length;
+
+  // Figure out if one of the last i bytes of our buffer announces an
+  // incomplete char.
+  for (; i > 0; i--) {
+    var c = buffer[buffer.length - i];
+
+    // See http://en.wikipedia.org/wiki/UTF-8#Description
+
+    // 110XXXXX
+    if (i == 1 && c >> 5 == 0x06) {
+      this.charLength = 2;
+      break;
+    }
+
+    // 1110XXXX
+    if (i <= 2 && c >> 4 == 0x0E) {
+      this.charLength = 3;
+      break;
+    }
+
+    // 11110XXX
+    if (i <= 3 && c >> 3 == 0x1E) {
+      this.charLength = 4;
+      break;
+    }
+  }
+  this.charReceived = i;
+};
+
+StringDecoder.prototype.end = function(buffer) {
+  var res = '';
+  if (buffer && buffer.length)
+    res = this.write(buffer);
+
+  if (this.charReceived) {
+    var cr = this.charReceived;
+    var buf = this.charBuffer;
+    var enc = this.encoding;
+    res += buf.slice(0, cr).toString(enc);
+  }
+
+  return res;
+};
+
+function passThroughWrite(buffer) {
+  return buffer.toString(this.encoding);
+}
+
+function utf16DetectIncompleteChar(buffer) {
+  this.charReceived = buffer.length % 2;
+  this.charLength = this.charReceived ? 2 : 0;
+}
+
+function base64DetectIncompleteChar(buffer) {
+  this.charReceived = buffer.length % 3;
+  this.charLength = this.charReceived ? 3 : 0;
+}
+
+},{"buffer":45}],92:[function(require,module,exports){
 (function (process){
 exports = module.exports = require('./lib/_stream_readable.js');
 exports.Stream = require('stream');
@@ -39556,9 +38003,9 @@ if (!process.browser && process.env.READABLE_STREAM === 'disable') {
 }
 
 }).call(this,require('_process'))
-},{"./lib/_stream_duplex.js":98,"./lib/_stream_passthrough.js":99,"./lib/_stream_readable.js":100,"./lib/_stream_transform.js":101,"./lib/_stream_writable.js":102,"_process":47,"stream":64}],107:[function(require,module,exports){
-arguments[4][96][0].apply(exports,arguments)
-},{"dup":96}],108:[function(require,module,exports){
+},{"./lib/_stream_duplex.js":84,"./lib/_stream_passthrough.js":85,"./lib/_stream_readable.js":86,"./lib/_stream_transform.js":87,"./lib/_stream_writable.js":88,"_process":46,"stream":316}],93:[function(require,module,exports){
+arguments[4][82][0].apply(exports,arguments)
+},{"dup":82}],94:[function(require,module,exports){
 module.exports = extend
 
 var hasOwnProperty = Object.prototype.hasOwnProperty;
@@ -39579,7 +38026,7 @@ function extend() {
     return target
 }
 
-},{}],109:[function(require,module,exports){
+},{}],95:[function(require,module,exports){
 module.exports={
   "name": "levelup",
   "description": "Fast & simple storage - a Node.js-style LevelDB wrapper",
@@ -39742,7 +38189,7 @@ module.exports={
   "_resolved": "https://registry.npmjs.org/levelup/-/levelup-1.3.2.tgz"
 }
 
-},{}],110:[function(require,module,exports){
+},{}],96:[function(require,module,exports){
 'use strict';
 var immediate = require('immediate');
 
@@ -39997,7 +38444,7 @@ function race(iterable) {
   }
 }
 
-},{"immediate":68}],111:[function(require,module,exports){
+},{"immediate":51}],97:[function(require,module,exports){
 (function (process,global,Buffer){
 var inherits          = require('inherits')
   , AbstractLevelDOWN = require('abstract-leveldown').AbstractLevelDOWN
@@ -40241,7 +38688,7 @@ MemDOWN.destroy = function (name, callback) {
 module.exports = MemDOWN
 
 }).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {},require("buffer").Buffer)
-},{"_process":47,"abstract-leveldown":115,"buffer":40,"functional-red-black-tree":118,"inherits":79,"ltgt":119}],112:[function(require,module,exports){
+},{"_process":46,"abstract-leveldown":101,"buffer":45,"functional-red-black-tree":104,"inherits":65,"ltgt":105}],98:[function(require,module,exports){
 (function (process){
 /* Copyright (c) 2013 Rod Vagg, MIT License */
 
@@ -40333,9 +38780,9 @@ AbstractChainedBatch.prototype.write = function (options, callback) {
 module.exports = AbstractChainedBatch
 
 }).call(this,require('_process'))
-},{"_process":47}],113:[function(require,module,exports){
-arguments[4][87][0].apply(exports,arguments)
-},{"_process":47,"dup":87}],114:[function(require,module,exports){
+},{"_process":46}],99:[function(require,module,exports){
+arguments[4][73][0].apply(exports,arguments)
+},{"_process":46,"dup":73}],100:[function(require,module,exports){
 (function (Buffer,process){
 /* Copyright (c) 2013 Rod Vagg, MIT License */
 
@@ -40610,14 +39057,14 @@ AbstractLevelDOWN.prototype._checkKey = function (obj, type) {
 
 module.exports = AbstractLevelDOWN
 
-}).call(this,{"isBuffer":require("../../../../../browserify/node_modules/insert-module-globals/node_modules/is-buffer/index.js")},require('_process'))
-},{"../../../../../browserify/node_modules/insert-module-globals/node_modules/is-buffer/index.js":46,"./abstract-chained-batch":112,"./abstract-iterator":113,"_process":47,"xtend":117}],115:[function(require,module,exports){
-arguments[4][89][0].apply(exports,arguments)
-},{"./abstract-chained-batch":112,"./abstract-iterator":113,"./abstract-leveldown":114,"./is-leveldown":116,"dup":89}],116:[function(require,module,exports){
-arguments[4][90][0].apply(exports,arguments)
-},{"./abstract-leveldown":114,"dup":90}],117:[function(require,module,exports){
-arguments[4][108][0].apply(exports,arguments)
-},{"dup":108}],118:[function(require,module,exports){
+}).call(this,{"isBuffer":require("../../../../../is-buffer/index.js")},require('_process'))
+},{"../../../../../is-buffer/index.js":53,"./abstract-chained-batch":98,"./abstract-iterator":99,"_process":46,"xtend":103}],101:[function(require,module,exports){
+arguments[4][75][0].apply(exports,arguments)
+},{"./abstract-chained-batch":98,"./abstract-iterator":99,"./abstract-leveldown":100,"./is-leveldown":102,"dup":75}],102:[function(require,module,exports){
+arguments[4][76][0].apply(exports,arguments)
+},{"./abstract-leveldown":100,"dup":76}],103:[function(require,module,exports){
+arguments[4][94][0].apply(exports,arguments)
+},{"dup":94}],104:[function(require,module,exports){
 "use strict"
 
 module.exports = createRBTree
@@ -41614,7 +40061,7 @@ function defaultCompare(a, b) {
 function createRBTree(compare) {
   return new RedBlackTree(compare || defaultCompare, null)
 }
-},{}],119:[function(require,module,exports){
+},{}],105:[function(require,module,exports){
 (function (Buffer){
 
 exports.compare = function (a, b) {
@@ -41712,8 +40159,8 @@ exports.filter = function (range, compare) {
   }
 }
 
-}).call(this,{"isBuffer":require("../../../../../browserify/node_modules/insert-module-globals/node_modules/is-buffer/index.js")})
-},{"../../../../../browserify/node_modules/insert-module-globals/node_modules/is-buffer/index.js":46}],120:[function(require,module,exports){
+}).call(this,{"isBuffer":require("../../../../../is-buffer/index.js")})
+},{"../../../../../is-buffer/index.js":53}],106:[function(require,module,exports){
 'use strict';
 
 var MIN_MAGNITUDE = -324; // verified by -Number.MIN_VALUE
@@ -42068,7 +40515,7 @@ function numToIndexableString(num) {
   return result;
 }
 
-},{"./utils":121}],121:[function(require,module,exports){
+},{"./utils":107}],107:[function(require,module,exports){
 'use strict';
 
 function pad(str, padWith, upToLength) {
@@ -42139,7 +40586,7 @@ exports.intToDecimalForm = function (int) {
 
   return result;
 };
-},{}],122:[function(require,module,exports){
+},{}],108:[function(require,module,exports){
 'use strict';
 exports.Map = LazyMap; // TODO: use ES6 map
 exports.Set = LazySet; // TODO: use ES6 set
@@ -42210,7 +40657,7 @@ LazySet.prototype.delete = function (key) {
   return this.store.delete(key);
 };
 
-},{}],123:[function(require,module,exports){
+},{}],109:[function(require,module,exports){
 // Generated by CoffeeScript 1.9.2
 (function() {
   var hasProp = {}.hasOwnProperty,
@@ -42234,7 +40681,7 @@ LazySet.prototype.delete = function (key) {
 
 }).call(this);
 
-},{}],124:[function(require,module,exports){
+},{}],110:[function(require,module,exports){
 (function (factory) {
     if (typeof exports === 'object') {
         // Node/CommonJS
@@ -42939,7 +41386,7 @@ LazySet.prototype.delete = function (key) {
     return SparkMD5;
 }));
 
-},{}],125:[function(require,module,exports){
+},{}],111:[function(require,module,exports){
 module.exports = {
   encode: function (decodedKey) {
     return '\xff' + decodedKey[0] + '\xff' + decodedKey[1]
@@ -42954,7 +41401,7 @@ module.exports = {
 }
 
 
-},{}],126:[function(require,module,exports){
+},{}],112:[function(require,module,exports){
 /* Copyright (c) 2012-2014 LevelUP contributors
  * See list at <https://github.com/rvagg/node-levelup#contributing>
  * MIT License
@@ -42978,7 +41425,7 @@ module.exports = {
   , EncodingError       : createError('EncodingError', LevelUPError)
 }
 
-},{"errno":132}],127:[function(require,module,exports){
+},{"errno":118}],113:[function(require,module,exports){
 var nut   = require('./nut')
 var shell = require('./shell') //the shell surrounds the nut
 var Codec = require('level-codec')
@@ -42993,7 +41440,7 @@ module.exports = function (db) {
 }
 
 
-},{"./codec/legacy":125,"./nut":128,"./read-stream":129,"./shell":130,"level-codec":134}],128:[function(require,module,exports){
+},{"./codec/legacy":111,"./nut":114,"./read-stream":115,"./shell":116,"level-codec":120}],114:[function(require,module,exports){
 var ltgt = require('ltgt')
 
 function isFunction (f) {
@@ -43175,7 +41622,7 @@ module.exports = function (db, precodec, codec, compare) {
 
 }
 
-},{"ltgt":136}],129:[function(require,module,exports){
+},{"ltgt":122}],115:[function(require,module,exports){
 /* Copyright (c) 2012-2014 LevelUP contributors
  * See list at <https://github.com/rvagg/node-levelup#contributing>
  * MIT License <https://github.com/rvagg/node-levelup/blob/master/LICENSE.md>
@@ -43270,7 +41717,7 @@ ReadStream.prototype.toString = function () {
 module.exports = ReadStream
 
 
-},{"./errors":126,"inherits":79,"readable-stream":145}],130:[function(require,module,exports){
+},{"./errors":112,"inherits":65,"readable-stream":131}],116:[function(require,module,exports){
 (function (process){
 var EventEmitter = require('events').EventEmitter
 
@@ -43415,17 +41862,17 @@ var sublevel = module.exports = function (nut, prefix, createStream, options) {
 }
 
 }).call(this,require('_process'))
-},{"./errors":126,"_process":47,"events":44}],131:[function(require,module,exports){
-arguments[4][94][0].apply(exports,arguments)
-},{"dup":94,"prr":133}],132:[function(require,module,exports){
-arguments[4][95][0].apply(exports,arguments)
-},{"./custom":131,"dup":95}],133:[function(require,module,exports){
-arguments[4][96][0].apply(exports,arguments)
-},{"dup":96}],134:[function(require,module,exports){
-arguments[4][91][0].apply(exports,arguments)
-},{"./lib/encodings":135,"dup":91}],135:[function(require,module,exports){
-arguments[4][92][0].apply(exports,arguments)
-},{"buffer":40,"dup":92}],136:[function(require,module,exports){
+},{"./errors":112,"_process":46,"events":49}],117:[function(require,module,exports){
+arguments[4][80][0].apply(exports,arguments)
+},{"dup":80,"prr":119}],118:[function(require,module,exports){
+arguments[4][81][0].apply(exports,arguments)
+},{"./custom":117,"dup":81}],119:[function(require,module,exports){
+arguments[4][82][0].apply(exports,arguments)
+},{"dup":82}],120:[function(require,module,exports){
+arguments[4][77][0].apply(exports,arguments)
+},{"./lib/encodings":121,"dup":77}],121:[function(require,module,exports){
+arguments[4][78][0].apply(exports,arguments)
+},{"buffer":45,"dup":78}],122:[function(require,module,exports){
 (function (Buffer){
 
 exports.compare = function (a, b) {
@@ -43574,12 +42021,12 @@ exports.filter = function (range, compare) {
   }
 }
 
-}).call(this,{"isBuffer":require("../../../../../browserify/node_modules/insert-module-globals/node_modules/is-buffer/index.js")})
-},{"../../../../../browserify/node_modules/insert-module-globals/node_modules/is-buffer/index.js":46}],137:[function(require,module,exports){
-arguments[4][98][0].apply(exports,arguments)
-},{"./_stream_readable":139,"./_stream_writable":141,"_process":47,"core-util-is":142,"dup":98,"inherits":79}],138:[function(require,module,exports){
-arguments[4][99][0].apply(exports,arguments)
-},{"./_stream_transform":140,"core-util-is":142,"dup":99,"inherits":79}],139:[function(require,module,exports){
+}).call(this,{"isBuffer":require("../../../../../is-buffer/index.js")})
+},{"../../../../../is-buffer/index.js":53}],123:[function(require,module,exports){
+arguments[4][84][0].apply(exports,arguments)
+},{"./_stream_readable":125,"./_stream_writable":127,"_process":46,"core-util-is":128,"dup":84,"inherits":65}],124:[function(require,module,exports){
+arguments[4][85][0].apply(exports,arguments)
+},{"./_stream_transform":126,"core-util-is":128,"dup":85,"inherits":65}],125:[function(require,module,exports){
 (function (process){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -44565,7 +43012,7 @@ function indexOf (xs, x) {
 }
 
 }).call(this,require('_process'))
-},{"_process":47,"buffer":40,"core-util-is":142,"events":44,"inherits":79,"isarray":143,"stream":64,"string_decoder/":144}],140:[function(require,module,exports){
+},{"_process":46,"buffer":45,"core-util-is":128,"events":49,"inherits":65,"isarray":129,"stream":316,"string_decoder/":130}],126:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -44777,7 +43224,7 @@ function done(stream, er) {
   return stream.push(null);
 }
 
-},{"./_stream_duplex":137,"core-util-is":142,"inherits":79}],141:[function(require,module,exports){
+},{"./_stream_duplex":123,"core-util-is":128,"inherits":65}],127:[function(require,module,exports){
 (function (process){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -45167,7 +43614,7 @@ function endWritable(stream, state, cb) {
 }
 
 }).call(this,require('_process'))
-},{"./_stream_duplex":137,"_process":47,"buffer":40,"core-util-is":142,"inherits":79,"stream":64}],142:[function(require,module,exports){
+},{"./_stream_duplex":123,"_process":46,"buffer":45,"core-util-is":128,"inherits":65,"stream":316}],128:[function(require,module,exports){
 (function (Buffer){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -45277,12 +43724,12 @@ function objectToString(o) {
   return Object.prototype.toString.call(o);
 }
 
-}).call(this,{"isBuffer":require("../../../../../../../../browserify/node_modules/insert-module-globals/node_modules/is-buffer/index.js")})
-},{"../../../../../../../../browserify/node_modules/insert-module-globals/node_modules/is-buffer/index.js":46}],143:[function(require,module,exports){
-arguments[4][104][0].apply(exports,arguments)
-},{"dup":104}],144:[function(require,module,exports){
-arguments[4][65][0].apply(exports,arguments)
-},{"buffer":40,"dup":65}],145:[function(require,module,exports){
+}).call(this,{"isBuffer":require("../../../../../../../../is-buffer/index.js")})
+},{"../../../../../../../../is-buffer/index.js":53}],129:[function(require,module,exports){
+arguments[4][90][0].apply(exports,arguments)
+},{"dup":90}],130:[function(require,module,exports){
+arguments[4][91][0].apply(exports,arguments)
+},{"buffer":45,"dup":91}],131:[function(require,module,exports){
 var Stream = require('stream'); // hack to fix a circular dependency issue when used with browserify
 exports = module.exports = require('./lib/_stream_readable.js');
 exports.Stream = Stream;
@@ -45292,9 +43739,83 @@ exports.Duplex = require('./lib/_stream_duplex.js');
 exports.Transform = require('./lib/_stream_transform.js');
 exports.PassThrough = require('./lib/_stream_passthrough.js');
 
-},{"./lib/_stream_duplex.js":137,"./lib/_stream_passthrough.js":138,"./lib/_stream_readable.js":139,"./lib/_stream_transform.js":140,"./lib/_stream_writable.js":141,"stream":64}],146:[function(require,module,exports){
-arguments[4][49][0].apply(exports,arguments)
-},{"./_stream_readable":147,"./_stream_writable":149,"core-util-is":150,"dup":49,"inherits":79,"process-nextick-args":152}],147:[function(require,module,exports){
+},{"./lib/_stream_duplex.js":123,"./lib/_stream_passthrough.js":124,"./lib/_stream_readable.js":125,"./lib/_stream_transform.js":126,"./lib/_stream_writable.js":127,"stream":316}],132:[function(require,module,exports){
+// a duplex stream is just a stream that is both readable and writable.
+// Since JS doesn't have multiple prototypal inheritance, this class
+// prototypally inherits from Readable, and then parasitically from
+// Writable.
+
+'use strict';
+
+/*<replacement>*/
+
+var objectKeys = Object.keys || function (obj) {
+  var keys = [];
+  for (var key in obj) {
+    keys.push(key);
+  }return keys;
+};
+/*</replacement>*/
+
+module.exports = Duplex;
+
+/*<replacement>*/
+var processNextTick = require('process-nextick-args');
+/*</replacement>*/
+
+/*<replacement>*/
+var util = require('core-util-is');
+util.inherits = require('inherits');
+/*</replacement>*/
+
+var Readable = require('./_stream_readable');
+var Writable = require('./_stream_writable');
+
+util.inherits(Duplex, Readable);
+
+var keys = objectKeys(Writable.prototype);
+for (var v = 0; v < keys.length; v++) {
+  var method = keys[v];
+  if (!Duplex.prototype[method]) Duplex.prototype[method] = Writable.prototype[method];
+}
+
+function Duplex(options) {
+  if (!(this instanceof Duplex)) return new Duplex(options);
+
+  Readable.call(this, options);
+  Writable.call(this, options);
+
+  if (options && options.readable === false) this.readable = false;
+
+  if (options && options.writable === false) this.writable = false;
+
+  this.allowHalfOpen = true;
+  if (options && options.allowHalfOpen === false) this.allowHalfOpen = false;
+
+  this.once('end', onend);
+}
+
+// the no-half-open enforcer
+function onend() {
+  // if we allow half-open state, or if the writable side ended,
+  // then we're ok.
+  if (this.allowHalfOpen || this._writableState.ended) return;
+
+  // no more data can be written.
+  // But allow more writes to happen in this tick.
+  processNextTick(onEndNT, this);
+}
+
+function onEndNT(self) {
+  self.end();
+}
+
+function forEach(xs, f) {
+  for (var i = 0, l = xs.length; i < l; i++) {
+    f(xs[i], i);
+  }
+}
+},{"./_stream_readable":133,"./_stream_writable":135,"core-util-is":136,"inherits":65,"process-nextick-args":138}],133:[function(require,module,exports){
 (function (process){
 'use strict';
 
@@ -46177,7 +44698,7 @@ function indexOf(xs, x) {
   return -1;
 }
 }).call(this,require('_process'))
-},{"./_stream_duplex":146,"_process":47,"buffer":40,"core-util-is":150,"events":44,"inherits":79,"isarray":151,"process-nextick-args":152,"string_decoder/":153,"util":39}],148:[function(require,module,exports){
+},{"./_stream_duplex":132,"_process":46,"buffer":45,"core-util-is":136,"events":49,"inherits":65,"isarray":137,"process-nextick-args":138,"string_decoder/":139,"util":44}],134:[function(require,module,exports){
 // a transform stream is a readable/writable stream where you do
 // something with the data.  Sometimes it's called a "filter",
 // but that's not a great name for it, since that implies a thing where
@@ -46358,7 +44879,7 @@ function done(stream, er) {
 
   return stream.push(null);
 }
-},{"./_stream_duplex":146,"core-util-is":150,"inherits":79}],149:[function(require,module,exports){
+},{"./_stream_duplex":132,"core-util-is":136,"inherits":65}],135:[function(require,module,exports){
 (function (process){
 // A bit simpler than readable streams.
 // Implement an async ._write(chunk, encoding, cb), and it'll handle all
@@ -46877,21 +45398,136 @@ function CorkedRequest(state) {
   };
 }
 }).call(this,require('_process'))
-},{"./_stream_duplex":146,"_process":47,"buffer":40,"core-util-is":150,"events":44,"inherits":79,"process-nextick-args":152,"util-deprecate":154}],150:[function(require,module,exports){
-arguments[4][142][0].apply(exports,arguments)
-},{"../../../../../../../../browserify/node_modules/insert-module-globals/node_modules/is-buffer/index.js":46,"dup":142}],151:[function(require,module,exports){
-arguments[4][43][0].apply(exports,arguments)
-},{"dup":43}],152:[function(require,module,exports){
-arguments[4][58][0].apply(exports,arguments)
-},{"_process":47,"dup":58}],153:[function(require,module,exports){
-arguments[4][65][0].apply(exports,arguments)
-},{"buffer":40,"dup":65}],154:[function(require,module,exports){
-arguments[4][59][0].apply(exports,arguments)
-},{"dup":59}],155:[function(require,module,exports){
-arguments[4][62][0].apply(exports,arguments)
-},{"./lib/_stream_transform.js":148,"dup":62}],156:[function(require,module,exports){
-arguments[4][108][0].apply(exports,arguments)
-},{"dup":108}],157:[function(require,module,exports){
+},{"./_stream_duplex":132,"_process":46,"buffer":45,"core-util-is":136,"events":49,"inherits":65,"process-nextick-args":138,"util-deprecate":140}],136:[function(require,module,exports){
+arguments[4][128][0].apply(exports,arguments)
+},{"../../../../../../../../is-buffer/index.js":53,"dup":128}],137:[function(require,module,exports){
+arguments[4][54][0].apply(exports,arguments)
+},{"dup":54}],138:[function(require,module,exports){
+(function (process){
+'use strict';
+
+if (!process.version ||
+    process.version.indexOf('v0.') === 0 ||
+    process.version.indexOf('v1.') === 0 && process.version.indexOf('v1.8.') !== 0) {
+  module.exports = nextTick;
+} else {
+  module.exports = process.nextTick;
+}
+
+function nextTick(fn, arg1, arg2, arg3) {
+  if (typeof fn !== 'function') {
+    throw new TypeError('"callback" argument must be a function');
+  }
+  var len = arguments.length;
+  var args, i;
+  switch (len) {
+  case 0:
+  case 1:
+    return process.nextTick(fn);
+  case 2:
+    return process.nextTick(function afterTickOne() {
+      fn.call(null, arg1);
+    });
+  case 3:
+    return process.nextTick(function afterTickTwo() {
+      fn.call(null, arg1, arg2);
+    });
+  case 4:
+    return process.nextTick(function afterTickThree() {
+      fn.call(null, arg1, arg2, arg3);
+    });
+  default:
+    args = new Array(len - 1);
+    i = 0;
+    while (i < args.length) {
+      args[i++] = arguments[i];
+    }
+    return process.nextTick(function afterTick() {
+      fn.apply(null, args);
+    });
+  }
+}
+
+}).call(this,require('_process'))
+},{"_process":46}],139:[function(require,module,exports){
+arguments[4][91][0].apply(exports,arguments)
+},{"buffer":45,"dup":91}],140:[function(require,module,exports){
+(function (global){
+
+/**
+ * Module exports.
+ */
+
+module.exports = deprecate;
+
+/**
+ * Mark that a method should not be used.
+ * Returns a modified function which warns once by default.
+ *
+ * If `localStorage.noDeprecation = true` is set, then it is a no-op.
+ *
+ * If `localStorage.throwDeprecation = true` is set, then deprecated functions
+ * will throw an Error when invoked.
+ *
+ * If `localStorage.traceDeprecation = true` is set, then deprecated functions
+ * will invoke `console.trace()` instead of `console.error()`.
+ *
+ * @param {Function} fn - the function to deprecate
+ * @param {String} msg - the string to print to the console when `fn` is invoked
+ * @returns {Function} a new "deprecated" version of `fn`
+ * @api public
+ */
+
+function deprecate (fn, msg) {
+  if (config('noDeprecation')) {
+    return fn;
+  }
+
+  var warned = false;
+  function deprecated() {
+    if (!warned) {
+      if (config('throwDeprecation')) {
+        throw new Error(msg);
+      } else if (config('traceDeprecation')) {
+        console.trace(msg);
+      } else {
+        console.warn(msg);
+      }
+      warned = true;
+    }
+    return fn.apply(this, arguments);
+  }
+
+  return deprecated;
+}
+
+/**
+ * Checks `localStorage` for boolean values for the given `name`.
+ *
+ * @param {String} name
+ * @returns {Boolean}
+ * @api private
+ */
+
+function config (name) {
+  // accessing global.localStorage can trigger a DOMException in sandboxed iframes
+  try {
+    if (!global.localStorage) return false;
+  } catch (_) {
+    return false;
+  }
+  var val = global.localStorage[name];
+  if (null == val) return false;
+  return String(val).toLowerCase() === 'true';
+}
+
+}).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
+},{}],141:[function(require,module,exports){
+module.exports = require("./lib/_stream_transform.js")
+
+},{"./lib/_stream_transform.js":134}],142:[function(require,module,exports){
+arguments[4][94][0].apply(exports,arguments)
+},{"dup":94}],143:[function(require,module,exports){
 (function (process){
 var Transform = require('readable-stream/transform')
   , inherits  = require('util').inherits
@@ -46991,7 +45627,7 @@ module.exports.obj = through2(function (options, transform, flush) {
 })
 
 }).call(this,require('_process'))
-},{"_process":47,"readable-stream/transform":155,"util":67,"xtend":156}],158:[function(require,module,exports){
+},{"_process":46,"readable-stream/transform":141,"util":321,"xtend":142}],144:[function(require,module,exports){
 'use strict';
 
 /**
@@ -47166,12 +45802,14 @@ exports.parse = function (str) {
   }
 };
 
-},{}],159:[function(require,module,exports){
+},{}],145:[function(require,module,exports){
+arguments[4][138][0].apply(exports,arguments)
+},{"_process":46,"dup":138}],146:[function(require,module,exports){
 'use strict';
 
 module.exports = require('react/lib/ReactDOM');
 
-},{"react/lib/ReactDOM":194}],160:[function(require,module,exports){
+},{"react/lib/ReactDOM":181}],147:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -47208,7 +45846,7 @@ var AutoFocusUtils = {
 };
 
 module.exports = AutoFocusUtils;
-},{"./ReactMount":224,"./findDOMNode":267,"fbjs/lib/focusNode":297}],161:[function(require,module,exports){
+},{"./ReactMount":211,"./findDOMNode":254,"fbjs/lib/focusNode":284}],148:[function(require,module,exports){
 /**
  * Copyright 2013-2015 Facebook, Inc.
  * All rights reserved.
@@ -47614,7 +46252,7 @@ var BeforeInputEventPlugin = {
 };
 
 module.exports = BeforeInputEventPlugin;
-},{"./EventConstants":173,"./EventPropagators":177,"./FallbackCompositionState":178,"./SyntheticCompositionEvent":249,"./SyntheticInputEvent":253,"fbjs/lib/ExecutionEnvironment":289,"fbjs/lib/keyOf":307}],162:[function(require,module,exports){
+},{"./EventConstants":160,"./EventPropagators":164,"./FallbackCompositionState":165,"./SyntheticCompositionEvent":236,"./SyntheticInputEvent":240,"fbjs/lib/ExecutionEnvironment":276,"fbjs/lib/keyOf":294}],149:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -47754,7 +46392,7 @@ var CSSProperty = {
 };
 
 module.exports = CSSProperty;
-},{}],163:[function(require,module,exports){
+},{}],150:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -47932,7 +46570,7 @@ ReactPerf.measureMethods(CSSPropertyOperations, 'CSSPropertyOperations', {
 
 module.exports = CSSPropertyOperations;
 }).call(this,require('_process'))
-},{"./CSSProperty":162,"./ReactPerf":230,"./dangerousStyleValue":264,"_process":47,"fbjs/lib/ExecutionEnvironment":289,"fbjs/lib/camelizeStyleName":291,"fbjs/lib/hyphenateStyleName":302,"fbjs/lib/memoizeStringOnly":309,"fbjs/lib/warning":314}],164:[function(require,module,exports){
+},{"./CSSProperty":149,"./ReactPerf":217,"./dangerousStyleValue":251,"_process":46,"fbjs/lib/ExecutionEnvironment":276,"fbjs/lib/camelizeStyleName":278,"fbjs/lib/hyphenateStyleName":289,"fbjs/lib/memoizeStringOnly":296,"fbjs/lib/warning":301}],151:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -48028,7 +46666,7 @@ PooledClass.addPoolingTo(CallbackQueue);
 
 module.exports = CallbackQueue;
 }).call(this,require('_process'))
-},{"./Object.assign":181,"./PooledClass":182,"_process":47,"fbjs/lib/invariant":303}],165:[function(require,module,exports){
+},{"./Object.assign":168,"./PooledClass":169,"_process":46,"fbjs/lib/invariant":290}],152:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -48350,7 +46988,7 @@ var ChangeEventPlugin = {
 };
 
 module.exports = ChangeEventPlugin;
-},{"./EventConstants":173,"./EventPluginHub":174,"./EventPropagators":177,"./ReactUpdates":242,"./SyntheticEvent":251,"./getEventTarget":273,"./isEventSupported":278,"./isTextInputElement":279,"fbjs/lib/ExecutionEnvironment":289,"fbjs/lib/keyOf":307}],166:[function(require,module,exports){
+},{"./EventConstants":160,"./EventPluginHub":161,"./EventPropagators":164,"./ReactUpdates":229,"./SyntheticEvent":238,"./getEventTarget":260,"./isEventSupported":265,"./isTextInputElement":266,"fbjs/lib/ExecutionEnvironment":276,"fbjs/lib/keyOf":294}],153:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -48374,7 +47012,7 @@ var ClientReactRootIndex = {
 };
 
 module.exports = ClientReactRootIndex;
-},{}],167:[function(require,module,exports){
+},{}],154:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -48506,7 +47144,7 @@ ReactPerf.measureMethods(DOMChildrenOperations, 'DOMChildrenOperations', {
 
 module.exports = DOMChildrenOperations;
 }).call(this,require('_process'))
-},{"./Danger":170,"./ReactMultiChildUpdateTypes":226,"./ReactPerf":230,"./setInnerHTML":283,"./setTextContent":284,"_process":47,"fbjs/lib/invariant":303}],168:[function(require,module,exports){
+},{"./Danger":157,"./ReactMultiChildUpdateTypes":213,"./ReactPerf":217,"./setInnerHTML":270,"./setTextContent":271,"_process":46,"fbjs/lib/invariant":290}],155:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -48743,7 +47381,7 @@ var DOMProperty = {
 
 module.exports = DOMProperty;
 }).call(this,require('_process'))
-},{"_process":47,"fbjs/lib/invariant":303}],169:[function(require,module,exports){
+},{"_process":46,"fbjs/lib/invariant":290}],156:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -48971,7 +47609,7 @@ ReactPerf.measureMethods(DOMPropertyOperations, 'DOMPropertyOperations', {
 
 module.exports = DOMPropertyOperations;
 }).call(this,require('_process'))
-},{"./DOMProperty":168,"./ReactPerf":230,"./quoteAttributeValueForBrowser":281,"_process":47,"fbjs/lib/warning":314}],170:[function(require,module,exports){
+},{"./DOMProperty":155,"./ReactPerf":217,"./quoteAttributeValueForBrowser":268,"_process":46,"fbjs/lib/warning":301}],157:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -49119,7 +47757,7 @@ var Danger = {
 
 module.exports = Danger;
 }).call(this,require('_process'))
-},{"_process":47,"fbjs/lib/ExecutionEnvironment":289,"fbjs/lib/createNodesFromMarkup":294,"fbjs/lib/emptyFunction":295,"fbjs/lib/getMarkupWrap":299,"fbjs/lib/invariant":303}],171:[function(require,module,exports){
+},{"_process":46,"fbjs/lib/ExecutionEnvironment":276,"fbjs/lib/createNodesFromMarkup":281,"fbjs/lib/emptyFunction":282,"fbjs/lib/getMarkupWrap":286,"fbjs/lib/invariant":290}],158:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -49147,7 +47785,7 @@ var keyOf = require('fbjs/lib/keyOf');
 var DefaultEventPluginOrder = [keyOf({ ResponderEventPlugin: null }), keyOf({ SimpleEventPlugin: null }), keyOf({ TapEventPlugin: null }), keyOf({ EnterLeaveEventPlugin: null }), keyOf({ ChangeEventPlugin: null }), keyOf({ SelectEventPlugin: null }), keyOf({ BeforeInputEventPlugin: null })];
 
 module.exports = DefaultEventPluginOrder;
-},{"fbjs/lib/keyOf":307}],172:[function(require,module,exports){
+},{"fbjs/lib/keyOf":294}],159:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -49272,7 +47910,7 @@ var EnterLeaveEventPlugin = {
 };
 
 module.exports = EnterLeaveEventPlugin;
-},{"./EventConstants":173,"./EventPropagators":177,"./ReactMount":224,"./SyntheticMouseEvent":255,"fbjs/lib/keyOf":307}],173:[function(require,module,exports){
+},{"./EventConstants":160,"./EventPropagators":164,"./ReactMount":211,"./SyntheticMouseEvent":242,"fbjs/lib/keyOf":294}],160:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -49365,7 +48003,7 @@ var EventConstants = {
 };
 
 module.exports = EventConstants;
-},{"fbjs/lib/keyMirror":306}],174:[function(require,module,exports){
+},{"fbjs/lib/keyMirror":293}],161:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -49647,7 +48285,7 @@ var EventPluginHub = {
 
 module.exports = EventPluginHub;
 }).call(this,require('_process'))
-},{"./EventPluginRegistry":175,"./EventPluginUtils":176,"./ReactErrorUtils":215,"./accumulateInto":261,"./forEachAccumulated":269,"_process":47,"fbjs/lib/invariant":303,"fbjs/lib/warning":314}],175:[function(require,module,exports){
+},{"./EventPluginRegistry":162,"./EventPluginUtils":163,"./ReactErrorUtils":202,"./accumulateInto":248,"./forEachAccumulated":256,"_process":46,"fbjs/lib/invariant":290,"fbjs/lib/warning":301}],162:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -49870,7 +48508,7 @@ var EventPluginRegistry = {
 
 module.exports = EventPluginRegistry;
 }).call(this,require('_process'))
-},{"_process":47,"fbjs/lib/invariant":303}],176:[function(require,module,exports){
+},{"_process":46,"fbjs/lib/invariant":290}],163:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -50075,7 +48713,7 @@ var EventPluginUtils = {
 
 module.exports = EventPluginUtils;
 }).call(this,require('_process'))
-},{"./EventConstants":173,"./ReactErrorUtils":215,"_process":47,"fbjs/lib/invariant":303,"fbjs/lib/warning":314}],177:[function(require,module,exports){
+},{"./EventConstants":160,"./ReactErrorUtils":202,"_process":46,"fbjs/lib/invariant":290,"fbjs/lib/warning":301}],164:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -50213,7 +48851,7 @@ var EventPropagators = {
 
 module.exports = EventPropagators;
 }).call(this,require('_process'))
-},{"./EventConstants":173,"./EventPluginHub":174,"./accumulateInto":261,"./forEachAccumulated":269,"_process":47,"fbjs/lib/warning":314}],178:[function(require,module,exports){
+},{"./EventConstants":160,"./EventPluginHub":161,"./accumulateInto":248,"./forEachAccumulated":256,"_process":46,"fbjs/lib/warning":301}],165:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -50309,7 +48947,7 @@ assign(FallbackCompositionState.prototype, {
 PooledClass.addPoolingTo(FallbackCompositionState);
 
 module.exports = FallbackCompositionState;
-},{"./Object.assign":181,"./PooledClass":182,"./getTextContentAccessor":276}],179:[function(require,module,exports){
+},{"./Object.assign":168,"./PooledClass":169,"./getTextContentAccessor":263}],166:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -50540,7 +49178,7 @@ var HTMLDOMPropertyConfig = {
 };
 
 module.exports = HTMLDOMPropertyConfig;
-},{"./DOMProperty":168,"fbjs/lib/ExecutionEnvironment":289}],180:[function(require,module,exports){
+},{"./DOMProperty":155,"fbjs/lib/ExecutionEnvironment":276}],167:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -50677,7 +49315,7 @@ var LinkedValueUtils = {
 
 module.exports = LinkedValueUtils;
 }).call(this,require('_process'))
-},{"./ReactPropTypeLocations":232,"./ReactPropTypes":233,"_process":47,"fbjs/lib/invariant":303,"fbjs/lib/warning":314}],181:[function(require,module,exports){
+},{"./ReactPropTypeLocations":219,"./ReactPropTypes":220,"_process":46,"fbjs/lib/invariant":290,"fbjs/lib/warning":301}],168:[function(require,module,exports){
 /**
  * Copyright 2014-2015, Facebook, Inc.
  * All rights reserved.
@@ -50725,7 +49363,7 @@ function assign(target, sources) {
 }
 
 module.exports = assign;
-},{}],182:[function(require,module,exports){
+},{}],169:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -50847,7 +49485,7 @@ var PooledClass = {
 
 module.exports = PooledClass;
 }).call(this,require('_process'))
-},{"_process":47,"fbjs/lib/invariant":303}],183:[function(require,module,exports){
+},{"_process":46,"fbjs/lib/invariant":290}],170:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -50888,7 +49526,7 @@ React.__SECRET_DOM_DO_NOT_USE_OR_YOU_WILL_BE_FIRED = ReactDOM;
 React.__SECRET_DOM_SERVER_DO_NOT_USE_OR_YOU_WILL_BE_FIRED = ReactDOMServer;
 
 module.exports = React;
-},{"./Object.assign":181,"./ReactDOM":194,"./ReactDOMServer":204,"./ReactIsomorphic":222,"./deprecated":265}],184:[function(require,module,exports){
+},{"./Object.assign":168,"./ReactDOM":181,"./ReactDOMServer":191,"./ReactIsomorphic":209,"./deprecated":252}],171:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -50927,7 +49565,7 @@ var ReactBrowserComponentMixin = {
 
 module.exports = ReactBrowserComponentMixin;
 }).call(this,require('_process'))
-},{"./ReactInstanceMap":221,"./findDOMNode":267,"_process":47,"fbjs/lib/warning":314}],185:[function(require,module,exports){
+},{"./ReactInstanceMap":208,"./findDOMNode":254,"_process":46,"fbjs/lib/warning":301}],172:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -51252,7 +49890,7 @@ ReactPerf.measureMethods(ReactBrowserEventEmitter, 'ReactBrowserEventEmitter', {
 });
 
 module.exports = ReactBrowserEventEmitter;
-},{"./EventConstants":173,"./EventPluginHub":174,"./EventPluginRegistry":175,"./Object.assign":181,"./ReactEventEmitterMixin":216,"./ReactPerf":230,"./ViewportMetrics":260,"./isEventSupported":278}],186:[function(require,module,exports){
+},{"./EventConstants":160,"./EventPluginHub":161,"./EventPluginRegistry":162,"./Object.assign":168,"./ReactEventEmitterMixin":203,"./ReactPerf":217,"./ViewportMetrics":247,"./isEventSupported":265}],173:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2014-2015, Facebook, Inc.
@@ -51377,7 +50015,7 @@ var ReactChildReconciler = {
 
 module.exports = ReactChildReconciler;
 }).call(this,require('_process'))
-},{"./ReactReconciler":235,"./instantiateReactComponent":277,"./shouldUpdateReactComponent":285,"./traverseAllChildren":286,"_process":47,"fbjs/lib/warning":314}],187:[function(require,module,exports){
+},{"./ReactReconciler":222,"./instantiateReactComponent":264,"./shouldUpdateReactComponent":272,"./traverseAllChildren":273,"_process":46,"fbjs/lib/warning":301}],174:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -51560,7 +50198,7 @@ var ReactChildren = {
 };
 
 module.exports = ReactChildren;
-},{"./PooledClass":182,"./ReactElement":211,"./traverseAllChildren":286,"fbjs/lib/emptyFunction":295}],188:[function(require,module,exports){
+},{"./PooledClass":169,"./ReactElement":198,"./traverseAllChildren":273,"fbjs/lib/emptyFunction":282}],175:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -52334,7 +50972,7 @@ var ReactClass = {
 
 module.exports = ReactClass;
 }).call(this,require('_process'))
-},{"./Object.assign":181,"./ReactComponent":189,"./ReactElement":211,"./ReactNoopUpdateQueue":228,"./ReactPropTypeLocationNames":231,"./ReactPropTypeLocations":232,"_process":47,"fbjs/lib/emptyObject":296,"fbjs/lib/invariant":303,"fbjs/lib/keyMirror":306,"fbjs/lib/keyOf":307,"fbjs/lib/warning":314}],189:[function(require,module,exports){
+},{"./Object.assign":168,"./ReactComponent":176,"./ReactElement":198,"./ReactNoopUpdateQueue":215,"./ReactPropTypeLocationNames":218,"./ReactPropTypeLocations":219,"_process":46,"fbjs/lib/emptyObject":283,"fbjs/lib/invariant":290,"fbjs/lib/keyMirror":293,"fbjs/lib/keyOf":294,"fbjs/lib/warning":301}],176:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -52459,7 +51097,7 @@ if (process.env.NODE_ENV !== 'production') {
 
 module.exports = ReactComponent;
 }).call(this,require('_process'))
-},{"./ReactNoopUpdateQueue":228,"./canDefineProperty":263,"_process":47,"fbjs/lib/emptyObject":296,"fbjs/lib/invariant":303,"fbjs/lib/warning":314}],190:[function(require,module,exports){
+},{"./ReactNoopUpdateQueue":215,"./canDefineProperty":250,"_process":46,"fbjs/lib/emptyObject":283,"fbjs/lib/invariant":290,"fbjs/lib/warning":301}],177:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -52501,7 +51139,7 @@ var ReactComponentBrowserEnvironment = {
 };
 
 module.exports = ReactComponentBrowserEnvironment;
-},{"./ReactDOMIDOperations":199,"./ReactMount":224}],191:[function(require,module,exports){
+},{"./ReactDOMIDOperations":186,"./ReactMount":211}],178:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2014-2015, Facebook, Inc.
@@ -52555,7 +51193,7 @@ var ReactComponentEnvironment = {
 
 module.exports = ReactComponentEnvironment;
 }).call(this,require('_process'))
-},{"_process":47,"fbjs/lib/invariant":303}],192:[function(require,module,exports){
+},{"_process":46,"fbjs/lib/invariant":290}],179:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -53252,7 +51890,7 @@ var ReactCompositeComponent = {
 
 module.exports = ReactCompositeComponent;
 }).call(this,require('_process'))
-},{"./Object.assign":181,"./ReactComponentEnvironment":191,"./ReactCurrentOwner":193,"./ReactElement":211,"./ReactInstanceMap":221,"./ReactPerf":230,"./ReactPropTypeLocationNames":231,"./ReactPropTypeLocations":232,"./ReactReconciler":235,"./ReactUpdateQueue":241,"./shouldUpdateReactComponent":285,"_process":47,"fbjs/lib/emptyObject":296,"fbjs/lib/invariant":303,"fbjs/lib/warning":314}],193:[function(require,module,exports){
+},{"./Object.assign":168,"./ReactComponentEnvironment":178,"./ReactCurrentOwner":180,"./ReactElement":198,"./ReactInstanceMap":208,"./ReactPerf":217,"./ReactPropTypeLocationNames":218,"./ReactPropTypeLocations":219,"./ReactReconciler":222,"./ReactUpdateQueue":228,"./shouldUpdateReactComponent":272,"_process":46,"fbjs/lib/emptyObject":283,"fbjs/lib/invariant":290,"fbjs/lib/warning":301}],180:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -53283,7 +51921,7 @@ var ReactCurrentOwner = {
 };
 
 module.exports = ReactCurrentOwner;
-},{}],194:[function(require,module,exports){
+},{}],181:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -53378,7 +52016,7 @@ if (process.env.NODE_ENV !== 'production') {
 
 module.exports = React;
 }).call(this,require('_process'))
-},{"./ReactCurrentOwner":193,"./ReactDOMTextComponent":205,"./ReactDefaultInjection":208,"./ReactInstanceHandles":220,"./ReactMount":224,"./ReactPerf":230,"./ReactReconciler":235,"./ReactUpdates":242,"./ReactVersion":243,"./findDOMNode":267,"./renderSubtreeIntoContainer":282,"_process":47,"fbjs/lib/ExecutionEnvironment":289,"fbjs/lib/warning":314}],195:[function(require,module,exports){
+},{"./ReactCurrentOwner":180,"./ReactDOMTextComponent":192,"./ReactDefaultInjection":195,"./ReactInstanceHandles":207,"./ReactMount":211,"./ReactPerf":217,"./ReactReconciler":222,"./ReactUpdates":229,"./ReactVersion":230,"./findDOMNode":254,"./renderSubtreeIntoContainer":269,"_process":46,"fbjs/lib/ExecutionEnvironment":276,"fbjs/lib/warning":301}],182:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -53429,7 +52067,7 @@ var ReactDOMButton = {
 };
 
 module.exports = ReactDOMButton;
-},{}],196:[function(require,module,exports){
+},{}],183:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -54394,7 +53032,7 @@ assign(ReactDOMComponent.prototype, ReactDOMComponent.Mixin, ReactMultiChild.Mix
 
 module.exports = ReactDOMComponent;
 }).call(this,require('_process'))
-},{"./AutoFocusUtils":160,"./CSSPropertyOperations":163,"./DOMProperty":168,"./DOMPropertyOperations":169,"./EventConstants":173,"./Object.assign":181,"./ReactBrowserEventEmitter":185,"./ReactComponentBrowserEnvironment":190,"./ReactDOMButton":195,"./ReactDOMInput":200,"./ReactDOMOption":201,"./ReactDOMSelect":202,"./ReactDOMTextarea":206,"./ReactMount":224,"./ReactMultiChild":225,"./ReactPerf":230,"./ReactUpdateQueue":241,"./canDefineProperty":263,"./escapeTextContentForBrowser":266,"./isEventSupported":278,"./setInnerHTML":283,"./setTextContent":284,"./validateDOMNesting":287,"_process":47,"fbjs/lib/invariant":303,"fbjs/lib/keyOf":307,"fbjs/lib/shallowEqual":312,"fbjs/lib/warning":314}],197:[function(require,module,exports){
+},{"./AutoFocusUtils":147,"./CSSPropertyOperations":150,"./DOMProperty":155,"./DOMPropertyOperations":156,"./EventConstants":160,"./Object.assign":168,"./ReactBrowserEventEmitter":172,"./ReactComponentBrowserEnvironment":177,"./ReactDOMButton":182,"./ReactDOMInput":187,"./ReactDOMOption":188,"./ReactDOMSelect":189,"./ReactDOMTextarea":193,"./ReactMount":211,"./ReactMultiChild":212,"./ReactPerf":217,"./ReactUpdateQueue":228,"./canDefineProperty":250,"./escapeTextContentForBrowser":253,"./isEventSupported":265,"./setInnerHTML":270,"./setTextContent":271,"./validateDOMNesting":274,"_process":46,"fbjs/lib/invariant":290,"fbjs/lib/keyOf":294,"fbjs/lib/shallowEqual":299,"fbjs/lib/warning":301}],184:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -54574,7 +53212,7 @@ var ReactDOMFactories = mapObject({
 
 module.exports = ReactDOMFactories;
 }).call(this,require('_process'))
-},{"./ReactElement":211,"./ReactElementValidator":212,"_process":47,"fbjs/lib/mapObject":308}],198:[function(require,module,exports){
+},{"./ReactElement":198,"./ReactElementValidator":199,"_process":46,"fbjs/lib/mapObject":295}],185:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -54593,7 +53231,7 @@ var ReactDOMFeatureFlags = {
 };
 
 module.exports = ReactDOMFeatureFlags;
-},{}],199:[function(require,module,exports){
+},{}],186:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -54690,7 +53328,7 @@ ReactPerf.measureMethods(ReactDOMIDOperations, 'ReactDOMIDOperations', {
 
 module.exports = ReactDOMIDOperations;
 }).call(this,require('_process'))
-},{"./DOMChildrenOperations":167,"./DOMPropertyOperations":169,"./ReactMount":224,"./ReactPerf":230,"_process":47,"fbjs/lib/invariant":303}],200:[function(require,module,exports){
+},{"./DOMChildrenOperations":154,"./DOMPropertyOperations":156,"./ReactMount":211,"./ReactPerf":217,"_process":46,"fbjs/lib/invariant":290}],187:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -54846,7 +53484,7 @@ function _handleChange(event) {
 
 module.exports = ReactDOMInput;
 }).call(this,require('_process'))
-},{"./LinkedValueUtils":180,"./Object.assign":181,"./ReactDOMIDOperations":199,"./ReactMount":224,"./ReactUpdates":242,"_process":47,"fbjs/lib/invariant":303}],201:[function(require,module,exports){
+},{"./LinkedValueUtils":167,"./Object.assign":168,"./ReactDOMIDOperations":186,"./ReactMount":211,"./ReactUpdates":229,"_process":46,"fbjs/lib/invariant":290}],188:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -54938,7 +53576,7 @@ var ReactDOMOption = {
 
 module.exports = ReactDOMOption;
 }).call(this,require('_process'))
-},{"./Object.assign":181,"./ReactChildren":187,"./ReactDOMSelect":202,"_process":47,"fbjs/lib/warning":314}],202:[function(require,module,exports){
+},{"./Object.assign":168,"./ReactChildren":174,"./ReactDOMSelect":189,"_process":46,"fbjs/lib/warning":301}],189:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -55129,7 +53767,7 @@ function _handleChange(event) {
 
 module.exports = ReactDOMSelect;
 }).call(this,require('_process'))
-},{"./LinkedValueUtils":180,"./Object.assign":181,"./ReactMount":224,"./ReactUpdates":242,"_process":47,"fbjs/lib/warning":314}],203:[function(require,module,exports){
+},{"./LinkedValueUtils":167,"./Object.assign":168,"./ReactMount":211,"./ReactUpdates":229,"_process":46,"fbjs/lib/warning":301}],190:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -55342,7 +53980,7 @@ var ReactDOMSelection = {
 };
 
 module.exports = ReactDOMSelection;
-},{"./getNodeForCharacterOffset":275,"./getTextContentAccessor":276,"fbjs/lib/ExecutionEnvironment":289}],204:[function(require,module,exports){
+},{"./getNodeForCharacterOffset":262,"./getTextContentAccessor":263,"fbjs/lib/ExecutionEnvironment":276}],191:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -55369,7 +54007,7 @@ var ReactDOMServer = {
 };
 
 module.exports = ReactDOMServer;
-},{"./ReactDefaultInjection":208,"./ReactServerRendering":239,"./ReactVersion":243}],205:[function(require,module,exports){
+},{"./ReactDefaultInjection":195,"./ReactServerRendering":226,"./ReactVersion":230}],192:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -55499,7 +54137,7 @@ assign(ReactDOMTextComponent.prototype, {
 
 module.exports = ReactDOMTextComponent;
 }).call(this,require('_process'))
-},{"./DOMChildrenOperations":167,"./DOMPropertyOperations":169,"./Object.assign":181,"./ReactComponentBrowserEnvironment":190,"./ReactMount":224,"./escapeTextContentForBrowser":266,"./setTextContent":284,"./validateDOMNesting":287,"_process":47}],206:[function(require,module,exports){
+},{"./DOMChildrenOperations":154,"./DOMPropertyOperations":156,"./Object.assign":168,"./ReactComponentBrowserEnvironment":177,"./ReactMount":211,"./escapeTextContentForBrowser":253,"./setTextContent":271,"./validateDOMNesting":274,"_process":46}],193:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -55615,7 +54253,7 @@ function _handleChange(event) {
 
 module.exports = ReactDOMTextarea;
 }).call(this,require('_process'))
-},{"./LinkedValueUtils":180,"./Object.assign":181,"./ReactDOMIDOperations":199,"./ReactUpdates":242,"_process":47,"fbjs/lib/invariant":303,"fbjs/lib/warning":314}],207:[function(require,module,exports){
+},{"./LinkedValueUtils":167,"./Object.assign":168,"./ReactDOMIDOperations":186,"./ReactUpdates":229,"_process":46,"fbjs/lib/invariant":290,"fbjs/lib/warning":301}],194:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -55683,7 +54321,7 @@ var ReactDefaultBatchingStrategy = {
 };
 
 module.exports = ReactDefaultBatchingStrategy;
-},{"./Object.assign":181,"./ReactUpdates":242,"./Transaction":259,"fbjs/lib/emptyFunction":295}],208:[function(require,module,exports){
+},{"./Object.assign":168,"./ReactUpdates":229,"./Transaction":246,"fbjs/lib/emptyFunction":282}],195:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -55783,7 +54421,7 @@ module.exports = {
   inject: inject
 };
 }).call(this,require('_process'))
-},{"./BeforeInputEventPlugin":161,"./ChangeEventPlugin":165,"./ClientReactRootIndex":166,"./DefaultEventPluginOrder":171,"./EnterLeaveEventPlugin":172,"./HTMLDOMPropertyConfig":179,"./ReactBrowserComponentMixin":184,"./ReactComponentBrowserEnvironment":190,"./ReactDOMComponent":196,"./ReactDOMTextComponent":205,"./ReactDefaultBatchingStrategy":207,"./ReactDefaultPerf":209,"./ReactEventListener":217,"./ReactInjection":218,"./ReactInstanceHandles":220,"./ReactMount":224,"./ReactReconcileTransaction":234,"./SVGDOMPropertyConfig":244,"./SelectEventPlugin":245,"./ServerReactRootIndex":246,"./SimpleEventPlugin":247,"_process":47,"fbjs/lib/ExecutionEnvironment":289}],209:[function(require,module,exports){
+},{"./BeforeInputEventPlugin":148,"./ChangeEventPlugin":152,"./ClientReactRootIndex":153,"./DefaultEventPluginOrder":158,"./EnterLeaveEventPlugin":159,"./HTMLDOMPropertyConfig":166,"./ReactBrowserComponentMixin":171,"./ReactComponentBrowserEnvironment":177,"./ReactDOMComponent":183,"./ReactDOMTextComponent":192,"./ReactDefaultBatchingStrategy":194,"./ReactDefaultPerf":196,"./ReactEventListener":204,"./ReactInjection":205,"./ReactInstanceHandles":207,"./ReactMount":211,"./ReactReconcileTransaction":221,"./SVGDOMPropertyConfig":231,"./SelectEventPlugin":232,"./ServerReactRootIndex":233,"./SimpleEventPlugin":234,"_process":46,"fbjs/lib/ExecutionEnvironment":276}],196:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -56021,7 +54659,7 @@ var ReactDefaultPerf = {
 };
 
 module.exports = ReactDefaultPerf;
-},{"./DOMProperty":168,"./ReactDefaultPerfAnalysis":210,"./ReactMount":224,"./ReactPerf":230,"fbjs/lib/performanceNow":311}],210:[function(require,module,exports){
+},{"./DOMProperty":155,"./ReactDefaultPerfAnalysis":197,"./ReactMount":211,"./ReactPerf":217,"fbjs/lib/performanceNow":298}],197:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -56223,7 +54861,7 @@ var ReactDefaultPerfAnalysis = {
 };
 
 module.exports = ReactDefaultPerfAnalysis;
-},{"./Object.assign":181}],211:[function(require,module,exports){
+},{"./Object.assign":168}],198:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2014-2015, Facebook, Inc.
@@ -56473,7 +55111,7 @@ ReactElement.isValidElement = function (object) {
 
 module.exports = ReactElement;
 }).call(this,require('_process'))
-},{"./Object.assign":181,"./ReactCurrentOwner":193,"./canDefineProperty":263,"_process":47}],212:[function(require,module,exports){
+},{"./Object.assign":168,"./ReactCurrentOwner":180,"./canDefineProperty":250,"_process":46}],199:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2014-2015, Facebook, Inc.
@@ -56757,7 +55395,7 @@ var ReactElementValidator = {
 
 module.exports = ReactElementValidator;
 }).call(this,require('_process'))
-},{"./ReactCurrentOwner":193,"./ReactElement":211,"./ReactPropTypeLocationNames":231,"./ReactPropTypeLocations":232,"./canDefineProperty":263,"./getIteratorFn":274,"_process":47,"fbjs/lib/invariant":303,"fbjs/lib/warning":314}],213:[function(require,module,exports){
+},{"./ReactCurrentOwner":180,"./ReactElement":198,"./ReactPropTypeLocationNames":218,"./ReactPropTypeLocations":219,"./canDefineProperty":250,"./getIteratorFn":261,"_process":46,"fbjs/lib/invariant":290,"fbjs/lib/warning":301}],200:[function(require,module,exports){
 /**
  * Copyright 2014-2015, Facebook, Inc.
  * All rights reserved.
@@ -56813,7 +55451,7 @@ assign(ReactEmptyComponent.prototype, {
 ReactEmptyComponent.injection = ReactEmptyComponentInjection;
 
 module.exports = ReactEmptyComponent;
-},{"./Object.assign":181,"./ReactElement":211,"./ReactEmptyComponentRegistry":214,"./ReactReconciler":235}],214:[function(require,module,exports){
+},{"./Object.assign":168,"./ReactElement":198,"./ReactEmptyComponentRegistry":201,"./ReactReconciler":222}],201:[function(require,module,exports){
 /**
  * Copyright 2014-2015, Facebook, Inc.
  * All rights reserved.
@@ -56862,7 +55500,7 @@ var ReactEmptyComponentRegistry = {
 };
 
 module.exports = ReactEmptyComponentRegistry;
-},{}],215:[function(require,module,exports){
+},{}],202:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -56942,7 +55580,7 @@ if (process.env.NODE_ENV !== 'production') {
 
 module.exports = ReactErrorUtils;
 }).call(this,require('_process'))
-},{"_process":47}],216:[function(require,module,exports){
+},{"_process":46}],203:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -56981,7 +55619,7 @@ var ReactEventEmitterMixin = {
 };
 
 module.exports = ReactEventEmitterMixin;
-},{"./EventPluginHub":174}],217:[function(require,module,exports){
+},{"./EventPluginHub":161}],204:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -57193,7 +55831,7 @@ var ReactEventListener = {
 };
 
 module.exports = ReactEventListener;
-},{"./Object.assign":181,"./PooledClass":182,"./ReactInstanceHandles":220,"./ReactMount":224,"./ReactUpdates":242,"./getEventTarget":273,"fbjs/lib/EventListener":288,"fbjs/lib/ExecutionEnvironment":289,"fbjs/lib/getUnboundedScrollPosition":300}],218:[function(require,module,exports){
+},{"./Object.assign":168,"./PooledClass":169,"./ReactInstanceHandles":207,"./ReactMount":211,"./ReactUpdates":229,"./getEventTarget":260,"fbjs/lib/EventListener":275,"fbjs/lib/ExecutionEnvironment":276,"fbjs/lib/getUnboundedScrollPosition":287}],205:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -57232,7 +55870,7 @@ var ReactInjection = {
 };
 
 module.exports = ReactInjection;
-},{"./DOMProperty":168,"./EventPluginHub":174,"./ReactBrowserEventEmitter":185,"./ReactClass":188,"./ReactComponentEnvironment":191,"./ReactEmptyComponent":213,"./ReactNativeComponent":227,"./ReactPerf":230,"./ReactRootIndex":237,"./ReactUpdates":242}],219:[function(require,module,exports){
+},{"./DOMProperty":155,"./EventPluginHub":161,"./ReactBrowserEventEmitter":172,"./ReactClass":175,"./ReactComponentEnvironment":178,"./ReactEmptyComponent":200,"./ReactNativeComponent":214,"./ReactPerf":217,"./ReactRootIndex":224,"./ReactUpdates":229}],206:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -57357,7 +55995,7 @@ var ReactInputSelection = {
 };
 
 module.exports = ReactInputSelection;
-},{"./ReactDOMSelection":203,"fbjs/lib/containsNode":292,"fbjs/lib/focusNode":297,"fbjs/lib/getActiveElement":298}],220:[function(require,module,exports){
+},{"./ReactDOMSelection":190,"fbjs/lib/containsNode":279,"fbjs/lib/focusNode":284,"fbjs/lib/getActiveElement":285}],207:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -57662,7 +56300,7 @@ var ReactInstanceHandles = {
 
 module.exports = ReactInstanceHandles;
 }).call(this,require('_process'))
-},{"./ReactRootIndex":237,"_process":47,"fbjs/lib/invariant":303}],221:[function(require,module,exports){
+},{"./ReactRootIndex":224,"_process":46,"fbjs/lib/invariant":290}],208:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -57710,7 +56348,7 @@ var ReactInstanceMap = {
 };
 
 module.exports = ReactInstanceMap;
-},{}],222:[function(require,module,exports){
+},{}],209:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -57787,7 +56425,7 @@ var React = {
 
 module.exports = React;
 }).call(this,require('_process'))
-},{"./Object.assign":181,"./ReactChildren":187,"./ReactClass":188,"./ReactComponent":189,"./ReactDOMFactories":197,"./ReactElement":211,"./ReactElementValidator":212,"./ReactPropTypes":233,"./ReactVersion":243,"./onlyChild":280,"_process":47}],223:[function(require,module,exports){
+},{"./Object.assign":168,"./ReactChildren":174,"./ReactClass":175,"./ReactComponent":176,"./ReactDOMFactories":184,"./ReactElement":198,"./ReactElementValidator":199,"./ReactPropTypes":220,"./ReactVersion":230,"./onlyChild":267,"_process":46}],210:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -57833,7 +56471,7 @@ var ReactMarkupChecksum = {
 };
 
 module.exports = ReactMarkupChecksum;
-},{"./adler32":262}],224:[function(require,module,exports){
+},{"./adler32":249}],211:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -58686,7 +57324,7 @@ ReactPerf.measureMethods(ReactMount, 'ReactMount', {
 
 module.exports = ReactMount;
 }).call(this,require('_process'))
-},{"./DOMProperty":168,"./Object.assign":181,"./ReactBrowserEventEmitter":185,"./ReactCurrentOwner":193,"./ReactDOMFeatureFlags":198,"./ReactElement":211,"./ReactEmptyComponentRegistry":214,"./ReactInstanceHandles":220,"./ReactInstanceMap":221,"./ReactMarkupChecksum":223,"./ReactPerf":230,"./ReactReconciler":235,"./ReactUpdateQueue":241,"./ReactUpdates":242,"./instantiateReactComponent":277,"./setInnerHTML":283,"./shouldUpdateReactComponent":285,"./validateDOMNesting":287,"_process":47,"fbjs/lib/containsNode":292,"fbjs/lib/emptyObject":296,"fbjs/lib/invariant":303,"fbjs/lib/warning":314}],225:[function(require,module,exports){
+},{"./DOMProperty":155,"./Object.assign":168,"./ReactBrowserEventEmitter":172,"./ReactCurrentOwner":180,"./ReactDOMFeatureFlags":185,"./ReactElement":198,"./ReactEmptyComponentRegistry":201,"./ReactInstanceHandles":207,"./ReactInstanceMap":208,"./ReactMarkupChecksum":210,"./ReactPerf":217,"./ReactReconciler":222,"./ReactUpdateQueue":228,"./ReactUpdates":229,"./instantiateReactComponent":264,"./setInnerHTML":270,"./shouldUpdateReactComponent":272,"./validateDOMNesting":274,"_process":46,"fbjs/lib/containsNode":279,"fbjs/lib/emptyObject":283,"fbjs/lib/invariant":290,"fbjs/lib/warning":301}],212:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -59185,7 +57823,7 @@ var ReactMultiChild = {
 
 module.exports = ReactMultiChild;
 }).call(this,require('_process'))
-},{"./ReactChildReconciler":186,"./ReactComponentEnvironment":191,"./ReactCurrentOwner":193,"./ReactMultiChildUpdateTypes":226,"./ReactReconciler":235,"./flattenChildren":268,"_process":47}],226:[function(require,module,exports){
+},{"./ReactChildReconciler":173,"./ReactComponentEnvironment":178,"./ReactCurrentOwner":180,"./ReactMultiChildUpdateTypes":213,"./ReactReconciler":222,"./flattenChildren":255,"_process":46}],213:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -59218,7 +57856,7 @@ var ReactMultiChildUpdateTypes = keyMirror({
 });
 
 module.exports = ReactMultiChildUpdateTypes;
-},{"fbjs/lib/keyMirror":306}],227:[function(require,module,exports){
+},{"fbjs/lib/keyMirror":293}],214:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2014-2015, Facebook, Inc.
@@ -59315,7 +57953,7 @@ var ReactNativeComponent = {
 
 module.exports = ReactNativeComponent;
 }).call(this,require('_process'))
-},{"./Object.assign":181,"_process":47,"fbjs/lib/invariant":303}],228:[function(require,module,exports){
+},{"./Object.assign":168,"_process":46,"fbjs/lib/invariant":290}],215:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2015, Facebook, Inc.
@@ -59436,7 +58074,7 @@ var ReactNoopUpdateQueue = {
 
 module.exports = ReactNoopUpdateQueue;
 }).call(this,require('_process'))
-},{"_process":47,"fbjs/lib/warning":314}],229:[function(require,module,exports){
+},{"_process":46,"fbjs/lib/warning":301}],216:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -59530,7 +58168,7 @@ var ReactOwner = {
 
 module.exports = ReactOwner;
 }).call(this,require('_process'))
-},{"_process":47,"fbjs/lib/invariant":303}],230:[function(require,module,exports){
+},{"_process":46,"fbjs/lib/invariant":290}],217:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -59629,7 +58267,7 @@ function _noMeasure(objName, fnName, func) {
 
 module.exports = ReactPerf;
 }).call(this,require('_process'))
-},{"_process":47}],231:[function(require,module,exports){
+},{"_process":46}],218:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -59656,7 +58294,7 @@ if (process.env.NODE_ENV !== 'production') {
 
 module.exports = ReactPropTypeLocationNames;
 }).call(this,require('_process'))
-},{"_process":47}],232:[function(require,module,exports){
+},{"_process":46}],219:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -59679,7 +58317,7 @@ var ReactPropTypeLocations = keyMirror({
 });
 
 module.exports = ReactPropTypeLocations;
-},{"fbjs/lib/keyMirror":306}],233:[function(require,module,exports){
+},{"fbjs/lib/keyMirror":293}],220:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -60036,7 +58674,7 @@ function getClassName(propValue) {
 }
 
 module.exports = ReactPropTypes;
-},{"./ReactElement":211,"./ReactPropTypeLocationNames":231,"./getIteratorFn":274,"fbjs/lib/emptyFunction":295}],234:[function(require,module,exports){
+},{"./ReactElement":198,"./ReactPropTypeLocationNames":218,"./getIteratorFn":261,"fbjs/lib/emptyFunction":282}],221:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -60188,7 +58826,7 @@ assign(ReactReconcileTransaction.prototype, Transaction.Mixin, Mixin);
 PooledClass.addPoolingTo(ReactReconcileTransaction);
 
 module.exports = ReactReconcileTransaction;
-},{"./CallbackQueue":164,"./Object.assign":181,"./PooledClass":182,"./ReactBrowserEventEmitter":185,"./ReactDOMFeatureFlags":198,"./ReactInputSelection":219,"./Transaction":259}],235:[function(require,module,exports){
+},{"./CallbackQueue":151,"./Object.assign":168,"./PooledClass":169,"./ReactBrowserEventEmitter":172,"./ReactDOMFeatureFlags":185,"./ReactInputSelection":206,"./Transaction":246}],222:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -60296,7 +58934,7 @@ var ReactReconciler = {
 };
 
 module.exports = ReactReconciler;
-},{"./ReactRef":236}],236:[function(require,module,exports){
+},{"./ReactRef":223}],223:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -60375,7 +59013,7 @@ ReactRef.detachRefs = function (instance, element) {
 };
 
 module.exports = ReactRef;
-},{"./ReactOwner":229}],237:[function(require,module,exports){
+},{"./ReactOwner":216}],224:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -60405,7 +59043,7 @@ var ReactRootIndex = {
 };
 
 module.exports = ReactRootIndex;
-},{}],238:[function(require,module,exports){
+},{}],225:[function(require,module,exports){
 /**
  * Copyright 2014-2015, Facebook, Inc.
  * All rights reserved.
@@ -60429,7 +59067,7 @@ var ReactServerBatchingStrategy = {
 };
 
 module.exports = ReactServerBatchingStrategy;
-},{}],239:[function(require,module,exports){
+},{}],226:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -60515,7 +59153,7 @@ module.exports = {
   renderToStaticMarkup: renderToStaticMarkup
 };
 }).call(this,require('_process'))
-},{"./ReactDefaultBatchingStrategy":207,"./ReactElement":211,"./ReactInstanceHandles":220,"./ReactMarkupChecksum":223,"./ReactServerBatchingStrategy":238,"./ReactServerRenderingTransaction":240,"./ReactUpdates":242,"./instantiateReactComponent":277,"_process":47,"fbjs/lib/emptyObject":296,"fbjs/lib/invariant":303}],240:[function(require,module,exports){
+},{"./ReactDefaultBatchingStrategy":194,"./ReactElement":198,"./ReactInstanceHandles":207,"./ReactMarkupChecksum":210,"./ReactServerBatchingStrategy":225,"./ReactServerRenderingTransaction":227,"./ReactUpdates":229,"./instantiateReactComponent":264,"_process":46,"fbjs/lib/emptyObject":283,"fbjs/lib/invariant":290}],227:[function(require,module,exports){
 /**
  * Copyright 2014-2015, Facebook, Inc.
  * All rights reserved.
@@ -60603,7 +59241,7 @@ assign(ReactServerRenderingTransaction.prototype, Transaction.Mixin, Mixin);
 PooledClass.addPoolingTo(ReactServerRenderingTransaction);
 
 module.exports = ReactServerRenderingTransaction;
-},{"./CallbackQueue":164,"./Object.assign":181,"./PooledClass":182,"./Transaction":259,"fbjs/lib/emptyFunction":295}],241:[function(require,module,exports){
+},{"./CallbackQueue":151,"./Object.assign":168,"./PooledClass":169,"./Transaction":246,"fbjs/lib/emptyFunction":282}],228:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2015, Facebook, Inc.
@@ -60863,7 +59501,7 @@ var ReactUpdateQueue = {
 
 module.exports = ReactUpdateQueue;
 }).call(this,require('_process'))
-},{"./Object.assign":181,"./ReactCurrentOwner":193,"./ReactElement":211,"./ReactInstanceMap":221,"./ReactUpdates":242,"_process":47,"fbjs/lib/invariant":303,"fbjs/lib/warning":314}],242:[function(require,module,exports){
+},{"./Object.assign":168,"./ReactCurrentOwner":180,"./ReactElement":198,"./ReactInstanceMap":208,"./ReactUpdates":229,"_process":46,"fbjs/lib/invariant":290,"fbjs/lib/warning":301}],229:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -61089,7 +59727,7 @@ var ReactUpdates = {
 
 module.exports = ReactUpdates;
 }).call(this,require('_process'))
-},{"./CallbackQueue":164,"./Object.assign":181,"./PooledClass":182,"./ReactPerf":230,"./ReactReconciler":235,"./Transaction":259,"_process":47,"fbjs/lib/invariant":303}],243:[function(require,module,exports){
+},{"./CallbackQueue":151,"./Object.assign":168,"./PooledClass":169,"./ReactPerf":217,"./ReactReconciler":222,"./Transaction":246,"_process":46,"fbjs/lib/invariant":290}],230:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -61104,7 +59742,7 @@ module.exports = ReactUpdates;
 'use strict';
 
 module.exports = '0.14.8';
-},{}],244:[function(require,module,exports){
+},{}],231:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -61232,7 +59870,7 @@ var SVGDOMPropertyConfig = {
 };
 
 module.exports = SVGDOMPropertyConfig;
-},{"./DOMProperty":168}],245:[function(require,module,exports){
+},{"./DOMProperty":155}],232:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -61434,7 +60072,7 @@ var SelectEventPlugin = {
 };
 
 module.exports = SelectEventPlugin;
-},{"./EventConstants":173,"./EventPropagators":177,"./ReactInputSelection":219,"./SyntheticEvent":251,"./isTextInputElement":279,"fbjs/lib/ExecutionEnvironment":289,"fbjs/lib/getActiveElement":298,"fbjs/lib/keyOf":307,"fbjs/lib/shallowEqual":312}],246:[function(require,module,exports){
+},{"./EventConstants":160,"./EventPropagators":164,"./ReactInputSelection":206,"./SyntheticEvent":238,"./isTextInputElement":266,"fbjs/lib/ExecutionEnvironment":276,"fbjs/lib/getActiveElement":285,"fbjs/lib/keyOf":294,"fbjs/lib/shallowEqual":299}],233:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -61464,7 +60102,7 @@ var ServerReactRootIndex = {
 };
 
 module.exports = ServerReactRootIndex;
-},{}],247:[function(require,module,exports){
+},{}],234:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -62054,7 +60692,7 @@ var SimpleEventPlugin = {
 
 module.exports = SimpleEventPlugin;
 }).call(this,require('_process'))
-},{"./EventConstants":173,"./EventPropagators":177,"./ReactMount":224,"./SyntheticClipboardEvent":248,"./SyntheticDragEvent":250,"./SyntheticEvent":251,"./SyntheticFocusEvent":252,"./SyntheticKeyboardEvent":254,"./SyntheticMouseEvent":255,"./SyntheticTouchEvent":256,"./SyntheticUIEvent":257,"./SyntheticWheelEvent":258,"./getEventCharCode":270,"_process":47,"fbjs/lib/EventListener":288,"fbjs/lib/emptyFunction":295,"fbjs/lib/invariant":303,"fbjs/lib/keyOf":307}],248:[function(require,module,exports){
+},{"./EventConstants":160,"./EventPropagators":164,"./ReactMount":211,"./SyntheticClipboardEvent":235,"./SyntheticDragEvent":237,"./SyntheticEvent":238,"./SyntheticFocusEvent":239,"./SyntheticKeyboardEvent":241,"./SyntheticMouseEvent":242,"./SyntheticTouchEvent":243,"./SyntheticUIEvent":244,"./SyntheticWheelEvent":245,"./getEventCharCode":257,"_process":46,"fbjs/lib/EventListener":275,"fbjs/lib/emptyFunction":282,"fbjs/lib/invariant":290,"fbjs/lib/keyOf":294}],235:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -62094,7 +60732,7 @@ function SyntheticClipboardEvent(dispatchConfig, dispatchMarker, nativeEvent, na
 SyntheticEvent.augmentClass(SyntheticClipboardEvent, ClipboardEventInterface);
 
 module.exports = SyntheticClipboardEvent;
-},{"./SyntheticEvent":251}],249:[function(require,module,exports){
+},{"./SyntheticEvent":238}],236:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -62132,7 +60770,7 @@ function SyntheticCompositionEvent(dispatchConfig, dispatchMarker, nativeEvent, 
 SyntheticEvent.augmentClass(SyntheticCompositionEvent, CompositionEventInterface);
 
 module.exports = SyntheticCompositionEvent;
-},{"./SyntheticEvent":251}],250:[function(require,module,exports){
+},{"./SyntheticEvent":238}],237:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -62170,7 +60808,7 @@ function SyntheticDragEvent(dispatchConfig, dispatchMarker, nativeEvent, nativeE
 SyntheticMouseEvent.augmentClass(SyntheticDragEvent, DragEventInterface);
 
 module.exports = SyntheticDragEvent;
-},{"./SyntheticMouseEvent":255}],251:[function(require,module,exports){
+},{"./SyntheticMouseEvent":242}],238:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -62353,7 +60991,7 @@ PooledClass.addPoolingTo(SyntheticEvent, PooledClass.fourArgumentPooler);
 
 module.exports = SyntheticEvent;
 }).call(this,require('_process'))
-},{"./Object.assign":181,"./PooledClass":182,"_process":47,"fbjs/lib/emptyFunction":295,"fbjs/lib/warning":314}],252:[function(require,module,exports){
+},{"./Object.assign":168,"./PooledClass":169,"_process":46,"fbjs/lib/emptyFunction":282,"fbjs/lib/warning":301}],239:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -62391,7 +61029,7 @@ function SyntheticFocusEvent(dispatchConfig, dispatchMarker, nativeEvent, native
 SyntheticUIEvent.augmentClass(SyntheticFocusEvent, FocusEventInterface);
 
 module.exports = SyntheticFocusEvent;
-},{"./SyntheticUIEvent":257}],253:[function(require,module,exports){
+},{"./SyntheticUIEvent":244}],240:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -62430,7 +61068,7 @@ function SyntheticInputEvent(dispatchConfig, dispatchMarker, nativeEvent, native
 SyntheticEvent.augmentClass(SyntheticInputEvent, InputEventInterface);
 
 module.exports = SyntheticInputEvent;
-},{"./SyntheticEvent":251}],254:[function(require,module,exports){
+},{"./SyntheticEvent":238}],241:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -62516,7 +61154,7 @@ function SyntheticKeyboardEvent(dispatchConfig, dispatchMarker, nativeEvent, nat
 SyntheticUIEvent.augmentClass(SyntheticKeyboardEvent, KeyboardEventInterface);
 
 module.exports = SyntheticKeyboardEvent;
-},{"./SyntheticUIEvent":257,"./getEventCharCode":270,"./getEventKey":271,"./getEventModifierState":272}],255:[function(require,module,exports){
+},{"./SyntheticUIEvent":244,"./getEventCharCode":257,"./getEventKey":258,"./getEventModifierState":259}],242:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -62590,7 +61228,7 @@ function SyntheticMouseEvent(dispatchConfig, dispatchMarker, nativeEvent, native
 SyntheticUIEvent.augmentClass(SyntheticMouseEvent, MouseEventInterface);
 
 module.exports = SyntheticMouseEvent;
-},{"./SyntheticUIEvent":257,"./ViewportMetrics":260,"./getEventModifierState":272}],256:[function(require,module,exports){
+},{"./SyntheticUIEvent":244,"./ViewportMetrics":247,"./getEventModifierState":259}],243:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -62637,7 +61275,7 @@ function SyntheticTouchEvent(dispatchConfig, dispatchMarker, nativeEvent, native
 SyntheticUIEvent.augmentClass(SyntheticTouchEvent, TouchEventInterface);
 
 module.exports = SyntheticTouchEvent;
-},{"./SyntheticUIEvent":257,"./getEventModifierState":272}],257:[function(require,module,exports){
+},{"./SyntheticUIEvent":244,"./getEventModifierState":259}],244:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -62698,7 +61336,7 @@ function SyntheticUIEvent(dispatchConfig, dispatchMarker, nativeEvent, nativeEve
 SyntheticEvent.augmentClass(SyntheticUIEvent, UIEventInterface);
 
 module.exports = SyntheticUIEvent;
-},{"./SyntheticEvent":251,"./getEventTarget":273}],258:[function(require,module,exports){
+},{"./SyntheticEvent":238,"./getEventTarget":260}],245:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -62754,7 +61392,7 @@ function SyntheticWheelEvent(dispatchConfig, dispatchMarker, nativeEvent, native
 SyntheticMouseEvent.augmentClass(SyntheticWheelEvent, WheelEventInterface);
 
 module.exports = SyntheticWheelEvent;
-},{"./SyntheticMouseEvent":255}],259:[function(require,module,exports){
+},{"./SyntheticMouseEvent":242}],246:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -62988,7 +61626,7 @@ var Transaction = {
 
 module.exports = Transaction;
 }).call(this,require('_process'))
-},{"_process":47,"fbjs/lib/invariant":303}],260:[function(require,module,exports){
+},{"_process":46,"fbjs/lib/invariant":290}],247:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -63016,7 +61654,7 @@ var ViewportMetrics = {
 };
 
 module.exports = ViewportMetrics;
-},{}],261:[function(require,module,exports){
+},{}],248:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2014-2015, Facebook, Inc.
@@ -63078,7 +61716,7 @@ function accumulateInto(current, next) {
 
 module.exports = accumulateInto;
 }).call(this,require('_process'))
-},{"_process":47,"fbjs/lib/invariant":303}],262:[function(require,module,exports){
+},{"_process":46,"fbjs/lib/invariant":290}],249:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -63121,7 +61759,7 @@ function adler32(data) {
 }
 
 module.exports = adler32;
-},{}],263:[function(require,module,exports){
+},{}],250:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -63148,7 +61786,7 @@ if (process.env.NODE_ENV !== 'production') {
 
 module.exports = canDefineProperty;
 }).call(this,require('_process'))
-},{"_process":47}],264:[function(require,module,exports){
+},{"_process":46}],251:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -63204,7 +61842,7 @@ function dangerousStyleValue(name, value) {
 }
 
 module.exports = dangerousStyleValue;
-},{"./CSSProperty":162}],265:[function(require,module,exports){
+},{"./CSSProperty":149}],252:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -63255,7 +61893,7 @@ function deprecated(fnName, newModule, newPackage, ctx, fn) {
 
 module.exports = deprecated;
 }).call(this,require('_process'))
-},{"./Object.assign":181,"_process":47,"fbjs/lib/warning":314}],266:[function(require,module,exports){
+},{"./Object.assign":168,"_process":46,"fbjs/lib/warning":301}],253:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -63294,7 +61932,7 @@ function escapeTextContentForBrowser(text) {
 }
 
 module.exports = escapeTextContentForBrowser;
-},{}],267:[function(require,module,exports){
+},{}],254:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -63346,7 +61984,7 @@ function findDOMNode(componentOrElement) {
 
 module.exports = findDOMNode;
 }).call(this,require('_process'))
-},{"./ReactCurrentOwner":193,"./ReactInstanceMap":221,"./ReactMount":224,"_process":47,"fbjs/lib/invariant":303,"fbjs/lib/warning":314}],268:[function(require,module,exports){
+},{"./ReactCurrentOwner":180,"./ReactInstanceMap":208,"./ReactMount":211,"_process":46,"fbjs/lib/invariant":290,"fbjs/lib/warning":301}],255:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -63397,7 +62035,7 @@ function flattenChildren(children) {
 
 module.exports = flattenChildren;
 }).call(this,require('_process'))
-},{"./traverseAllChildren":286,"_process":47,"fbjs/lib/warning":314}],269:[function(require,module,exports){
+},{"./traverseAllChildren":273,"_process":46,"fbjs/lib/warning":301}],256:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -63427,7 +62065,7 @@ var forEachAccumulated = function (arr, cb, scope) {
 };
 
 module.exports = forEachAccumulated;
-},{}],270:[function(require,module,exports){
+},{}],257:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -63478,7 +62116,7 @@ function getEventCharCode(nativeEvent) {
 }
 
 module.exports = getEventCharCode;
-},{}],271:[function(require,module,exports){
+},{}],258:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -63582,7 +62220,7 @@ function getEventKey(nativeEvent) {
 }
 
 module.exports = getEventKey;
-},{"./getEventCharCode":270}],272:[function(require,module,exports){
+},{"./getEventCharCode":257}],259:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -63627,7 +62265,7 @@ function getEventModifierState(nativeEvent) {
 }
 
 module.exports = getEventModifierState;
-},{}],273:[function(require,module,exports){
+},{}],260:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -63657,7 +62295,7 @@ function getEventTarget(nativeEvent) {
 }
 
 module.exports = getEventTarget;
-},{}],274:[function(require,module,exports){
+},{}],261:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -63698,7 +62336,7 @@ function getIteratorFn(maybeIterable) {
 }
 
 module.exports = getIteratorFn;
-},{}],275:[function(require,module,exports){
+},{}],262:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -63772,7 +62410,7 @@ function getNodeForCharacterOffset(root, offset) {
 }
 
 module.exports = getNodeForCharacterOffset;
-},{}],276:[function(require,module,exports){
+},{}],263:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -63806,7 +62444,7 @@ function getTextContentAccessor() {
 }
 
 module.exports = getTextContentAccessor;
-},{"fbjs/lib/ExecutionEnvironment":289}],277:[function(require,module,exports){
+},{"fbjs/lib/ExecutionEnvironment":276}],264:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -63921,7 +62559,7 @@ function instantiateReactComponent(node) {
 
 module.exports = instantiateReactComponent;
 }).call(this,require('_process'))
-},{"./Object.assign":181,"./ReactCompositeComponent":192,"./ReactEmptyComponent":213,"./ReactNativeComponent":227,"_process":47,"fbjs/lib/invariant":303,"fbjs/lib/warning":314}],278:[function(require,module,exports){
+},{"./Object.assign":168,"./ReactCompositeComponent":179,"./ReactEmptyComponent":200,"./ReactNativeComponent":214,"_process":46,"fbjs/lib/invariant":290,"fbjs/lib/warning":301}],265:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -63982,7 +62620,7 @@ function isEventSupported(eventNameSuffix, capture) {
 }
 
 module.exports = isEventSupported;
-},{"fbjs/lib/ExecutionEnvironment":289}],279:[function(require,module,exports){
+},{"fbjs/lib/ExecutionEnvironment":276}],266:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -64023,7 +62661,7 @@ function isTextInputElement(elem) {
 }
 
 module.exports = isTextInputElement;
-},{}],280:[function(require,module,exports){
+},{}],267:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -64059,7 +62697,7 @@ function onlyChild(children) {
 
 module.exports = onlyChild;
 }).call(this,require('_process'))
-},{"./ReactElement":211,"_process":47,"fbjs/lib/invariant":303}],281:[function(require,module,exports){
+},{"./ReactElement":198,"_process":46,"fbjs/lib/invariant":290}],268:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -64086,7 +62724,7 @@ function quoteAttributeValueForBrowser(value) {
 }
 
 module.exports = quoteAttributeValueForBrowser;
-},{"./escapeTextContentForBrowser":266}],282:[function(require,module,exports){
+},{"./escapeTextContentForBrowser":253}],269:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -64103,7 +62741,7 @@ module.exports = quoteAttributeValueForBrowser;
 var ReactMount = require('./ReactMount');
 
 module.exports = ReactMount.renderSubtreeIntoContainer;
-},{"./ReactMount":224}],283:[function(require,module,exports){
+},{"./ReactMount":211}],270:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -64194,7 +62832,7 @@ if (ExecutionEnvironment.canUseDOM) {
 }
 
 module.exports = setInnerHTML;
-},{"fbjs/lib/ExecutionEnvironment":289}],284:[function(require,module,exports){
+},{"fbjs/lib/ExecutionEnvironment":276}],271:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -64235,7 +62873,7 @@ if (ExecutionEnvironment.canUseDOM) {
 }
 
 module.exports = setTextContent;
-},{"./escapeTextContentForBrowser":266,"./setInnerHTML":283,"fbjs/lib/ExecutionEnvironment":289}],285:[function(require,module,exports){
+},{"./escapeTextContentForBrowser":253,"./setInnerHTML":270,"fbjs/lib/ExecutionEnvironment":276}],272:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -64279,7 +62917,7 @@ function shouldUpdateReactComponent(prevElement, nextElement) {
 }
 
 module.exports = shouldUpdateReactComponent;
-},{}],286:[function(require,module,exports){
+},{}],273:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -64471,7 +63109,7 @@ function traverseAllChildren(children, callback, traverseContext) {
 
 module.exports = traverseAllChildren;
 }).call(this,require('_process'))
-},{"./ReactCurrentOwner":193,"./ReactElement":211,"./ReactInstanceHandles":220,"./getIteratorFn":274,"_process":47,"fbjs/lib/invariant":303,"fbjs/lib/warning":314}],287:[function(require,module,exports){
+},{"./ReactCurrentOwner":180,"./ReactElement":198,"./ReactInstanceHandles":207,"./getIteratorFn":261,"_process":46,"fbjs/lib/invariant":290,"fbjs/lib/warning":301}],274:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2015, Facebook, Inc.
@@ -64837,7 +63475,7 @@ if (process.env.NODE_ENV !== 'production') {
 
 module.exports = validateDOMNesting;
 }).call(this,require('_process'))
-},{"./Object.assign":181,"_process":47,"fbjs/lib/emptyFunction":295,"fbjs/lib/warning":314}],288:[function(require,module,exports){
+},{"./Object.assign":168,"_process":46,"fbjs/lib/emptyFunction":282,"fbjs/lib/warning":301}],275:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -64924,7 +63562,7 @@ var EventListener = {
 
 module.exports = EventListener;
 }).call(this,require('_process'))
-},{"./emptyFunction":295,"_process":47}],289:[function(require,module,exports){
+},{"./emptyFunction":282,"_process":46}],276:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -64961,7 +63599,7 @@ var ExecutionEnvironment = {
 };
 
 module.exports = ExecutionEnvironment;
-},{}],290:[function(require,module,exports){
+},{}],277:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -64994,7 +63632,7 @@ function camelize(string) {
 }
 
 module.exports = camelize;
-},{}],291:[function(require,module,exports){
+},{}],278:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -65035,7 +63673,7 @@ function camelizeStyleName(string) {
 }
 
 module.exports = camelizeStyleName;
-},{"./camelize":290}],292:[function(require,module,exports){
+},{"./camelize":277}],279:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -65091,7 +63729,7 @@ function containsNode(_x, _x2) {
 }
 
 module.exports = containsNode;
-},{"./isTextNode":305}],293:[function(require,module,exports){
+},{"./isTextNode":292}],280:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -65177,7 +63815,7 @@ function createArrayFromMixed(obj) {
 }
 
 module.exports = createArrayFromMixed;
-},{"./toArray":313}],294:[function(require,module,exports){
+},{"./toArray":300}],281:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -65264,7 +63902,7 @@ function createNodesFromMarkup(markup, handleScript) {
 
 module.exports = createNodesFromMarkup;
 }).call(this,require('_process'))
-},{"./ExecutionEnvironment":289,"./createArrayFromMixed":293,"./getMarkupWrap":299,"./invariant":303,"_process":47}],295:[function(require,module,exports){
+},{"./ExecutionEnvironment":276,"./createArrayFromMixed":280,"./getMarkupWrap":286,"./invariant":290,"_process":46}],282:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -65303,7 +63941,7 @@ emptyFunction.thatReturnsArgument = function (arg) {
 };
 
 module.exports = emptyFunction;
-},{}],296:[function(require,module,exports){
+},{}],283:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -65326,7 +63964,7 @@ if (process.env.NODE_ENV !== 'production') {
 
 module.exports = emptyObject;
 }).call(this,require('_process'))
-},{"_process":47}],297:[function(require,module,exports){
+},{"_process":46}],284:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -65353,7 +63991,7 @@ function focusNode(node) {
 }
 
 module.exports = focusNode;
-},{}],298:[function(require,module,exports){
+},{}],285:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -65389,7 +64027,7 @@ function getActiveElement() /*?DOMElement*/{
 }
 
 module.exports = getActiveElement;
-},{}],299:[function(require,module,exports){
+},{}],286:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -65487,7 +64125,7 @@ function getMarkupWrap(nodeName) {
 
 module.exports = getMarkupWrap;
 }).call(this,require('_process'))
-},{"./ExecutionEnvironment":289,"./invariant":303,"_process":47}],300:[function(require,module,exports){
+},{"./ExecutionEnvironment":276,"./invariant":290,"_process":46}],287:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -65526,7 +64164,7 @@ function getUnboundedScrollPosition(scrollable) {
 }
 
 module.exports = getUnboundedScrollPosition;
-},{}],301:[function(require,module,exports){
+},{}],288:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -65560,7 +64198,7 @@ function hyphenate(string) {
 }
 
 module.exports = hyphenate;
-},{}],302:[function(require,module,exports){
+},{}],289:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -65600,7 +64238,7 @@ function hyphenateStyleName(string) {
 }
 
 module.exports = hyphenateStyleName;
-},{"./hyphenate":301}],303:[function(require,module,exports){
+},{"./hyphenate":288}],290:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -65653,7 +64291,7 @@ function invariant(condition, format, a, b, c, d, e, f) {
 
 module.exports = invariant;
 }).call(this,require('_process'))
-},{"_process":47}],304:[function(require,module,exports){
+},{"_process":46}],291:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -65677,7 +64315,7 @@ function isNode(object) {
 }
 
 module.exports = isNode;
-},{}],305:[function(require,module,exports){
+},{}],292:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -65703,7 +64341,7 @@ function isTextNode(object) {
 }
 
 module.exports = isTextNode;
-},{"./isNode":304}],306:[function(require,module,exports){
+},{"./isNode":291}],293:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -65754,7 +64392,7 @@ var keyMirror = function (obj) {
 
 module.exports = keyMirror;
 }).call(this,require('_process'))
-},{"./invariant":303,"_process":47}],307:[function(require,module,exports){
+},{"./invariant":290,"_process":46}],294:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -65790,7 +64428,7 @@ var keyOf = function (oneKeyObj) {
 };
 
 module.exports = keyOf;
-},{}],308:[function(require,module,exports){
+},{}],295:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -65842,7 +64480,7 @@ function mapObject(object, callback, context) {
 }
 
 module.exports = mapObject;
-},{}],309:[function(require,module,exports){
+},{}],296:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -65874,7 +64512,7 @@ function memoizeStringOnly(callback) {
 }
 
 module.exports = memoizeStringOnly;
-},{}],310:[function(require,module,exports){
+},{}],297:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -65898,7 +64536,7 @@ if (ExecutionEnvironment.canUseDOM) {
 }
 
 module.exports = performance || {};
-},{"./ExecutionEnvironment":289}],311:[function(require,module,exports){
+},{"./ExecutionEnvironment":276}],298:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -65933,7 +64571,7 @@ if (performance.now) {
 }
 
 module.exports = performanceNow;
-},{"./performance":310}],312:[function(require,module,exports){
+},{"./performance":297}],299:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -65984,7 +64622,7 @@ function shallowEqual(objA, objB) {
 }
 
 module.exports = shallowEqual;
-},{}],313:[function(require,module,exports){
+},{}],300:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -66044,7 +64682,7 @@ function toArray(obj) {
 
 module.exports = toArray;
 }).call(this,require('_process'))
-},{"./invariant":303,"_process":47}],314:[function(require,module,exports){
+},{"./invariant":290,"_process":46}],301:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2014-2015, Facebook, Inc.
@@ -66104,9 +64742,2801 @@ if (process.env.NODE_ENV !== 'production') {
 
 module.exports = warning;
 }).call(this,require('_process'))
-},{"./emptyFunction":295,"_process":47}],315:[function(require,module,exports){
+},{"./emptyFunction":282,"_process":46}],302:[function(require,module,exports){
 'use strict';
 
 module.exports = require('./lib/React');
 
-},{"./lib/React":183}]},{},[1]);
+},{"./lib/React":170}],303:[function(require,module,exports){
+module.exports = require('./lib/_stream_duplex.js');
+
+},{"./lib/_stream_duplex.js":304}],304:[function(require,module,exports){
+arguments[4][132][0].apply(exports,arguments)
+},{"./_stream_readable":306,"./_stream_writable":308,"core-util-is":48,"dup":132,"inherits":52,"process-nextick-args":145}],305:[function(require,module,exports){
+// a passthrough stream.
+// basically just the most minimal sort of Transform stream.
+// Every written chunk gets output as-is.
+
+'use strict';
+
+module.exports = PassThrough;
+
+var Transform = require('./_stream_transform');
+
+/*<replacement>*/
+var util = require('core-util-is');
+util.inherits = require('inherits');
+/*</replacement>*/
+
+util.inherits(PassThrough, Transform);
+
+function PassThrough(options) {
+  if (!(this instanceof PassThrough)) return new PassThrough(options);
+
+  Transform.call(this, options);
+}
+
+PassThrough.prototype._transform = function (chunk, encoding, cb) {
+  cb(null, chunk);
+};
+},{"./_stream_transform":307,"core-util-is":48,"inherits":52}],306:[function(require,module,exports){
+(function (process){
+'use strict';
+
+module.exports = Readable;
+
+/*<replacement>*/
+var processNextTick = require('process-nextick-args');
+/*</replacement>*/
+
+/*<replacement>*/
+var isArray = require('isarray');
+/*</replacement>*/
+
+/*<replacement>*/
+var Duplex;
+/*</replacement>*/
+
+Readable.ReadableState = ReadableState;
+
+/*<replacement>*/
+var EE = require('events').EventEmitter;
+
+var EElistenerCount = function (emitter, type) {
+  return emitter.listeners(type).length;
+};
+/*</replacement>*/
+
+/*<replacement>*/
+var Stream = require('./internal/streams/stream');
+/*</replacement>*/
+
+var Buffer = require('buffer').Buffer;
+/*<replacement>*/
+var bufferShim = require('buffer-shims');
+/*</replacement>*/
+
+/*<replacement>*/
+var util = require('core-util-is');
+util.inherits = require('inherits');
+/*</replacement>*/
+
+/*<replacement>*/
+var debugUtil = require('util');
+var debug = void 0;
+if (debugUtil && debugUtil.debuglog) {
+  debug = debugUtil.debuglog('stream');
+} else {
+  debug = function () {};
+}
+/*</replacement>*/
+
+var BufferList = require('./internal/streams/BufferList');
+var StringDecoder;
+
+util.inherits(Readable, Stream);
+
+var kProxyEvents = ['error', 'close', 'destroy', 'pause', 'resume'];
+
+function prependListener(emitter, event, fn) {
+  // Sadly this is not cacheable as some libraries bundle their own
+  // event emitter implementation with them.
+  if (typeof emitter.prependListener === 'function') {
+    return emitter.prependListener(event, fn);
+  } else {
+    // This is a hack to make sure that our error handler is attached before any
+    // userland ones.  NEVER DO THIS. This is here only because this code needs
+    // to continue to work with older versions of Node.js that do not include
+    // the prependListener() method. The goal is to eventually remove this hack.
+    if (!emitter._events || !emitter._events[event]) emitter.on(event, fn);else if (isArray(emitter._events[event])) emitter._events[event].unshift(fn);else emitter._events[event] = [fn, emitter._events[event]];
+  }
+}
+
+function ReadableState(options, stream) {
+  Duplex = Duplex || require('./_stream_duplex');
+
+  options = options || {};
+
+  // object stream flag. Used to make read(n) ignore n and to
+  // make all the buffer merging and length checks go away
+  this.objectMode = !!options.objectMode;
+
+  if (stream instanceof Duplex) this.objectMode = this.objectMode || !!options.readableObjectMode;
+
+  // the point at which it stops calling _read() to fill the buffer
+  // Note: 0 is a valid value, means "don't call _read preemptively ever"
+  var hwm = options.highWaterMark;
+  var defaultHwm = this.objectMode ? 16 : 16 * 1024;
+  this.highWaterMark = hwm || hwm === 0 ? hwm : defaultHwm;
+
+  // cast to ints.
+  this.highWaterMark = ~~this.highWaterMark;
+
+  // A linked list is used to store data chunks instead of an array because the
+  // linked list can remove elements from the beginning faster than
+  // array.shift()
+  this.buffer = new BufferList();
+  this.length = 0;
+  this.pipes = null;
+  this.pipesCount = 0;
+  this.flowing = null;
+  this.ended = false;
+  this.endEmitted = false;
+  this.reading = false;
+
+  // a flag to be able to tell if the onwrite cb is called immediately,
+  // or on a later tick.  We set this to true at first, because any
+  // actions that shouldn't happen until "later" should generally also
+  // not happen before the first write call.
+  this.sync = true;
+
+  // whenever we return null, then we set a flag to say
+  // that we're awaiting a 'readable' event emission.
+  this.needReadable = false;
+  this.emittedReadable = false;
+  this.readableListening = false;
+  this.resumeScheduled = false;
+
+  // Crypto is kind of old and crusty.  Historically, its default string
+  // encoding is 'binary' so we have to make this configurable.
+  // Everything else in the universe uses 'utf8', though.
+  this.defaultEncoding = options.defaultEncoding || 'utf8';
+
+  // when piping, we only care about 'readable' events that happen
+  // after read()ing all the bytes and not getting any pushback.
+  this.ranOut = false;
+
+  // the number of writers that are awaiting a drain event in .pipe()s
+  this.awaitDrain = 0;
+
+  // if true, a maybeReadMore has been scheduled
+  this.readingMore = false;
+
+  this.decoder = null;
+  this.encoding = null;
+  if (options.encoding) {
+    if (!StringDecoder) StringDecoder = require('string_decoder/').StringDecoder;
+    this.decoder = new StringDecoder(options.encoding);
+    this.encoding = options.encoding;
+  }
+}
+
+function Readable(options) {
+  Duplex = Duplex || require('./_stream_duplex');
+
+  if (!(this instanceof Readable)) return new Readable(options);
+
+  this._readableState = new ReadableState(options, this);
+
+  // legacy
+  this.readable = true;
+
+  if (options && typeof options.read === 'function') this._read = options.read;
+
+  Stream.call(this);
+}
+
+// Manually shove something into the read() buffer.
+// This returns true if the highWaterMark has not been hit yet,
+// similar to how Writable.write() returns true if you should
+// write() some more.
+Readable.prototype.push = function (chunk, encoding) {
+  var state = this._readableState;
+
+  if (!state.objectMode && typeof chunk === 'string') {
+    encoding = encoding || state.defaultEncoding;
+    if (encoding !== state.encoding) {
+      chunk = bufferShim.from(chunk, encoding);
+      encoding = '';
+    }
+  }
+
+  return readableAddChunk(this, state, chunk, encoding, false);
+};
+
+// Unshift should *always* be something directly out of read()
+Readable.prototype.unshift = function (chunk) {
+  var state = this._readableState;
+  return readableAddChunk(this, state, chunk, '', true);
+};
+
+Readable.prototype.isPaused = function () {
+  return this._readableState.flowing === false;
+};
+
+function readableAddChunk(stream, state, chunk, encoding, addToFront) {
+  var er = chunkInvalid(state, chunk);
+  if (er) {
+    stream.emit('error', er);
+  } else if (chunk === null) {
+    state.reading = false;
+    onEofChunk(stream, state);
+  } else if (state.objectMode || chunk && chunk.length > 0) {
+    if (state.ended && !addToFront) {
+      var e = new Error('stream.push() after EOF');
+      stream.emit('error', e);
+    } else if (state.endEmitted && addToFront) {
+      var _e = new Error('stream.unshift() after end event');
+      stream.emit('error', _e);
+    } else {
+      var skipAdd;
+      if (state.decoder && !addToFront && !encoding) {
+        chunk = state.decoder.write(chunk);
+        skipAdd = !state.objectMode && chunk.length === 0;
+      }
+
+      if (!addToFront) state.reading = false;
+
+      // Don't add to the buffer if we've decoded to an empty string chunk and
+      // we're not in object mode
+      if (!skipAdd) {
+        // if we want the data now, just emit it.
+        if (state.flowing && state.length === 0 && !state.sync) {
+          stream.emit('data', chunk);
+          stream.read(0);
+        } else {
+          // update the buffer info.
+          state.length += state.objectMode ? 1 : chunk.length;
+          if (addToFront) state.buffer.unshift(chunk);else state.buffer.push(chunk);
+
+          if (state.needReadable) emitReadable(stream);
+        }
+      }
+
+      maybeReadMore(stream, state);
+    }
+  } else if (!addToFront) {
+    state.reading = false;
+  }
+
+  return needMoreData(state);
+}
+
+// if it's past the high water mark, we can push in some more.
+// Also, if we have no data yet, we can stand some
+// more bytes.  This is to work around cases where hwm=0,
+// such as the repl.  Also, if the push() triggered a
+// readable event, and the user called read(largeNumber) such that
+// needReadable was set, then we ought to push more, so that another
+// 'readable' event will be triggered.
+function needMoreData(state) {
+  return !state.ended && (state.needReadable || state.length < state.highWaterMark || state.length === 0);
+}
+
+// backwards compatibility.
+Readable.prototype.setEncoding = function (enc) {
+  if (!StringDecoder) StringDecoder = require('string_decoder/').StringDecoder;
+  this._readableState.decoder = new StringDecoder(enc);
+  this._readableState.encoding = enc;
+  return this;
+};
+
+// Don't raise the hwm > 8MB
+var MAX_HWM = 0x800000;
+function computeNewHighWaterMark(n) {
+  if (n >= MAX_HWM) {
+    n = MAX_HWM;
+  } else {
+    // Get the next highest power of 2 to prevent increasing hwm excessively in
+    // tiny amounts
+    n--;
+    n |= n >>> 1;
+    n |= n >>> 2;
+    n |= n >>> 4;
+    n |= n >>> 8;
+    n |= n >>> 16;
+    n++;
+  }
+  return n;
+}
+
+// This function is designed to be inlinable, so please take care when making
+// changes to the function body.
+function howMuchToRead(n, state) {
+  if (n <= 0 || state.length === 0 && state.ended) return 0;
+  if (state.objectMode) return 1;
+  if (n !== n) {
+    // Only flow one buffer at a time
+    if (state.flowing && state.length) return state.buffer.head.data.length;else return state.length;
+  }
+  // If we're asking for more than the current hwm, then raise the hwm.
+  if (n > state.highWaterMark) state.highWaterMark = computeNewHighWaterMark(n);
+  if (n <= state.length) return n;
+  // Don't have enough
+  if (!state.ended) {
+    state.needReadable = true;
+    return 0;
+  }
+  return state.length;
+}
+
+// you can override either this method, or the async _read(n) below.
+Readable.prototype.read = function (n) {
+  debug('read', n);
+  n = parseInt(n, 10);
+  var state = this._readableState;
+  var nOrig = n;
+
+  if (n !== 0) state.emittedReadable = false;
+
+  // if we're doing read(0) to trigger a readable event, but we
+  // already have a bunch of data in the buffer, then just trigger
+  // the 'readable' event and move on.
+  if (n === 0 && state.needReadable && (state.length >= state.highWaterMark || state.ended)) {
+    debug('read: emitReadable', state.length, state.ended);
+    if (state.length === 0 && state.ended) endReadable(this);else emitReadable(this);
+    return null;
+  }
+
+  n = howMuchToRead(n, state);
+
+  // if we've ended, and we're now clear, then finish it up.
+  if (n === 0 && state.ended) {
+    if (state.length === 0) endReadable(this);
+    return null;
+  }
+
+  // All the actual chunk generation logic needs to be
+  // *below* the call to _read.  The reason is that in certain
+  // synthetic stream cases, such as passthrough streams, _read
+  // may be a completely synchronous operation which may change
+  // the state of the read buffer, providing enough data when
+  // before there was *not* enough.
+  //
+  // So, the steps are:
+  // 1. Figure out what the state of things will be after we do
+  // a read from the buffer.
+  //
+  // 2. If that resulting state will trigger a _read, then call _read.
+  // Note that this may be asynchronous, or synchronous.  Yes, it is
+  // deeply ugly to write APIs this way, but that still doesn't mean
+  // that the Readable class should behave improperly, as streams are
+  // designed to be sync/async agnostic.
+  // Take note if the _read call is sync or async (ie, if the read call
+  // has returned yet), so that we know whether or not it's safe to emit
+  // 'readable' etc.
+  //
+  // 3. Actually pull the requested chunks out of the buffer and return.
+
+  // if we need a readable event, then we need to do some reading.
+  var doRead = state.needReadable;
+  debug('need readable', doRead);
+
+  // if we currently have less than the highWaterMark, then also read some
+  if (state.length === 0 || state.length - n < state.highWaterMark) {
+    doRead = true;
+    debug('length less than watermark', doRead);
+  }
+
+  // however, if we've ended, then there's no point, and if we're already
+  // reading, then it's unnecessary.
+  if (state.ended || state.reading) {
+    doRead = false;
+    debug('reading or ended', doRead);
+  } else if (doRead) {
+    debug('do read');
+    state.reading = true;
+    state.sync = true;
+    // if the length is currently zero, then we *need* a readable event.
+    if (state.length === 0) state.needReadable = true;
+    // call internal read method
+    this._read(state.highWaterMark);
+    state.sync = false;
+    // If _read pushed data synchronously, then `reading` will be false,
+    // and we need to re-evaluate how much data we can return to the user.
+    if (!state.reading) n = howMuchToRead(nOrig, state);
+  }
+
+  var ret;
+  if (n > 0) ret = fromList(n, state);else ret = null;
+
+  if (ret === null) {
+    state.needReadable = true;
+    n = 0;
+  } else {
+    state.length -= n;
+  }
+
+  if (state.length === 0) {
+    // If we have nothing in the buffer, then we want to know
+    // as soon as we *do* get something into the buffer.
+    if (!state.ended) state.needReadable = true;
+
+    // If we tried to read() past the EOF, then emit end on the next tick.
+    if (nOrig !== n && state.ended) endReadable(this);
+  }
+
+  if (ret !== null) this.emit('data', ret);
+
+  return ret;
+};
+
+function chunkInvalid(state, chunk) {
+  var er = null;
+  if (!Buffer.isBuffer(chunk) && typeof chunk !== 'string' && chunk !== null && chunk !== undefined && !state.objectMode) {
+    er = new TypeError('Invalid non-string/buffer chunk');
+  }
+  return er;
+}
+
+function onEofChunk(stream, state) {
+  if (state.ended) return;
+  if (state.decoder) {
+    var chunk = state.decoder.end();
+    if (chunk && chunk.length) {
+      state.buffer.push(chunk);
+      state.length += state.objectMode ? 1 : chunk.length;
+    }
+  }
+  state.ended = true;
+
+  // emit 'readable' now to make sure it gets picked up.
+  emitReadable(stream);
+}
+
+// Don't emit readable right away in sync mode, because this can trigger
+// another read() call => stack overflow.  This way, it might trigger
+// a nextTick recursion warning, but that's not so bad.
+function emitReadable(stream) {
+  var state = stream._readableState;
+  state.needReadable = false;
+  if (!state.emittedReadable) {
+    debug('emitReadable', state.flowing);
+    state.emittedReadable = true;
+    if (state.sync) processNextTick(emitReadable_, stream);else emitReadable_(stream);
+  }
+}
+
+function emitReadable_(stream) {
+  debug('emit readable');
+  stream.emit('readable');
+  flow(stream);
+}
+
+// at this point, the user has presumably seen the 'readable' event,
+// and called read() to consume some data.  that may have triggered
+// in turn another _read(n) call, in which case reading = true if
+// it's in progress.
+// However, if we're not ended, or reading, and the length < hwm,
+// then go ahead and try to read some more preemptively.
+function maybeReadMore(stream, state) {
+  if (!state.readingMore) {
+    state.readingMore = true;
+    processNextTick(maybeReadMore_, stream, state);
+  }
+}
+
+function maybeReadMore_(stream, state) {
+  var len = state.length;
+  while (!state.reading && !state.flowing && !state.ended && state.length < state.highWaterMark) {
+    debug('maybeReadMore read 0');
+    stream.read(0);
+    if (len === state.length)
+      // didn't get any data, stop spinning.
+      break;else len = state.length;
+  }
+  state.readingMore = false;
+}
+
+// abstract method.  to be overridden in specific implementation classes.
+// call cb(er, data) where data is <= n in length.
+// for virtual (non-string, non-buffer) streams, "length" is somewhat
+// arbitrary, and perhaps not very meaningful.
+Readable.prototype._read = function (n) {
+  this.emit('error', new Error('_read() is not implemented'));
+};
+
+Readable.prototype.pipe = function (dest, pipeOpts) {
+  var src = this;
+  var state = this._readableState;
+
+  switch (state.pipesCount) {
+    case 0:
+      state.pipes = dest;
+      break;
+    case 1:
+      state.pipes = [state.pipes, dest];
+      break;
+    default:
+      state.pipes.push(dest);
+      break;
+  }
+  state.pipesCount += 1;
+  debug('pipe count=%d opts=%j', state.pipesCount, pipeOpts);
+
+  var doEnd = (!pipeOpts || pipeOpts.end !== false) && dest !== process.stdout && dest !== process.stderr;
+
+  var endFn = doEnd ? onend : cleanup;
+  if (state.endEmitted) processNextTick(endFn);else src.once('end', endFn);
+
+  dest.on('unpipe', onunpipe);
+  function onunpipe(readable) {
+    debug('onunpipe');
+    if (readable === src) {
+      cleanup();
+    }
+  }
+
+  function onend() {
+    debug('onend');
+    dest.end();
+  }
+
+  // when the dest drains, it reduces the awaitDrain counter
+  // on the source.  This would be more elegant with a .once()
+  // handler in flow(), but adding and removing repeatedly is
+  // too slow.
+  var ondrain = pipeOnDrain(src);
+  dest.on('drain', ondrain);
+
+  var cleanedUp = false;
+  function cleanup() {
+    debug('cleanup');
+    // cleanup event handlers once the pipe is broken
+    dest.removeListener('close', onclose);
+    dest.removeListener('finish', onfinish);
+    dest.removeListener('drain', ondrain);
+    dest.removeListener('error', onerror);
+    dest.removeListener('unpipe', onunpipe);
+    src.removeListener('end', onend);
+    src.removeListener('end', cleanup);
+    src.removeListener('data', ondata);
+
+    cleanedUp = true;
+
+    // if the reader is waiting for a drain event from this
+    // specific writer, then it would cause it to never start
+    // flowing again.
+    // So, if this is awaiting a drain, then we just call it now.
+    // If we don't know, then assume that we are waiting for one.
+    if (state.awaitDrain && (!dest._writableState || dest._writableState.needDrain)) ondrain();
+  }
+
+  // If the user pushes more data while we're writing to dest then we'll end up
+  // in ondata again. However, we only want to increase awaitDrain once because
+  // dest will only emit one 'drain' event for the multiple writes.
+  // => Introduce a guard on increasing awaitDrain.
+  var increasedAwaitDrain = false;
+  src.on('data', ondata);
+  function ondata(chunk) {
+    debug('ondata');
+    increasedAwaitDrain = false;
+    var ret = dest.write(chunk);
+    if (false === ret && !increasedAwaitDrain) {
+      // If the user unpiped during `dest.write()`, it is possible
+      // to get stuck in a permanently paused state if that write
+      // also returned false.
+      // => Check whether `dest` is still a piping destination.
+      if ((state.pipesCount === 1 && state.pipes === dest || state.pipesCount > 1 && indexOf(state.pipes, dest) !== -1) && !cleanedUp) {
+        debug('false write response, pause', src._readableState.awaitDrain);
+        src._readableState.awaitDrain++;
+        increasedAwaitDrain = true;
+      }
+      src.pause();
+    }
+  }
+
+  // if the dest has an error, then stop piping into it.
+  // however, don't suppress the throwing behavior for this.
+  function onerror(er) {
+    debug('onerror', er);
+    unpipe();
+    dest.removeListener('error', onerror);
+    if (EElistenerCount(dest, 'error') === 0) dest.emit('error', er);
+  }
+
+  // Make sure our error handler is attached before userland ones.
+  prependListener(dest, 'error', onerror);
+
+  // Both close and finish should trigger unpipe, but only once.
+  function onclose() {
+    dest.removeListener('finish', onfinish);
+    unpipe();
+  }
+  dest.once('close', onclose);
+  function onfinish() {
+    debug('onfinish');
+    dest.removeListener('close', onclose);
+    unpipe();
+  }
+  dest.once('finish', onfinish);
+
+  function unpipe() {
+    debug('unpipe');
+    src.unpipe(dest);
+  }
+
+  // tell the dest that it's being piped to
+  dest.emit('pipe', src);
+
+  // start the flow if it hasn't been started already.
+  if (!state.flowing) {
+    debug('pipe resume');
+    src.resume();
+  }
+
+  return dest;
+};
+
+function pipeOnDrain(src) {
+  return function () {
+    var state = src._readableState;
+    debug('pipeOnDrain', state.awaitDrain);
+    if (state.awaitDrain) state.awaitDrain--;
+    if (state.awaitDrain === 0 && EElistenerCount(src, 'data')) {
+      state.flowing = true;
+      flow(src);
+    }
+  };
+}
+
+Readable.prototype.unpipe = function (dest) {
+  var state = this._readableState;
+
+  // if we're not piping anywhere, then do nothing.
+  if (state.pipesCount === 0) return this;
+
+  // just one destination.  most common case.
+  if (state.pipesCount === 1) {
+    // passed in one, but it's not the right one.
+    if (dest && dest !== state.pipes) return this;
+
+    if (!dest) dest = state.pipes;
+
+    // got a match.
+    state.pipes = null;
+    state.pipesCount = 0;
+    state.flowing = false;
+    if (dest) dest.emit('unpipe', this);
+    return this;
+  }
+
+  // slow case. multiple pipe destinations.
+
+  if (!dest) {
+    // remove all.
+    var dests = state.pipes;
+    var len = state.pipesCount;
+    state.pipes = null;
+    state.pipesCount = 0;
+    state.flowing = false;
+
+    for (var i = 0; i < len; i++) {
+      dests[i].emit('unpipe', this);
+    }return this;
+  }
+
+  // try to find the right one.
+  var index = indexOf(state.pipes, dest);
+  if (index === -1) return this;
+
+  state.pipes.splice(index, 1);
+  state.pipesCount -= 1;
+  if (state.pipesCount === 1) state.pipes = state.pipes[0];
+
+  dest.emit('unpipe', this);
+
+  return this;
+};
+
+// set up data events if they are asked for
+// Ensure readable listeners eventually get something
+Readable.prototype.on = function (ev, fn) {
+  var res = Stream.prototype.on.call(this, ev, fn);
+
+  if (ev === 'data') {
+    // Start flowing on next tick if stream isn't explicitly paused
+    if (this._readableState.flowing !== false) this.resume();
+  } else if (ev === 'readable') {
+    var state = this._readableState;
+    if (!state.endEmitted && !state.readableListening) {
+      state.readableListening = state.needReadable = true;
+      state.emittedReadable = false;
+      if (!state.reading) {
+        processNextTick(nReadingNextTick, this);
+      } else if (state.length) {
+        emitReadable(this, state);
+      }
+    }
+  }
+
+  return res;
+};
+Readable.prototype.addListener = Readable.prototype.on;
+
+function nReadingNextTick(self) {
+  debug('readable nexttick read 0');
+  self.read(0);
+}
+
+// pause() and resume() are remnants of the legacy readable stream API
+// If the user uses them, then switch into old mode.
+Readable.prototype.resume = function () {
+  var state = this._readableState;
+  if (!state.flowing) {
+    debug('resume');
+    state.flowing = true;
+    resume(this, state);
+  }
+  return this;
+};
+
+function resume(stream, state) {
+  if (!state.resumeScheduled) {
+    state.resumeScheduled = true;
+    processNextTick(resume_, stream, state);
+  }
+}
+
+function resume_(stream, state) {
+  if (!state.reading) {
+    debug('resume read 0');
+    stream.read(0);
+  }
+
+  state.resumeScheduled = false;
+  state.awaitDrain = 0;
+  stream.emit('resume');
+  flow(stream);
+  if (state.flowing && !state.reading) stream.read(0);
+}
+
+Readable.prototype.pause = function () {
+  debug('call pause flowing=%j', this._readableState.flowing);
+  if (false !== this._readableState.flowing) {
+    debug('pause');
+    this._readableState.flowing = false;
+    this.emit('pause');
+  }
+  return this;
+};
+
+function flow(stream) {
+  var state = stream._readableState;
+  debug('flow', state.flowing);
+  while (state.flowing && stream.read() !== null) {}
+}
+
+// wrap an old-style stream as the async data source.
+// This is *not* part of the readable stream interface.
+// It is an ugly unfortunate mess of history.
+Readable.prototype.wrap = function (stream) {
+  var state = this._readableState;
+  var paused = false;
+
+  var self = this;
+  stream.on('end', function () {
+    debug('wrapped end');
+    if (state.decoder && !state.ended) {
+      var chunk = state.decoder.end();
+      if (chunk && chunk.length) self.push(chunk);
+    }
+
+    self.push(null);
+  });
+
+  stream.on('data', function (chunk) {
+    debug('wrapped data');
+    if (state.decoder) chunk = state.decoder.write(chunk);
+
+    // don't skip over falsy values in objectMode
+    if (state.objectMode && (chunk === null || chunk === undefined)) return;else if (!state.objectMode && (!chunk || !chunk.length)) return;
+
+    var ret = self.push(chunk);
+    if (!ret) {
+      paused = true;
+      stream.pause();
+    }
+  });
+
+  // proxy all the other methods.
+  // important when wrapping filters and duplexes.
+  for (var i in stream) {
+    if (this[i] === undefined && typeof stream[i] === 'function') {
+      this[i] = function (method) {
+        return function () {
+          return stream[method].apply(stream, arguments);
+        };
+      }(i);
+    }
+  }
+
+  // proxy certain important events.
+  for (var n = 0; n < kProxyEvents.length; n++) {
+    stream.on(kProxyEvents[n], self.emit.bind(self, kProxyEvents[n]));
+  }
+
+  // when we try to consume some more bytes, simply unpause the
+  // underlying stream.
+  self._read = function (n) {
+    debug('wrapped _read', n);
+    if (paused) {
+      paused = false;
+      stream.resume();
+    }
+  };
+
+  return self;
+};
+
+// exposed for testing purposes only.
+Readable._fromList = fromList;
+
+// Pluck off n bytes from an array of buffers.
+// Length is the combined lengths of all the buffers in the list.
+// This function is designed to be inlinable, so please take care when making
+// changes to the function body.
+function fromList(n, state) {
+  // nothing buffered
+  if (state.length === 0) return null;
+
+  var ret;
+  if (state.objectMode) ret = state.buffer.shift();else if (!n || n >= state.length) {
+    // read it all, truncate the list
+    if (state.decoder) ret = state.buffer.join('');else if (state.buffer.length === 1) ret = state.buffer.head.data;else ret = state.buffer.concat(state.length);
+    state.buffer.clear();
+  } else {
+    // read part of list
+    ret = fromListPartial(n, state.buffer, state.decoder);
+  }
+
+  return ret;
+}
+
+// Extracts only enough buffered data to satisfy the amount requested.
+// This function is designed to be inlinable, so please take care when making
+// changes to the function body.
+function fromListPartial(n, list, hasStrings) {
+  var ret;
+  if (n < list.head.data.length) {
+    // slice is the same for buffers and strings
+    ret = list.head.data.slice(0, n);
+    list.head.data = list.head.data.slice(n);
+  } else if (n === list.head.data.length) {
+    // first chunk is a perfect match
+    ret = list.shift();
+  } else {
+    // result spans more than one buffer
+    ret = hasStrings ? copyFromBufferString(n, list) : copyFromBuffer(n, list);
+  }
+  return ret;
+}
+
+// Copies a specified amount of characters from the list of buffered data
+// chunks.
+// This function is designed to be inlinable, so please take care when making
+// changes to the function body.
+function copyFromBufferString(n, list) {
+  var p = list.head;
+  var c = 1;
+  var ret = p.data;
+  n -= ret.length;
+  while (p = p.next) {
+    var str = p.data;
+    var nb = n > str.length ? str.length : n;
+    if (nb === str.length) ret += str;else ret += str.slice(0, n);
+    n -= nb;
+    if (n === 0) {
+      if (nb === str.length) {
+        ++c;
+        if (p.next) list.head = p.next;else list.head = list.tail = null;
+      } else {
+        list.head = p;
+        p.data = str.slice(nb);
+      }
+      break;
+    }
+    ++c;
+  }
+  list.length -= c;
+  return ret;
+}
+
+// Copies a specified amount of bytes from the list of buffered data chunks.
+// This function is designed to be inlinable, so please take care when making
+// changes to the function body.
+function copyFromBuffer(n, list) {
+  var ret = bufferShim.allocUnsafe(n);
+  var p = list.head;
+  var c = 1;
+  p.data.copy(ret);
+  n -= p.data.length;
+  while (p = p.next) {
+    var buf = p.data;
+    var nb = n > buf.length ? buf.length : n;
+    buf.copy(ret, ret.length - n, 0, nb);
+    n -= nb;
+    if (n === 0) {
+      if (nb === buf.length) {
+        ++c;
+        if (p.next) list.head = p.next;else list.head = list.tail = null;
+      } else {
+        list.head = p;
+        p.data = buf.slice(nb);
+      }
+      break;
+    }
+    ++c;
+  }
+  list.length -= c;
+  return ret;
+}
+
+function endReadable(stream) {
+  var state = stream._readableState;
+
+  // If we get here before consuming all the bytes, then that is a
+  // bug in node.  Should never happen.
+  if (state.length > 0) throw new Error('"endReadable()" called on non-empty stream');
+
+  if (!state.endEmitted) {
+    state.ended = true;
+    processNextTick(endReadableNT, state, stream);
+  }
+}
+
+function endReadableNT(state, stream) {
+  // Check that we didn't get one last unshift.
+  if (!state.endEmitted && state.length === 0) {
+    state.endEmitted = true;
+    stream.readable = false;
+    stream.emit('end');
+  }
+}
+
+function forEach(xs, f) {
+  for (var i = 0, l = xs.length; i < l; i++) {
+    f(xs[i], i);
+  }
+}
+
+function indexOf(xs, x) {
+  for (var i = 0, l = xs.length; i < l; i++) {
+    if (xs[i] === x) return i;
+  }
+  return -1;
+}
+}).call(this,require('_process'))
+},{"./_stream_duplex":304,"./internal/streams/BufferList":309,"./internal/streams/stream":310,"_process":46,"buffer":45,"buffer-shims":47,"core-util-is":48,"events":49,"inherits":52,"isarray":54,"process-nextick-args":145,"string_decoder/":317,"util":44}],307:[function(require,module,exports){
+// a transform stream is a readable/writable stream where you do
+// something with the data.  Sometimes it's called a "filter",
+// but that's not a great name for it, since that implies a thing where
+// some bits pass through, and others are simply ignored.  (That would
+// be a valid example of a transform, of course.)
+//
+// While the output is causally related to the input, it's not a
+// necessarily symmetric or synchronous transformation.  For example,
+// a zlib stream might take multiple plain-text writes(), and then
+// emit a single compressed chunk some time in the future.
+//
+// Here's how this works:
+//
+// The Transform stream has all the aspects of the readable and writable
+// stream classes.  When you write(chunk), that calls _write(chunk,cb)
+// internally, and returns false if there's a lot of pending writes
+// buffered up.  When you call read(), that calls _read(n) until
+// there's enough pending readable data buffered up.
+//
+// In a transform stream, the written data is placed in a buffer.  When
+// _read(n) is called, it transforms the queued up data, calling the
+// buffered _write cb's as it consumes chunks.  If consuming a single
+// written chunk would result in multiple output chunks, then the first
+// outputted bit calls the readcb, and subsequent chunks just go into
+// the read buffer, and will cause it to emit 'readable' if necessary.
+//
+// This way, back-pressure is actually determined by the reading side,
+// since _read has to be called to start processing a new chunk.  However,
+// a pathological inflate type of transform can cause excessive buffering
+// here.  For example, imagine a stream where every byte of input is
+// interpreted as an integer from 0-255, and then results in that many
+// bytes of output.  Writing the 4 bytes {ff,ff,ff,ff} would result in
+// 1kb of data being output.  In this case, you could write a very small
+// amount of input, and end up with a very large amount of output.  In
+// such a pathological inflating mechanism, there'd be no way to tell
+// the system to stop doing the transform.  A single 4MB write could
+// cause the system to run out of memory.
+//
+// However, even in such a pathological case, only a single written chunk
+// would be consumed, and then the rest would wait (un-transformed) until
+// the results of the previous transformed chunk were consumed.
+
+'use strict';
+
+module.exports = Transform;
+
+var Duplex = require('./_stream_duplex');
+
+/*<replacement>*/
+var util = require('core-util-is');
+util.inherits = require('inherits');
+/*</replacement>*/
+
+util.inherits(Transform, Duplex);
+
+function TransformState(stream) {
+  this.afterTransform = function (er, data) {
+    return afterTransform(stream, er, data);
+  };
+
+  this.needTransform = false;
+  this.transforming = false;
+  this.writecb = null;
+  this.writechunk = null;
+  this.writeencoding = null;
+}
+
+function afterTransform(stream, er, data) {
+  var ts = stream._transformState;
+  ts.transforming = false;
+
+  var cb = ts.writecb;
+
+  if (!cb) return stream.emit('error', new Error('no writecb in Transform class'));
+
+  ts.writechunk = null;
+  ts.writecb = null;
+
+  if (data !== null && data !== undefined) stream.push(data);
+
+  cb(er);
+
+  var rs = stream._readableState;
+  rs.reading = false;
+  if (rs.needReadable || rs.length < rs.highWaterMark) {
+    stream._read(rs.highWaterMark);
+  }
+}
+
+function Transform(options) {
+  if (!(this instanceof Transform)) return new Transform(options);
+
+  Duplex.call(this, options);
+
+  this._transformState = new TransformState(this);
+
+  var stream = this;
+
+  // start out asking for a readable event once data is transformed.
+  this._readableState.needReadable = true;
+
+  // we have implemented the _read method, and done the other things
+  // that Readable wants before the first _read call, so unset the
+  // sync guard flag.
+  this._readableState.sync = false;
+
+  if (options) {
+    if (typeof options.transform === 'function') this._transform = options.transform;
+
+    if (typeof options.flush === 'function') this._flush = options.flush;
+  }
+
+  // When the writable side finishes, then flush out anything remaining.
+  this.once('prefinish', function () {
+    if (typeof this._flush === 'function') this._flush(function (er, data) {
+      done(stream, er, data);
+    });else done(stream);
+  });
+}
+
+Transform.prototype.push = function (chunk, encoding) {
+  this._transformState.needTransform = false;
+  return Duplex.prototype.push.call(this, chunk, encoding);
+};
+
+// This is the part where you do stuff!
+// override this function in implementation classes.
+// 'chunk' is an input chunk.
+//
+// Call `push(newChunk)` to pass along transformed output
+// to the readable side.  You may call 'push' zero or more times.
+//
+// Call `cb(err)` when you are done with this chunk.  If you pass
+// an error, then that'll put the hurt on the whole operation.  If you
+// never call cb(), then you'll never get another chunk.
+Transform.prototype._transform = function (chunk, encoding, cb) {
+  throw new Error('_transform() is not implemented');
+};
+
+Transform.prototype._write = function (chunk, encoding, cb) {
+  var ts = this._transformState;
+  ts.writecb = cb;
+  ts.writechunk = chunk;
+  ts.writeencoding = encoding;
+  if (!ts.transforming) {
+    var rs = this._readableState;
+    if (ts.needTransform || rs.needReadable || rs.length < rs.highWaterMark) this._read(rs.highWaterMark);
+  }
+};
+
+// Doesn't matter what the args are here.
+// _transform does all the work.
+// That we got here means that the readable side wants more data.
+Transform.prototype._read = function (n) {
+  var ts = this._transformState;
+
+  if (ts.writechunk !== null && ts.writecb && !ts.transforming) {
+    ts.transforming = true;
+    this._transform(ts.writechunk, ts.writeencoding, ts.afterTransform);
+  } else {
+    // mark that we need a transform, so that any data that comes in
+    // will get processed, now that we've asked for it.
+    ts.needTransform = true;
+  }
+};
+
+function done(stream, er, data) {
+  if (er) return stream.emit('error', er);
+
+  if (data !== null && data !== undefined) stream.push(data);
+
+  // if there's nothing in the write buffer, then that means
+  // that nothing more will ever be provided
+  var ws = stream._writableState;
+  var ts = stream._transformState;
+
+  if (ws.length) throw new Error('Calling transform done when ws.length != 0');
+
+  if (ts.transforming) throw new Error('Calling transform done when still transforming');
+
+  return stream.push(null);
+}
+},{"./_stream_duplex":304,"core-util-is":48,"inherits":52}],308:[function(require,module,exports){
+(function (process){
+// A bit simpler than readable streams.
+// Implement an async ._write(chunk, encoding, cb), and it'll handle all
+// the drain event emission and buffering.
+
+'use strict';
+
+module.exports = Writable;
+
+/*<replacement>*/
+var processNextTick = require('process-nextick-args');
+/*</replacement>*/
+
+/*<replacement>*/
+var asyncWrite = !process.browser && ['v0.10', 'v0.9.'].indexOf(process.version.slice(0, 5)) > -1 ? setImmediate : processNextTick;
+/*</replacement>*/
+
+/*<replacement>*/
+var Duplex;
+/*</replacement>*/
+
+Writable.WritableState = WritableState;
+
+/*<replacement>*/
+var util = require('core-util-is');
+util.inherits = require('inherits');
+/*</replacement>*/
+
+/*<replacement>*/
+var internalUtil = {
+  deprecate: require('util-deprecate')
+};
+/*</replacement>*/
+
+/*<replacement>*/
+var Stream = require('./internal/streams/stream');
+/*</replacement>*/
+
+var Buffer = require('buffer').Buffer;
+/*<replacement>*/
+var bufferShim = require('buffer-shims');
+/*</replacement>*/
+
+util.inherits(Writable, Stream);
+
+function nop() {}
+
+function WriteReq(chunk, encoding, cb) {
+  this.chunk = chunk;
+  this.encoding = encoding;
+  this.callback = cb;
+  this.next = null;
+}
+
+function WritableState(options, stream) {
+  Duplex = Duplex || require('./_stream_duplex');
+
+  options = options || {};
+
+  // object stream flag to indicate whether or not this stream
+  // contains buffers or objects.
+  this.objectMode = !!options.objectMode;
+
+  if (stream instanceof Duplex) this.objectMode = this.objectMode || !!options.writableObjectMode;
+
+  // the point at which write() starts returning false
+  // Note: 0 is a valid value, means that we always return false if
+  // the entire buffer is not flushed immediately on write()
+  var hwm = options.highWaterMark;
+  var defaultHwm = this.objectMode ? 16 : 16 * 1024;
+  this.highWaterMark = hwm || hwm === 0 ? hwm : defaultHwm;
+
+  // cast to ints.
+  this.highWaterMark = ~~this.highWaterMark;
+
+  // drain event flag.
+  this.needDrain = false;
+  // at the start of calling end()
+  this.ending = false;
+  // when end() has been called, and returned
+  this.ended = false;
+  // when 'finish' is emitted
+  this.finished = false;
+
+  // should we decode strings into buffers before passing to _write?
+  // this is here so that some node-core streams can optimize string
+  // handling at a lower level.
+  var noDecode = options.decodeStrings === false;
+  this.decodeStrings = !noDecode;
+
+  // Crypto is kind of old and crusty.  Historically, its default string
+  // encoding is 'binary' so we have to make this configurable.
+  // Everything else in the universe uses 'utf8', though.
+  this.defaultEncoding = options.defaultEncoding || 'utf8';
+
+  // not an actual buffer we keep track of, but a measurement
+  // of how much we're waiting to get pushed to some underlying
+  // socket or file.
+  this.length = 0;
+
+  // a flag to see when we're in the middle of a write.
+  this.writing = false;
+
+  // when true all writes will be buffered until .uncork() call
+  this.corked = 0;
+
+  // a flag to be able to tell if the onwrite cb is called immediately,
+  // or on a later tick.  We set this to true at first, because any
+  // actions that shouldn't happen until "later" should generally also
+  // not happen before the first write call.
+  this.sync = true;
+
+  // a flag to know if we're processing previously buffered items, which
+  // may call the _write() callback in the same tick, so that we don't
+  // end up in an overlapped onwrite situation.
+  this.bufferProcessing = false;
+
+  // the callback that's passed to _write(chunk,cb)
+  this.onwrite = function (er) {
+    onwrite(stream, er);
+  };
+
+  // the callback that the user supplies to write(chunk,encoding,cb)
+  this.writecb = null;
+
+  // the amount that is being written when _write is called.
+  this.writelen = 0;
+
+  this.bufferedRequest = null;
+  this.lastBufferedRequest = null;
+
+  // number of pending user-supplied write callbacks
+  // this must be 0 before 'finish' can be emitted
+  this.pendingcb = 0;
+
+  // emit prefinish if the only thing we're waiting for is _write cbs
+  // This is relevant for synchronous Transform streams
+  this.prefinished = false;
+
+  // True if the error was already emitted and should not be thrown again
+  this.errorEmitted = false;
+
+  // count buffered requests
+  this.bufferedRequestCount = 0;
+
+  // allocate the first CorkedRequest, there is always
+  // one allocated and free to use, and we maintain at most two
+  this.corkedRequestsFree = new CorkedRequest(this);
+}
+
+WritableState.prototype.getBuffer = function getBuffer() {
+  var current = this.bufferedRequest;
+  var out = [];
+  while (current) {
+    out.push(current);
+    current = current.next;
+  }
+  return out;
+};
+
+(function () {
+  try {
+    Object.defineProperty(WritableState.prototype, 'buffer', {
+      get: internalUtil.deprecate(function () {
+        return this.getBuffer();
+      }, '_writableState.buffer is deprecated. Use _writableState.getBuffer ' + 'instead.')
+    });
+  } catch (_) {}
+})();
+
+// Test _writableState for inheritance to account for Duplex streams,
+// whose prototype chain only points to Readable.
+var realHasInstance;
+if (typeof Symbol === 'function' && Symbol.hasInstance && typeof Function.prototype[Symbol.hasInstance] === 'function') {
+  realHasInstance = Function.prototype[Symbol.hasInstance];
+  Object.defineProperty(Writable, Symbol.hasInstance, {
+    value: function (object) {
+      if (realHasInstance.call(this, object)) return true;
+
+      return object && object._writableState instanceof WritableState;
+    }
+  });
+} else {
+  realHasInstance = function (object) {
+    return object instanceof this;
+  };
+}
+
+function Writable(options) {
+  Duplex = Duplex || require('./_stream_duplex');
+
+  // Writable ctor is applied to Duplexes, too.
+  // `realHasInstance` is necessary because using plain `instanceof`
+  // would return false, as no `_writableState` property is attached.
+
+  // Trying to use the custom `instanceof` for Writable here will also break the
+  // Node.js LazyTransform implementation, which has a non-trivial getter for
+  // `_writableState` that would lead to infinite recursion.
+  if (!realHasInstance.call(Writable, this) && !(this instanceof Duplex)) {
+    return new Writable(options);
+  }
+
+  this._writableState = new WritableState(options, this);
+
+  // legacy.
+  this.writable = true;
+
+  if (options) {
+    if (typeof options.write === 'function') this._write = options.write;
+
+    if (typeof options.writev === 'function') this._writev = options.writev;
+  }
+
+  Stream.call(this);
+}
+
+// Otherwise people can pipe Writable streams, which is just wrong.
+Writable.prototype.pipe = function () {
+  this.emit('error', new Error('Cannot pipe, not readable'));
+};
+
+function writeAfterEnd(stream, cb) {
+  var er = new Error('write after end');
+  // TODO: defer error events consistently everywhere, not just the cb
+  stream.emit('error', er);
+  processNextTick(cb, er);
+}
+
+// Checks that a user-supplied chunk is valid, especially for the particular
+// mode the stream is in. Currently this means that `null` is never accepted
+// and undefined/non-string values are only allowed in object mode.
+function validChunk(stream, state, chunk, cb) {
+  var valid = true;
+  var er = false;
+
+  if (chunk === null) {
+    er = new TypeError('May not write null values to stream');
+  } else if (typeof chunk !== 'string' && chunk !== undefined && !state.objectMode) {
+    er = new TypeError('Invalid non-string/buffer chunk');
+  }
+  if (er) {
+    stream.emit('error', er);
+    processNextTick(cb, er);
+    valid = false;
+  }
+  return valid;
+}
+
+Writable.prototype.write = function (chunk, encoding, cb) {
+  var state = this._writableState;
+  var ret = false;
+  var isBuf = Buffer.isBuffer(chunk);
+
+  if (typeof encoding === 'function') {
+    cb = encoding;
+    encoding = null;
+  }
+
+  if (isBuf) encoding = 'buffer';else if (!encoding) encoding = state.defaultEncoding;
+
+  if (typeof cb !== 'function') cb = nop;
+
+  if (state.ended) writeAfterEnd(this, cb);else if (isBuf || validChunk(this, state, chunk, cb)) {
+    state.pendingcb++;
+    ret = writeOrBuffer(this, state, isBuf, chunk, encoding, cb);
+  }
+
+  return ret;
+};
+
+Writable.prototype.cork = function () {
+  var state = this._writableState;
+
+  state.corked++;
+};
+
+Writable.prototype.uncork = function () {
+  var state = this._writableState;
+
+  if (state.corked) {
+    state.corked--;
+
+    if (!state.writing && !state.corked && !state.finished && !state.bufferProcessing && state.bufferedRequest) clearBuffer(this, state);
+  }
+};
+
+Writable.prototype.setDefaultEncoding = function setDefaultEncoding(encoding) {
+  // node::ParseEncoding() requires lower case.
+  if (typeof encoding === 'string') encoding = encoding.toLowerCase();
+  if (!(['hex', 'utf8', 'utf-8', 'ascii', 'binary', 'base64', 'ucs2', 'ucs-2', 'utf16le', 'utf-16le', 'raw'].indexOf((encoding + '').toLowerCase()) > -1)) throw new TypeError('Unknown encoding: ' + encoding);
+  this._writableState.defaultEncoding = encoding;
+  return this;
+};
+
+function decodeChunk(state, chunk, encoding) {
+  if (!state.objectMode && state.decodeStrings !== false && typeof chunk === 'string') {
+    chunk = bufferShim.from(chunk, encoding);
+  }
+  return chunk;
+}
+
+// if we're already writing something, then just put this
+// in the queue, and wait our turn.  Otherwise, call _write
+// If we return false, then we need a drain event, so set that flag.
+function writeOrBuffer(stream, state, isBuf, chunk, encoding, cb) {
+  if (!isBuf) {
+    chunk = decodeChunk(state, chunk, encoding);
+    if (Buffer.isBuffer(chunk)) encoding = 'buffer';
+  }
+  var len = state.objectMode ? 1 : chunk.length;
+
+  state.length += len;
+
+  var ret = state.length < state.highWaterMark;
+  // we must ensure that previous needDrain will not be reset to false.
+  if (!ret) state.needDrain = true;
+
+  if (state.writing || state.corked) {
+    var last = state.lastBufferedRequest;
+    state.lastBufferedRequest = new WriteReq(chunk, encoding, cb);
+    if (last) {
+      last.next = state.lastBufferedRequest;
+    } else {
+      state.bufferedRequest = state.lastBufferedRequest;
+    }
+    state.bufferedRequestCount += 1;
+  } else {
+    doWrite(stream, state, false, len, chunk, encoding, cb);
+  }
+
+  return ret;
+}
+
+function doWrite(stream, state, writev, len, chunk, encoding, cb) {
+  state.writelen = len;
+  state.writecb = cb;
+  state.writing = true;
+  state.sync = true;
+  if (writev) stream._writev(chunk, state.onwrite);else stream._write(chunk, encoding, state.onwrite);
+  state.sync = false;
+}
+
+function onwriteError(stream, state, sync, er, cb) {
+  --state.pendingcb;
+  if (sync) processNextTick(cb, er);else cb(er);
+
+  stream._writableState.errorEmitted = true;
+  stream.emit('error', er);
+}
+
+function onwriteStateUpdate(state) {
+  state.writing = false;
+  state.writecb = null;
+  state.length -= state.writelen;
+  state.writelen = 0;
+}
+
+function onwrite(stream, er) {
+  var state = stream._writableState;
+  var sync = state.sync;
+  var cb = state.writecb;
+
+  onwriteStateUpdate(state);
+
+  if (er) onwriteError(stream, state, sync, er, cb);else {
+    // Check if we're actually ready to finish, but don't emit yet
+    var finished = needFinish(state);
+
+    if (!finished && !state.corked && !state.bufferProcessing && state.bufferedRequest) {
+      clearBuffer(stream, state);
+    }
+
+    if (sync) {
+      /*<replacement>*/
+      asyncWrite(afterWrite, stream, state, finished, cb);
+      /*</replacement>*/
+    } else {
+      afterWrite(stream, state, finished, cb);
+    }
+  }
+}
+
+function afterWrite(stream, state, finished, cb) {
+  if (!finished) onwriteDrain(stream, state);
+  state.pendingcb--;
+  cb();
+  finishMaybe(stream, state);
+}
+
+// Must force callback to be called on nextTick, so that we don't
+// emit 'drain' before the write() consumer gets the 'false' return
+// value, and has a chance to attach a 'drain' listener.
+function onwriteDrain(stream, state) {
+  if (state.length === 0 && state.needDrain) {
+    state.needDrain = false;
+    stream.emit('drain');
+  }
+}
+
+// if there's something in the buffer waiting, then process it
+function clearBuffer(stream, state) {
+  state.bufferProcessing = true;
+  var entry = state.bufferedRequest;
+
+  if (stream._writev && entry && entry.next) {
+    // Fast case, write everything using _writev()
+    var l = state.bufferedRequestCount;
+    var buffer = new Array(l);
+    var holder = state.corkedRequestsFree;
+    holder.entry = entry;
+
+    var count = 0;
+    while (entry) {
+      buffer[count] = entry;
+      entry = entry.next;
+      count += 1;
+    }
+
+    doWrite(stream, state, true, state.length, buffer, '', holder.finish);
+
+    // doWrite is almost always async, defer these to save a bit of time
+    // as the hot path ends with doWrite
+    state.pendingcb++;
+    state.lastBufferedRequest = null;
+    if (holder.next) {
+      state.corkedRequestsFree = holder.next;
+      holder.next = null;
+    } else {
+      state.corkedRequestsFree = new CorkedRequest(state);
+    }
+  } else {
+    // Slow case, write chunks one-by-one
+    while (entry) {
+      var chunk = entry.chunk;
+      var encoding = entry.encoding;
+      var cb = entry.callback;
+      var len = state.objectMode ? 1 : chunk.length;
+
+      doWrite(stream, state, false, len, chunk, encoding, cb);
+      entry = entry.next;
+      // if we didn't call the onwrite immediately, then
+      // it means that we need to wait until it does.
+      // also, that means that the chunk and cb are currently
+      // being processed, so move the buffer counter past them.
+      if (state.writing) {
+        break;
+      }
+    }
+
+    if (entry === null) state.lastBufferedRequest = null;
+  }
+
+  state.bufferedRequestCount = 0;
+  state.bufferedRequest = entry;
+  state.bufferProcessing = false;
+}
+
+Writable.prototype._write = function (chunk, encoding, cb) {
+  cb(new Error('_write() is not implemented'));
+};
+
+Writable.prototype._writev = null;
+
+Writable.prototype.end = function (chunk, encoding, cb) {
+  var state = this._writableState;
+
+  if (typeof chunk === 'function') {
+    cb = chunk;
+    chunk = null;
+    encoding = null;
+  } else if (typeof encoding === 'function') {
+    cb = encoding;
+    encoding = null;
+  }
+
+  if (chunk !== null && chunk !== undefined) this.write(chunk, encoding);
+
+  // .end() fully uncorks
+  if (state.corked) {
+    state.corked = 1;
+    this.uncork();
+  }
+
+  // ignore unnecessary end() calls.
+  if (!state.ending && !state.finished) endWritable(this, state, cb);
+};
+
+function needFinish(state) {
+  return state.ending && state.length === 0 && state.bufferedRequest === null && !state.finished && !state.writing;
+}
+
+function prefinish(stream, state) {
+  if (!state.prefinished) {
+    state.prefinished = true;
+    stream.emit('prefinish');
+  }
+}
+
+function finishMaybe(stream, state) {
+  var need = needFinish(state);
+  if (need) {
+    if (state.pendingcb === 0) {
+      prefinish(stream, state);
+      state.finished = true;
+      stream.emit('finish');
+    } else {
+      prefinish(stream, state);
+    }
+  }
+  return need;
+}
+
+function endWritable(stream, state, cb) {
+  state.ending = true;
+  finishMaybe(stream, state);
+  if (cb) {
+    if (state.finished) processNextTick(cb);else stream.once('finish', cb);
+  }
+  state.ended = true;
+  stream.writable = false;
+}
+
+// It seems a linked list but it is not
+// there will be only 2 of these for each stream
+function CorkedRequest(state) {
+  var _this = this;
+
+  this.next = null;
+  this.entry = null;
+  this.finish = function (err) {
+    var entry = _this.entry;
+    _this.entry = null;
+    while (entry) {
+      var cb = entry.callback;
+      state.pendingcb--;
+      cb(err);
+      entry = entry.next;
+    }
+    if (state.corkedRequestsFree) {
+      state.corkedRequestsFree.next = _this;
+    } else {
+      state.corkedRequestsFree = _this;
+    }
+  };
+}
+}).call(this,require('_process'))
+},{"./_stream_duplex":304,"./internal/streams/stream":310,"_process":46,"buffer":45,"buffer-shims":47,"core-util-is":48,"inherits":52,"process-nextick-args":145,"util-deprecate":318}],309:[function(require,module,exports){
+'use strict';
+
+var Buffer = require('buffer').Buffer;
+/*<replacement>*/
+var bufferShim = require('buffer-shims');
+/*</replacement>*/
+
+module.exports = BufferList;
+
+function BufferList() {
+  this.head = null;
+  this.tail = null;
+  this.length = 0;
+}
+
+BufferList.prototype.push = function (v) {
+  var entry = { data: v, next: null };
+  if (this.length > 0) this.tail.next = entry;else this.head = entry;
+  this.tail = entry;
+  ++this.length;
+};
+
+BufferList.prototype.unshift = function (v) {
+  var entry = { data: v, next: this.head };
+  if (this.length === 0) this.tail = entry;
+  this.head = entry;
+  ++this.length;
+};
+
+BufferList.prototype.shift = function () {
+  if (this.length === 0) return;
+  var ret = this.head.data;
+  if (this.length === 1) this.head = this.tail = null;else this.head = this.head.next;
+  --this.length;
+  return ret;
+};
+
+BufferList.prototype.clear = function () {
+  this.head = this.tail = null;
+  this.length = 0;
+};
+
+BufferList.prototype.join = function (s) {
+  if (this.length === 0) return '';
+  var p = this.head;
+  var ret = '' + p.data;
+  while (p = p.next) {
+    ret += s + p.data;
+  }return ret;
+};
+
+BufferList.prototype.concat = function (n) {
+  if (this.length === 0) return bufferShim.alloc(0);
+  if (this.length === 1) return this.head.data;
+  var ret = bufferShim.allocUnsafe(n >>> 0);
+  var p = this.head;
+  var i = 0;
+  while (p) {
+    p.data.copy(ret, i);
+    i += p.data.length;
+    p = p.next;
+  }
+  return ret;
+};
+},{"buffer":45,"buffer-shims":47}],310:[function(require,module,exports){
+module.exports = require('events').EventEmitter;
+
+},{"events":49}],311:[function(require,module,exports){
+module.exports = require('./readable').PassThrough
+
+},{"./readable":312}],312:[function(require,module,exports){
+exports = module.exports = require('./lib/_stream_readable.js');
+exports.Stream = exports;
+exports.Readable = exports;
+exports.Writable = require('./lib/_stream_writable.js');
+exports.Duplex = require('./lib/_stream_duplex.js');
+exports.Transform = require('./lib/_stream_transform.js');
+exports.PassThrough = require('./lib/_stream_passthrough.js');
+
+},{"./lib/_stream_duplex.js":304,"./lib/_stream_passthrough.js":305,"./lib/_stream_readable.js":306,"./lib/_stream_transform.js":307,"./lib/_stream_writable.js":308}],313:[function(require,module,exports){
+module.exports = require('./readable').Transform
+
+},{"./readable":312}],314:[function(require,module,exports){
+module.exports = require('./lib/_stream_writable.js');
+
+},{"./lib/_stream_writable.js":308}],315:[function(require,module,exports){
+module.exports = require('buffer')
+
+},{"buffer":45}],316:[function(require,module,exports){
+// Copyright Joyent, Inc. and other Node contributors.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a
+// copy of this software and associated documentation files (the
+// "Software"), to deal in the Software without restriction, including
+// without limitation the rights to use, copy, modify, merge, publish,
+// distribute, sublicense, and/or sell copies of the Software, and to permit
+// persons to whom the Software is furnished to do so, subject to the
+// following conditions:
+//
+// The above copyright notice and this permission notice shall be included
+// in all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
+// NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+// DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+// OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+// USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+module.exports = Stream;
+
+var EE = require('events').EventEmitter;
+var inherits = require('inherits');
+
+inherits(Stream, EE);
+Stream.Readable = require('readable-stream/readable.js');
+Stream.Writable = require('readable-stream/writable.js');
+Stream.Duplex = require('readable-stream/duplex.js');
+Stream.Transform = require('readable-stream/transform.js');
+Stream.PassThrough = require('readable-stream/passthrough.js');
+
+// Backwards-compat with node 0.4.x
+Stream.Stream = Stream;
+
+
+
+// old-style streams.  Note that the pipe method (the only relevant
+// part of this class) is overridden in the Readable class.
+
+function Stream() {
+  EE.call(this);
+}
+
+Stream.prototype.pipe = function(dest, options) {
+  var source = this;
+
+  function ondata(chunk) {
+    if (dest.writable) {
+      if (false === dest.write(chunk) && source.pause) {
+        source.pause();
+      }
+    }
+  }
+
+  source.on('data', ondata);
+
+  function ondrain() {
+    if (source.readable && source.resume) {
+      source.resume();
+    }
+  }
+
+  dest.on('drain', ondrain);
+
+  // If the 'end' option is not supplied, dest.end() will be called when
+  // source gets the 'end' or 'close' events.  Only dest.end() once.
+  if (!dest._isStdio && (!options || options.end !== false)) {
+    source.on('end', onend);
+    source.on('close', onclose);
+  }
+
+  var didOnEnd = false;
+  function onend() {
+    if (didOnEnd) return;
+    didOnEnd = true;
+
+    dest.end();
+  }
+
+
+  function onclose() {
+    if (didOnEnd) return;
+    didOnEnd = true;
+
+    if (typeof dest.destroy === 'function') dest.destroy();
+  }
+
+  // don't leave dangling pipes when there are errors.
+  function onerror(er) {
+    cleanup();
+    if (EE.listenerCount(this, 'error') === 0) {
+      throw er; // Unhandled stream error in pipe.
+    }
+  }
+
+  source.on('error', onerror);
+  dest.on('error', onerror);
+
+  // remove all the event listeners that were added.
+  function cleanup() {
+    source.removeListener('data', ondata);
+    dest.removeListener('drain', ondrain);
+
+    source.removeListener('end', onend);
+    source.removeListener('close', onclose);
+
+    source.removeListener('error', onerror);
+    dest.removeListener('error', onerror);
+
+    source.removeListener('end', cleanup);
+    source.removeListener('close', cleanup);
+
+    dest.removeListener('close', cleanup);
+  }
+
+  source.on('end', cleanup);
+  source.on('close', cleanup);
+
+  dest.on('close', cleanup);
+
+  dest.emit('pipe', source);
+
+  // Allow for unix-like usage: A.pipe(B).pipe(C)
+  return dest;
+};
+
+},{"events":49,"inherits":52,"readable-stream/duplex.js":303,"readable-stream/passthrough.js":311,"readable-stream/readable.js":312,"readable-stream/transform.js":313,"readable-stream/writable.js":314}],317:[function(require,module,exports){
+'use strict';
+
+var Buffer = require('safe-buffer').Buffer;
+
+var isEncoding = Buffer.isEncoding || function (encoding) {
+  encoding = '' + encoding;
+  switch (encoding && encoding.toLowerCase()) {
+    case 'hex':case 'utf8':case 'utf-8':case 'ascii':case 'binary':case 'base64':case 'ucs2':case 'ucs-2':case 'utf16le':case 'utf-16le':case 'raw':
+      return true;
+    default:
+      return false;
+  }
+};
+
+function _normalizeEncoding(enc) {
+  if (!enc) return 'utf8';
+  var retried;
+  while (true) {
+    switch (enc) {
+      case 'utf8':
+      case 'utf-8':
+        return 'utf8';
+      case 'ucs2':
+      case 'ucs-2':
+      case 'utf16le':
+      case 'utf-16le':
+        return 'utf16le';
+      case 'latin1':
+      case 'binary':
+        return 'latin1';
+      case 'base64':
+      case 'ascii':
+      case 'hex':
+        return enc;
+      default:
+        if (retried) return; // undefined
+        enc = ('' + enc).toLowerCase();
+        retried = true;
+    }
+  }
+};
+
+// Do not cache `Buffer.isEncoding` when checking encoding names as some
+// modules monkey-patch it to support additional encodings
+function normalizeEncoding(enc) {
+  var nenc = _normalizeEncoding(enc);
+  if (typeof nenc !== 'string' && (Buffer.isEncoding === isEncoding || !isEncoding(enc))) throw new Error('Unknown encoding: ' + enc);
+  return nenc || enc;
+}
+
+// StringDecoder provides an interface for efficiently splitting a series of
+// buffers into a series of JS strings without breaking apart multi-byte
+// characters.
+exports.StringDecoder = StringDecoder;
+function StringDecoder(encoding) {
+  this.encoding = normalizeEncoding(encoding);
+  var nb;
+  switch (this.encoding) {
+    case 'utf16le':
+      this.text = utf16Text;
+      this.end = utf16End;
+      nb = 4;
+      break;
+    case 'utf8':
+      this.fillLast = utf8FillLast;
+      nb = 4;
+      break;
+    case 'base64':
+      this.text = base64Text;
+      this.end = base64End;
+      nb = 3;
+      break;
+    default:
+      this.write = simpleWrite;
+      this.end = simpleEnd;
+      return;
+  }
+  this.lastNeed = 0;
+  this.lastTotal = 0;
+  this.lastChar = Buffer.allocUnsafe(nb);
+}
+
+StringDecoder.prototype.write = function (buf) {
+  if (buf.length === 0) return '';
+  var r;
+  var i;
+  if (this.lastNeed) {
+    r = this.fillLast(buf);
+    if (r === undefined) return '';
+    i = this.lastNeed;
+    this.lastNeed = 0;
+  } else {
+    i = 0;
+  }
+  if (i < buf.length) return r ? r + this.text(buf, i) : this.text(buf, i);
+  return r || '';
+};
+
+StringDecoder.prototype.end = utf8End;
+
+// Returns only complete characters in a Buffer
+StringDecoder.prototype.text = utf8Text;
+
+// Attempts to complete a partial non-UTF-8 character using bytes from a Buffer
+StringDecoder.prototype.fillLast = function (buf) {
+  if (this.lastNeed <= buf.length) {
+    buf.copy(this.lastChar, this.lastTotal - this.lastNeed, 0, this.lastNeed);
+    return this.lastChar.toString(this.encoding, 0, this.lastTotal);
+  }
+  buf.copy(this.lastChar, this.lastTotal - this.lastNeed, 0, buf.length);
+  this.lastNeed -= buf.length;
+};
+
+// Checks the type of a UTF-8 byte, whether it's ASCII, a leading byte, or a
+// continuation byte.
+function utf8CheckByte(byte) {
+  if (byte <= 0x7F) return 0;else if (byte >> 5 === 0x06) return 2;else if (byte >> 4 === 0x0E) return 3;else if (byte >> 3 === 0x1E) return 4;
+  return -1;
+}
+
+// Checks at most 3 bytes at the end of a Buffer in order to detect an
+// incomplete multi-byte UTF-8 character. The total number of bytes (2, 3, or 4)
+// needed to complete the UTF-8 character (if applicable) are returned.
+function utf8CheckIncomplete(self, buf, i) {
+  var j = buf.length - 1;
+  if (j < i) return 0;
+  var nb = utf8CheckByte(buf[j]);
+  if (nb >= 0) {
+    if (nb > 0) self.lastNeed = nb - 1;
+    return nb;
+  }
+  if (--j < i) return 0;
+  nb = utf8CheckByte(buf[j]);
+  if (nb >= 0) {
+    if (nb > 0) self.lastNeed = nb - 2;
+    return nb;
+  }
+  if (--j < i) return 0;
+  nb = utf8CheckByte(buf[j]);
+  if (nb >= 0) {
+    if (nb > 0) {
+      if (nb === 2) nb = 0;else self.lastNeed = nb - 3;
+    }
+    return nb;
+  }
+  return 0;
+}
+
+// Validates as many continuation bytes for a multi-byte UTF-8 character as
+// needed or are available. If we see a non-continuation byte where we expect
+// one, we "replace" the validated continuation bytes we've seen so far with
+// UTF-8 replacement characters ('\ufffd'), to match v8's UTF-8 decoding
+// behavior. The continuation byte check is included three times in the case
+// where all of the continuation bytes for a character exist in the same buffer.
+// It is also done this way as a slight performance increase instead of using a
+// loop.
+function utf8CheckExtraBytes(self, buf, p) {
+  if ((buf[0] & 0xC0) !== 0x80) {
+    self.lastNeed = 0;
+    return '\ufffd'.repeat(p);
+  }
+  if (self.lastNeed > 1 && buf.length > 1) {
+    if ((buf[1] & 0xC0) !== 0x80) {
+      self.lastNeed = 1;
+      return '\ufffd'.repeat(p + 1);
+    }
+    if (self.lastNeed > 2 && buf.length > 2) {
+      if ((buf[2] & 0xC0) !== 0x80) {
+        self.lastNeed = 2;
+        return '\ufffd'.repeat(p + 2);
+      }
+    }
+  }
+}
+
+// Attempts to complete a multi-byte UTF-8 character using bytes from a Buffer.
+function utf8FillLast(buf) {
+  var p = this.lastTotal - this.lastNeed;
+  var r = utf8CheckExtraBytes(this, buf, p);
+  if (r !== undefined) return r;
+  if (this.lastNeed <= buf.length) {
+    buf.copy(this.lastChar, p, 0, this.lastNeed);
+    return this.lastChar.toString(this.encoding, 0, this.lastTotal);
+  }
+  buf.copy(this.lastChar, p, 0, buf.length);
+  this.lastNeed -= buf.length;
+}
+
+// Returns all complete UTF-8 characters in a Buffer. If the Buffer ended on a
+// partial character, the character's bytes are buffered until the required
+// number of bytes are available.
+function utf8Text(buf, i) {
+  var total = utf8CheckIncomplete(this, buf, i);
+  if (!this.lastNeed) return buf.toString('utf8', i);
+  this.lastTotal = total;
+  var end = buf.length - (total - this.lastNeed);
+  buf.copy(this.lastChar, 0, end);
+  return buf.toString('utf8', i, end);
+}
+
+// For UTF-8, a replacement character for each buffered byte of a (partial)
+// character needs to be added to the output.
+function utf8End(buf) {
+  var r = buf && buf.length ? this.write(buf) : '';
+  if (this.lastNeed) return r + '\ufffd'.repeat(this.lastTotal - this.lastNeed);
+  return r;
+}
+
+// UTF-16LE typically needs two bytes per character, but even if we have an even
+// number of bytes available, we need to check if we end on a leading/high
+// surrogate. In that case, we need to wait for the next two bytes in order to
+// decode the last character properly.
+function utf16Text(buf, i) {
+  if ((buf.length - i) % 2 === 0) {
+    var r = buf.toString('utf16le', i);
+    if (r) {
+      var c = r.charCodeAt(r.length - 1);
+      if (c >= 0xD800 && c <= 0xDBFF) {
+        this.lastNeed = 2;
+        this.lastTotal = 4;
+        this.lastChar[0] = buf[buf.length - 2];
+        this.lastChar[1] = buf[buf.length - 1];
+        return r.slice(0, -1);
+      }
+    }
+    return r;
+  }
+  this.lastNeed = 1;
+  this.lastTotal = 2;
+  this.lastChar[0] = buf[buf.length - 1];
+  return buf.toString('utf16le', i, buf.length - 1);
+}
+
+// For UTF-16LE we do not explicitly append special replacement characters if we
+// end on a partial character, we simply let v8 handle that.
+function utf16End(buf) {
+  var r = buf && buf.length ? this.write(buf) : '';
+  if (this.lastNeed) {
+    var end = this.lastTotal - this.lastNeed;
+    return r + this.lastChar.toString('utf16le', 0, end);
+  }
+  return r;
+}
+
+function base64Text(buf, i) {
+  var n = (buf.length - i) % 3;
+  if (n === 0) return buf.toString('base64', i);
+  this.lastNeed = 3 - n;
+  this.lastTotal = 3;
+  if (n === 1) {
+    this.lastChar[0] = buf[buf.length - 1];
+  } else {
+    this.lastChar[0] = buf[buf.length - 2];
+    this.lastChar[1] = buf[buf.length - 1];
+  }
+  return buf.toString('base64', i, buf.length - n);
+}
+
+function base64End(buf) {
+  var r = buf && buf.length ? this.write(buf) : '';
+  if (this.lastNeed) return r + this.lastChar.toString('base64', 0, 3 - this.lastNeed);
+  return r;
+}
+
+// Pass bytes on through for single-byte encodings (e.g. ascii, latin1, hex)
+function simpleWrite(buf) {
+  return buf.toString(this.encoding);
+}
+
+function simpleEnd(buf) {
+  return buf && buf.length ? this.write(buf) : '';
+}
+},{"safe-buffer":315}],318:[function(require,module,exports){
+arguments[4][140][0].apply(exports,arguments)
+},{"dup":140}],319:[function(require,module,exports){
+arguments[4][52][0].apply(exports,arguments)
+},{"dup":52}],320:[function(require,module,exports){
+module.exports = function isBuffer(arg) {
+  return arg && typeof arg === 'object'
+    && typeof arg.copy === 'function'
+    && typeof arg.fill === 'function'
+    && typeof arg.readUInt8 === 'function';
+}
+},{}],321:[function(require,module,exports){
+(function (process,global){
+// Copyright Joyent, Inc. and other Node contributors.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a
+// copy of this software and associated documentation files (the
+// "Software"), to deal in the Software without restriction, including
+// without limitation the rights to use, copy, modify, merge, publish,
+// distribute, sublicense, and/or sell copies of the Software, and to permit
+// persons to whom the Software is furnished to do so, subject to the
+// following conditions:
+//
+// The above copyright notice and this permission notice shall be included
+// in all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
+// NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+// DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+// OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+// USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+var formatRegExp = /%[sdj%]/g;
+exports.format = function(f) {
+  if (!isString(f)) {
+    var objects = [];
+    for (var i = 0; i < arguments.length; i++) {
+      objects.push(inspect(arguments[i]));
+    }
+    return objects.join(' ');
+  }
+
+  var i = 1;
+  var args = arguments;
+  var len = args.length;
+  var str = String(f).replace(formatRegExp, function(x) {
+    if (x === '%%') return '%';
+    if (i >= len) return x;
+    switch (x) {
+      case '%s': return String(args[i++]);
+      case '%d': return Number(args[i++]);
+      case '%j':
+        try {
+          return JSON.stringify(args[i++]);
+        } catch (_) {
+          return '[Circular]';
+        }
+      default:
+        return x;
+    }
+  });
+  for (var x = args[i]; i < len; x = args[++i]) {
+    if (isNull(x) || !isObject(x)) {
+      str += ' ' + x;
+    } else {
+      str += ' ' + inspect(x);
+    }
+  }
+  return str;
+};
+
+
+// Mark that a method should not be used.
+// Returns a modified function which warns once by default.
+// If --no-deprecation is set, then it is a no-op.
+exports.deprecate = function(fn, msg) {
+  // Allow for deprecating things in the process of starting up.
+  if (isUndefined(global.process)) {
+    return function() {
+      return exports.deprecate(fn, msg).apply(this, arguments);
+    };
+  }
+
+  if (process.noDeprecation === true) {
+    return fn;
+  }
+
+  var warned = false;
+  function deprecated() {
+    if (!warned) {
+      if (process.throwDeprecation) {
+        throw new Error(msg);
+      } else if (process.traceDeprecation) {
+        console.trace(msg);
+      } else {
+        console.error(msg);
+      }
+      warned = true;
+    }
+    return fn.apply(this, arguments);
+  }
+
+  return deprecated;
+};
+
+
+var debugs = {};
+var debugEnviron;
+exports.debuglog = function(set) {
+  if (isUndefined(debugEnviron))
+    debugEnviron = process.env.NODE_DEBUG || '';
+  set = set.toUpperCase();
+  if (!debugs[set]) {
+    if (new RegExp('\\b' + set + '\\b', 'i').test(debugEnviron)) {
+      var pid = process.pid;
+      debugs[set] = function() {
+        var msg = exports.format.apply(exports, arguments);
+        console.error('%s %d: %s', set, pid, msg);
+      };
+    } else {
+      debugs[set] = function() {};
+    }
+  }
+  return debugs[set];
+};
+
+
+/**
+ * Echos the value of a value. Trys to print the value out
+ * in the best way possible given the different types.
+ *
+ * @param {Object} obj The object to print out.
+ * @param {Object} opts Optional options object that alters the output.
+ */
+/* legacy: obj, showHidden, depth, colors*/
+function inspect(obj, opts) {
+  // default options
+  var ctx = {
+    seen: [],
+    stylize: stylizeNoColor
+  };
+  // legacy...
+  if (arguments.length >= 3) ctx.depth = arguments[2];
+  if (arguments.length >= 4) ctx.colors = arguments[3];
+  if (isBoolean(opts)) {
+    // legacy...
+    ctx.showHidden = opts;
+  } else if (opts) {
+    // got an "options" object
+    exports._extend(ctx, opts);
+  }
+  // set default options
+  if (isUndefined(ctx.showHidden)) ctx.showHidden = false;
+  if (isUndefined(ctx.depth)) ctx.depth = 2;
+  if (isUndefined(ctx.colors)) ctx.colors = false;
+  if (isUndefined(ctx.customInspect)) ctx.customInspect = true;
+  if (ctx.colors) ctx.stylize = stylizeWithColor;
+  return formatValue(ctx, obj, ctx.depth);
+}
+exports.inspect = inspect;
+
+
+// http://en.wikipedia.org/wiki/ANSI_escape_code#graphics
+inspect.colors = {
+  'bold' : [1, 22],
+  'italic' : [3, 23],
+  'underline' : [4, 24],
+  'inverse' : [7, 27],
+  'white' : [37, 39],
+  'grey' : [90, 39],
+  'black' : [30, 39],
+  'blue' : [34, 39],
+  'cyan' : [36, 39],
+  'green' : [32, 39],
+  'magenta' : [35, 39],
+  'red' : [31, 39],
+  'yellow' : [33, 39]
+};
+
+// Don't use 'blue' not visible on cmd.exe
+inspect.styles = {
+  'special': 'cyan',
+  'number': 'yellow',
+  'boolean': 'yellow',
+  'undefined': 'grey',
+  'null': 'bold',
+  'string': 'green',
+  'date': 'magenta',
+  // "name": intentionally not styling
+  'regexp': 'red'
+};
+
+
+function stylizeWithColor(str, styleType) {
+  var style = inspect.styles[styleType];
+
+  if (style) {
+    return '\u001b[' + inspect.colors[style][0] + 'm' + str +
+           '\u001b[' + inspect.colors[style][1] + 'm';
+  } else {
+    return str;
+  }
+}
+
+
+function stylizeNoColor(str, styleType) {
+  return str;
+}
+
+
+function arrayToHash(array) {
+  var hash = {};
+
+  array.forEach(function(val, idx) {
+    hash[val] = true;
+  });
+
+  return hash;
+}
+
+
+function formatValue(ctx, value, recurseTimes) {
+  // Provide a hook for user-specified inspect functions.
+  // Check that value is an object with an inspect function on it
+  if (ctx.customInspect &&
+      value &&
+      isFunction(value.inspect) &&
+      // Filter out the util module, it's inspect function is special
+      value.inspect !== exports.inspect &&
+      // Also filter out any prototype objects using the circular check.
+      !(value.constructor && value.constructor.prototype === value)) {
+    var ret = value.inspect(recurseTimes, ctx);
+    if (!isString(ret)) {
+      ret = formatValue(ctx, ret, recurseTimes);
+    }
+    return ret;
+  }
+
+  // Primitive types cannot have properties
+  var primitive = formatPrimitive(ctx, value);
+  if (primitive) {
+    return primitive;
+  }
+
+  // Look up the keys of the object.
+  var keys = Object.keys(value);
+  var visibleKeys = arrayToHash(keys);
+
+  if (ctx.showHidden) {
+    keys = Object.getOwnPropertyNames(value);
+  }
+
+  // IE doesn't make error fields non-enumerable
+  // http://msdn.microsoft.com/en-us/library/ie/dww52sbt(v=vs.94).aspx
+  if (isError(value)
+      && (keys.indexOf('message') >= 0 || keys.indexOf('description') >= 0)) {
+    return formatError(value);
+  }
+
+  // Some type of object without properties can be shortcutted.
+  if (keys.length === 0) {
+    if (isFunction(value)) {
+      var name = value.name ? ': ' + value.name : '';
+      return ctx.stylize('[Function' + name + ']', 'special');
+    }
+    if (isRegExp(value)) {
+      return ctx.stylize(RegExp.prototype.toString.call(value), 'regexp');
+    }
+    if (isDate(value)) {
+      return ctx.stylize(Date.prototype.toString.call(value), 'date');
+    }
+    if (isError(value)) {
+      return formatError(value);
+    }
+  }
+
+  var base = '', array = false, braces = ['{', '}'];
+
+  // Make Array say that they are Array
+  if (isArray(value)) {
+    array = true;
+    braces = ['[', ']'];
+  }
+
+  // Make functions say that they are functions
+  if (isFunction(value)) {
+    var n = value.name ? ': ' + value.name : '';
+    base = ' [Function' + n + ']';
+  }
+
+  // Make RegExps say that they are RegExps
+  if (isRegExp(value)) {
+    base = ' ' + RegExp.prototype.toString.call(value);
+  }
+
+  // Make dates with properties first say the date
+  if (isDate(value)) {
+    base = ' ' + Date.prototype.toUTCString.call(value);
+  }
+
+  // Make error with message first say the error
+  if (isError(value)) {
+    base = ' ' + formatError(value);
+  }
+
+  if (keys.length === 0 && (!array || value.length == 0)) {
+    return braces[0] + base + braces[1];
+  }
+
+  if (recurseTimes < 0) {
+    if (isRegExp(value)) {
+      return ctx.stylize(RegExp.prototype.toString.call(value), 'regexp');
+    } else {
+      return ctx.stylize('[Object]', 'special');
+    }
+  }
+
+  ctx.seen.push(value);
+
+  var output;
+  if (array) {
+    output = formatArray(ctx, value, recurseTimes, visibleKeys, keys);
+  } else {
+    output = keys.map(function(key) {
+      return formatProperty(ctx, value, recurseTimes, visibleKeys, key, array);
+    });
+  }
+
+  ctx.seen.pop();
+
+  return reduceToSingleString(output, base, braces);
+}
+
+
+function formatPrimitive(ctx, value) {
+  if (isUndefined(value))
+    return ctx.stylize('undefined', 'undefined');
+  if (isString(value)) {
+    var simple = '\'' + JSON.stringify(value).replace(/^"|"$/g, '')
+                                             .replace(/'/g, "\\'")
+                                             .replace(/\\"/g, '"') + '\'';
+    return ctx.stylize(simple, 'string');
+  }
+  if (isNumber(value))
+    return ctx.stylize('' + value, 'number');
+  if (isBoolean(value))
+    return ctx.stylize('' + value, 'boolean');
+  // For some reason typeof null is "object", so special case here.
+  if (isNull(value))
+    return ctx.stylize('null', 'null');
+}
+
+
+function formatError(value) {
+  return '[' + Error.prototype.toString.call(value) + ']';
+}
+
+
+function formatArray(ctx, value, recurseTimes, visibleKeys, keys) {
+  var output = [];
+  for (var i = 0, l = value.length; i < l; ++i) {
+    if (hasOwnProperty(value, String(i))) {
+      output.push(formatProperty(ctx, value, recurseTimes, visibleKeys,
+          String(i), true));
+    } else {
+      output.push('');
+    }
+  }
+  keys.forEach(function(key) {
+    if (!key.match(/^\d+$/)) {
+      output.push(formatProperty(ctx, value, recurseTimes, visibleKeys,
+          key, true));
+    }
+  });
+  return output;
+}
+
+
+function formatProperty(ctx, value, recurseTimes, visibleKeys, key, array) {
+  var name, str, desc;
+  desc = Object.getOwnPropertyDescriptor(value, key) || { value: value[key] };
+  if (desc.get) {
+    if (desc.set) {
+      str = ctx.stylize('[Getter/Setter]', 'special');
+    } else {
+      str = ctx.stylize('[Getter]', 'special');
+    }
+  } else {
+    if (desc.set) {
+      str = ctx.stylize('[Setter]', 'special');
+    }
+  }
+  if (!hasOwnProperty(visibleKeys, key)) {
+    name = '[' + key + ']';
+  }
+  if (!str) {
+    if (ctx.seen.indexOf(desc.value) < 0) {
+      if (isNull(recurseTimes)) {
+        str = formatValue(ctx, desc.value, null);
+      } else {
+        str = formatValue(ctx, desc.value, recurseTimes - 1);
+      }
+      if (str.indexOf('\n') > -1) {
+        if (array) {
+          str = str.split('\n').map(function(line) {
+            return '  ' + line;
+          }).join('\n').substr(2);
+        } else {
+          str = '\n' + str.split('\n').map(function(line) {
+            return '   ' + line;
+          }).join('\n');
+        }
+      }
+    } else {
+      str = ctx.stylize('[Circular]', 'special');
+    }
+  }
+  if (isUndefined(name)) {
+    if (array && key.match(/^\d+$/)) {
+      return str;
+    }
+    name = JSON.stringify('' + key);
+    if (name.match(/^"([a-zA-Z_][a-zA-Z_0-9]*)"$/)) {
+      name = name.substr(1, name.length - 2);
+      name = ctx.stylize(name, 'name');
+    } else {
+      name = name.replace(/'/g, "\\'")
+                 .replace(/\\"/g, '"')
+                 .replace(/(^"|"$)/g, "'");
+      name = ctx.stylize(name, 'string');
+    }
+  }
+
+  return name + ': ' + str;
+}
+
+
+function reduceToSingleString(output, base, braces) {
+  var numLinesEst = 0;
+  var length = output.reduce(function(prev, cur) {
+    numLinesEst++;
+    if (cur.indexOf('\n') >= 0) numLinesEst++;
+    return prev + cur.replace(/\u001b\[\d\d?m/g, '').length + 1;
+  }, 0);
+
+  if (length > 60) {
+    return braces[0] +
+           (base === '' ? '' : base + '\n ') +
+           ' ' +
+           output.join(',\n  ') +
+           ' ' +
+           braces[1];
+  }
+
+  return braces[0] + base + ' ' + output.join(', ') + ' ' + braces[1];
+}
+
+
+// NOTE: These type checking functions intentionally don't use `instanceof`
+// because it is fragile and can be easily faked with `Object.create()`.
+function isArray(ar) {
+  return Array.isArray(ar);
+}
+exports.isArray = isArray;
+
+function isBoolean(arg) {
+  return typeof arg === 'boolean';
+}
+exports.isBoolean = isBoolean;
+
+function isNull(arg) {
+  return arg === null;
+}
+exports.isNull = isNull;
+
+function isNullOrUndefined(arg) {
+  return arg == null;
+}
+exports.isNullOrUndefined = isNullOrUndefined;
+
+function isNumber(arg) {
+  return typeof arg === 'number';
+}
+exports.isNumber = isNumber;
+
+function isString(arg) {
+  return typeof arg === 'string';
+}
+exports.isString = isString;
+
+function isSymbol(arg) {
+  return typeof arg === 'symbol';
+}
+exports.isSymbol = isSymbol;
+
+function isUndefined(arg) {
+  return arg === void 0;
+}
+exports.isUndefined = isUndefined;
+
+function isRegExp(re) {
+  return isObject(re) && objectToString(re) === '[object RegExp]';
+}
+exports.isRegExp = isRegExp;
+
+function isObject(arg) {
+  return typeof arg === 'object' && arg !== null;
+}
+exports.isObject = isObject;
+
+function isDate(d) {
+  return isObject(d) && objectToString(d) === '[object Date]';
+}
+exports.isDate = isDate;
+
+function isError(e) {
+  return isObject(e) &&
+      (objectToString(e) === '[object Error]' || e instanceof Error);
+}
+exports.isError = isError;
+
+function isFunction(arg) {
+  return typeof arg === 'function';
+}
+exports.isFunction = isFunction;
+
+function isPrimitive(arg) {
+  return arg === null ||
+         typeof arg === 'boolean' ||
+         typeof arg === 'number' ||
+         typeof arg === 'string' ||
+         typeof arg === 'symbol' ||  // ES6 symbol
+         typeof arg === 'undefined';
+}
+exports.isPrimitive = isPrimitive;
+
+exports.isBuffer = require('./support/isBuffer');
+
+function objectToString(o) {
+  return Object.prototype.toString.call(o);
+}
+
+
+function pad(n) {
+  return n < 10 ? '0' + n.toString(10) : n.toString(10);
+}
+
+
+var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep',
+              'Oct', 'Nov', 'Dec'];
+
+// 26 Feb 16:19:34
+function timestamp() {
+  var d = new Date();
+  var time = [pad(d.getHours()),
+              pad(d.getMinutes()),
+              pad(d.getSeconds())].join(':');
+  return [d.getDate(), months[d.getMonth()], time].join(' ');
+}
+
+
+// log is just a thin wrapper to console.log that prepends a timestamp
+exports.log = function() {
+  console.log('%s - %s', timestamp(), exports.format.apply(exports, arguments));
+};
+
+
+/**
+ * Inherit the prototype methods from one constructor into another.
+ *
+ * The Function.prototype.inherits from lang.js rewritten as a standalone
+ * function (not on Function.prototype). NOTE: If this file is to be loaded
+ * during bootstrapping this function needs to be rewritten using some native
+ * functions as prototype setup using normal JavaScript does not work as
+ * expected during bootstrapping (see mirror.js in r114903).
+ *
+ * @param {function} ctor Constructor function which needs to inherit the
+ *     prototype.
+ * @param {function} superCtor Constructor function to inherit prototype from.
+ */
+exports.inherits = require('inherits');
+
+exports._extend = function(origin, add) {
+  // Don't do anything if add isn't an object
+  if (!add || !isObject(add)) return origin;
+
+  var keys = Object.keys(add);
+  var i = keys.length;
+  while (i--) {
+    origin[keys[i]] = add[keys[i]];
+  }
+  return origin;
+};
+
+function hasOwnProperty(obj, prop) {
+  return Object.prototype.hasOwnProperty.call(obj, prop);
+}
+
+}).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
+},{"./support/isBuffer":320,"_process":46,"inherits":319}]},{},[1]);

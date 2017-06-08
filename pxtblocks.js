@@ -9,187 +9,35 @@ var __extends = (this && this.__extends) || function (d, b) {
 //                A compiler from Blocky to TouchDevelop                     //
 ///////////////////////////////////////////////////////////////////////////////
 var B = Blockly;
+var iface;
 var pxt;
 (function (pxt) {
     var blocks;
     (function (blocks) {
-        (function (NT) {
-            NT[NT["Prefix"] = 0] = "Prefix";
-            NT[NT["Infix"] = 1] = "Infix";
-            NT[NT["Block"] = 2] = "Block";
-            NT[NT["NewLine"] = 3] = "NewLine";
-        })(blocks.NT || (blocks.NT = {}));
-        var NT = blocks.NT;
-        var MAX_COMMENT_LINE_LENGTH = 50;
-        var reservedWords = ["break", "case", "catch", "class", "const", "continue", "debugger",
-            "default", "delete", "do", "else", "enum", "export", "extends", "false", "finally",
-            "for", "function", "if", "import", "in", "instanceof", "new", "null", "return",
-            "super", "switch", "this", "throw", "true", "try", "typeof", "var", "void", "while",
-            "with"];
+        blocks.reservedWords = ["abstract", "any", "as", "break",
+            "case", "catch", "class", "continue", "const", "constructor", "debugger",
+            "declare", "default", "delete", "do", "else", "enum", "export", "extends",
+            "false", "finally", "for", "from", "function", "get", "if", "implements",
+            "import", "in", "instanceof", "interface", "is", "let", "module", "namespace",
+            "new", "null", "package", "private", "protected", "public",
+            "require", "global", "return", "set", "static", "super", "switch",
+            "symbol", "this", "throw", "true", "try", "type", "typeof", "var", "void",
+            "while", "with", "yield", "async", "await", "of",
+            // PXT Specific
+            "Math"];
+        function initWorker() {
+            if (!iface) {
+                iface = pxt.worker.makeWebWorker(pxt.webConfig.workerjs);
+            }
+        }
+        blocks.initWorker = initWorker;
+        function workerOpAsync(op, arg) {
+            initWorker();
+            return iface.opAsync(op, arg);
+        }
+        blocks.workerOpAsync = workerOpAsync;
         var placeholders = {};
-        function stringLit(s) {
-            if (s.length > 20 && /\n/.test(s))
-                return "`" + s.replace(/[\\`${}]/g, function (f) { return "\\" + f; }) + "`";
-            else
-                return JSON.stringify(s);
-        }
-        function mkNode(tp, pref, children) {
-            return {
-                type: tp,
-                op: pref,
-                children: children
-            };
-        }
-        function mkNewLine() {
-            return mkNode(NT.NewLine, "", []);
-        }
-        function mkPrefix(pref, children) {
-            return mkNode(NT.Prefix, pref, children);
-        }
-        function mkInfix(child0, op, child1) {
-            return mkNode(NT.Infix, op, [child0, child1]);
-        }
-        function mkText(s) {
-            return mkPrefix(s, []);
-        }
-        blocks.mkText = mkText;
-        function mkBlock(nodes) {
-            return mkNode(NT.Block, "", nodes);
-        }
-        function mkGroup(nodes) {
-            return mkPrefix("", nodes);
-        }
-        blocks.mkGroup = mkGroup;
-        function mkStmt() {
-            var nodes = [];
-            for (var _i = 0; _i < arguments.length; _i++) {
-                nodes[_i - 0] = arguments[_i];
-            }
-            nodes.push(mkNewLine());
-            return mkGroup(nodes);
-        }
-        function mkCommaSep(nodes, externalInputs) {
-            var r = [];
-            for (var _i = 0, nodes_1 = nodes; _i < nodes_1.length; _i++) {
-                var n = nodes_1[_i];
-                if (externalInputs) {
-                    if (r.length > 0)
-                        r.push(mkText(","));
-                    r.push(mkNewLine());
-                }
-                else if (r.length > 0) {
-                    r.push(mkText(", "));
-                }
-                r.push(n);
-            }
-            if (externalInputs)
-                r.push(mkNewLine());
-            return mkGroup(r);
-        }
-        // A series of utility functions for constructing various J* AST nodes.
-        var Helpers;
-        (function (Helpers) {
-            function mkArrayLiteral(args) {
-                return mkGroup([
-                    mkText("["),
-                    mkCommaSep(args, false),
-                    mkText("]")
-                ]);
-            }
-            Helpers.mkArrayLiteral = mkArrayLiteral;
-            function mkNumberLiteral(x) {
-                return mkText(x.toString());
-            }
-            Helpers.mkNumberLiteral = mkNumberLiteral;
-            function mkBooleanLiteral(x) {
-                return mkText(x ? "true" : "false");
-            }
-            Helpers.mkBooleanLiteral = mkBooleanLiteral;
-            function mkStringLiteral(x) {
-                return mkText(stringLit(x));
-            }
-            Helpers.mkStringLiteral = mkStringLiteral;
-            function mkPropertyAccess(name, thisArg) {
-                return mkGroup([
-                    mkInfix(thisArg, ".", mkText(name)),
-                ]);
-            }
-            Helpers.mkPropertyAccess = mkPropertyAccess;
-            function mkCall(name, args, externalInputs, method) {
-                if (method === void 0) { method = false; }
-                if (method)
-                    return mkGroup([
-                        mkInfix(args[0], ".", mkText(name)),
-                        mkText("("),
-                        mkCommaSep(args.slice(1), externalInputs),
-                        mkText(")")
-                    ]);
-                else
-                    return mkGroup([
-                        mkText(name),
-                        mkText("("),
-                        mkCommaSep(args, externalInputs),
-                        mkText(")")
-                    ]);
-            }
-            Helpers.mkCall = mkCall;
-            // Call function [name] from the standard device library with arguments
-            // [args].
-            function stdCall(name, args, externalInputs) {
-                return mkCall(name, args, externalInputs);
-            }
-            Helpers.stdCall = stdCall;
-            // Call extension method [name] on the first argument
-            function extensionCall(name, args, externalInputs) {
-                return mkCall(name, args, externalInputs, true);
-            }
-            Helpers.extensionCall = extensionCall;
-            // Call function [name] from the specified [namespace] in the micro:bit
-            // library.
-            function namespaceCall(namespace, name, args, externalInputs) {
-                return mkCall(namespace + "." + name, args, externalInputs);
-            }
-            Helpers.namespaceCall = namespaceCall;
-            function mathCall(name, args) {
-                return namespaceCall("Math", name, args, false);
-            }
-            Helpers.mathCall = mathCall;
-            function mkGlobalRef(name) {
-                return mkText(name);
-            }
-            Helpers.mkGlobalRef = mkGlobalRef;
-            function mkSimpleCall(p, args) {
-                assert(args.length == 2);
-                return mkInfix(args[0], p, args[1]);
-            }
-            Helpers.mkSimpleCall = mkSimpleCall;
-            function mkWhile(condition, body) {
-                return mkGroup([
-                    mkText("while ("),
-                    condition,
-                    mkText(")"),
-                    mkBlock(body)
-                ]);
-            }
-            Helpers.mkWhile = mkWhile;
-            function mkComment(text) {
-                return mkStmt(mkText("// " + text));
-            }
-            Helpers.mkComment = mkComment;
-            function mkAssign(x, e) {
-                return mkStmt(mkSimpleCall("=", [x, e]));
-            }
-            Helpers.mkAssign = mkAssign;
-            function mkParenthesizedExpression(expression) {
-                return mkGroup([
-                    mkText("("),
-                    expression,
-                    mkText(")")
-                ]);
-            }
-            Helpers.mkParenthesizedExpression = mkParenthesizedExpression;
-        })(Helpers || (Helpers = {}));
-        var H = Helpers;
+        var MAX_COMMENT_LINE_LENGTH = 50;
         ///////////////////////////////////////////////////////////////////////////////
         // Miscellaneous utility functions
         ///////////////////////////////////////////////////////////////////////////////
@@ -233,9 +81,11 @@ var pxt;
         // type doesn't match the inferred type, it's an error. If the type was
         // undetermined as of yet, the type of the variable becomes the expected type.
         var Point = (function () {
-            function Point(link, type) {
+            function Point(link, type, parentType, childType) {
                 this.link = link;
                 this.type = type;
+                this.parentType = parentType;
+                this.childType = childType;
             }
             return Point;
         }());
@@ -243,8 +93,7 @@ var pxt;
         function find(p) {
             if (p.link)
                 return find(p.link);
-            else
-                return p;
+            return p;
         }
         function union(p1, p2) {
             var _p1 = find(p1);
@@ -252,8 +101,25 @@ var pxt;
             assert(_p1.link == null && _p2.link == null);
             if (_p1 == _p2)
                 return;
+            if (_p1.childType && _p2.childType) {
+                var ct = _p1.childType;
+                _p1.childType = null;
+                union(ct, _p2.childType);
+            }
+            else if (_p1.childType && !_p2.childType) {
+                _p2.childType = _p1.childType;
+            }
+            if (_p1.parentType && _p2.parentType) {
+                var pt = _p1.parentType;
+                _p1.parentType = null;
+                union(pt, _p2.parentType);
+            }
+            else if (_p1.parentType && !_p2.parentType) {
+                _p2.parentType = _p1.parentType;
+            }
             var t = unify(_p1.type, _p2.type);
             p1.link = _p2;
+            _p1.link = _p2;
             p1.type = null;
             p2.type = t;
         }
@@ -293,38 +159,91 @@ var pxt;
                 return find(b.p);
             if (b.type == "variables_get")
                 return find(lookup(e, escapeVarName(b.getFieldValue("VAR"), e)).type);
-            assert(!b.outputConnection || b.outputConnection.check_ && b.outputConnection.check_.length > 0);
-            if (!b.outputConnection)
+            if (!b.outputConnection) {
                 return ground(pUnit.type);
-            return ground(b.outputConnection.check_[0]);
+            }
+            var check = b.outputConnection.check_ && b.outputConnection.check_.length ? b.outputConnection.check_[0] : "T";
+            if (check === "Array") {
+                // The only block that hits this case should be lists_create_with, so we
+                // can safely infer the type from the first input that has a return type
+                var tp = void 0;
+                if (b.inputList && b.inputList.length) {
+                    for (var _i = 0, _a = b.inputList; _i < _a.length; _i++) {
+                        var input = _a[_i];
+                        if (input.connection && input.connection.targetBlock()) {
+                            var t = find(returnType(e, input.connection.targetBlock()));
+                            if (t) {
+                                if (t.parentType) {
+                                    return t.parentType;
+                                }
+                                tp = ground(t.type + "[]");
+                                genericLink(tp, t);
+                                break;
+                            }
+                        }
+                    }
+                }
+                return tp || ground("number[]");
+            }
+            else if (check === "T") {
+                var func_1 = e.stdCallTable[b.type];
+                var isArrayGet = b.type === "lists_index_get";
+                if (isArrayGet || func_1 && func_1.args.length) {
+                    var parentInput = void 0;
+                    if (isArrayGet) {
+                        parentInput = b.inputList.filter(function (i) { return i.name === "LIST"; })[0];
+                    }
+                    else {
+                        parentInput = b.inputList.filter(function (i) { return i.name === func_1.args[0].field; })[0];
+                    }
+                    if (parentInput.connection && parentInput.connection.targetBlock()) {
+                        var parentType = returnType(e, parentInput.connection.targetBlock());
+                        if (parentType.childType) {
+                            return parentType.childType;
+                        }
+                        var p = isArrayType(parentType.type) ? mkPoint(parentType.type.substr(-2)) : mkPoint(null);
+                        genericLink(parentType, p);
+                        return p;
+                    }
+                }
+                return mkPoint(null);
+            }
+            return ground(check);
         }
         // Basic type unification routine; easy, because there's no structural types.
+        // FIXME: Generics are not supported
         function unify(t1, t2) {
-            if (t1 == null)
+            if (t1 == null || t1 === "Array" && isArrayType(t2))
                 return t2;
-            else if (t2 == null)
+            else if (t2 == null || t2 === "Array" && isArrayType(t1))
                 return t1;
             else if (t1 == t2)
                 return t1;
             else
                 throw new Error("cannot mix " + t1 + " with " + t2);
         }
-        function mkPlaceholderBlock(e) {
+        function isArrayType(type) {
+            return type && type.indexOf("[]") !== -1;
+        }
+        function mkPlaceholderBlock(e, parent, type) {
             // XXX define a proper placeholder block type
             return {
                 type: "placeholder",
-                p: mkPoint(null),
+                p: mkPoint(type || null),
                 workspace: e.workspace,
+                parentBlock_: parent
             };
         }
-        function attachPlaceholderIf(e, b, n) {
+        function attachPlaceholderIf(e, b, n, type) {
             // Ugly hack to keep track of the type we want there.
             var target = b.getInputTargetBlock(n);
             if (!target) {
                 if (!placeholders[b.id]) {
                     placeholders[b.id] = {};
                 }
-                placeholders[b.id][n] = mkPlaceholderBlock(e);
+                if (!placeholders[b.id][n]) {
+                    placeholders[b.id][n] = mkPlaceholderBlock(e, b, type);
+                }
             }
             else if (target.type === pxtc.TS_OUTPUT_TYPE && !(target.p)) {
                 target.p = mkPoint(null);
@@ -380,8 +299,8 @@ var pxt;
                                     break;
                                 case "AND":
                                 case "OR":
-                                    unionParam(e, b, "A", ground(pBoolean.type));
-                                    unionParam(e, b, "B", ground(pBoolean.type));
+                                    attachPlaceholderIf(e, b, "A", pBoolean.type);
+                                    attachPlaceholderIf(e, b, "B", pBoolean.type);
                                     break;
                                 case "EQ":
                                 case "NEQ":
@@ -402,18 +321,24 @@ var pxt;
                             }
                             break;
                         case "logic_operation":
-                            unionParam(e, b, "A", ground(pBoolean.type));
-                            unionParam(e, b, "B", ground(pBoolean.type));
+                            attachPlaceholderIf(e, b, "A", pBoolean.type);
+                            attachPlaceholderIf(e, b, "B", pBoolean.type);
                             break;
                         case "logic_negate":
-                            unionParam(e, b, "BOOL", ground(pBoolean.type));
+                            attachPlaceholderIf(e, b, "BOOL", pBoolean.type);
                             break;
                         case "controls_if":
                             for (var i = 0; i <= b.elseifCount_; ++i)
-                                unionParam(e, b, "IF" + i, ground(pBoolean.type));
+                                attachPlaceholderIf(e, b, "IF" + i, pBoolean.type);
                             break;
                         case "controls_simple_for":
                             unionParam(e, b, "TO", ground(pNumber.type));
+                            break;
+                        case "controls_for_of":
+                            unionParam(e, b, "LIST", ground("Array"));
+                            var listTp = returnType(e, getInputTargetBlock(b, "LIST"));
+                            var elementTp = lookup(e, escapeVarName(b.getFieldValue("VAR"), e)).type;
+                            genericLink(listTp, elementTp);
                             break;
                         case "variables_set":
                         case "variables_change":
@@ -435,18 +360,47 @@ var pxt;
                             unionParam(e, b, "TIMES", ground(pNumber.type));
                             break;
                         case "device_while":
-                            unionParam(e, b, "COND", ground(pBoolean.type));
+                            attachPlaceholderIf(e, b, "COND", pBoolean.type);
+                            break;
+                        case "lists_index_get":
+                            unionParam(e, b, "LIST", ground("Array"));
+                            unionParam(e, b, "INDEX", ground(pNumber.type));
+                            var listType = returnType(e, getInputTargetBlock(b, "LIST"));
+                            var ret = returnType(e, b);
+                            genericLink(listType, ret);
+                            break;
+                        case "lists_index_set":
+                            unionParam(e, b, "LIST", ground("Array"));
+                            attachPlaceholderIf(e, b, "VALUE");
+                            handleGenericType(b, "LIST");
+                            unionParam(e, b, "INDEX", ground(pNumber.type));
                             break;
                         default:
                             if (b.type in e.stdCallTable) {
-                                e.stdCallTable[b.type].args.forEach(function (p) {
+                                var call_1 = e.stdCallTable[b.type];
+                                call_1.args.forEach(function (p, i) {
+                                    var isInstance = call_1.isExtensionMethod && i === 0;
                                     if (p.field && !b.getFieldValue(p.field)) {
-                                        var i = b.inputList.filter(function (i) { return i.name == p.field; })[0];
-                                        // This will throw if someone modified blocks-custom.js and forgot to add
-                                        // [setCheck]s in the block definition. This is intentional and MUST be
-                                        // fixed.
-                                        var t = i.connection.check_[0];
-                                        unionParam(e, b, p.field, ground(t));
+                                        var i_1 = b.inputList.filter(function (i) { return i.name == p.field; })[0];
+                                        if (i_1.connection && i_1.connection.check_) {
+                                            if (isInstance && connectionCheck(i_1) === "Array") {
+                                                var gen = handleGenericType(b, p.field);
+                                                if (gen) {
+                                                    return;
+                                                }
+                                            }
+                                            // All of our injected blocks have single output checks, but the builtin
+                                            // blockly ones like string.length and array.length might have multiple
+                                            for (var j = 0; j < i_1.connection.check_.length; j++) {
+                                                try {
+                                                    var t = i_1.connection.check_[j];
+                                                    unionParam(e, b, p.field, ground(t));
+                                                    break;
+                                                }
+                                                catch (e) {
+                                                }
+                                            }
+                                        }
                                     }
                                 });
                             }
@@ -461,9 +415,66 @@ var pxt;
             // Last pass: if some variable has no type (because it was never used or
             // assigned to), just unify it with int...
             e.bindings.forEach(function (b) {
-                if (find(b.type).type == null)
+                if (getConcreteType(b.type).type == null)
                     union(b.type, ground(pNumber.type));
             });
+            function connectionCheck(i) {
+                return i.name ? i.connection && i.connection.check_ && i.connection.check_.length ? i.connection.check_[0] : "T" : undefined;
+            }
+            function handleGenericType(b, name) {
+                var genericArgs = b.inputList.filter(function (input) { return connectionCheck(input) === "T"; });
+                if (genericArgs.length) {
+                    var gen = getInputTargetBlock(b, genericArgs[0].name);
+                    if (gen) {
+                        var arg = returnType(e, gen);
+                        var arrayType = arg.type ? ground(returnType(e, gen).type + "[]") : ground(null);
+                        genericLink(arrayType, arg);
+                        unionParam(e, b, name, arrayType);
+                        return true;
+                    }
+                }
+                return false;
+            }
+        }
+        function genericLink(parent, child) {
+            var p = find(parent);
+            var c = find(child);
+            if (p.childType) {
+                union(p.childType, c);
+            }
+            else {
+                p.childType = c;
+            }
+            if (c.parentType) {
+                union(c.parentType, p);
+            }
+            else {
+                c.parentType = p;
+            }
+        }
+        function getConcreteType(point, found) {
+            if (found === void 0) { found = []; }
+            var t = find(point);
+            if (found.indexOf(t) === -1) {
+                found.push(t);
+                if (!t.type || t.type === "Array") {
+                    if (t.parentType) {
+                        var parent_1 = getConcreteType(t.parentType, found);
+                        if (parent_1.type && parent_1.type !== "Array") {
+                            t.type = parent_1.type.substr(0, parent_1.type.length - 2);
+                            return t;
+                        }
+                    }
+                    if (t.childType) {
+                        var child = getConcreteType(t.childType, found);
+                        if (child.type) {
+                            t.type = child.type + "[]";
+                            return t;
+                        }
+                    }
+                }
+            }
+            return t;
         }
         ///////////////////////////////////////////////////////////////////////////////
         // Expressions
@@ -472,21 +483,21 @@ var pxt;
         // each property ref, the right value for its [parent] property.
         ///////////////////////////////////////////////////////////////////////////////
         function extractNumber(b) {
-            var v = b.getFieldValue("NUM");
+            var v = b.getFieldValue(b.type === "math_number_minmax" ? "SLIDER" : "NUM");
             var parsed = parseFloat(v);
             checkNumber(parsed);
             return parsed;
         }
         function checkNumber(n) {
-            if (n === Infinity || n === NaN) {
+            if (n === Infinity || isNaN(n)) {
                 pxt.U.userError(lf("Number entered is either too large or too small"));
             }
         }
         function extractTsExpression(e, b, comments) {
-            return mkText(b.getFieldValue("EXPRESSION"));
+            return blocks.mkText(b.getFieldValue("EXPRESSION"));
         }
         function compileNumber(e, b, comments) {
-            return H.mkNumberLiteral(extractNumber(b));
+            return blocks.H.mkNumberLiteral(extractNumber(b));
         }
         var opToTok = {
             // POWER gets a special treatment because there's no operator for it in
@@ -512,38 +523,38 @@ var pxt;
             var t = returnType(e, left).type;
             if (t == pString.type) {
                 if (bOp == "EQ")
-                    return H.mkSimpleCall("==", args);
+                    return blocks.H.mkSimpleCall("==", args);
                 else if (bOp == "NEQ")
-                    return H.mkSimpleCall("!=", args);
+                    return blocks.H.mkSimpleCall("!=", args);
             }
             else if (t == pBoolean.type)
-                return H.mkSimpleCall(opToTok[bOp], args);
+                return blocks.H.mkSimpleCall(opToTok[bOp], args);
             // Compilation of math operators.
             if (bOp == "POWER")
-                return H.mathCall("pow", args);
+                return blocks.H.mathCall("pow", args);
             else {
                 assert(bOp in opToTok);
-                return H.mkSimpleCall(opToTok[bOp], args);
+                return blocks.H.mkSimpleCall(opToTok[bOp], args);
             }
         }
         function compileModulo(e, b, comments) {
             var left = getInputTargetBlock(b, "DIVIDEND");
             var right = getInputTargetBlock(b, "DIVISOR");
             var args = [compileExpression(e, left, comments), compileExpression(e, right, comments)];
-            return H.mkSimpleCall("%", args);
+            return blocks.H.mkSimpleCall("%", args);
         }
         function compileMathOp2(e, b, comments) {
             var op = b.getFieldValue("op");
             var x = compileExpression(e, getInputTargetBlock(b, "x"), comments);
             var y = compileExpression(e, getInputTargetBlock(b, "y"), comments);
-            return H.mathCall(op, [x, y]);
+            return blocks.H.mathCall(op, [x, y]);
         }
         function compileMathOp3(e, b, comments) {
             var x = compileExpression(e, getInputTargetBlock(b, "x"), comments);
-            return H.mathCall("abs", [x]);
+            return blocks.H.mathCall("abs", [x]);
         }
         function compileText(e, b, comments) {
-            return H.mkStringLiteral(b.getFieldValue("TEXT"));
+            return blocks.H.mkStringLiteral(b.getFieldValue("TEXT"));
         }
         function compileTextJoin(e, b, comments) {
             var last;
@@ -567,27 +578,27 @@ var pxt;
                     else {
                         // If we don't start with a string, then the TS won't match
                         // the implied semantics of the blocks
-                        last = H.mkSimpleCall("+", [H.mkStringLiteral(""), compiled]);
+                        last = blocks.H.mkSimpleCall("+", [blocks.H.mkStringLiteral(""), compiled]);
                     }
                 }
                 else {
-                    last = H.mkSimpleCall("+", [last, compiled]);
+                    last = blocks.H.mkSimpleCall("+", [last, compiled]);
                 }
             }
             if (!last) {
-                return H.mkStringLiteral("");
+                return blocks.H.mkStringLiteral("");
             }
             return last;
         }
         function compileBoolean(e, b, comments) {
-            return H.mkBooleanLiteral(b.getFieldValue("BOOL") == "TRUE");
+            return blocks.H.mkBooleanLiteral(b.getFieldValue("BOOL") == "TRUE");
         }
         function compileNot(e, b, comments) {
             var expr = compileExpression(e, getInputTargetBlock(b, "BOOL"), comments);
-            return mkPrefix("!", [H.mkParenthesizedExpression(expr)]);
+            return blocks.mkPrefix("!", [blocks.H.mkParenthesizedExpression(expr)]);
         }
         function extractNumberLit(e) {
-            if (e.type != NT.Prefix || !/^-?\d+$/.test(e.op))
+            if (e.type != blocks.NT.Prefix || !/^-?\d+$/.test(e.op))
                 return null;
             var parsed = parseInt(e.op);
             checkNumber(parsed);
@@ -597,33 +608,48 @@ var pxt;
             var expr = compileExpression(e, getInputTargetBlock(b, "limit"), comments);
             var v = extractNumberLit(expr);
             if (v != null)
-                return H.mathCall("random", [H.mkNumberLiteral(v + 1)]);
+                return blocks.H.mathCall("random", [blocks.H.mkNumberLiteral(v + 1)]);
             else
-                return H.mathCall("random", [H.mkSimpleCall(opToTok["ADD"], [expr, H.mkNumberLiteral(1)])]);
+                return blocks.H.mathCall("random", [blocks.H.mkSimpleCall(opToTok["ADD"], [expr, blocks.H.mkNumberLiteral(1)])]);
         }
         function compileCreateList(e, b, comments) {
             // collect argument
             var args = b.inputList.map(function (input) { return input.connection && input.connection.targetBlock() ? compileExpression(e, input.connection.targetBlock(), comments) : undefined; })
                 .filter(function (e) { return !!e; });
-            // we need at least 1 element to determine the type...
-            if (args.length < 0)
-                pxt.U.userError(lf("The list must have at least one element"));
-            return H.mkArrayLiteral(args);
+            return blocks.H.mkArrayLiteral(args);
+        }
+        function compileListGet(e, b, comments) {
+            var listBlock = getInputTargetBlock(b, "LIST");
+            var listExpr = compileExpression(e, listBlock, comments);
+            var index = compileExpression(e, getInputTargetBlock(b, "INDEX"), comments);
+            var res = blocks.mkGroup([listExpr, blocks.mkText("["), index, blocks.mkText("]")]);
+            return res;
+        }
+        function compileListSet(e, b, comments) {
+            var listBlock = getInputTargetBlock(b, "LIST");
+            var listExpr = compileExpression(e, listBlock, comments);
+            var index = compileExpression(e, getInputTargetBlock(b, "INDEX"), comments);
+            var value = compileExpression(e, getInputTargetBlock(b, "VALUE"), comments);
+            var res = blocks.mkGroup([listExpr, blocks.mkText("["), index, blocks.mkText("] = "), value]);
+            return listBlock.type === "lists_create_with" ? prefixWithSemicolon(res) : res;
         }
         function defaultValueForType(t) {
             if (t.type == null) {
                 union(t, ground(pNumber.type));
                 t = find(t);
             }
+            if (isArrayType(t.type)) {
+                return blocks.mkText("[]");
+            }
             switch (t.type) {
                 case "boolean":
-                    return H.mkBooleanLiteral(false);
+                    return blocks.H.mkBooleanLiteral(false);
                 case "number":
-                    return H.mkNumberLiteral(0);
+                    return blocks.H.mkNumberLiteral(0);
                 case "string":
-                    return H.mkStringLiteral("");
+                    return blocks.H.mkStringLiteral("");
                 default:
-                    return mkText("null");
+                    return blocks.mkText("null");
             }
         }
         // [t] is the expected type; we assume that we never null block children
@@ -631,13 +657,34 @@ var pxt;
         // whenever a block was actually missing).
         function compileExpression(e, b, comments) {
             assert(b != null);
+            e.stats[b.type] = (e.stats[b.type] || 0) + 1;
             maybeAddComment(b, comments);
             var expr;
-            if (b.disabled || b.type == "placeholder")
-                expr = defaultValueForType(returnType(e, b));
+            if (b.disabled || b.type == "placeholder") {
+                var ret = find(returnType(e, b));
+                if (ret.type === "Array") {
+                    // FIXME: Can't use default type here because TS complains about
+                    // the array having an implicit any type. However, forcing this
+                    // to be a number array may cause type issues. Also, potential semicolon
+                    // issues if we ever have a block where the array is not the first argument...
+                    var isExpression = b.parentBlock_.type === "lists_index_get";
+                    if (!isExpression) {
+                        var call = e.stdCallTable[b.parentBlock_.type];
+                        isExpression = call && call.isExpression;
+                    }
+                    var arrayNode = blocks.mkText("[0]");
+                    expr = isExpression ? arrayNode : prefixWithSemicolon(arrayNode);
+                }
+                else {
+                    expr = defaultValueForType(returnType(e, b));
+                }
+            }
             else
                 switch (b.type) {
                     case "math_number":
+                        expr = compileNumber(e, b, comments);
+                        break;
+                    case "math_number_minmax":
                         expr = compileNumber(e, b, comments);
                         break;
                     case "math_op2":
@@ -674,6 +721,12 @@ var pxt;
                         break;
                     case "lists_create_with":
                         expr = compileCreateList(e, b, comments);
+                        break;
+                    case "lists_index_get":
+                        expr = compileListGet(e, b, comments);
+                        break;
+                    case "lists_index_set":
+                        expr = compileListSet(e, b, comments);
                         break;
                     case pxtc.TS_OUTPUT_TYPE:
                         expr = extractTsExpression(e, b, comments);
@@ -712,7 +765,8 @@ var pxt;
                 bindings: [{ name: x, type: ground(t), declaredInLocalScope: 0 }].concat(e.bindings),
                 stdCallTable: e.stdCallTable,
                 errors: e.errors,
-                renames: e.renames
+                renames: e.renames,
+                stats: e.stats
             };
         }
         function lookup(e, n) {
@@ -737,7 +791,8 @@ var pxt;
                 renames: {
                     oldToNew: {},
                     takenNames: {}
-                }
+                },
+                stats: {}
             };
         }
         ;
@@ -750,21 +805,21 @@ var pxt;
             for (var i = 0; i <= b.elseifCount_; ++i) {
                 var cond = compileExpression(e, getInputTargetBlock(b, "IF" + i), comments);
                 var thenBranch = compileStatements(e, getInputTargetBlock(b, "DO" + i));
-                var startNode = mkText("if (");
+                var startNode = blocks.mkText("if (");
                 if (i > 0) {
-                    startNode = mkText("else if (");
-                    startNode.glueToBlock = true;
+                    startNode = blocks.mkText("else if (");
+                    startNode.glueToBlock = blocks.GlueMode.WithSpace;
                 }
                 append(stmts, [
                     startNode,
                     cond,
-                    mkText(")"),
+                    blocks.mkText(")"),
                     thenBranch
                 ]);
             }
             if (b.elseCount_) {
-                var elseNode = mkText("else");
-                elseNode.glueToBlock = true;
+                var elseNode = blocks.mkText("else");
+                elseNode.glueToBlock = blocks.GlueMode.WithSpace;
                 append(stmts, [
                     elseNode,
                     compileStatements(e, getInputTargetBlock(b, "ELSE"))
@@ -782,13 +837,13 @@ var pxt;
             var binding = lookup(e, bVar);
             assert(binding.declaredInLocalScope > 0);
             return [
-                mkText("for (let " + bVar + " = "),
-                bFrom ? compileExpression(e, bFrom, comments) : mkText("0"),
-                mkText("; "),
-                mkInfix(mkText(bVar), "<=", compileExpression(e, bTo, comments)),
-                mkText("; "),
-                incOne ? mkText(bVar + "++") : mkInfix(mkText(bVar), "+=", compileExpression(e, bBy, comments)),
-                mkText(")"),
+                blocks.mkText("for (let " + bVar + " = "),
+                bFrom ? compileExpression(e, bFrom, comments) : blocks.mkText("0"),
+                blocks.mkText("; "),
+                blocks.mkInfix(blocks.mkText(bVar), "<=", compileExpression(e, bTo, comments)),
+                blocks.mkText("; "),
+                incOne ? blocks.mkText(bVar + "++") : blocks.mkInfix(blocks.mkText(bVar), "+=", compileExpression(e, bBy, comments)),
+                blocks.mkText(")"),
                 compileStatements(e, bDo)
             ];
         }
@@ -800,9 +855,9 @@ var pxt;
             for (var i = 0; !valid(name); i++)
                 name = "i" + i;
             return [
-                mkText("for (let " + name + " = 0; "),
-                mkInfix(mkText(name), "<", bound),
-                mkText("; " + name + "++)"),
+                blocks.mkText("for (let " + name + " = 0; "),
+                blocks.mkInfix(blocks.mkText(name), "<", bound),
+                blocks.mkText("; " + name + "++)"),
                 body
             ];
         }
@@ -810,10 +865,23 @@ var pxt;
             var cond = compileExpression(e, getInputTargetBlock(b, "COND"), comments);
             var body = compileStatements(e, getInputTargetBlock(b, "DO"));
             return [
-                mkText("while ("),
+                blocks.mkText("while ("),
                 cond,
-                mkText(")"),
+                blocks.mkText(")"),
                 body
+            ];
+        }
+        function compileControlsForOf(e, b, comments) {
+            var bVar = escapeVarName(b.getFieldValue("VAR"), e);
+            var bOf = getInputTargetBlock(b, "LIST");
+            var bDo = getInputTargetBlock(b, "DO");
+            var binding = lookup(e, bVar);
+            assert(binding.declaredInLocalScope > 0);
+            return [
+                blocks.mkText("for (let " + bVar + " of "),
+                compileExpression(e, bOf, comments),
+                blocks.mkText(")"),
+                compileStatements(e, bDo)
             ];
         }
         function compileForever(e, b) {
@@ -829,9 +897,9 @@ var pxt;
                 return e.renames.oldToNew[name];
             }
             var n = name.replace(/\s+/g, "_").replace(/[^a-zA-Z0-9_$]/g, function (a) {
-                return ts.isIdentifierPart(a.charCodeAt(0), ts.ScriptTarget.ES5) ? a : "";
+                return ts.pxtc.isIdentifierPart(a.charCodeAt(0), ts.pxtc.ScriptTarget.ES5) ? a : "";
             });
-            if (!n || !ts.isIdentifierStart(n.charCodeAt(0), ts.ScriptTarget.ES5)) {
+            if (!n || !ts.pxtc.isIdentifierStart(n.charCodeAt(0), ts.pxtc.ScriptTarget.ES5) || blocks.reservedWords.indexOf(n) !== -1) {
                 n = "_" + n;
             }
             if (e.renames.takenNames[n]) {
@@ -852,7 +920,7 @@ var pxt;
             if (!binding.assigned)
                 binding.assigned = VarUsage.Read;
             assert(binding != null && binding.type != null);
-            return mkText(name);
+            return blocks.mkText(name);
         }
         function compileSet(e, b, comments) {
             var bVar = escapeVarName(b.getFieldValue("VAR"), e);
@@ -869,7 +937,7 @@ var pxt;
                     isDef = true;
                 }
             var expr = compileExpression(e, bExpr, comments);
-            return mkStmt(mkText(isDef ? "let " : ""), mkText(bVar + " = "), expr);
+            return blocks.mkStmt(blocks.mkText(isDef ? "let " : ""), blocks.mkText(bVar + " = "), expr);
         }
         function compileChange(e, b, comments) {
             var bVar = escapeVarName(b.getFieldValue("VAR"), e);
@@ -878,8 +946,8 @@ var pxt;
             if (!binding.assigned)
                 binding.assigned = VarUsage.Read;
             var expr = compileExpression(e, bExpr, comments);
-            var ref = mkText(bVar);
-            return mkStmt(mkInfix(ref, "+=", expr));
+            var ref = blocks.mkText(bVar);
+            return blocks.mkStmt(blocks.mkInfix(ref, "+=", expr));
         }
         function eventArgs(call) {
             return call.args.map(function (ar) { return ar.field; }).filter(function (ar) { return !!ar; });
@@ -887,21 +955,32 @@ var pxt;
         function compileCall(e, b, comments) {
             var call = e.stdCallTable[b.type];
             if (call.imageLiteral)
-                return mkStmt(compileImage(e, b, call.imageLiteral, call.namespace, call.f, call.args.map(function (ar) { return compileArgument(e, b, ar, comments); })));
+                return blocks.mkStmt(compileImage(e, b, call.imageLiteral, call.namespace, call.f, call.args.map(function (ar) { return compileArgument(e, b, ar, comments); })));
             else if (call.hasHandler)
                 return compileEvent(e, b, call, eventArgs(call), call.namespace, comments);
             else
-                return mkStmt(compileStdCall(e, b, e.stdCallTable[b.type], comments));
+                return blocks.mkStmt(compileStdCall(e, b, call, comments));
         }
-        function compileArgument(e, b, p, comments) {
+        function compileArgument(e, b, p, comments, beginningOfStatement) {
+            if (beginningOfStatement === void 0) { beginningOfStatement = false; }
             var lit = p.literal;
             if (lit)
-                return lit instanceof String ? H.mkStringLiteral(lit) : H.mkNumberLiteral(lit);
+                return lit instanceof String ? blocks.H.mkStringLiteral(lit) : blocks.H.mkNumberLiteral(lit);
             var f = b.getFieldValue(p.field);
-            if (f)
-                return mkText(f);
-            else
-                return compileExpression(e, getInputTargetBlock(b, p.field), comments);
+            if (f != null)
+                return blocks.mkText(f);
+            else {
+                attachPlaceholderIf(e, b, p.field);
+                var target = getInputTargetBlock(b, p.field);
+                if (beginningOfStatement && target.type === "lists_create_with") {
+                    // We have to be careful of array literals at the beginning of a statement
+                    // because they can cause errors (i.e. they get parsed as an index). Add a
+                    // semicolon to the previous statement just in case.
+                    // FIXME: No need to do this if the previous statement was a code block
+                    return prefixWithSemicolon(compileExpression(e, target, comments));
+                }
+                return compileExpression(e, target, comments);
+            }
         }
         function compileStdCall(e, b, func, comments) {
             var args;
@@ -909,13 +988,13 @@ var pxt;
                 args = b.mutation.compileMutation(e, comments).children;
             }
             else {
-                args = func.args.map(function (p) { return compileArgument(e, b, p, comments); });
+                args = func.args.map(function (p, i) { return compileArgument(e, b, p, comments, func.isExtensionMethod && i === 0 && !func.isExpression); });
             }
             var externalInputs = !b.getInputsInline();
             if (func.isIdentity)
                 return args[0];
             else if (func.property) {
-                return H.mkPropertyAccess(func.f, args[0]);
+                return blocks.H.mkPropertyAccess(func.f, args[0]);
             }
             else if (func.isExtensionMethod) {
                 if (func.attrs.defaultInstance) {
@@ -927,46 +1006,49 @@ var pxt;
                         args.unshift(instance);
                     }
                     else {
-                        args.unshift(mkText(func.attrs.defaultInstance));
+                        args.unshift(blocks.mkText(func.attrs.defaultInstance));
                     }
                 }
-                return H.extensionCall(func.f, args, externalInputs);
+                return blocks.H.extensionCall(func.f, args, externalInputs);
             }
             else if (func.namespace) {
-                return H.namespaceCall(func.namespace, func.f, args, externalInputs);
+                return blocks.H.namespaceCall(func.namespace, func.f, args, externalInputs);
             }
             else {
-                return H.stdCall(func.f, args, externalInputs);
+                return blocks.H.stdCall(func.f, args, externalInputs);
             }
         }
         function compileStdBlock(e, b, f, comments) {
-            return mkStmt(compileStdCall(e, b, f, comments));
+            return blocks.mkStmt(compileStdCall(e, b, f, comments));
         }
         function mkCallWithCallback(e, n, f, args, body, argumentDeclaration, isExtension) {
             if (isExtension === void 0) { isExtension = false; }
             body.noFinalNewline = true;
             var callback;
             if (argumentDeclaration) {
-                callback = mkGroup([argumentDeclaration, body]);
+                callback = blocks.mkGroup([argumentDeclaration, body]);
             }
             else {
-                callback = mkGroup([mkText("() =>"), body]);
+                callback = blocks.mkGroup([blocks.mkText("() =>"), body]);
             }
             if (isExtension)
-                return mkStmt(H.extensionCall(f, args.concat([callback]), false));
+                return blocks.mkStmt(blocks.H.extensionCall(f, args.concat([callback]), false));
             else
-                return mkStmt(H.namespaceCall(n, f, args.concat([callback]), false));
+                return blocks.mkStmt(blocks.H.namespaceCall(n, f, args.concat([callback]), false));
         }
         function compileArg(e, b, arg, comments) {
             // b.getFieldValue may be string, numbers
             var argb = getInputTargetBlock(b, arg);
             if (argb)
                 return compileExpression(e, argb, comments);
-            return mkText(b.getFieldValue(arg));
+            return blocks.mkText(b.getFieldValue(arg));
         }
         function compileStartEvent(e, b) {
             var bBody = getInputTargetBlock(b, "HANDLER");
             var body = compileStatements(e, bBody);
+            if (pxt.appTarget.compile && pxt.appTarget.compile.onStartText && body && body.children) {
+                body.children.unshift(blocks.mkStmt(blocks.mkText("// " + pxtc.ON_START_COMMENT + "\n")));
+            }
             return body;
         }
         function compileEvent(e, b, stdfun, args, ns, comments) {
@@ -995,13 +1077,14 @@ var pxt;
                 }
                 state += '\n';
             }
-            var lit = H.mkStringLiteral(state);
+            var lit = blocks.H.mkStringLiteral(state);
             lit.canIndentInside = true;
-            return H.namespaceCall(n, f, [lit].concat(args), false);
+            return blocks.H.namespaceCall(n, f, [lit].concat(args), false);
         }
         function compileStatementBlock(e, b) {
             var r;
             var comments = [];
+            e.stats[b.type] = (e.stats[b.type] || 0) + 1;
             maybeAddComment(b, comments);
             switch (b.type) {
                 case 'controls_if':
@@ -1010,6 +1093,9 @@ var pxt;
                 case 'controls_for':
                 case 'controls_simple_for':
                     r = compileControlsFor(e, b, comments);
+                    break;
+                case 'controls_for_of':
+                    r = compileControlsForOf(e, b, comments);
                     break;
                 case 'variables_set':
                     r = [compileSet(e, b, comments)];
@@ -1034,7 +1120,7 @@ var pxt;
                     if (call)
                         r = [compileCall(e, b, comments)];
                     else
-                        r = [mkStmt(compileExpression(e, b, comments))];
+                        r = [blocks.mkStmt(compileExpression(e, b, comments))];
                     break;
             }
             var l = r[r.length - 1];
@@ -1043,6 +1129,11 @@ var pxt;
             if (comments.length) {
                 addCommentNodes(comments, r);
             }
+            r.forEach(function (l) {
+                if (l.type === blocks.NT.Block || l.type === blocks.NT.Prefix && pxt.Util.startsWith(l.op, "//")) {
+                    l.id = b.id;
+                }
+            });
             return r;
         }
         function compileStatements(e, b) {
@@ -1052,7 +1143,7 @@ var pxt;
                     append(stmts, compileStatementBlock(e, b));
                 b = b.getNextBlock();
             }
-            return mkBlock(stmts);
+            return blocks.mkBlock(stmts);
         }
         function compileTypescriptBlock(e, b) {
             var res = [];
@@ -1061,7 +1152,7 @@ var pxt;
                 var value = b.getFieldValue("LINE" + i);
                 i++;
                 if (value !== null) {
-                    res.push(mkText(value + "\n"));
+                    res.push(blocks.mkText(value + "\n"));
                     var declaredVars = b.declaredVariables;
                     if (declaredVars) {
                         var varNames = declaredVars.split(",");
@@ -1089,6 +1180,11 @@ var pxt;
             }
             return res;
         }
+        function prefixWithSemicolon(n) {
+            var emptyStatement = blocks.mkStmt(blocks.mkText(";"));
+            emptyStatement.glueToBlock = blocks.GlueMode.NoSpace;
+            return blocks.mkGroup([emptyStatement, n]);
+        }
         // This function creates an empty environment where type inference has NOT yet
         // been performed.
         // - All variables have been assigned an initial [Point] in the union-find.
@@ -1098,13 +1194,22 @@ var pxt;
             // The to-be-returned environment.
             var e = emptyEnv(w);
             // append functions in stdcalltable
-            if (blockInfo)
+            if (blockInfo) {
+                // Enums are not enclosed in namespaces, so add them to the taken names
+                // to avoid collision
+                Object.keys(blockInfo.apis.byQName).forEach(function (name) {
+                    var info = blockInfo.apis.byQName[name];
+                    if (info.kind === pxtc.SymbolKind.Enum) {
+                        e.renames.takenNames[info.qName] = true;
+                    }
+                });
                 blockInfo.blocks
                     .forEach(function (fn) {
                     if (e.stdCallTable[fn.attributes.blockId]) {
                         pxt.reportError("blocks", "function already defined", { "details": fn.attributes.blockId });
                         return;
                     }
+                    e.renames.takenNames[fn.namespace] = true;
                     var fieldMap = pxt.blocks.parameterNames(fn);
                     var instance = fn.kind == pxtc.SymbolKind.Method || fn.kind == pxtc.SymbolKind.Property;
                     var args = (fn.parameters || []).map(function (p) {
@@ -1124,18 +1229,20 @@ var pxt;
                         args: args,
                         attrs: fn.attributes,
                         isExtensionMethod: instance,
+                        isExpression: fn.retType && fn.retType !== "void",
                         imageLiteral: fn.attributes.imageLiteral,
                         hasHandler: fn.parameters && fn.parameters.some(function (p) { return (p.type == "() => void" || !!p.properties); }),
                         property: !fn.parameters,
                         isIdentity: fn.attributes.shim == "TD_ID"
                     };
                 });
+            }
             if (skipVariables)
                 return e;
             var variableIsScoped = function (b, name) {
                 if (!b)
                     return false;
-                else if ((b.type == "controls_for" || b.type == "controls_simple_for")
+                else if ((b.type == "controls_for" || b.type == "controls_simple_for" || b.type == "controls_for_of")
                     && escapeVarName(b.getFieldValue("VAR"), e) == name)
                     return true;
                 else if (isMutatingBlock(b) && b.mutation.isDeclaredByMutation(name))
@@ -1156,9 +1263,14 @@ var pxt;
             }
             // collect local variables.
             w.getAllBlocks().filter(function (b) { return !b.disabled; }).forEach(function (b) {
-                if (b.type == "controls_for" || b.type == "controls_simple_for") {
+                if (b.type == "controls_for" || b.type == "controls_simple_for" || b.type == "controls_for_of") {
                     var x = escapeVarName(b.getFieldValue("VAR"), e);
-                    trackLocalDeclaration(x, pNumber.type);
+                    if (b.type == "controls_for_of") {
+                        trackLocalDeclaration(x, null);
+                    }
+                    else {
+                        trackLocalDeclaration(x, pNumber.type);
+                    }
                 }
                 else if (isMutatingBlock(b)) {
                     var declarations = b.mutation.getDeclaredVariables();
@@ -1185,52 +1297,61 @@ var pxt;
             return e;
         }
         blocks.mkEnv = mkEnv;
-        function compileBlock(b, blockInfo) {
+        function compileBlockAsync(b, blockInfo) {
             var w = b.workspace;
             var e = mkEnv(w, blockInfo);
             infer(e, w);
             var compiled = compileStatementBlock(e, b);
             removeAllPlaceholders();
-            return tdASTtoTS(compiled);
+            return tdASTtoTS(e, compiled);
         }
-        blocks.compileBlock = compileBlock;
-        function compileWorkspace(w, blockInfo) {
+        blocks.compileBlockAsync = compileBlockAsync;
+        function compileWorkspace(e, w, blockInfo) {
             try {
-                var e_1 = mkEnv(w, blockInfo);
-                infer(e_1, w);
+                infer(e, w);
                 var stmtsMain_1 = [];
                 // all compiled top level blocks are event, move on start to bottom
                 var topblocks = w.getTopBlocks(true).sort(function (a, b) {
                     return (a.type == ts.pxtc.ON_START_TYPE ? 1 : 0) - (b.type == ts.pxtc.ON_START_TYPE ? 1 : 0);
                 });
-                updateDisabledBlocks(e_1, w.getAllBlocks(), topblocks);
+                updateDisabledBlocks(e, w.getAllBlocks(), topblocks);
                 topblocks.forEach(function (b) {
                     if (b.type == ts.pxtc.ON_START_TYPE)
-                        append(stmtsMain_1, compileStartEvent(e_1, b).children);
+                        append(stmtsMain_1, compileStartEvent(e, b).children);
                     else {
-                        var compiled = compileStatements(e_1, b);
-                        if (compiled.type == NT.Block)
+                        var compiled = compileStatements(e, b);
+                        if (compiled.type == blocks.NT.Block)
                             append(stmtsMain_1, compiled.children);
                         else
                             stmtsMain_1.push(compiled);
                     }
                 });
                 // All variables in this script are compiled as locals within main unless loop or previsouly assigned
-                var stmtsVariables = e_1.bindings.filter(function (b) { return !isCompiledAsLocalVariable(b) && b.assigned != VarUsage.Assign; })
+                var stmtsVariables = e.bindings.filter(function (b) { return !isCompiledAsLocalVariable(b) && b.assigned != VarUsage.Assign; })
                     .map(function (b) {
-                    // let btype = find(b.type);
-                    // Not sure we need the type here - is is always number or boolean?
-                    var defl = defaultValueForType(find(b.type));
+                    var t = getConcreteType(b.type);
+                    var defl;
+                    if (t.type === "Array") {
+                        defl = blocks.mkText("[]");
+                    }
+                    else {
+                        defl = defaultValueForType(t);
+                    }
                     var tp = "";
-                    if (defl.op == "null") {
-                        var tpname = find(b.type).type;
+                    if (defl.op == "null" || defl.op == "[]") {
+                        var tpname = t.type;
+                        // If the type is "Array" or null[] it means that we failed to narrow the type of array.
+                        // Best we can do is just default to number[]
+                        if (tpname === "Array" || tpname === "null[]") {
+                            tpname = "number[]";
+                        }
                         var tpinfo = blockInfo.apis.byQName[tpname];
                         if (tpinfo && tpinfo.attributes.autoCreate)
-                            defl = mkText(tpinfo.attributes.autoCreate + "()");
+                            defl = blocks.mkText(tpinfo.attributes.autoCreate + "()");
                         else
                             tp = ": " + tpname;
                     }
-                    return mkStmt(mkText("let " + b.name + tp + " = "), defl);
+                    return blocks.mkStmt(blocks.mkText("let " + b.name + tp + " = "), defl);
                 });
                 return stmtsVariables.concat(stmtsMain_1);
             }
@@ -1295,185 +1416,38 @@ var pxt;
         function findBlockId(sourceMap, loc) {
             if (!loc)
                 return undefined;
+            var bestChunk;
+            var bestChunkLength;
             for (var i = 0; i < sourceMap.length; ++i) {
                 var chunk = sourceMap[i];
-                if (chunk.start <= loc.start && chunk.end >= loc.start + loc.length)
-                    return chunk.id;
+                if (chunk.start <= loc.start && chunk.end > loc.start + loc.length && (!bestChunk || bestChunkLength > chunk.end - chunk.start)) {
+                    bestChunk = chunk;
+                    bestChunkLength = chunk.end - chunk.start;
+                }
+            }
+            if (bestChunk) {
+                return bestChunk.id;
             }
             return undefined;
         }
         blocks.findBlockId = findBlockId;
-        function compile(b, blockInfo) {
-            return tdASTtoTS(compileWorkspace(b, blockInfo));
+        function compileAsync(b, blockInfo) {
+            var e = mkEnv(b, blockInfo);
+            var nodes = compileWorkspace(e, b, blockInfo);
+            var result = tdASTtoTS(e, nodes);
+            return result;
         }
-        blocks.compile = compile;
-        // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Operator_Precedence
-        var infixPriTable = {
-            // 0 = comma/sequence
-            // 1 = spread (...)
-            // 2 = yield, yield*
-            // 3 = assignment
-            "=": 3,
-            "+=": 3,
-            "-=": 3,
-            // 4 = conditional (?:)
-            "||": 5,
-            "&&": 6,
-            "|": 7,
-            "^": 8,
-            "&": 9,
-            // 10 = equality
-            "==": 10,
-            "!=": 10,
-            "===": 10,
-            "!==": 10,
-            // 11 = comparison (excludes in, instanceof)
-            "<": 11,
-            ">": 11,
-            "<=": 11,
-            ">=": 11,
-            // 12 = bitise shift
-            ">>": 12,
-            ">>>": 12,
-            "<<": 12,
-            "+": 13,
-            "-": 13,
-            "*": 14,
-            "/": 14,
-            "%": 14,
-            "!": 15,
-            ".": 18,
-        };
-        function tdASTtoTS(app) {
-            var sourceMap = [];
-            var output = "";
-            var indent = "";
-            var variables = [{}];
-            function flatten(e0) {
-                function rec(e, outPrio) {
-                    if (e.type != NT.Infix) {
-                        for (var _i = 0, _a = e.children; _i < _a.length; _i++) {
-                            var c = _a[_i];
-                            rec(c, -1);
-                        }
-                        return;
-                    }
-                    var r = [];
-                    function pushOp(c) {
-                        r.push(mkText(c));
-                    }
-                    var infixPri = pxt.U.lookup(infixPriTable, e.op);
-                    if (infixPri == null)
-                        pxt.U.oops("bad infix op: " + e.op);
-                    if (infixPri < outPrio)
-                        pushOp("(");
-                    if (e.children.length == 1) {
-                        pushOp(e.op);
-                        rec(e.children[0], infixPri);
-                    }
-                    else {
-                        var bindLeft = infixPri != 3 && e.op != "**";
-                        var letType = undefined;
-                        /*
-                        if (e.name == "=" && e.args[0].nodeType == 'localRef') {
-                            let varloc = <TDev.AST.Json.JLocalRef>e.args[0];
-                            let varname = varloc.name;
-                            if (!variables[variables.length - 1][varname]) {
-                                variables[variables.length - 1][varname] = "1";
-                                pushOp("let")
-                                letType = varloc.type as any as string;
-                            }
-                        }
-                        */
-                        rec(e.children[0], bindLeft ? infixPri : infixPri + 0.1);
-                        r.push(e.children[0]);
-                        if (letType && letType != "number") {
-                            pushOp(": ");
-                            pushOp(letType);
-                        }
-                        if (e.op == ".")
-                            pushOp(".");
-                        else
-                            pushOp(" " + e.op + " ");
-                        rec(e.children[1], !bindLeft ? infixPri : infixPri + 0.1);
-                        r.push(e.children[1]);
-                    }
-                    if (infixPri < outPrio)
-                        pushOp(")");
-                    e.type = NT.Prefix;
-                    e.op = "";
-                    e.children = r;
-                }
-                rec(e0, -1);
-            }
-            var root = mkGroup(app);
-            flatten(root);
-            emit(root);
-            // never return empty string - TS compiler service thinks it's an error
-            if (!output)
-                output += "\n";
-            // outformat
-            output = pxtc.format(output, 1).formatted;
-            return {
-                source: output,
-                sourceMap: sourceMap
-            };
-            function emit(n) {
-                if (n.glueToBlock) {
-                    removeLastIndent();
-                    output += " ";
-                }
-                var start = output.length;
-                switch (n.type) {
-                    case NT.Infix:
-                        pxt.U.oops("no infix should be left");
-                        break;
-                    case NT.NewLine:
-                        output += "\n" + indent;
-                        break;
-                    case NT.Block:
-                        block(n);
-                        break;
-                    case NT.Prefix:
-                        if (n.canIndentInside)
-                            output += n.op.replace(/\n/g, "\n" + indent + "    ");
-                        else
-                            output += n.op;
-                        n.children.forEach(emit);
-                        break;
-                    default:
-                        break;
-                }
-                var end = output.length;
-                if (n.id && start != end) {
-                    sourceMap.push({ id: n.id, start: start, end: end });
-                }
-            }
-            function write(s) {
-                output += s.replace(/\n/g, "\n" + indent);
-            }
-            function removeLastIndent() {
-                output = output.replace(/\n *$/, "");
-            }
-            function block(n) {
-                var finalNl = n.noFinalNewline ? "" : "\n";
-                if (n.children.length == 0) {
-                    write(" {\n\t\n}" + finalNl);
-                    return;
-                }
-                var vars = pxt.U.clone(variables[variables.length - 1] || {});
-                variables.push(vars);
-                indent += "    ";
-                write(" {\n");
-                for (var _i = 0, _a = n.children; _i < _a.length; _i++) {
-                    var nn = _a[_i];
-                    emit(nn);
-                }
-                indent = indent.slice(4);
-                removeLastIndent();
-                write("\n}" + finalNl);
-                variables.pop();
-            }
+        blocks.compileAsync = compileAsync;
+        function tdASTtoTS(env, app) {
+            var res = blocks.flattenNode(app);
+            // Note: the result of format is not used!
+            return workerOpAsync("format", { format: { input: res.output, pos: 1 } }).then(function () {
+                return {
+                    source: res.output,
+                    sourceMap: res.sourceMap,
+                    stats: env.stats
+                };
+            });
         }
         function maybeAddComment(b, comments) {
             if (b.comment) {
@@ -1505,8 +1479,8 @@ var pxt;
                         currentLine = word;
                     }
                     else if (currentLine.length + word.length > MAX_COMMENT_LINE_LENGTH) {
-                        commentNodes.push(mkText("// " + currentLine));
-                        commentNodes.push(mkNewLine());
+                        commentNodes.push(blocks.mkText("// " + currentLine));
+                        commentNodes.push(blocks.mkNewLine());
                         currentLine = word;
                     }
                     else {
@@ -1514,13 +1488,13 @@ var pxt;
                     }
                 }
                 if (currentLine) {
-                    commentNodes.push(mkText("// " + currentLine));
-                    commentNodes.push(mkNewLine());
+                    commentNodes.push(blocks.mkText("// " + currentLine));
+                    commentNodes.push(blocks.mkNewLine());
                 }
                 // The decompiler expects an empty comment line between paragraphs
                 if (i !== paragraphs.length - 1) {
-                    commentNodes.push(mkText("//"));
-                    commentNodes.push(mkNewLine());
+                    commentNodes.push(blocks.mkText("//"));
+                    commentNodes.push(blocks.mkNewLine());
                 }
             }
             for (var _d = 0, _e = commentNodes.reverse(); _d < _e.length; _d++) {
@@ -1534,9 +1508,51 @@ var pxt;
             }
             return text.substr(text.length - suffix.length) === suffix;
         }
-        function isReservedWord(str) {
-            return reservedWords.indexOf(str) !== -1;
+    })(blocks = pxt.blocks || (pxt.blocks = {}));
+})(pxt || (pxt = {}));
+var pxt;
+(function (pxt) {
+    var blocks;
+    (function (blocks) {
+        var registeredFieldEditors = {};
+        function initFieldEditors() {
+            // Initialize PXT custom editors
+            var noteValidator = function (text) {
+                if (text === null) {
+                    return null;
+                }
+                text = String(text);
+                var n = parseFloat(text || '0');
+                if (isNaN(n) || n < 0) {
+                    // Invalid number.
+                    return null;
+                }
+                // Get the value in range.
+                return String(Math.round(Number(text)));
+            };
+            registerFieldEditor('note', pxtblockly.FieldNote, noteValidator);
+            registerFieldEditor('gridpicker', pxtblockly.FieldGridPicker);
         }
+        blocks.initFieldEditors = initFieldEditors;
+        function registerFieldEditor(selector, field, validator) {
+            if (registeredFieldEditors[selector] == undefined) {
+                registeredFieldEditors[selector] = {
+                    field: field,
+                    validator: validator
+                };
+            }
+        }
+        blocks.registerFieldEditor = registerFieldEditor;
+        function createFieldEditor(selector, text, params) {
+            if (registeredFieldEditors[selector] == undefined) {
+                console.error("Field editor " + selector + " not registered");
+                return null;
+            }
+            var customField = registeredFieldEditors[selector];
+            var instance = new customField.field(text, params, customField.validator);
+            return instance;
+        }
+        blocks.createFieldEditor = createFieldEditor;
     })(blocks = pxt.blocks || (pxt.blocks = {}));
 })(pxt || (pxt = {}));
 ///<reference path='../localtypings/blockly.d.ts'/>
@@ -1551,6 +1567,30 @@ var pxt;
             return text;
         }
         blocks_1.saveWorkspaceXml = saveWorkspaceXml;
+        function getDirectChildren(parent, tag) {
+            var res = [];
+            for (var i = 0; i < parent.childNodes.length; i++) {
+                var n = parent.childNodes.item(i);
+                if (n.tagName === tag) {
+                    res.push(n);
+                }
+            }
+            return res;
+        }
+        blocks_1.getDirectChildren = getDirectChildren;
+        function getBlocksWithType(parent, type) {
+            return getChildrenWithAttr(parent, "block", "type", type);
+        }
+        blocks_1.getBlocksWithType = getBlocksWithType;
+        function getChildrenWithAttr(parent, tag, attr, value) {
+            return pxt.Util.toArray(parent.getElementsByTagName(tag)).filter(function (b) { return b.getAttribute(attr) === value; });
+        }
+        blocks_1.getChildrenWithAttr = getChildrenWithAttr;
+        function getFirstChildWithAttr(parent, tag, attr, value) {
+            var res = getChildrenWithAttr(parent, tag, attr, value);
+            return res.length ? res[0] : undefined;
+        }
+        blocks_1.getFirstChildWithAttr = getFirstChildWithAttr;
         /**
          * Loads the xml into a off-screen workspace (not suitable for size computations)
          */
@@ -1570,7 +1610,8 @@ var pxt;
         }
         blocks_1.loadWorkspaceXml = loadWorkspaceXml;
         function patchFloatingBlocks(dom, info) {
-            var onstart = dom.querySelector("block[type=" + ts.pxtc.ON_START_TYPE + "]");
+            var onstarts = getBlocksWithType(dom, ts.pxtc.ON_START_TYPE);
+            var onstart = onstarts.length ? onstarts[0] : undefined;
             if (onstart) {
                 onstart.removeAttribute("deletable");
                 return;
@@ -1585,7 +1626,7 @@ var pxt;
                 var nextNode = node.nextElementSibling;
                 // does this block is disable or have s nested statement block?
                 var nodeType = node.getAttribute("type");
-                if (!node.getAttribute("disabled") && !node.querySelector("statement")
+                if (!node.getAttribute("disabled") && !node.getElementsByTagName("statement").length
                     && (pxt.blocks.buildinBlockStatements[nodeType] ||
                         (blocks[nodeType] && blocks[nodeType].retType == "void" && !blocks_1.hasArrowFunction(blocks[nodeType])))) {
                     // old block, needs to be wrapped in onstart
@@ -1622,17 +1663,31 @@ var pxt;
             try {
                 var parser = new DOMParser();
                 var doc_1 = parser.parseFromString(xml, "application/xml");
-                // patch block types
-                var upgrades = (pxt.appTarget.compile && pxt.appTarget.compile.upgrades)
-                    ? pxt.appTarget.compile.upgrades.filter(function (up) { return up.type == "blockId"; })
-                    : [];
-                upgrades.forEach(function (up) { return Object.keys(up.map).forEach(function (type) {
-                    pxt.Util.toArray(doc_1.querySelectorAll("block[type=" + type + "]"))
-                        .forEach(function (blockNode) {
-                        blockNode.setAttribute("type", up.map[type]);
-                        pxt.debug("patched block " + type + " -> " + up.map[type]);
-                    });
-                }); });
+                if (pxt.appTarget.compile) {
+                    var upgrades = pxt.appTarget.compile.upgrades || [];
+                    // patch block types
+                    upgrades.filter(function (up) { return up.type == "blockId"; })
+                        .forEach(function (up) { return Object.keys(up.map).forEach(function (type) {
+                        getBlocksWithType(doc_1, type)
+                            .forEach(function (blockNode) {
+                            blockNode.setAttribute("type", up.map[type]);
+                            pxt.debug("patched block " + type + " -> " + up.map[type]);
+                        });
+                    }); });
+                    // patch block value
+                    upgrades.filter(function (up) { return up.type == "blockValue"; })
+                        .forEach(function (up) { return Object.keys(up.map).forEach(function (k) {
+                        var m = k.split('.');
+                        var type = m[0];
+                        var name = m[1];
+                        getBlocksWithType(doc_1, type)
+                            .reduce(function (prev, current) { return prev.concat(getDirectChildren(current, "value")); }, [])
+                            .forEach(function (blockNode) {
+                            blockNode.setAttribute("name", up.map[k]);
+                            pxt.debug("patched block value " + k + " -> " + up.map[k]);
+                        });
+                    }); });
+                }
                 // build upgrade map
                 var enums = {};
                 for (var k in info.apis.byQName) {
@@ -1667,7 +1722,7 @@ var pxt;
             symbol.parameters.forEach(function (p, i) {
                 var ptype = info.apis.byQName[p.type];
                 if (ptype && ptype.kind == pxtc.SymbolKind.Enum) {
-                    var field = block.querySelector("field[name=" + params[p.name].name + "]");
+                    var field = getFirstChildWithAttr(block, "field", "name", params[p.name].name);
                     if (field) {
                         var en = enums[ptype.name + '.' + field.textContent];
                         if (en)
@@ -1742,7 +1797,7 @@ var pxt;
                 blocks.forEach(function (block) {
                     block.moveBy(0, y);
                     y += block.getHeightWidth().height;
-                    y += emPixels; //buffer            
+                    y += emPixels; //buffer
                 });
             }
             layout.verticalAlign = verticalAlign;
@@ -1762,32 +1817,41 @@ var pxt;
                 flowBlocks(ws.getTopBlocks(true), ratio);
             }
             layout.flow = flow;
+            function screenshotEnabled() {
+                return !pxt.BrowserUtils.isIE();
+            }
+            layout.screenshotEnabled = screenshotEnabled;
             function screenshotAsync(ws) {
                 return toPngAsync(ws);
             }
             layout.screenshotAsync = screenshotAsync;
             function toPngAsync(ws) {
-                var sg = toSvg(ws);
-                if (!sg)
-                    return Promise.resolve(undefined);
-                return toPngAsyncInternal(sg.width, sg.height, sg.xml);
+                return toSvgAsync(ws)
+                    .then(function (sg) {
+                    if (!sg)
+                        return Promise.resolve(undefined);
+                    return toPngAsyncInternal(sg.width, sg.height, 4, sg.xml);
+                });
             }
             layout.toPngAsync = toPngAsync;
-            function svgToPngAsync(svg, customCss, x, y, width, height) {
-                var sg = toSvgInternal(svg, customCss, x, y, width, height);
-                if (!sg)
-                    return Promise.resolve(undefined);
-                return toPngAsyncInternal(sg.width, sg.height, sg.xml);
+            function svgToPngAsync(svg, customCss, x, y, width, height, pixelDensity) {
+                return blocklyToSvgAsync(svg, customCss, x, y, width, height)
+                    .then(function (sg) {
+                    if (!sg)
+                        return Promise.resolve(undefined);
+                    return toPngAsyncInternal(sg.width, sg.height, pixelDensity, sg.xml);
+                });
             }
             layout.svgToPngAsync = svgToPngAsync;
-            function toPngAsyncInternal(width, height, data) {
+            function toPngAsyncInternal(width, height, pixelDensity, data) {
                 return new Promise(function (resolve, reject) {
-                    var cvs = document.createElement("canvas"), ctx = cvs.getContext("2d");
+                    var cvs = document.createElement("canvas");
+                    var ctx = cvs.getContext("2d");
                     var img = new Image;
-                    cvs.width = width;
-                    cvs.height = height;
+                    cvs.width = width * pixelDensity;
+                    cvs.height = height * pixelDensity;
                     img.onload = function () {
-                        ctx.drawImage(img, 0, 0, width, height);
+                        ctx.drawImage(img, 0, 0, width, height, 0, 0, cvs.width, cvs.height);
                         var canvasdata = cvs.toDataURL("image/png");
                         resolve(canvasdata);
                     };
@@ -1798,29 +1862,66 @@ var pxt;
                     img.src = data;
                 });
             }
-            function toSvg(ws) {
+            var CUSTOM_CSS = "\n.blocklyMainBackground {\n    stroke:none !important;\n}\n\n.blocklyTreeLabel, .blocklyText, .blocklyHtmlInput {\n    font-family:'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', 'source-code-pro', monospace !important;\n}\n\n.rtl .blocklyText {\n    text-align:right;\n}\n\n.blocklyTreeLabel {\n    font-size:1.25rem !important;\n}\n\n.blocklyCheckbox {\n    fill: #ff3030 !important;\n    text-shadow: 0px 0px 6px #f00;\n    font-size: 17pt !important;\n}";
+            var XLINK_NAMESPACE = "http://www.w3.org/1999/xlink";
+            function toSvgAsync(ws) {
                 if (!ws)
-                    return undefined;
+                    return Promise.resolve(undefined);
                 var bbox = document.getElementsByClassName("blocklyBlockCanvas")[0].getBBox();
                 var sg = ws.svgBlockCanvas_.cloneNode(true);
-                var customCss = "\n.blocklyMainBackground {\n    stroke:none !important;\n}\n\n.blocklyTreeLabel, .blocklyText, .blocklyHtmlInput {\n    font-family:'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', 'source-code-pro', monospace !important;   \n}\n\n.blocklyText {    \n    font-size:1rem !important;\n}\n\n.rtl .blocklyText {\n    text-align:right;\n}\n\n.blocklyTreeLabel {\n    font-size:1.25rem !important;\n}\n\n.blocklyCheckbox {\n    fill: #ff3030 !important;\n    text-shadow: 0px 0px 6px #f00;\n    font-size: 17pt !important;\n}";
-                return toSvgInternal(sg, customCss, bbox.x, bbox.y, bbox.width, bbox.height);
+                return blocklyToSvgAsync(sg, CUSTOM_CSS, bbox.x, bbox.y, bbox.width, bbox.height);
             }
-            layout.toSvg = toSvg;
-            function toSvgInternal(sg, customCss, x, y, width, height) {
+            layout.toSvgAsync = toSvgAsync;
+            function blocklyToSvgAsync(sg, customCss, x, y, width, height) {
                 if (!sg.childNodes[0])
-                    return undefined;
+                    return Promise.resolve(undefined);
                 sg.removeAttribute("width");
                 sg.removeAttribute("height");
                 sg.removeAttribute("transform");
-                var xsg = new DOMParser().parseFromString("<svg version=\"1.1\" xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"" + width + "\" height=\"" + height + "\" viewBox=\"" + x + " " + y + " " + width + " " + height + "\">\n            " + new XMLSerializer().serializeToString(sg) + "\n            </svg>", "image/svg+xml");
+                var xsg = new DOMParser().parseFromString("<svg version=\"1.1\" xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"" + XLINK_NAMESPACE + "\" width=\"" + width + "\" height=\"" + height + "\" viewBox=\"" + x + " " + y + " " + width + " " + height + "\">\n            " + new XMLSerializer().serializeToString(sg) + "\n            </svg>", "image/svg+xml");
                 var cssLink = xsg.createElementNS("http://www.w3.org/1999/xhtml", "style");
                 // CSS may contain <, > which need to be stored in CDATA section
                 cssLink.appendChild(xsg.createCDATASection(Blockly.Css.CONTENT.join('') + '\n\n' + customCss + '\n\n'));
                 xsg.documentElement.insertBefore(cssLink, xsg.documentElement.firstElementChild);
+                return expandImagesAsync(xsg)
+                    .then(function () {
+                    return { width: width, height: height, xml: documentToSvg(xsg) };
+                });
+            }
+            layout.blocklyToSvgAsync = blocklyToSvgAsync;
+            function documentToSvg(xsg) {
                 var xml = new XMLSerializer().serializeToString(xsg);
                 var data = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(xml)));
-                return { width: width, height: height, xml: data };
+                return data;
+            }
+            layout.documentToSvg = documentToSvg;
+            var imageXLinkCache;
+            function expandImagesAsync(xsg) {
+                if (!imageXLinkCache)
+                    imageXLinkCache = {};
+                var images = xsg.getElementsByTagName("image");
+                var p = pxt.Util.toArray(images)
+                    .filter(function (image) { return !/^data:/.test(image.getAttributeNS(XLINK_NAMESPACE, "href")); })
+                    .map(function (image) {
+                    var href = image.getAttributeNS(XLINK_NAMESPACE, "href");
+                    var dataUri = imageXLinkCache[href];
+                    return (dataUri ? Promise.resolve(imageXLinkCache[href])
+                        : pxt.BrowserUtils.loadImageAsync(image.getAttributeNS(XLINK_NAMESPACE, "href"))
+                            .then(function (img) {
+                            var cvs = document.createElement("canvas");
+                            var ctx = cvs.getContext("2d");
+                            cvs.width = img.width;
+                            cvs.height = img.height;
+                            ctx.drawImage(img, 0, 0, img.width, img.height, 0, 0, cvs.width, cvs.height);
+                            imageXLinkCache[href] = dataUri = cvs.toDataURL("image/png");
+                            return dataUri;
+                        }).catch(function (e) {
+                            // ignore load error
+                            pxt.debug("svg render: failed to load " + href);
+                        }))
+                        .then(function (href) { image.setAttributeNS(XLINK_NAMESPACE, "href", href); });
+                });
+                return Promise.all(p).then(function () { });
             }
             function flowBlocks(blocks, ratio) {
                 if (ratio === void 0) { ratio = 1.62; }
@@ -1898,8 +1999,15 @@ var pxt;
             images: '#5C2D91',
             variables: '#A80000',
             text: '#996600',
-            lists: '#D83B01'
+            arrays: '#A94400',
+            advanced: '#3c3c3c'
         };
+        (function (CategoryMode) {
+            CategoryMode[CategoryMode["All"] = 0] = "All";
+            CategoryMode[CategoryMode["None"] = 1] = "None";
+            CategoryMode[CategoryMode["Basic"] = 2] = "Basic";
+        })(blocks_6.CategoryMode || (blocks_6.CategoryMode = {}));
+        var CategoryMode = blocks_6.CategoryMode;
         var typeDefaults = {
             "string": {
                 field: "TEXT",
@@ -1915,6 +2023,11 @@ var pxt;
                 field: "BOOL",
                 block: "logic_boolean",
                 defaultValue: "false"
+            },
+            "Array": {
+                field: "VAR",
+                block: "variables_get",
+                defaultValue: "list"
             }
         };
         var usedBlocks = {};
@@ -1982,15 +2095,34 @@ var pxt;
                 var attr = attrNames["this"];
                 block.appendChild(createShadowValue(attr.name, attr.type, attr.shadowValue || attr.name, attr.shadowType || "variables_get"));
             }
-            if (fn.parameters)
+            if (fn.parameters) {
                 fn.parameters.filter(function (pr) { return !!attrNames[pr.name].name &&
                     (/^(string|number|boolean)$/.test(attrNames[pr.name].type)
                         || !!attrNames[pr.name].shadowType
                         || !!attrNames[pr.name].shadowValue); })
                     .forEach(function (pr) {
                     var attr = attrNames[pr.name];
-                    block.appendChild(createShadowValue(attr.name, attr.type, attr.shadowValue, attr.shadowType));
+                    var shadowValue;
+                    var container;
+                    if (pr.options && pr.options['min'] && pr.options['max']) {
+                        shadowValue = createShadowValue(attr.name, attr.type, attr.shadowValue, 'math_number_minmax');
+                        container = document.createElement('mutation');
+                        container.setAttribute('min', pr.options['min'].value);
+                        container.setAttribute('max', pr.options['max'].value);
+                    }
+                    else {
+                        shadowValue = createShadowValue(attr.name, attr.type, attr.shadowValue, attr.shadowType);
+                    }
+                    if (pr.options && pr.options['fieldEditorOptions']) {
+                        if (!container)
+                            container = document.createElement('mutation');
+                        container.setAttribute("customfield", JSON.stringify(pr.options['fieldEditorOptions'].value));
+                    }
+                    if (shadowValue && container)
+                        shadowValue.firstChild.appendChild(container);
+                    block.appendChild(shadowValue);
                 });
+            }
             searchElementCache[fn.attributes.blockId] = block.cloneNode(true);
             return block;
         }
@@ -2009,6 +2141,7 @@ var pxt;
             return result;
         }
         function injectToolbox(tb, info, fn, block, showCategories) {
+            if (showCategories === void 0) { showCategories = CategoryMode.Basic; }
             // identity function are just a trick to get an enum drop down in the block
             // while allowing the parameter to be a number
             if (fn.attributes.blockHidden)
@@ -2016,23 +2149,26 @@ var pxt;
             if (!fn.attributes.deprecated) {
                 var ns = (fn.attributes.blockNamespace || fn.namespace).split('.')[0];
                 var nsn = info.apis.byQName[ns];
+                var isAdvanced = nsn && nsn.attributes.advanced;
                 if (nsn)
                     ns = nsn.attributes.block || ns;
                 var catName = ts.pxtc.blocksCategory(fn);
+                if (nsn && nsn.name)
+                    catName = pxt.Util.capitalize(nsn.name);
                 var category_1 = categoryElement(tb, catName);
-                if (showCategories) {
+                if (showCategories === CategoryMode.All || showCategories == CategoryMode.Basic && !isAdvanced) {
                     if (!category_1) {
                         var categories = getChildCategories(tb);
                         var parentCategoryList = tb;
                         pxt.debug('toolbox: adding category ' + ns);
                         var nsWeight = (nsn ? nsn.attributes.weight : 50) || 50;
-                        var locCatName = (nsn ? nsn.attributes.block : "") || catName;
+                        var locCatName = pxt.Util.capitalize((nsn ? nsn.attributes.block : "") || catName);
                         category_1 = createCategoryElement(locCatName, catName, nsWeight);
                         if (nsn && nsn.attributes.color) {
                             category_1.setAttribute("colour", nsn.attributes.color);
                         }
-                        else if (blocks_6.blockColors[ns]) {
-                            category_1.setAttribute("colour", blocks_6.blockColors[ns].toString());
+                        else if (getNamespaceColor(ns)) {
+                            category_1.setAttribute("colour", getNamespaceColor(ns));
                         }
                         if (nsn && nsn.attributes.icon) {
                             var nsnIconClassName = ("blocklyTreeIcon" + nsn.name.toLowerCase()).replace(/\s/g, '');
@@ -2044,33 +2180,36 @@ var pxt;
                             category_1.setAttribute("iconclass", "blocklyTreeIconDefault");
                             category_1.setAttribute("expandedclass", "blocklyTreeIconDefault");
                         }
-                        if (nsn && nsn.attributes.advanced) {
-                            parentCategoryList = getOrAddSubcategory(tb, pxt.Util.lf("{id:category}Advanced"), "Advanced", 1, "#3c3c3c", 'blocklyTreeIconadvanced');
-                            categories = getChildCategories(parentCategoryList);
-                        }
-                        // Insert the category based on weight
-                        var ci = 0;
-                        for (ci = 0; ci < categories.length; ++ci) {
-                            var cat = categories[ci];
-                            if (parseInt(cat.getAttribute("weight") || "50") < nsWeight) {
-                                parentCategoryList.insertBefore(category_1, cat);
-                                break;
-                            }
-                        }
-                        if (ci == categories.length)
-                            parentCategoryList.appendChild(category_1);
+                        insertTopLevelCategory(category_1, tb, nsWeight, isAdvanced);
                     }
                     if (fn.attributes.advanced) {
-                        category_1 = getOrAddSubcategory(category_1, lf("More"), "More", 1, category_1.getAttribute("colour"), 'blocklyTreeIconmore');
+                        category_1 = getOrAddSubcategoryByWeight(category_1, lf("More"), "More", 1, category_1.getAttribute("colour"), 'blocklyTreeIconmore');
                     }
+                    else if (fn.attributes.subcategory) {
+                        var sub = fn.attributes.subcategory;
+                        var all = nsn.attributes.subcategories;
+                        if (all && all.indexOf(sub) !== -1) {
+                            // Respect the weights given by the package
+                            var weight = 10000 - all.indexOf(sub);
+                            category_1 = getOrAddSubcategoryByWeight(category_1, sub, sub, weight, category_1.getAttribute("colour"), 'blocklyTreeIconmore');
+                        }
+                        else {
+                            // If no weight is specified, insert alphabetically after the weighted subcategories but above "More"
+                            category_1 = getOrAddSubcategoryByName(category_1, sub, sub, category_1.getAttribute("colour"), 'blocklyTreeIconmore');
+                        }
+                    }
+                }
+                if (showCategories === CategoryMode.Basic && isAdvanced) {
+                    var type = block.getAttribute("type");
+                    usedBlocks[type] = true;
                 }
                 if (fn.attributes.mutateDefaults) {
                     var mutationValues = fn.attributes.mutateDefaults.split(";");
                     mutationValues.forEach(function (mutation) {
                         var mutatedBlock = block.cloneNode(true);
                         blocks_6.mutateToolboxBlock(mutatedBlock, fn.attributes.mutate, mutation);
-                        if (showCategories) {
-                            category_1.appendChild(mutatedBlock);
+                        if (showCategories !== CategoryMode.None) {
+                            insertBlock(mutatedBlock, category_1, fn.attributes.weight);
                         }
                         else {
                             tb.appendChild(mutatedBlock);
@@ -2078,14 +2217,37 @@ var pxt;
                     });
                 }
                 else {
-                    if (showCategories) {
-                        category_1.appendChild(block);
+                    if (showCategories !== CategoryMode.None && !(showCategories === CategoryMode.Basic && isAdvanced)) {
+                        insertBlock(block, category_1, fn.attributes.weight);
                         injectToolboxIconCss();
                     }
-                    else {
+                    else if (showCategories === CategoryMode.None) {
                         tb.appendChild(block);
                     }
                 }
+            }
+        }
+        function insertBlock(bl, cat, weight) {
+            var isBuiltin = !!blocks_6.blockColors[cat.getAttribute("nameid")];
+            if (isBuiltin && weight > 50) {
+                bl.setAttribute("loaded", "true");
+                var first = void 0;
+                for (var i = 0; i < cat.childNodes.length; i++) {
+                    var n = cat.childNodes.item(i);
+                    if (n.tagName === "block" && !n.getAttribute("loaded")) {
+                        first = n;
+                        break;
+                    }
+                }
+                if (first) {
+                    cat.insertBefore(bl, first);
+                }
+                else {
+                    cat.appendChild(bl);
+                }
+            }
+            else {
+                cat.appendChild(bl);
             }
         }
         var toolboxStyle;
@@ -2093,8 +2255,13 @@ var pxt;
         function appendToolboxIconCss(className, i) {
             if (toolboxStyleBuffer.indexOf(className) > -1)
                 return;
-            var icon = pxt.Util.unicodeToChar(i);
-            toolboxStyleBuffer += "\n            .blocklyTreeIcon." + className + "::before {\n                content: \"" + icon + "\";\n            }\n        ";
+            if (i.length === 1) {
+                var icon = pxt.Util.unicodeToChar(i);
+                toolboxStyleBuffer += "\n                .blocklyTreeIcon." + className + "::before {\n                    content: \"" + icon + "\";\n                }\n            ";
+            }
+            else {
+                toolboxStyleBuffer += "\n                .blocklyTreeIcon." + className + " {\n                    display: inline-block !important;\n                    background-image: url(\"" + (pxt.webConfig.commitCdnUrl + encodeURI(i)) + "\")!important;\n                    width: 1em;\n                    height: 1em;\n                    background-size: 1em!important;\n                }\n            ";
+            }
         }
         blocks_6.appendToolboxIconCss = appendToolboxIconCss;
         function injectToolboxIconCss() {
@@ -2117,20 +2284,25 @@ var pxt;
         function iconToFieldImage(c) {
             var url = iconCanvasCache[c];
             if (!url) {
-                var canvas = document.createElement('canvas');
-                canvas.width = 64;
-                canvas.height = 64;
-                var ctx = canvas.getContext('2d');
-                ctx.fillStyle = 'white';
-                ctx.font = "56px Icons";
-                ctx.textAlign = "center";
-                ctx.fillText(c, canvas.width / 2, 56);
-                url = iconCanvasCache[c] = canvas.toDataURL();
+                if (c.length === 1) {
+                    var canvas = document.createElement('canvas');
+                    canvas.width = 64;
+                    canvas.height = 64;
+                    var ctx = canvas.getContext('2d');
+                    ctx.fillStyle = 'white';
+                    ctx.font = "56px Icons";
+                    ctx.textAlign = "center";
+                    ctx.fillText(c, canvas.width / 2, 56);
+                    url = iconCanvasCache[c] = canvas.toDataURL();
+                }
+                else {
+                    url = pxt.webConfig.commitCdnUrl + encodeURI(c);
+                }
             }
             return new Blockly.FieldImage(url, 16, 16, '');
         }
         function getChildCategories(parent) {
-            var elements = parent.querySelectorAll("category");
+            var elements = parent.getElementsByTagName("category");
             var result = [];
             for (var i = 0; i < elements.length; i++) {
                 if (elements[i].parentNode === parent) {
@@ -2139,13 +2311,92 @@ var pxt;
             }
             return result;
         }
-        function getOrAddSubcategory(parent, name, nameid, weight, colour, iconClass) {
-            var existing = parent.querySelector("category[nameid=\"" + nameid.toLowerCase() + "\"]");
+        function insertTopLevelCategory(category, tb, nsWeight, isAdvanced) {
+            var categories = getChildCategories(tb);
+            if (isAdvanced) {
+                category.setAttribute("advanced", "true");
+            }
+            // Insert the category based on weight
+            var ci = 0;
+            for (ci = 0; ci < categories.length; ++ci) {
+                var cat = categories[ci];
+                // Advanced categories always come last
+                if (isAdvanced) {
+                    if (!cat.hasAttribute("advanced")) {
+                        continue;
+                    }
+                }
+                else if (cat.hasAttribute("advanced")) {
+                    tb.insertBefore(category, cat);
+                    break;
+                }
+                if (parseInt(cat.getAttribute("weight") || "50") < nsWeight) {
+                    tb.insertBefore(category, cat);
+                    break;
+                }
+            }
+            if (ci == categories.length)
+                tb.appendChild(category);
+        }
+        function getOrAddSubcategoryByWeight(parent, name, nameid, weight, colour, iconClass) {
+            var existing = blocks_6.getFirstChildWithAttr(parent, "category", "nameid", nameid.toLowerCase());
             if (existing) {
                 return existing;
             }
             var newCategory = createCategoryElement(name, nameid, weight, colour, iconClass);
-            parent.appendChild(newCategory);
+            var siblings = parent.getElementsByTagName("category");
+            var ci = 0;
+            for (ci = 0; ci < siblings.length; ++ci) {
+                var cat = siblings[ci];
+                if (parseInt(cat.getAttribute("weight") || "50") < weight) {
+                    parent.insertBefore(newCategory, cat);
+                    break;
+                }
+            }
+            if (ci == siblings.length)
+                parent.appendChild(newCategory);
+            return newCategory;
+        }
+        function getOrAddSubcategoryByName(parent, name, nameid, colour, iconClass) {
+            var existing = blocks_6.getFirstChildWithAttr(parent, "category", "nameid", nameid.toLowerCase());
+            if (existing) {
+                return existing;
+            }
+            var newCategory = createCategoryElement(name, nameid, 100, colour, iconClass);
+            var siblings = parent.getElementsByTagName("category");
+            var filtered = [];
+            var ci = 0;
+            var inserted = false;
+            var last = undefined;
+            for (ci = 0; ci < siblings.length; ++ci) {
+                var cat = siblings[ci];
+                var sibWeight = parseInt(cat.getAttribute("weight") || "50");
+                if (sibWeight >= 1000) {
+                    continue;
+                }
+                else if (sibWeight === 1) {
+                    last = cat;
+                    break;
+                }
+                filtered.push(cat);
+                if (!inserted && cat.getAttribute("name").localeCompare(name) >= 0) {
+                    parent.insertBefore(newCategory, cat);
+                    filtered.splice(filtered.length - 1, 0, newCategory);
+                    inserted = true;
+                }
+            }
+            if (!inserted) {
+                filtered.push(newCategory);
+                if (last) {
+                    parent.insertBefore(newCategory, last);
+                }
+                else {
+                    parent.appendChild(newCategory);
+                }
+            }
+            filtered.forEach(function (e, i) {
+                e.setAttribute("weight", (200 - i).toString());
+            });
             return newCategory;
         }
         function injectBlockDefinition(info, fn, attrNames, blockXml) {
@@ -2175,7 +2426,7 @@ var pxt;
             return true;
         }
         function initField(i, ni, fn, ns, pre, right, type, nsinfo) {
-            if (ni == 0) {
+            if (ni == 0 && !pxt.appTarget.appTheme.disableBlockIcons) {
                 var icon = ns && ns.attributes.icon ? ns.attributes.icon : null;
                 if (icon)
                     i.appendField(iconToFieldImage(icon));
@@ -2211,17 +2462,26 @@ var pxt;
             return false;
         }
         function initBlock(block, info, fn, attrNames) {
+            var _this = this;
             var ns = (fn.attributes.blockNamespace || fn.namespace).split('.')[0];
             var instance = fn.kind == pxtc.SymbolKind.Method || fn.kind == pxtc.SymbolKind.Property;
             var nsinfo = info.apis.byQName[ns];
             var color = fn.attributes.color
                 || (nsinfo ? nsinfo.attributes.color : undefined)
-                || blocks_6.blockColors[ns.toLowerCase()]
+                || getNamespaceColor(ns.toLowerCase())
                 || 255;
             if (fn.attributes.help)
                 block.setHelpUrl("/reference/" + fn.attributes.help.replace(/^\//, ''));
+            else if (fn.pkg && !pxt.appTarget.bundledpkgs[fn.pkg]) {
+                var anchor = fn.qName.toLowerCase().split('.');
+                if (anchor[0] == fn.pkg)
+                    anchor.shift();
+                block.setHelpUrl("/pkg/" + fn.pkg + "#" + encodeURIComponent(anchor.join('-')));
+            }
             block.setTooltip(fn.attributes.jsDoc);
             block.setColour(color);
+            if (fn.attributes.undeletable)
+                block.setDeletable(false);
             blocks_6.parseFields(fn.attributes.block).map(function (field) {
                 var i;
                 if (!field.p) {
@@ -2240,6 +2500,7 @@ var pxt;
                     var typeInfo_1 = pxt.U.lookup(info.apis.byQName, pr_1.type);
                     var isEnum_1 = typeInfo_1 && typeInfo_1.kind == pxtc.SymbolKind.Enum;
                     var isFixed = typeInfo_1 && !!typeInfo_1.attributes.fixedInstances;
+                    var customField = (fn.attributes.paramFieldEditor && fn.attributes.paramFieldEditor[p_1]);
                     if (isEnum_1 || isFixed) {
                         var syms = pxt.Util.values(info.apis.byQName)
                             .filter(function (e) {
@@ -2255,7 +2516,7 @@ var pxt;
                             var k = v.attributes.block || v.attributes.blockId || v.name;
                             return [
                                 v.attributes.blockImage ? {
-                                    src: pxt.webConfig.targetCdnUrl + ("blocks/" + v.namespace.toLowerCase() + "/" + v.name.toLowerCase() + ".png"),
+                                    src: pxt.webConfig.commitCdnUrl + ("blocks/" + v.namespace.toLowerCase() + "/" + v.name.toLowerCase() + ".png"),
                                     alt: k,
                                     width: 32,
                                     height: 32
@@ -2265,38 +2526,40 @@ var pxt;
                         });
                         i = initField(block.appendDummyInput(), field.ni, fn, nsinfo, pre, true);
                         // if a value is provided, move it first
-                        if (pr_1.shadowValue)
-                            dd.sort(function (v1, v2) { return v1[1] == pr_1.shadowValue ? -1 : v2[1] == pr_1.shadowValue ? 1 : 0; });
-                        var noteValidator = function (text) {
-                            if (text === null) {
-                                return null;
+                        if (pr_1.shadowValue) {
+                            var shadowValueIndex_1 = -1;
+                            dd.some(function (v, i) {
+                                if (v[1] === pr_1.shadowValue) {
+                                    shadowValueIndex_1 = i;
+                                    return true;
+                                }
+                                return false;
+                            });
+                            if (shadowValueIndex_1 > -1) {
+                                var shadowValue = dd.splice(shadowValueIndex_1, 1)[0];
+                                dd.unshift(shadowValue);
                             }
-                            text = String(text);
-                            var n = parseFloat(text || '0');
-                            if (isNaN(n) || n < 0) {
-                                // Invalid number.
-                                return null;
-                            }
-                            // Get the value in range.
-                            return String(Math.round(Number(text)));
-                        };
-                        if (fn.attributes.blockFieldEditor == "note_editor")
-                            i.appendField(new Blockly.FieldNote("262", color, noteValidator), attrNames[n].name);
-                        else if (fn.attributes.blockFieldEditor == "FieldDropdownGrid") {
-                            var params = fn.attributes.blockFieldEditorParams.split(",");
-                            var cols = parseInt(params[0]);
-                            var width = parseInt(params[1]);
-                            var useTooltips = params[2] === "true";
-                            var tooltipXOffset = !!params[3] ? parseInt(params[3]) : null;
-                            var tooltipYOffset = !!params[4] ? parseInt(params[4]) : null;
-                            i.appendField(new Blockly.FieldDropdownGrid(dd, cols, width, {
-                                enabled: useTooltips,
-                                xOffset: tooltipXOffset,
-                                yOffset: tooltipYOffset
-                            }), attrNames[n].name);
+                        }
+                        if (customField) {
+                            var defl = fn.attributes.paramDefl[pr_1.name] || "";
+                            var options_1 = {
+                                data: dd,
+                                colour: color
+                            };
+                            pxt.Util.jsonMergeFrom(options_1, fn.attributes.paramFieldEditorOptions && fn.attributes.paramFieldEditorOptions[pr_1.name] || {});
+                            i.appendField(blocks_6.createFieldEditor(customField, defl, options_1), attrNames[n].name);
                         }
                         else
                             i.appendField(new Blockly.FieldDropdown(dd), attrNames[n].name);
+                    }
+                    else if (customField) {
+                        i = initField(block.appendDummyInput(), field.ni, fn, nsinfo, pre, true);
+                        var defl = fn.attributes.paramDefl[pr_1.name] || "";
+                        var options_2 = {
+                            colour: color
+                        };
+                        pxt.Util.jsonMergeFrom(options_2, fn.attributes.paramFieldEditorOptions && fn.attributes.paramFieldEditorOptions[pr_1.name] || {});
+                        i.appendField(blocks_6.createFieldEditor(customField, defl, options_2), attrNames[n].name);
                     }
                     else if (instance && n == "this") {
                         if (!fn.attributes.defaultInstance) {
@@ -2330,6 +2593,32 @@ var pxt;
             else if (fn.attributes.defaultInstance) {
                 blocks_6.addMutation(block, fn, blocks_6.MutatorTypes.DefaultInstanceMutator);
             }
+            var oldMutationToDom = block.mutationToDom;
+            var oldDomToMutation = block.domToMutation;
+            block.mutationToDom = function () {
+                var retVal = oldMutationToDom ? oldMutationToDom.call(_this) : document.createElement('mutation');
+                block.inputList.forEach(function (input) {
+                    input.fieldRow.forEach(function (fieldRow) {
+                        if (fieldRow.isFieldCustom_ && fieldRow.saveOptions) {
+                            var getOptions = fieldRow.saveOptions();
+                            retVal.setAttribute("customfield", JSON.stringify(getOptions));
+                        }
+                    });
+                });
+                return retVal;
+            };
+            block.domToMutation = function (mutation) {
+                if (oldDomToMutation)
+                    oldDomToMutation.call(_this, mutation);
+                block.inputList.forEach(function (input) {
+                    input.fieldRow.forEach(function (fieldRow) {
+                        if (fieldRow.isFieldCustom_ && fieldRow.restoreOptions) {
+                            var options_3 = JSON.parse(mutation.getAttribute("customfield"));
+                            fieldRow.restoreOptions(options_3);
+                        }
+                    });
+                });
+            };
             var body = fn.parameters ? fn.parameters.filter(function (pr) { return pr.type == "() => void"; })[0] : undefined;
             if (body) {
                 block.appendStatementInput("HANDLER")
@@ -2360,7 +2649,7 @@ var pxt;
                     break;
                 case "void": break; // do nothing
                 //TODO
-                default: block.setOutput(true, fn.retType);
+                default: block.setOutput(true, fn.retType !== "T" ? fn.retType : undefined);
             }
             // hook up/down if return value is void
             var hasHandlers = hasArrowFunction(fn);
@@ -2380,8 +2669,14 @@ var pxt;
             if (e && e.parentNode)
                 e.parentNode.removeChild(e);
         }
-        function createToolbox(blockInfo, toolbox, showCategories, blockSubset) {
-            if (showCategories === void 0) { showCategories = true; }
+        (function (FilterState) {
+            FilterState[FilterState["Hidden"] = 0] = "Hidden";
+            FilterState[FilterState["Visible"] = 1] = "Visible";
+            FilterState[FilterState["Disabled"] = 2] = "Disabled";
+        })(blocks_6.FilterState || (blocks_6.FilterState = {}));
+        var FilterState = blocks_6.FilterState;
+        function createToolbox(blockInfo, toolbox, showCategories, filters) {
+            if (showCategories === void 0) { showCategories = CategoryMode.Basic; }
             init();
             // create new toolbox and update block definitions
             var tb = toolbox ? toolbox.cloneNode(true) : undefined;
@@ -2402,11 +2697,13 @@ var pxt;
                 return c;
             });
             searchElementCache = {};
+            usedBlocks = {};
             var currentBlocks = {};
+            var showAdvanced = false;
             var dbg = pxt.options.debug;
             // create new toolbox and update block definitions
             blockInfo.blocks
-                .filter(function (fn) { return !tb || !tb.querySelector("block[type='" + fn.attributes.blockId + "']"); })
+                .filter(function (fn) { return !tb || !blocks_6.getFirstChildWithAttr(tb, "block", "type", fn.attributes.blockId); })
                 .forEach(function (fn) {
                 if (fn.attributes.blockBuiltin) {
                     pxt.Util.assert(!!builtinBlocks[fn.attributes.blockId]);
@@ -2419,6 +2716,11 @@ var pxt;
                         if (tb && (!fn.attributes.debug || dbg))
                             injectToolbox(tb, blockInfo, fn, block, showCategories);
                         currentBlocks[fn.attributes.blockId] = 1;
+                        if (!showAdvanced && !fn.attributes.blockHidden && !fn.attributes.deprecated) {
+                            var ns = (fn.attributes.blockNamespace || fn.namespace).split('.')[0];
+                            var nsn = blockInfo.apis.byQName[ns];
+                            showAdvanced = showAdvanced || (nsn && nsn.attributes.advanced);
+                        }
                     }
                 }
             });
@@ -2448,10 +2750,10 @@ var pxt;
                             el.appendChild(fe);
                         }
                     }
-                    if (showCategories) {
+                    if (showCategories !== CategoryMode.None) {
                         var cat = categoryElement(tb, eb.namespace);
                         if (cat) {
-                            cat.appendChild(el);
+                            insertBlock(el, cat, eb.weight);
                         }
                         else {
                             console.error("trying to add block " + eb.type + " to unknown category " + eb.namespace);
@@ -2462,25 +2764,73 @@ var pxt;
                     }
                 });
             }
-            if (tb && showCategories) {
+            if (tb && showCategories !== CategoryMode.None) {
                 // remove unused categories
                 var config = pxt.appTarget.runtime || {};
                 if (!config.mathBlocks)
                     removeCategory(tb, "Math");
-                if (!config.textBlocks)
-                    removeCategory(tb, "Text");
-                if (!config.listsBlocks)
-                    removeCategory(tb, "Lists");
                 if (!config.variablesBlocks)
                     removeCategory(tb, "Variables");
                 if (!config.logicBlocks)
                     removeCategory(tb, "Logic");
                 if (!config.loopsBlocks)
                     removeCategory(tb, "Loops");
+                // Advanced builtin categories
+                if (!config.textBlocks) {
+                    removeCategory(tb, "Text");
+                }
+                else {
+                    showAdvanced = true;
+                    var cat = categoryElement(tb, "Text");
+                    if (cat) {
+                        var blockElements = cat.getElementsByTagName("block");
+                        for (var i = 0; i < blockElements.length; i++) {
+                            var b = blockElements.item(i);
+                            usedBlocks[b.getAttribute("type")] = true;
+                        }
+                    }
+                    if (showCategories === CategoryMode.Basic) {
+                        removeCategory(tb, "Text");
+                    }
+                }
+                if (!config.listsBlocks) {
+                    removeCategory(tb, "Arrays");
+                    if (config.loopsBlocks) {
+                        var cat = categoryElement(tb, "Loops");
+                        cat.removeChild(blocks_6.getFirstChildWithAttr(cat, "block", "type", "controls_for_of"));
+                    }
+                }
+                else {
+                    showAdvanced = true;
+                    var cat = categoryElement(tb, "Arrays");
+                    if (cat) {
+                        var blockElements = cat.getElementsByTagName("block");
+                        for (var i = 0; i < blockElements.length; i++) {
+                            var b = blockElements.item(i);
+                            usedBlocks[b.getAttribute("type")] = true;
+                        }
+                    }
+                    if (showCategories === CategoryMode.Basic) {
+                        removeCategory(tb, "Arrays");
+                    }
+                }
                 // Load localized names for default categories
-                var cats = tb.querySelectorAll('category');
+                var cats = tb.getElementsByTagName('category');
                 for (var i = 0; i < cats.length; i++) {
                     cats[i].setAttribute('name', pxt.Util.rlf("{id:category}" + cats[i].getAttribute('name'), []));
+                }
+                // update category colors
+                var topCats = blocks_6.getDirectChildren(tb, "category");
+                for (var i = 0; i < topCats.length; i++) {
+                    var nsColor = getNamespaceColor(topCats[i].getAttribute('nameid'));
+                    if (nsColor && nsColor != "") {
+                        topCats[i].setAttribute('colour', nsColor);
+                        // update children colors
+                        var childCats = topCats[i].getElementsByTagName('category');
+                        for (var j = 0; j < childCats.length; j++) {
+                            childCats[j].setAttribute('colour', nsColor);
+                        }
+                    }
                 }
             }
             // Do not remove this comment.
@@ -2488,7 +2838,7 @@ var pxt;
             // lf("{id:category}Loops")
             // lf("{id:category}Logic")
             // lf("{id:category}Variables")
-            // lf("{id:category}Lists")
+            // lf("{id:category}Arrays")
             // lf("{id:category}Text")
             // lf("{id:category}Math")
             // lf("{id:category}Advanced")
@@ -2502,56 +2852,126 @@ var pxt;
                         shadow.innerHTML = b.innerHTML;
                 });
             }
-            // Add the "Add package" category
-            if (tb && showCategories && pxt.appTarget.cloud && pxt.appTarget.cloud.packages) {
-                getOrAddSubcategory(tb, pxt.Util.lf("{id:category}Add Package"), "Add Package", 1, "#717171", 'blocklyTreeIconaddpackage');
+            // Add the "Advanced" category
+            if (showAdvanced && tb && showCategories !== CategoryMode.None) {
+                var cat = createCategoryElement(pxt.Util.lf("{id:category}Advanced"), "Advanced", 1, getNamespaceColor('advanced'), showCategories === CategoryMode.Basic ? 'blocklyTreeIconadvancedcollapsed' : 'blocklyTreeIconadvancedexpanded');
+                insertTopLevelCategory(document.createElement("sep"), tb, 1.5, false);
+                insertTopLevelCategory(cat, tb, 1, false);
             }
-            // Filter the blocks
-            if (blockSubset) {
-                var keepcategories = {};
-                var categories = tb.querySelectorAll("category");
-                var blocks_7 = tb.querySelectorAll("block");
-                for (var bi = 0; bi < blocks_7.length; ++bi) {
-                    var blk = blocks_7.item(bi);
-                    var type = blk.getAttribute("type");
-                    var catName = blk.parentNode.getAttribute("name");
-                    var sticky = blk.getAttribute("sticky");
-                    if (!blockSubset[type] && !sticky) {
-                        blk.parentNode.removeChild(blk);
-                    }
-                    else {
-                        keepcategories[catName] = 1;
-                        if (type.indexOf("variables") == 0) {
-                            keepcategories["Variables"] = 1;
-                        }
-                    }
+            if (tb && (!showAdvanced || showCategories === CategoryMode.All) && pxt.appTarget.cloud && pxt.appTarget.cloud.packages) {
+                if (!showAdvanced) {
+                    insertTopLevelCategory(document.createElement("sep"), tb, 1.5, false);
                 }
-                if (showCategories) {
-                    for (var ci = 0; ci < categories.length; ++ci) {
-                        var cat = categories.item(ci);
-                        var catName = cat.getAttribute("name");
-                        if (!keepcategories[catName] && catName != pxt.Util.lf("{id:category}Advanced")) {
-                            cat.parentNode.removeChild(cat);
-                        }
-                    }
-                }
+                // Add the "Add package" category
+                getOrAddSubcategoryByWeight(tb, pxt.Util.lf("{id:category}Add Package"), "Add Package", 1, "#717171", 'blocklyTreeIconaddpackage');
             }
             if (tb) {
-                usedBlocks = {};
-                var blocks_8 = tb.querySelectorAll("block");
-                for (var i = 0; i < blocks_8.length; i++) {
-                    usedBlocks[blocks_8.item(i).getAttribute("type")] = true;
+                var blocks_7 = tb.getElementsByTagName("block");
+                for (var i = 0; i < blocks_7.length; i++) {
+                    usedBlocks[blocks_7.item(i).getAttribute("type")] = true;
                 }
                 updateUsedBlocks = true;
+            }
+            // Filter the blocks
+            if (filters) {
+                function filterBlocks(blocks, defaultState) {
+                    var hasChild = false;
+                    for (var bi = 0; bi < blocks.length; ++bi) {
+                        var blk = blocks.item(bi);
+                        var type = blk.getAttribute("type");
+                        var blockState = filters.blocks && filters.blocks[type] != undefined ? filters.blocks[type] : (defaultState != undefined ? defaultState : filters.defaultState);
+                        switch (blockState) {
+                            case FilterState.Hidden:
+                                blk.parentNode.removeChild(blk);
+                                --bi;
+                                break;
+                            case FilterState.Disabled:
+                                blk.setAttribute("disabled", "true");
+                                break;
+                            case FilterState.Visible:
+                                hasChild = true;
+                                break;
+                        }
+                    }
+                    return hasChild;
+                }
+                if (showCategories !== CategoryMode.None) {
+                    // Go through namespaces and keep the ones with an override
+                    var categories = tb.getElementsByTagName("category");
+                    for (var ci = 0; ci < categories.length; ++ci) {
+                        var cat = categories.item(ci);
+                        var catName = cat.getAttribute("nameid");
+                        if (catName === "more" || catName === "advanced") {
+                            continue;
+                        }
+                        var categoryState = filters.namespaces && filters.namespaces[catName] != undefined ? filters.namespaces[catName] : filters.defaultState;
+                        var blocks_8 = cat.getElementsByTagName("block");
+                        var hasVisibleChildren = filterBlocks(blocks_8, categoryState);
+                        switch (categoryState) {
+                            case FilterState.Disabled:
+                                if (!hasVisibleChildren) {
+                                    cat.setAttribute("disabled", "true");
+                                    // disable sub categories
+                                    var subcategories = cat.getElementsByTagName("category");
+                                    for (var si = 0; si < subcategories.length; ++si) {
+                                        subcategories.item(si).setAttribute("disabled", "true");
+                                    }
+                                }
+                                break;
+                            case FilterState.Visible:
+                            case FilterState.Hidden:
+                                if (!hasVisibleChildren) {
+                                    cat.parentNode.removeChild(cat);
+                                    --ci;
+                                }
+                                break;
+                        }
+                    }
+                    // If advanced has no children, remove the category
+                    for (var ci = 0; ci < categories.length; ++ci) {
+                        var cat = categories.item(ci);
+                        var catName = cat.getAttribute("nameid");
+                        if (catName == "advanced" && cat.childNodes.length == 0) {
+                            cat.parentNode.removeChild(cat);
+                            --ci;
+                            // Remove separator
+                            var sep = tb.getElementsByTagName("sep")[0];
+                            sep.parentNode.removeChild(sep);
+                        }
+                        else {
+                            continue;
+                        }
+                    }
+                }
+                else {
+                    var blocks_9 = tb.getElementsByTagName("block");
+                    filterBlocks(blocks_9);
+                }
+                if (showCategories !== CategoryMode.None) {
+                    // Go through all categories, hide the ones that have no blocks inside
+                    var categories = tb.getElementsByTagName("category");
+                    for (var ci = 0; ci < categories.length; ++ci) {
+                        var cat = categories.item(ci);
+                        var catName = cat.getAttribute("nameid");
+                        // Don't do this for special blockly categories
+                        if (catName == "variables" || catName == "functions" || catName == "advanced")
+                            continue;
+                        var blockCount = cat.getElementsByTagName("block");
+                        if (blockCount.length == 0) {
+                            if (cat.parentNode)
+                                cat.parentNode.removeChild(cat);
+                        }
+                    }
+                }
             }
             return tb;
         }
         blocks_6.createToolbox = createToolbox;
-        function initBlocks(blockInfo, toolbox, showCategories, blockSubset) {
-            if (showCategories === void 0) { showCategories = true; }
+        function initBlocks(blockInfo, toolbox, showCategories, filters) {
+            if (showCategories === void 0) { showCategories = CategoryMode.Basic; }
             init();
             initTooltip(blockInfo);
-            var tb = createToolbox(blockInfo, toolbox, showCategories, blockSubset);
+            var tb = createToolbox(blockInfo, toolbox, showCategories, filters);
             // add trash icon to toolbox
             if (!$('#blocklyTrashIcon').length) {
                 var trashDiv = document.createElement('div');
@@ -2566,7 +2986,7 @@ var pxt;
             return tb;
         }
         blocks_6.initBlocks = initBlocks;
-        function initSearch(workspace, tb, searchAsync, updateToolbox) {
+        function initSearch(workspace, tb, tbAll, searchAsync, updateToolbox) {
             var blocklySearchInputField = document.getElementById('blocklySearchInputField');
             var blocklySearchInput = document.getElementById('blocklySearchInput');
             var origClassName = 'ui fluid icon input';
@@ -2590,13 +3010,14 @@ var pxt;
                 $('.blocklyToolboxDiv').prepend(blocklySearchArea);
             }
             pxt.blocks.cachedSearchTb = tb;
+            pxt.blocks.cachedSearchTbAll = tbAll;
             var searchHandler = pxt.Util.debounce(function () {
                 var searchField = $('.blocklySearchInputField');
                 var searchFor = searchField.val().toLowerCase();
                 blocklySearchInput.className += ' loading';
                 if (searchFor != '') {
                     pxt.tickEvent("blocks.search");
-                    var searchTb_1 = tb ? tb.cloneNode(true) : undefined;
+                    var searchTb_1 = pxt.blocks.cachedSearchTb ? pxt.blocks.cachedSearchTb.cloneNode(true) : undefined;
                     var catName = 'Search';
                     var category_2 = categoryElement(searchTb_1, catName);
                     if (!category_2) {
@@ -2632,11 +3053,15 @@ var pxt;
                             return;
                         }
                         blocks.forEach(function (info) {
-                            if (tb) {
+                            if (pxt.blocks.cachedSearchTbAll) {
                                 var type = info.id;
                                 var block = searchElementCache[type];
                                 if (!block) {
-                                    block = (searchElementCache[type] = tb.querySelector("block[type=\"" + type + "\"]").cloneNode(true));
+                                    // Catches built-in blocks that aren't loaded dynamically
+                                    var existing = blocks_6.getFirstChildWithAttr(pxt.blocks.cachedSearchTbAll, "block", "type", type);
+                                    if (existing) {
+                                        block = (searchElementCache[type] = existing.cloneNode(true));
+                                    }
                                 }
                                 if (block) {
                                     category_2.appendChild(block);
@@ -2656,7 +3081,7 @@ var pxt;
                     blocklySearchInput.className = origClassName;
                 }
                 // Search
-            }, 700, false);
+            }, 1000, false);
             blocklySearchInputField.oninput = searchHandler;
             blocklySearchInputField.onchange = searchHandler;
             blocklySearchInputField.onfocus = function () { return blocklySearchInputField.select(); };
@@ -2666,7 +3091,7 @@ var pxt;
         }
         blocks_6.initSearch = initSearch;
         function categoryElement(tb, nameid) {
-            return tb ? tb.querySelector("category[nameid=\"" + nameid.toLowerCase() + "\"]") : undefined;
+            return tb ? blocks_6.getFirstChildWithAttr(tb, "category", "nameid", nameid.toLowerCase()) : undefined;
         }
         function cleanBlocks() {
             pxt.debug('removing all custom blocks');
@@ -2695,32 +3120,36 @@ var pxt;
             }
             Blockly.FieldCheckbox.CHECK_CHAR = '■';
             Blockly.BlockSvg.START_HAT = !!pxt.appTarget.appTheme.blockHats;
+            blocks_6.initFieldEditors();
             initContextMenu();
             initOnStart();
             initMath();
             initVariables();
+            initLists();
             initLoops();
             initLogic();
             initText();
             initDrag();
         }
         function setBuiltinHelpInfo(block, id) {
-            var info = pxt.blocks.helpResources()[id];
-            setHelpResources(block, id, info.name, info.tooltip, info.url, String(blocks_6.blockColors[info.category]));
+            var info = pxt.blocks.getBlockDefinition(id);
+            setHelpResources(block, id, info.name, info.tooltip, info.url, getNamespaceColor(info.category));
         }
         function installBuiltinHelpInfo(id) {
-            var info = pxt.blocks.helpResources()[id];
-            installHelpResources(id, info.name, info.tooltip, info.url, String(blocks_6.blockColors[info.category]));
+            var info = pxt.blocks.getBlockDefinition(id);
+            installHelpResources(id, info.name, info.tooltip, info.url, getNamespaceColor(info.category));
         }
-        function setHelpResources(block, id, name, tooltip, url, colour) {
-            if (tooltip)
+        function setHelpResources(block, id, name, tooltip, url, colour, undeletable) {
+            if (tooltip && (typeof tooltip === "string" || typeof tooltip === "function"))
                 block.setTooltip(tooltip);
             if (url)
                 block.setHelpUrl(url);
             if (colour)
                 block.setColour(colour);
+            if (undeletable)
+                block.setDeletable(false);
             var tb = document.getElementById('blocklyToolboxDefinition');
-            var xml = tb ? tb.querySelector("category block[type~='" + id + "']") : undefined;
+            var xml = tb ? blocks_6.getFirstChildWithAttr(tb, "block", "type", id) : undefined;
             block.codeCard = {
                 header: name,
                 name: name,
@@ -2741,17 +3170,37 @@ var pxt;
                 setHelpResources(this, id, name, tooltip, url, colour);
             };
         }
+        function initLists() {
+            var msg = Blockly.Msg;
+            // lists_create_with
+            var listsCreateWithId = "lists_create_with";
+            var listsCreateWithDef = pxt.blocks.getBlockDefinition(listsCreateWithId);
+            msg.LISTS_CREATE_EMPTY_TITLE = listsCreateWithDef.block["LISTS_CREATE_EMPTY_TITLE"];
+            msg.LISTS_CREATE_WITH_INPUT_WITH = listsCreateWithDef.block["LISTS_CREATE_WITH_INPUT_WITH"];
+            msg.LISTS_CREATE_WITH_CONTAINER_TITLE_ADD = listsCreateWithDef.block["LISTS_CREATE_WITH_CONTAINER_TITLE_ADD"];
+            msg.LISTS_CREATE_WITH_ITEM_TITLE = listsCreateWithDef.block["LISTS_CREATE_WITH_ITEM_TITLE"];
+            installBuiltinHelpInfo(listsCreateWithId);
+            // lists_length
+            var listsLengthId = "lists_length";
+            var listsLengthDef = pxt.blocks.getBlockDefinition(listsLengthId);
+            msg.LISTS_LENGTH_TITLE = listsLengthDef.block["LISTS_LENGTH_TITLE"];
+            installBuiltinHelpInfo(listsLengthId);
+        }
         function initLoops() {
             var msg = Blockly.Msg;
-            // builtin controls_repeat_ext
-            msg.CONTROLS_REPEAT_TITLE = lf("repeat %1 times");
-            msg.CONTROLS_REPEAT_INPUT_DO = lf("{id:repeat}do");
-            installBuiltinHelpInfo('controls_repeat_ext');
-            // pxt device_while
-            Blockly.Blocks['device_while'] = {
+            // controls_repeat_ext
+            var controlsRepeatExtId = "controls_repeat_ext";
+            var controlsRepeatExtDef = pxt.blocks.getBlockDefinition(controlsRepeatExtId);
+            msg.CONTROLS_REPEAT_TITLE = controlsRepeatExtDef.block["CONTROLS_REPEAT_TITLE"];
+            msg.CONTROLS_REPEAT_INPUT_DO = controlsRepeatExtDef.block["CONTROLS_REPEAT_INPUT_DO"];
+            installBuiltinHelpInfo(controlsRepeatExtId);
+            // device_while
+            var deviceWhileId = "device_while";
+            var deviceWhileDef = pxt.blocks.getBlockDefinition(deviceWhileId);
+            Blockly.Blocks[deviceWhileId] = {
                 init: function () {
                     this.jsonInit({
-                        "message0": lf("while %1"),
+                        "message0": deviceWhileDef.block["message0"],
                         "args0": [
                             {
                                 "type": "input_value",
@@ -2761,27 +3210,29 @@ var pxt;
                         ],
                         "previousStatement": null,
                         "nextStatement": null,
-                        "colour": blocks_6.blockColors['loops']
+                        "colour": getNamespaceColor('loops')
                     });
                     this.appendStatementInput("DO")
-                        .appendField(lf("{id:while}do"));
-                    setBuiltinHelpInfo(this, 'device_while');
+                        .appendField(deviceWhileDef.block["appendField"]);
+                    setBuiltinHelpInfo(this, deviceWhileId);
                 }
             };
-            // pxt controls_simple_for
-            Blockly.Blocks['controls_simple_for'] = {
+            // controls_simple_for
+            var controlsSimpleForId = "controls_simple_for";
+            var controlsSimpleForDef = pxt.blocks.getBlockDefinition(controlsSimpleForId);
+            Blockly.Blocks[controlsSimpleForId] = {
                 /**
                  * Block for 'for' loop.
                  * @this Blockly.Block
                  */
                 init: function () {
                     this.jsonInit({
-                        "message0": lf("for %1 from 0 to %2"),
+                        "message0": controlsSimpleForDef.block["message0"],
                         "args0": [
                             {
                                 "type": "field_variable",
                                 "name": "VAR",
-                                "variable": lf("{id:var}index")
+                                "variable": controlsSimpleForDef.block["variable"]
                             },
                             {
                                 "type": "input_value",
@@ -2791,16 +3242,15 @@ var pxt;
                         ],
                         "previousStatement": null,
                         "nextStatement": null,
-                        "colour": blocks_6.blockColors['loops'],
+                        "colour": getNamespaceColor('loops'),
                         "inputsInline": true
                     });
                     this.appendStatementInput('DO')
-                        .appendField(lf("{id:for}do"));
-                    var info = pxt.blocks.helpResources()['controls_simple_for'];
+                        .appendField(controlsSimpleForDef.block["appendField"]);
                     var thisBlock = this;
-                    setHelpResources(this, 'controls_simple_for', info.name, function () {
-                        return lf("Have the variable '{0}' take on the values from 0 to the end number, counting by 1, and do the specified blocks.", thisBlock.getFieldValue('VAR'));
-                    }, info.url, String(blocks_6.blockColors['loops']));
+                    setHelpResources(this, controlsSimpleForId, controlsSimpleForDef.name, function () {
+                        return pxt.U.rlf(controlsSimpleForDef.tooltip, thisBlock.getFieldValue('VAR'));
+                    }, controlsSimpleForDef.url, String(getNamespaceColor('loops')));
                 },
                 /**
                  * Return all variables referenced by this block.
@@ -2905,6 +3355,12 @@ var pxt;
             msg.DELETE_BLOCK = lf("Delete Block");
             msg.DELETE_X_BLOCKS = lf("Delete %1 Blocks");
             msg.HELP = lf("Help");
+            // inject hook to handle openings docs
+            Blockly.BlockSvg.prototype.showHelp_ = function () {
+                var url = goog.isFunction(this.helpUrl) ? this.helpUrl() : this.helpUrl;
+                if (url)
+                    (pxt.blocks.openHelpUrl || window.open)(url);
+            };
             /**
              * Show the context menu for the workspace.
              * @param {!Event} e Mouse event.
@@ -3021,30 +3477,22 @@ var pxt;
                     }
                 };
                 menuOptions.push(formatCodeOption);
-                var shuffleOption = {
-                    text: lf("Shuffle Blocks"),
-                    enabled: topBlocks.length > 0,
-                    callback: function () {
-                        pxt.tickEvent("blocks.context.shuffle");
-                        pxt.blocks.layout.shuffle(_this, 1);
-                    }
-                };
-                // TODO: temporarily removing shuffle blocks option until we have a better way of surfacing it to content creators
-                //menuOptions.push(shuffleOption);
-                var screenshotOption = {
-                    text: lf("Download Screenshot"),
-                    enabled: topBlocks.length > 0,
-                    callback: function () {
-                        pxt.tickEvent("blocks.context.screenshot");
-                        pxt.blocks.layout.screenshotAsync(_this)
-                            .done(function (uri) {
-                            if (pxt.BrowserUtils.isSafari())
-                                uri = uri.replace(/^data:image\/[^;]/, 'data:application/octet-stream');
-                            pxt.BrowserUtils.browserDownloadDataUri(uri, (pxt.appTarget.nickname || pxt.appTarget.id) + "-" + lf("screenshot") + ".png");
-                        });
-                    }
-                };
-                menuOptions.push(screenshotOption);
+                if (pxt.blocks.layout.screenshotEnabled()) {
+                    var screenshotOption = {
+                        text: lf("Download Screenshot"),
+                        enabled: topBlocks.length > 0,
+                        callback: function () {
+                            pxt.tickEvent("blocks.context.screenshot");
+                            pxt.blocks.layout.screenshotAsync(_this)
+                                .done(function (uri) {
+                                if (pxt.BrowserUtils.isSafari())
+                                    uri = uri.replace(/^data:image\/[^;]/, 'data:application/octet-stream');
+                                pxt.BrowserUtils.browserDownloadDataUri(uri, (pxt.appTarget.nickname || pxt.appTarget.id) + "-" + lf("screenshot") + ".png");
+                            });
+                        }
+                    };
+                    menuOptions.push(screenshotOption);
+                }
                 // custom options...
                 if (blocks_6.onShowContextMenu)
                     blocks_6.onShowContextMenu(this, menuOptions);
@@ -3058,29 +3506,16 @@ var pxt;
                 var that = this;
                 if (!that.isSelected()) {
                     // Collapse the currently selected node and its parent nodes
-                    collapseMoreCategory(that.getTree().getSelectedItem(), that);
+                    collapseSubcategories(that.getTree().getSelectedItem(), that);
                 }
                 if (that.hasChildren() && that.isUserCollapsible_) {
-                    // If this is a category of categories, we want to toggle when clicked
-                    if (that.getChildCount() > 1) {
-                        that.toggle();
-                        if (that.isSelected()) {
-                            that.getTree().setSelectedItem(null);
-                        }
-                        else {
-                            that.select();
-                        }
+                    if (that.isSelected()) {
+                        collapseSubcategories(that.getTree().getSelectedItem(), that);
+                        that.getTree().setSelectedItem(null);
                     }
                     else {
-                        // If this category has 1 or less children, don't bother toggling; we always want "More..." to show
-                        if (that.isSelected()) {
-                            collapseMoreCategory(that.getTree().getSelectedItem(), that);
-                            that.getTree().setSelectedItem(null);
-                        }
-                        else {
-                            that.setExpanded(true);
-                            that.select();
-                        }
+                        that.setExpanded(true);
+                        that.select();
                     }
                 }
                 else if (that.isSelected()) {
@@ -3101,17 +3536,22 @@ var pxt;
                     return;
                 }
                 if (a === null) {
-                    collapseMoreCategory(that.selectedItem_);
+                    collapseSubcategories(that.selectedItem_);
                     editor.lastInvertedCategory = that.selectedItem_;
                 }
                 oldSetSelectedItem.call(that, a);
             };
+            // TODO: look into porting this code over to pxt-blockly
             // Fix highlighting bug in edge
             Blockly.Flyout.prototype.addBlockListeners_ = function (root, block, rect) {
                 this.listeners_.push(Blockly.bindEventWithChecks_(root, 'mousedown', null, this.blockMouseDown_(block)));
                 this.listeners_.push(Blockly.bindEventWithChecks_(rect, 'mousedown', null, this.blockMouseDown_(block)));
-                this.listeners_.push(Blockly.bindEvent_(root, 'mouseover', block, select));
-                this.listeners_.push(Blockly.bindEvent_(rect, 'mouseover', block, select));
+                this.listeners_.push(Blockly.bindEvent_(root, 'mouseover', block, block.addSelect));
+                this.listeners_.push(Blockly.bindEvent_(root, 'mouseout', block, block.removeSelect));
+                this.listeners_.push(Blockly.bindEvent_(rect, 'mouseover', block, block.addSelect));
+                this.listeners_.push(Blockly.bindEvent_(rect, 'mouseout', block, block.removeSelect));
+                // pxtblockly: don't show context menu on right click
+                this.listeners_.push(Blockly.bindEventWithChecks_(root, 'contextmenu', null, Blockly.utils.noEvent));
                 var that = this;
                 function select() {
                     if (that._selectedItem && that._selectedItem.svgGroup_) {
@@ -3122,10 +3562,9 @@ var pxt;
                 }
             };
         }
-        function collapseMoreCategory(cat, child) {
+        function collapseSubcategories(cat, child) {
             while (cat) {
-                // Only collapse categories that have a single child (e.g. "More...")
-                if (cat.getChildCount() === 1 && cat.isUserCollapsible_ && cat != child && (!child || !isChild(child, cat))) {
+                if (cat.isUserCollapsible_ && cat != child && (!child || !isChild(child, cat))) {
                     cat.setExpanded(false);
                     cat.updateRow();
                 }
@@ -3140,11 +3579,12 @@ var pxt;
             return false;
         }
         function initOnStart() {
-            // pxt math_op2
+            // on_start
+            var onStartDef = pxt.blocks.getBlockDefinition(ts.pxtc.ON_START_TYPE);
             Blockly.Blocks[ts.pxtc.ON_START_TYPE] = {
                 init: function () {
                     this.jsonInit({
-                        "message0": lf("on start %1 %2"),
+                        "message0": onStartDef.block["message0"],
                         "args0": [
                             {
                                 "type": "input_dummy"
@@ -3154,9 +3594,9 @@ var pxt;
                                 "name": "HANDLER"
                             }
                         ],
-                        "colour": (pxt.appTarget.runtime ? pxt.appTarget.runtime.onStartColor : '') || blocks_6.blockColors['loops']
+                        "colour": (pxt.appTarget.runtime ? pxt.appTarget.runtime.onStartColor : '') || getNamespaceColor('loops')
                     });
-                    setHelpResources(this, ts.pxtc.ON_START_TYPE, lf("on start event"), lf("Run code when the program starts"), '/blocks/on-start', String((pxt.appTarget.runtime ? pxt.appTarget.runtime.onStartColor : '') || blocks_6.blockColors['loops']));
+                    setHelpResources(this, ts.pxtc.ON_START_TYPE, onStartDef.name, onStartDef.tooltip, onStartDef.url, String((pxt.appTarget.runtime ? pxt.appTarget.runtime.onStartColor : '') || getNamespaceColor('loops')), pxt.appTarget.runtime ? pxt.appTarget.runtime.onStartUnDeletable : false);
                 }
             };
             Blockly.Blocks[pxtc.TS_STATEMENT_TYPE] = {
@@ -3215,10 +3655,105 @@ var pxt;
                     setHelpResources(this, pxtc.TS_OUTPUT_TYPE, lf("JavaScript expression"), lf("A JavaScript expression that could not be converted to blocks"), '/blocks/javascript-blocks', "#717171");
                 }
             };
+            // controls_for_of
+            var controlsForOfId = "controls_for_of";
+            var controlsForOfDef = pxt.blocks.getBlockDefinition(controlsForOfId);
+            Blockly.Blocks[controlsForOfId] = {
+                init: function () {
+                    this.jsonInit({
+                        "message0": controlsForOfDef.block["message0"],
+                        "args0": [
+                            {
+                                "type": "field_variable",
+                                "name": "VAR",
+                                "variable": controlsForOfDef.block["variable"]
+                            },
+                            {
+                                "type": "input_value",
+                                "name": "LIST",
+                                "check": "Array"
+                            }
+                        ],
+                        "previousStatement": null,
+                        "nextStatement": null,
+                        "colour": blocks_6.blockColors['loops'],
+                        "inputsInline": true
+                    });
+                    this.appendStatementInput('DO')
+                        .appendField(controlsForOfDef.block["appendField"]);
+                    var thisBlock = this;
+                    setHelpResources(this, controlsForOfId, controlsForOfDef.name, function () {
+                        return pxt.U.rlf(controlsForOfDef.tooltip, thisBlock.getFieldValue('VAR'));
+                    }, controlsForOfDef.url, String(getNamespaceColor('loops')));
+                }
+            };
+            // lists_index_get
+            var listsIndexGetId = "lists_index_get";
+            var listsIndexGetDef = pxt.blocks.getBlockDefinition(listsIndexGetId);
+            Blockly.Blocks["lists_index_get"] = {
+                init: function () {
+                    this.jsonInit({
+                        "message0": listsIndexGetDef.block["message0"],
+                        "args0": [
+                            {
+                                "type": "input_value",
+                                "name": "LIST",
+                                "check": "Array"
+                            },
+                            {
+                                "type": "input_value",
+                                "name": "INDEX",
+                                "check": "Number"
+                            }
+                        ],
+                        "colour": blocks_6.blockColors['arrays'],
+                        "inputsInline": true
+                    });
+                    this.setPreviousStatement(false);
+                    this.setNextStatement(false);
+                    this.setOutput(true);
+                    setBuiltinHelpInfo(this, listsIndexGetId);
+                }
+            };
+            // lists_index_set
+            var listsIndexSetId = "lists_index_set";
+            var listsIndexSetDef = pxt.blocks.getBlockDefinition(listsIndexSetId);
+            Blockly.Blocks[listsIndexSetId] = {
+                init: function () {
+                    this.jsonInit({
+                        "message0": listsIndexSetDef.block["message0"],
+                        "args0": [
+                            {
+                                "type": "input_value",
+                                "name": "LIST",
+                                "check": "Array"
+                            },
+                            {
+                                "type": "input_value",
+                                "name": "INDEX",
+                                "check": "Number"
+                            },
+                            {
+                                "type": "input_value",
+                                "name": "VALUE",
+                                "check": null
+                            }
+                        ],
+                        "previousStatement": null,
+                        "nextStatement": null,
+                        "colour": blocks_6.blockColors['arrays'],
+                        "inputsInline": true
+                    });
+                    setBuiltinHelpInfo(this, listsIndexSetId);
+                }
+            };
         }
         function initMath() {
-            // pxt math_op2
-            Blockly.Blocks['math_op2'] = {
+            // math_op2
+            var mathOp2Id = "math_op2";
+            var mathOp2Def = pxt.blocks.getBlockDefinition(mathOp2Id);
+            var mathOp2Tooltips = mathOp2Def.tooltip;
+            Blockly.Blocks[mathOp2Id] = {
                 init: function () {
                     this.jsonInit({
                         "message0": lf("%1 of %2 and %3"),
@@ -3244,20 +3779,21 @@ var pxt;
                         ],
                         "inputsInline": true,
                         "output": "Number",
-                        "colour": blocks_6.blockColors['math']
+                        "colour": getNamespaceColor('math')
                     });
                     var thisBlock = this;
-                    var info = pxt.blocks.helpResources()['math_op2'];
-                    setHelpResources(this, 'math_op2', info.name, function () {
-                        return thisBlock.getFieldValue('op') == 'min' ? lf("smaller value of 2 numbers") : lf("larger value of 2 numbers");
-                    }, info.url, String(blocks_6.blockColors[info.category]));
+                    setHelpResources(this, mathOp2Id, mathOp2Def.name, function (block) {
+                        return mathOp2Tooltips[block.getFieldValue('op')];
+                    }, mathOp2Def.url, getNamespaceColor(mathOp2Def.category));
                 }
             };
-            // pxt math_op3
-            Blockly.Blocks['math_op3'] = {
+            // math_op3
+            var mathOp3Id = "math_op3";
+            var mathOp3Def = pxt.blocks.getBlockDefinition(mathOp3Id);
+            Blockly.Blocks[mathOp3Id] = {
                 init: function () {
                     this.jsonInit({
-                        "message0": lf("absolute of %1"),
+                        "message0": mathOp3Def.block["message0"],
                         "args0": [
                             {
                                 "type": "input_value",
@@ -3267,16 +3803,18 @@ var pxt;
                         ],
                         "inputsInline": true,
                         "output": "Number",
-                        "colour": blocks_6.blockColors['math']
+                        "colour": getNamespaceColor('math')
                     });
-                    setBuiltinHelpInfo(this, 'math_op3');
+                    setBuiltinHelpInfo(this, mathOp3Id);
                 }
             };
-            // pxt device_random
-            Blockly.Blocks['device_random'] = {
+            // device_random
+            var deviceRandomId = "device_random";
+            var deviceRandomDef = pxt.blocks.getBlockDefinition(deviceRandomId);
+            Blockly.Blocks[deviceRandomId] = {
                 init: function () {
                     this.jsonInit({
-                        "message0": lf("pick random 0 to %1"),
+                        "message0": deviceRandomDef.block["message0"],
                         "args0": [
                             {
                                 "type": "input_value",
@@ -3286,37 +3824,50 @@ var pxt;
                         ],
                         "inputsInline": true,
                         "output": "Number",
-                        "colour": blocks_6.blockColors['math']
+                        "colour": getNamespaceColor('math')
                     });
-                    setBuiltinHelpInfo(this, 'device_random');
+                    setBuiltinHelpInfo(this, deviceRandomId);
                 }
             };
             // builtin math_number
             //XXX Integer validation needed.
-            var mInfo = pxt.blocks.helpResources()['math_number'];
-            installHelpResources('math_number', mInfo.name, (pxt.appTarget.compile && pxt.appTarget.compile.floatingPoint) ? lf("a decimal number") : lf("an integer number"), mInfo.url, String(blocks_6.blockColors[mInfo.category]));
+            var mInfo = pxt.blocks.getBlockDefinition("math_number");
+            installHelpResources('math_number', mInfo.name, (pxt.appTarget.compile && pxt.appTarget.compile.floatingPoint) ? lf("a decimal number") : lf("an integer number"), mInfo.url, getNamespaceColor(mInfo.category));
+            // builtin math_number_minmax
+            //XXX Integer validation needed.
+            var mMInfo = pxt.blocks.getBlockDefinition("math_number_minmax");
+            installHelpResources('math_number_minmax', mMInfo.name, (pxt.appTarget.compile && pxt.appTarget.compile.floatingPoint) ? lf("a decimal number") : lf("an integer number"), mMInfo.url, getNamespaceColor(mMInfo.category));
             // builtin math_arithmetic
             var msg = Blockly.Msg;
-            msg.MATH_ADDITION_SYMBOL = lf("{id:op}+");
-            msg.MATH_SUBTRACTION_SYMBOL = lf("{id:op}-");
-            msg.MATH_MULTIPLICATION_SYMBOL = lf("{id:op}×");
-            msg.MATH_DIVISION_SYMBOL = lf("{id:op}÷");
-            msg.MATH_POWER_SYMBOL = lf("{id:op}^");
-            var TOOLTIPS = {
-                'ADD': lf("Return the sum of the two numbers."),
-                'MINUS': lf("Return the difference of the two numbers."),
-                'MULTIPLY': lf("Return the product of the two numbers."),
-                'DIVIDE': lf("Return the quotient of the two numbers."),
-                'POWER': lf("Return the first number raised to the power of the second number."),
-            };
-            var aInfo = pxt.blocks.helpResources()['math_arithmetic'];
-            installHelpResources('math_arithmetic', aInfo.name, function (block) {
-                return TOOLTIPS[block.getFieldValue('OP')];
-            }, aInfo.url, String(blocks_6.blockColors[aInfo.category]));
+            var mathArithmeticId = "math_arithmetic";
+            var mathArithmeticDef = pxt.blocks.getBlockDefinition(mathArithmeticId);
+            var mathArithmeticTooltips = mathArithmeticDef.tooltip;
+            msg.MATH_ADDITION_SYMBOL = mathArithmeticDef.block["MATH_ADDITION_SYMBOL"];
+            msg.MATH_SUBTRACTION_SYMBOL = mathArithmeticDef.block["MATH_SUBTRACTION_SYMBOL"];
+            msg.MATH_MULTIPLICATION_SYMBOL = mathArithmeticDef.block["MATH_MULTIPLICATION_SYMBOL"];
+            msg.MATH_DIVISION_SYMBOL = mathArithmeticDef.block["MATH_DIVISION_SYMBOL"];
+            msg.MATH_POWER_SYMBOL = mathArithmeticDef.block["MATH_POWER_SYMBOL"];
+            installHelpResources(mathArithmeticId, mathArithmeticDef.name, function (block) {
+                return mathArithmeticTooltips[block.getFieldValue('OP')];
+            }, mathArithmeticDef.url, getNamespaceColor(mathArithmeticDef.category));
             // builtin math_modulo
-            msg.MATH_MODULO_TITLE = lf("remainder of %1 ÷ %2");
-            installBuiltinHelpInfo('math_modulo');
+            var mathModuloId = "math_modulo";
+            var mathModuloDef = pxt.blocks.getBlockDefinition(mathModuloId);
+            msg.MATH_MODULO_TITLE = mathModuloDef.block["MATH_MODULO_TITLE"];
+            installBuiltinHelpInfo(mathModuloId);
         }
+        function getNamespaceColor(ns) {
+            if (pxt.appTarget.appTheme.blockColors && pxt.appTarget.appTheme.blockColors[ns])
+                return pxt.appTarget.appTheme.blockColors[ns];
+            if (blocks_6.blockColors[ns])
+                return blocks_6.blockColors[ns];
+            return "";
+        }
+        blocks_6.getNamespaceColor = getNamespaceColor;
+        function initFlyouts(workspace) {
+            workspace.registerToolboxCategoryCallback(Blockly.VARIABLE_CATEGORY_NAME, Blockly.Variables.flyoutCategory);
+        }
+        blocks_6.initFlyouts = initFlyouts;
         function initVariables() {
             var varname = lf("{id:var}item");
             Blockly.Variables.flyoutCategory = function (workspace) {
@@ -3343,7 +3894,7 @@ var pxt;
                     var block = goog.dom.createDom('block');
                     block.setAttribute('type', 'variables_get');
                     block.setAttribute('gap', '8');
-                    block.setAttribute('colour', String(blocks_6.blockColors['variables']));
+                    block.setAttribute('colour', getNamespaceColor('variables'));
                     var field = goog.dom.createDom('field', null, variableList[i]);
                     field.setAttribute('name', 'VAR');
                     block.appendChild(field);
@@ -3401,20 +3952,26 @@ var pxt;
             };
             // builtin variables_get
             var msg = Blockly.Msg;
-            msg.VARIABLES_GET_CREATE_SET = lf("Create 'set %1'");
-            installBuiltinHelpInfo('variables_get');
+            var variablesGetId = "variables_get";
+            var variablesGetDef = pxt.blocks.getBlockDefinition(variablesGetId);
+            msg.VARIABLES_GET_CREATE_SET = variablesGetDef.block["VARIABLES_GET_CREATE_SET"];
+            installBuiltinHelpInfo(variablesGetId);
             // builtin variables_set
-            msg.VARIABLES_SET = lf("set %1 to %2");
+            var variablesSetId = "variables_set";
+            var variablesSetDef = pxt.blocks.getBlockDefinition(variablesSetId);
+            msg.VARIABLES_SET = variablesSetDef.block["VARIABLES_SET"];
             msg.VARIABLES_DEFAULT_NAME = varname;
             //XXX Do not translate the default variable name.
             //XXX Variable names with Unicode character are harmful at this point.
             msg.VARIABLES_SET_CREATE_GET = lf("Create 'get %1'");
-            installBuiltinHelpInfo('variables_set');
+            installBuiltinHelpInfo(variablesSetId);
             // pxt variables_change
-            Blockly.Blocks['variables_change'] = {
+            var variablesChangeId = "variables_change";
+            var variablesChangeDef = pxt.blocks.getBlockDefinition(variablesChangeId);
+            Blockly.Blocks[variablesChangeId] = {
                 init: function () {
                     this.jsonInit({
-                        "message0": lf("change %1 by %2"),
+                        "message0": variablesChangeDef.block["message0"],
                         "args0": [
                             {
                                 "type": "field_variable",
@@ -3430,58 +3987,78 @@ var pxt;
                         "inputsInline": true,
                         "previousStatement": null,
                         "nextStatement": null,
-                        "colour": blocks_6.blockColors['variables']
+                        "colour": getNamespaceColor('variables')
                     });
-                    setBuiltinHelpInfo(this, 'variables_change');
+                    setBuiltinHelpInfo(this, variablesChangeId);
                 }
             };
         }
         function initLogic() {
             var msg = Blockly.Msg;
             // builtin controls_if
-            msg.CONTROLS_IF_MSG_IF = lf("{id:logic}if");
-            msg.CONTROLS_IF_MSG_THEN = lf("{id:logic}then");
-            msg.CONTROLS_IF_MSG_ELSE = lf("{id:logic}else");
-            msg.CONTROLS_IF_MSG_ELSEIF = lf("{id:logic}else if");
-            msg.CONTROLS_IF_TOOLTIP_1 = lf("If a value is true, then do some statements.");
-            msg.CONTROLS_IF_TOOLTIP_2 = lf("If a value is true, then do the first block of statements. Otherwise, do the second block of statements.");
-            msg.CONTROLS_IF_TOOLTIP_3 = lf("If the first value is true, then do the first block of statements. Otherwise, if the second value is true, do the second block of statements.");
-            msg.CONTROLS_IF_TOOLTIP_4 = lf("If the first value is true, then do the first block of statements. Otherwise, if the second value is true, do the second block of statements. If none of the values are true, do the last block of statements.");
-            installBuiltinHelpInfo('controls_if');
+            var controlsIfId = "controls_if";
+            var controlsIfDef = pxt.blocks.getBlockDefinition(controlsIfId);
+            var controlsIfTooltips = controlsIfDef.tooltip;
+            msg.CONTROLS_IF_MSG_IF = controlsIfDef.block["CONTROLS_IF_MSG_IF"];
+            msg.CONTROLS_IF_MSG_THEN = controlsIfDef.block["CONTROLS_IF_MSG_THEN"];
+            msg.CONTROLS_IF_MSG_ELSE = controlsIfDef.block["CONTROLS_IF_MSG_ELSE"];
+            msg.CONTROLS_IF_MSG_ELSEIF = controlsIfDef.block["CONTROLS_IF_MSG_ELSEIF"];
+            msg.CONTROLS_IF_TOOLTIP_1 = controlsIfTooltips["CONTROLS_IF_TOOLTIP_1"];
+            msg.CONTROLS_IF_TOOLTIP_2 = controlsIfTooltips["CONTROLS_IF_TOOLTIP_2"];
+            msg.CONTROLS_IF_TOOLTIP_3 = controlsIfTooltips["CONTROLS_IF_TOOLTIP_3"];
+            msg.CONTROLS_IF_TOOLTIP_4 = controlsIfTooltips["CONTROLS_IF_TOOLTIP_4"];
+            installBuiltinHelpInfo(controlsIfId);
             // builtin logic_compare
-            msg.LOGIC_COMPARE_TOOLTIP_EQ = lf("Return true if both inputs equal each other.");
-            msg.LOGIC_COMPARE_TOOLTIP_NEQ = lf("Return true if both inputs are not equal to each other.");
-            msg.LOGIC_COMPARE_TOOLTIP_LT = lf("Return true if the first input is smaller than the second input.");
-            msg.LOGIC_COMPARE_TOOLTIP_LTE = lf("Return true if the first input is smaller than or equal to the second input.");
-            msg.LOGIC_COMPARE_TOOLTIP_GT = lf("Return true if the first input is greater than the second input.");
-            msg.LOGIC_COMPARE_TOOLTIP_GTE = lf("Return true if the first input is greater than or equal to the second input.");
-            installBuiltinHelpInfo('logic_compare');
+            var logicCompareId = "logic_compare";
+            var logicCompareDef = pxt.blocks.getBlockDefinition(logicCompareId);
+            var logicCompareTooltips = logicCompareDef.tooltip;
+            msg.LOGIC_COMPARE_TOOLTIP_EQ = logicCompareTooltips["LOGIC_COMPARE_TOOLTIP_EQ"];
+            msg.LOGIC_COMPARE_TOOLTIP_NEQ = logicCompareTooltips["LOGIC_COMPARE_TOOLTIP_NEQ"];
+            msg.LOGIC_COMPARE_TOOLTIP_LT = logicCompareTooltips["LOGIC_COMPARE_TOOLTIP_LT"];
+            msg.LOGIC_COMPARE_TOOLTIP_LTE = logicCompareTooltips["LOGIC_COMPARE_TOOLTIP_LTE"];
+            msg.LOGIC_COMPARE_TOOLTIP_GT = logicCompareTooltips["LOGIC_COMPARE_TOOLTIP_GT"];
+            msg.LOGIC_COMPARE_TOOLTIP_GTE = logicCompareTooltips["LOGIC_COMPARE_TOOLTIP_GTE"];
+            installBuiltinHelpInfo(logicCompareId);
             // builtin logic_operation
-            msg.LOGIC_OPERATION_AND = lf("{id:op}and");
-            msg.LOGIC_OPERATION_OR = lf("{id:op}or");
-            msg.LOGIC_OPERATION_TOOLTIP_AND = lf("Return true if both inputs are true."),
-                msg.LOGIC_OPERATION_TOOLTIP_OR = lf("Return true if at least one of the inputs is true."),
-                installBuiltinHelpInfo('logic_operation');
+            var logicOperationId = "logic_operation";
+            var logicOperationDef = pxt.blocks.getBlockDefinition(logicOperationId);
+            var logicOperationTooltips = logicOperationDef.tooltip;
+            msg.LOGIC_OPERATION_AND = logicOperationDef.block["LOGIC_OPERATION_AND"];
+            msg.LOGIC_OPERATION_OR = logicOperationDef.block["LOGIC_OPERATION_OR"];
+            msg.LOGIC_OPERATION_TOOLTIP_AND = logicOperationTooltips["LOGIC_OPERATION_TOOLTIP_AND"];
+            msg.LOGIC_OPERATION_TOOLTIP_OR = logicOperationTooltips["LOGIC_OPERATION_TOOLTIP_OR"];
+            installBuiltinHelpInfo(logicOperationId);
             // builtin logic_negate
-            msg.LOGIC_NEGATE_TITLE = lf("not %1");
-            installBuiltinHelpInfo('logic_negate');
+            var logicNegateId = "logic_negate";
+            var logicNegateDef = pxt.blocks.getBlockDefinition(logicNegateId);
+            msg.LOGIC_NEGATE_TITLE = logicNegateDef.block["LOGIC_NEGATE_TITLE"];
+            installBuiltinHelpInfo(logicNegateId);
             // builtin logic_boolean
-            msg.LOGIC_BOOLEAN_TRUE = lf("{id:boolean}true");
-            msg.LOGIC_BOOLEAN_FALSE = lf("{id:boolean}false");
-            installBuiltinHelpInfo('logic_boolean');
+            var logicBooleanId = "logic_boolean";
+            var logicBooleanDef = pxt.blocks.getBlockDefinition(logicBooleanId);
+            msg.LOGIC_BOOLEAN_TRUE = logicBooleanDef.block["LOGIC_BOOLEAN_TRUE"];
+            msg.LOGIC_BOOLEAN_FALSE = logicBooleanDef.block["LOGIC_BOOLEAN_FALSE"];
+            installBuiltinHelpInfo(logicBooleanId);
         }
         function initText() {
             // builtin text
             installBuiltinHelpInfo('text');
-            // builtin text_length and text_join
+            // builtin text_length
             var msg = Blockly.Msg;
-            msg.TEXT_LENGTH_TITLE = lf("length of %1");
-            msg.TEXT_JOIN_TITLE_CREATEWITH = lf("join");
-            installBuiltinHelpInfo('text_length');
-            installBuiltinHelpInfo('text_join');
+            var textLengthId = "text_length";
+            var textLengthDef = pxt.blocks.getBlockDefinition(textLengthId);
+            msg.TEXT_LENGTH_TITLE = textLengthDef.block["TEXT_LENGTH_TITLE"];
+            installBuiltinHelpInfo(textLengthId);
+            // builtin text_join
+            var textJoinId = "text_join";
+            var textJoinDef = pxt.blocks.getBlockDefinition(textJoinId);
+            msg.TEXT_JOIN_TITLE_CREATEWITH = textJoinDef.block["TEXT_JOIN_TITLE_CREATEWITH"];
+            installBuiltinHelpInfo(textJoinId);
         }
         function initTooltip(blockInfo) {
             var renderTip = function (el) {
+                if (el.disabled)
+                    return lf("This block is disabled and will not run. Attach this block to an event to enable it.");
                 var tip = el.tooltip;
                 while (goog.isFunction(tip)) {
                     tip = tip(el);
@@ -3502,12 +4079,54 @@ var pxt;
                 goog.dom.removeChildren(/** @type {!Element} */ (Blockly.Tooltip.DIV));
                 // Get the new text.
                 var card = Blockly.Tooltip.element_.codeCard;
+                function render() {
+                    var rtl = Blockly.Tooltip.element_.RTL;
+                    var windowSize = goog.dom.getViewportSize();
+                    // Display the tooltip.
+                    Blockly.Tooltip.DIV.style.direction = rtl ? 'rtl' : 'ltr';
+                    Blockly.Tooltip.DIV.style.display = 'block';
+                    Blockly.Tooltip.visible = true;
+                    // Move the tooltip to just below the cursor.
+                    var anchorX = Blockly.Tooltip.lastX_;
+                    if (rtl) {
+                        anchorX -= Blockly.Tooltip.OFFSET_X + Blockly.Tooltip.DIV.offsetWidth;
+                    }
+                    else {
+                        anchorX += Blockly.Tooltip.OFFSET_X;
+                    }
+                    var anchorY = Blockly.Tooltip.lastY_ + Blockly.Tooltip.OFFSET_Y;
+                    if (anchorY + Blockly.Tooltip.DIV.offsetHeight >
+                        windowSize.height + window.scrollY) {
+                        // Falling off the bottom of the screen; shift the tooltip up.
+                        anchorY -= Blockly.Tooltip.DIV.offsetHeight + 2 * Blockly.Tooltip.OFFSET_Y;
+                    }
+                    if (rtl) {
+                        // Prevent falling off left edge in RTL mode.
+                        anchorX = Math.max(Blockly.Tooltip.MARGINS - window.scrollX, anchorX);
+                    }
+                    else {
+                        if (anchorX + Blockly.Tooltip.DIV.offsetWidth >
+                            windowSize.width + window.scrollX - 2 * Blockly.Tooltip.MARGINS) {
+                            // Falling off the right edge of the screen;
+                            // clamp the tooltip on the edge.
+                            anchorX = windowSize.width - Blockly.Tooltip.DIV.offsetWidth -
+                                2 * Blockly.Tooltip.MARGINS;
+                        }
+                    }
+                    Blockly.Tooltip.DIV.style.top = anchorY + 'px';
+                    Blockly.Tooltip.DIV.style.left = anchorX + 'px';
+                }
                 if (card) {
-                    var cardEl = pxt.docs.codeCard.render({
-                        header: renderTip(Blockly.Tooltip.element_),
-                        typeScript: pxt.blocks.compileBlock(Blockly.Tooltip.element_, blockInfo).source
+                    pxt.blocks.compileBlockAsync(Blockly.Tooltip.element_, blockInfo).then(function (compileResult) {
+                        var cardEl = pxt.docs.codeCard.render({
+                            header: renderTip(Blockly.Tooltip.element_),
+                            typeScript: Blockly.Tooltip.element_.disabled || pxt.appTarget.appTheme.hideBlocklyJavascriptHint
+                                ? undefined
+                                : compileResult.source
+                        });
+                        Blockly.Tooltip.DIV.appendChild(cardEl);
+                        render();
                     });
-                    Blockly.Tooltip.DIV.appendChild(cardEl);
                 }
                 else {
                     var tip = renderTip(Blockly.Tooltip.element_);
@@ -3519,42 +4138,8 @@ var pxt;
                         div.appendChild(document.createTextNode(lines[i]));
                         Blockly.Tooltip.DIV.appendChild(div);
                     }
+                    render();
                 }
-                var rtl = Blockly.Tooltip.element_.RTL;
-                var windowSize = goog.dom.getViewportSize();
-                // Display the tooltip.
-                Blockly.Tooltip.DIV.style.direction = rtl ? 'rtl' : 'ltr';
-                Blockly.Tooltip.DIV.style.display = 'block';
-                Blockly.Tooltip.visible = true;
-                // Move the tooltip to just below the cursor.
-                var anchorX = Blockly.Tooltip.lastX_;
-                if (rtl) {
-                    anchorX -= Blockly.Tooltip.OFFSET_X + Blockly.Tooltip.DIV.offsetWidth;
-                }
-                else {
-                    anchorX += Blockly.Tooltip.OFFSET_X;
-                }
-                var anchorY = Blockly.Tooltip.lastY_ + Blockly.Tooltip.OFFSET_Y;
-                if (anchorY + Blockly.Tooltip.DIV.offsetHeight >
-                    windowSize.height + window.scrollY) {
-                    // Falling off the bottom of the screen; shift the tooltip up.
-                    anchorY -= Blockly.Tooltip.DIV.offsetHeight + 2 * Blockly.Tooltip.OFFSET_Y;
-                }
-                if (rtl) {
-                    // Prevent falling off left edge in RTL mode.
-                    anchorX = Math.max(Blockly.Tooltip.MARGINS - window.scrollX, anchorX);
-                }
-                else {
-                    if (anchorX + Blockly.Tooltip.DIV.offsetWidth >
-                        windowSize.width + window.scrollX - 2 * Blockly.Tooltip.MARGINS) {
-                        // Falling off the right edge of the screen;
-                        // clamp the tooltip on the edge.
-                        anchorX = windowSize.width - Blockly.Tooltip.DIV.offsetWidth -
-                            2 * Blockly.Tooltip.MARGINS;
-                    }
-                }
-                Blockly.Tooltip.DIV.style.top = anchorY + 'px';
-                Blockly.Tooltip.DIV.style.left = anchorX + 'px';
             };
         }
     })(blocks = pxt.blocks || (pxt.blocks = {}));
@@ -3573,9 +4158,25 @@ var pxt;
             var m;
             switch (mutationType) {
                 case MutatorTypes.ObjectDestructuringMutator:
-                    if (!info.parameters || info.parameters.length !== 1 || info.parameters[0].properties.length === 0) {
-                        console.error("Mutating blocks only supported for functions with one parameter that has multiple properties");
-                        return;
+                    if (!info.parameters || info.parameters.length < 1) {
+                        console.error("Destructuring mutations require at least one parameter");
+                    }
+                    else {
+                        var found = false;
+                        for (var _i = 0, _a = info.parameters; _i < _a.length; _i++) {
+                            var param = _a[_i];
+                            if (param.type.indexOf("=>") !== -1) {
+                                if (!param.properties || param.properties.length === 0) {
+                                    console.error("Destructuring mutations only supported for functions with an event parameter that has multiple properties");
+                                    return;
+                                }
+                                found = true;
+                            }
+                        }
+                        if (!found) {
+                            console.error("Destructuring mutations must have an event parameter");
+                            return;
+                        }
                     }
                     m = new DestructuringMutator(b, info);
                     break;
@@ -3710,6 +4311,7 @@ var pxt;
                 _super.call(this, b, info);
                 this.currentlyVisible = [];
                 this.parameterRenames = {};
+                this.prefix = this.info.attributes.mutatePrefix;
                 this.block.appendDummyInput(MutatorHelper.mutatedVariableInputName);
                 this.block.appendStatementInput("HANDLER")
                     .setCheck("null");
@@ -3719,7 +4321,7 @@ var pxt;
             };
             DestructuringMutator.prototype.compileMutation = function (e, comments) {
                 var _this = this;
-                if (!this.parameters.length) {
+                if (!this.info.attributes.mutatePropertyEnum && !this.parameters.length) {
                     return undefined;
                 }
                 var declarationString = this.parameters.map(function (param) {
@@ -3731,7 +4333,13 @@ var pxt;
                     }
                     return escapedParam;
                 }).join(", ");
-                return blocks.mkText("({ " + declarationString + " }) => ");
+                var lambdaString = " ({ " + declarationString + " }) => ";
+                if (this.info.attributes.mutatePropertyEnum) {
+                    return blocks.mkText(" [" + this.parameters.map(function (p) { return (_this.info.attributes.mutatePropertyEnum + "." + p); }).join(", ") + "]," + lambdaString);
+                }
+                else {
+                    return blocks.mkText(lambdaString);
+                }
             };
             DestructuringMutator.prototype.getDeclaredVariables = function () {
                 var _this = this;
@@ -3772,10 +4380,13 @@ var pxt;
                 if (savedParameters) {
                     var split = savedParameters.split(",");
                     var properties_1 = [];
+                    if (this.paramIndex === undefined) {
+                        this.paramIndex = this.getParameterIndex();
+                    }
                     split.forEach(function (saved) {
                         // Parse the old way of storing renames to maintain backwards compatibility
                         var parts = saved.split(":");
-                        if (_this.info.parameters[0].properties.some(function (p) { return p.name === parts[0]; })) {
+                        if (_this.info.parameters[_this.paramIndex].properties.some(function (p) { return p.name === parts[0]; })) {
                             properties_1.push({
                                 property: parts[0],
                                 newName: parts[1]
@@ -3820,7 +4431,10 @@ var pxt;
                 var _this = this;
                 this.parameters = [];
                 this.parameterTypes = {};
-                return this.info.parameters[0].properties.map(function (property) {
+                if (this.paramIndex === undefined) {
+                    this.paramIndex = this.getParameterIndex();
+                }
+                return this.info.parameters[this.paramIndex].properties.map(function (property) {
                     // Used when compiling the destructured arguments
                     _this.parameterTypes[property.name] = property.type;
                     return {
@@ -3839,6 +4453,9 @@ var pxt;
                     return;
                 }
                 var dummyInput = this.block.inputList.filter(function (i) { return i.name === MutatorHelper.mutatedVariableInputName; })[0];
+                if (this.prefix && this.currentlyVisible.length === 0) {
+                    dummyInput.appendField(this.prefix, DestructuringMutator.prefixLabel);
+                }
                 this.currentlyVisible.forEach(function (param) {
                     if (_this.parameters.indexOf(param) === -1) {
                         var name_2 = _this.block.getFieldValue(param);
@@ -3855,13 +4472,26 @@ var pxt;
                         dummyInput.appendField(new Blockly.FieldVariable(fieldValue), param);
                     }
                 });
+                if (this.prefix && this.parameters.length === 0) {
+                    dummyInput.removeField(DestructuringMutator.prefixLabel);
+                }
                 this.currentlyVisible = this.parameters;
             };
             DestructuringMutator.prototype.propertyId = function (property) {
                 return this.block.type + "_" + property;
             };
+            DestructuringMutator.prototype.getParameterIndex = function () {
+                for (var i = 0; i < this.info.parameters.length; i++) {
+                    if (this.info.parameters[i].type.indexOf("=>") !== -1) {
+                        return i;
+                    }
+                }
+                return undefined;
+            };
             DestructuringMutator.propertiesAttributeName = "callbackproperties";
             DestructuringMutator.renameAttributeName = "renamemap";
+            // Avoid clashes by starting labels with a number
+            DestructuringMutator.prefixLabel = "0prefix_label_";
             return DestructuringMutator;
         }(MutatorHelper));
         var ArrayMutator = (function (_super) {
@@ -4020,7 +4650,7 @@ var pxt;
 var pxt;
 (function (pxt) {
     var blocks;
-    (function (blocks_9) {
+    (function (blocks_10) {
         var workspace;
         var blocklyDiv;
         function align(ws, emPixels) {
@@ -4037,8 +4667,8 @@ var pxt;
             BlockLayout[BlockLayout["Shuffle"] = 2] = "Shuffle";
             BlockLayout[BlockLayout["Clean"] = 3] = "Clean";
             BlockLayout[BlockLayout["Flow"] = 4] = "Flow";
-        })(blocks_9.BlockLayout || (blocks_9.BlockLayout = {}));
-        var BlockLayout = blocks_9.BlockLayout;
+        })(blocks_10.BlockLayout || (blocks_10.BlockLayout = {}));
+        var BlockLayout = blocks_10.BlockLayout;
         function render(blocksXml, options) {
             if (options === void 0) { options = { emPixels: 14, layout: BlockLayout.Flow }; }
             if (!workspace) {
@@ -4054,8 +4684,8 @@ var pxt;
                     readOnly: true,
                     zoom: false,
                     sound: false,
-                    media: pxt.webConfig.pxtCdnUrl + "blockly/media/",
-                    rtl: pxt.Util.userLanguageRtl()
+                    media: pxt.webConfig.commitCdnUrl + "blockly/media/",
+                    rtl: pxt.Util.isUserLanguageRtl()
                 });
             }
             workspace.clear();
@@ -4098,7 +4728,7 @@ var pxt;
                 return undefined;
             }
         }
-        blocks_9.render = render;
+        blocks_10.render = render;
         function blocksMetrics(ws) {
             var blocks = ws.getTopBlocks(false);
             if (!blocks.length)
@@ -4120,7 +4750,7 @@ var pxt;
                 height: m.b - m.t
             };
         }
-        blocks_9.blocksMetrics = blocksMetrics;
+        blocks_10.blocksMetrics = blocksMetrics;
     })(blocks = pxt.blocks || (pxt.blocks = {}));
 })(pxt || (pxt = {}));
 var pxt;
@@ -4180,6 +4810,12 @@ var pxt;
                         div(h, 'description', 'span', card.header);
                 }
                 var img = div(r, "ui image" + (card.responsive ? " tall landscape only" : ""));
+                if (card.label) {
+                    var lbl = document.createElement("label");
+                    lbl.className = "ui orange right ribbon label";
+                    lbl.innerText = card.label;
+                    img.appendChild(lbl);
+                }
                 if (card.blocksXml) {
                     var svg = pxt.blocks.render(card.blocksXml);
                     if (!svg) {
@@ -4202,6 +4838,12 @@ var pxt;
                     image.className = "ui image";
                     image.src = card.imageUrl;
                     img.appendChild(image);
+                }
+                if (card.youTubeId) {
+                    var screenshot = document.createElement("img");
+                    screenshot.className = "ui image";
+                    screenshot.src = "https://img.youtube.com/vi/" + card.youTubeId + "/maxresdefault.jpg";
+                    img.appendChild(screenshot);
                 }
                 var name = (options.shortName ? card.shortName : '') || card.name;
                 if (name || card.description) {
@@ -4228,3 +4870,963 @@ var pxt;
         })(codeCard = docs.codeCard || (docs.codeCard = {}));
     })(docs = pxt.docs || (pxt.docs = {}));
 })(pxt || (pxt = {}));
+/// <reference path="../../localtypings/blockly.d.ts" />
+var pxtblockly;
+(function (pxtblockly) {
+    var FieldGridPicker = (function (_super) {
+        __extends(FieldGridPicker, _super);
+        function FieldGridPicker(text, options, validator) {
+            _super.call(this, options.data);
+            this.isFieldCustom_ = true;
+            this.tooltips_ = [];
+            this.columns_ = parseInt(options.columns) || 4;
+            this.maxRows_ = parseInt(options.maxRows) || 0;
+            this.width_ = parseInt(options.width) || 400;
+            this.backgroundColour_ = pxtblockly.parseColour(options.colour);
+            this.itemColour_ = options.itemColour || "rgba(255, 255, 255, 0.6)";
+            this.borderColour_ = Blockly.PXTUtils.fadeColour(this.backgroundColour_, 0.4, false);
+            var tooltipCfg = {
+                xOffset: parseInt(options.tooltipsXOffset) || 15,
+                yOffset: parseInt(options.tooltipsYOffset) || -10
+            };
+            this.tooltipConfig_ = tooltipCfg;
+        }
+        /**
+         * When disposing the grid picker, make sure the tooltips are disposed too.
+         * @public
+         */
+        FieldGridPicker.prototype.dispose = function () {
+            _super.prototype.dispose.call(this);
+            this.disposeTooltips();
+        };
+        /**
+         * Create a dropdown menu under the text.
+         * @private
+         */
+        FieldGridPicker.prototype.showEditor_ = function () {
+            var _this = this;
+            Blockly.WidgetDiv.show(this, this.sourceBlock_.RTL, null);
+            this.disposeTooltips();
+            var options = this.getOptions();
+            // Container for the menu rows
+            var tableContainer = new goog.ui.Control();
+            // Container used to limit the height of the tableContainer, because the tableContainer uses
+            // display: table, which ignores height and maxHeight
+            var scrollContainer = new goog.ui.Control();
+            // Needed to correctly style borders and padding around the scrollContainer, because the padding around the
+            // scrollContainer is part of the scrollable area and will not be correctly shown at the top and bottom
+            // when scrolling
+            var paddingContainer = new goog.ui.Control();
+            for (var i = 0; i < options.length / this.columns_; i++) {
+                var row = this.createRow(i, options);
+                tableContainer.addChild(row, true);
+            }
+            // Record windowSize and scrollOffset before adding menu.
+            var windowSize = goog.dom.getViewportSize();
+            var scrollOffset = goog.style.getViewportPageOffset(document);
+            var xy = this.getAbsoluteXY_();
+            var borderBBox = this.getScaledBBox_();
+            var div = Blockly.WidgetDiv.DIV;
+            scrollContainer.addChild(tableContainer, true);
+            paddingContainer.addChild(scrollContainer, true);
+            paddingContainer.render(div);
+            paddingContainer.getElement().style.border = "solid 1px " + this.borderColour_;
+            var paddingContainerDom = paddingContainer.getElement();
+            var scrollContainerDom = scrollContainer.getElement();
+            var tableContainerDom = tableContainer.getElement();
+            // Resize the grid picker if width > screen width
+            if (this.width_ > windowSize.width) {
+                this.width_ = windowSize.width;
+            }
+            tableContainerDom.style.width = this.width_ + 'px';
+            tableContainerDom.style.backgroundColor = this.backgroundColour_;
+            scrollContainerDom.style.backgroundColor = this.backgroundColour_;
+            paddingContainerDom.style.backgroundColor = this.backgroundColour_;
+            tableContainerDom.className = 'blocklyGridPickerMenu';
+            scrollContainerDom.className = 'blocklyGridPickerScroller';
+            paddingContainerDom.className = 'blocklyGridPickerPadder';
+            // Add the tooltips and style the items
+            var menuItemsDom = tableContainerDom.getElementsByClassName('goog-menuitem');
+            var largestTextItem = -1;
+            var _loop_2 = function(i) {
+                var elem = menuItemsDom[i];
+                elem.style.borderColor = this_2.backgroundColour_;
+                elem.style.backgroundColor = this_2.itemColour_;
+                elem.parentElement.className = 'blocklyGridPickerRow';
+                var tooltipText = options[i][0].alt;
+                if (tooltipText) {
+                    var tooltip_1 = new goog.ui.Tooltip(elem, tooltipText);
+                    var onShowOld_1 = tooltip_1.onShow;
+                    tooltip_1.onShow = function () {
+                        onShowOld_1.call(tooltip_1);
+                        var newPos = new goog.positioning.ClientPosition(tooltip_1.cursorPosition.x + _this.tooltipConfig_.xOffset, tooltip_1.cursorPosition.y + _this.tooltipConfig_.yOffset);
+                        tooltip_1.setPosition(newPos);
+                    };
+                    tooltip_1.setShowDelayMs(0);
+                    tooltip_1.className = 'goog-tooltip blocklyGridPickerTooltip';
+                    elem.addEventListener('mousemove', function (e) {
+                        var newPos = new goog.positioning.ClientPosition(e.clientX + _this.tooltipConfig_.xOffset, e.clientY + _this.tooltipConfig_.yOffset);
+                        tooltip_1.setPosition(newPos);
+                    });
+                    this_2.tooltips_.push(tooltip_1);
+                }
+                else {
+                    var elemWidth = goog.style.getSize(elem).width;
+                    if (elemWidth > largestTextItem) {
+                        largestTextItem = elemWidth;
+                    }
+                }
+            };
+            var this_2 = this;
+            for (var i = 0; i < menuItemsDom.length; ++i) {
+                _loop_2(i);
+            }
+            // Resize text items so they have a uniform width
+            if (largestTextItem > -1) {
+                for (var i = 0; i < menuItemsDom.length; ++i) {
+                    var elem = menuItemsDom[i];
+                    goog.style.setWidth(elem, largestTextItem);
+                }
+            }
+            // Record current container sizes after adding menu.
+            var paddingContainerSize = goog.style.getSize(paddingContainerDom);
+            var scrollContainerSize = goog.style.getSize(scrollContainerDom);
+            // Recalculate dimensions for the total content, not only box.
+            scrollContainerSize.height = scrollContainerDom.scrollHeight;
+            scrollContainerSize.width = scrollContainerDom.scrollWidth;
+            paddingContainerSize.height = paddingContainerDom.scrollHeight;
+            paddingContainerSize.width = paddingContainerDom.scrollWidth;
+            // Limit scroll container's height if a row limit was specified
+            if (this.maxRows_ > 0) {
+                var firstRowDom = tableContainerDom.children[0];
+                var rowSize = goog.style.getSize(firstRowDom);
+                // Compute maxHeight using maxRows + 0.3 to partially show next row, to hint at scrolling
+                var maxHeight = rowSize.height * (this.maxRows_ + 0.3);
+                // If the current height is greater than the computed max height, limit the height of the scroll
+                // container and increase its width to accomodate the scrollbar
+                if (scrollContainerSize.height > maxHeight) {
+                    scrollContainerDom.style.overflowY = "auto";
+                    goog.style.setHeight(scrollContainerDom, maxHeight);
+                    // Calculate total border, margin and padding width
+                    var scrollPaddings = goog.style.getPaddingBox(scrollContainerDom);
+                    var scrollPaddingWidth = scrollPaddings.left + scrollPaddings.right;
+                    var scrollMargins = goog.style.getMarginBox(scrollContainerDom);
+                    var scrollMarginWidth = scrollMargins.left + scrollMargins.right;
+                    var scrollBorders = goog.style.getBorderBox(scrollContainerDom);
+                    var scrollBorderWidth = scrollBorders.left + scrollBorders.right;
+                    var totalExtraWidth = scrollPaddingWidth + scrollMarginWidth + scrollBorderWidth;
+                    // Increase scroll container's width by the width of the scrollbar, so that we don't have horizontal scrolling
+                    var scrollbarWidth = scrollContainerDom.offsetWidth - scrollContainerDom.clientWidth - totalExtraWidth;
+                    goog.style.setWidth(scrollContainerDom, scrollContainerSize.width + scrollbarWidth);
+                    // Refresh the padding container's dimensions
+                    paddingContainerSize.height = paddingContainerDom.scrollHeight;
+                    paddingContainerSize.width = paddingContainerDom.scrollWidth;
+                    // Scroll the currently selected item into view
+                    var rowCount = tableContainer.getChildCount();
+                    var selectedItemDom = void 0;
+                    for (var row = 0; row < rowCount; ++row) {
+                        for (var col = 0; col < this.columns_; ++col) {
+                            var val = tableContainer.getChildAt(row).getChildAt(col).getValue();
+                            if (this.value_ === val) {
+                                selectedItemDom = tableContainerDom.children[row].children[col];
+                                break;
+                            }
+                        }
+                        if (selectedItemDom) {
+                            goog.style.scrollIntoContainerView(selectedItemDom, scrollContainerDom, true);
+                            break;
+                        }
+                    }
+                }
+            }
+            // Position the menu.
+            // Flip menu vertically if off the bottom.
+            if (xy.y + paddingContainerSize.height + borderBBox.height >=
+                windowSize.height + scrollOffset.y) {
+                xy.y -= paddingContainerSize.height + 2;
+            }
+            else {
+                xy.y += borderBBox.height;
+            }
+            if (this.sourceBlock_.RTL) {
+                xy.x += paddingContainerSize.width / 2 - borderBBox.width / 2;
+                // Don't go offscreen left.
+                if (xy.x < scrollOffset.x + paddingContainerSize.width) {
+                    xy.x = scrollOffset.x + paddingContainerSize.width;
+                }
+            }
+            else {
+                xy.x += borderBBox.width / 2 - paddingContainerSize.width / 2;
+                // Don't go offscreen right.
+                if (xy.x > windowSize.width + scrollOffset.x - paddingContainerSize.width) {
+                    xy.x = windowSize.width + scrollOffset.x - paddingContainerSize.width;
+                }
+            }
+            Blockly.WidgetDiv.position(xy.x, xy.y, windowSize, scrollOffset, this.sourceBlock_.RTL);
+            goog.style.setHeight(div, "auto");
+            tableContainerDom.focus();
+        };
+        FieldGridPicker.prototype.createRow = function (row, options) {
+            var columns = this.columns_;
+            var thisField = this;
+            function callback(e) {
+                var menu = this;
+                var menuItem = e.target;
+                if (menuItem) {
+                    thisField.onItemSelected(menu, menuItem);
+                }
+                Blockly.WidgetDiv.hideIfOwner(thisField);
+                Blockly.Events.setGroup(false);
+                thisField.disposeTooltips();
+            }
+            var menu = new goog.ui.Menu();
+            menu.setRightToLeft(this.sourceBlock_.RTL);
+            for (var i = (columns * row); i < Math.min((columns * row) + columns, options.length); i++) {
+                var content = options[i][0]; // Human-readable text or image.
+                var value = options[i][1]; // Language-neutral value.
+                if (typeof content == 'object') {
+                    // An image, not text.
+                    var image = new Image(content['width'], content['height']);
+                    image.src = content['src'];
+                    image.alt = content['alt'] || '';
+                    content = image;
+                }
+                var menuItem = new goog.ui.MenuItem(content);
+                menuItem.setRightToLeft(this.sourceBlock_.RTL);
+                menuItem.setValue(value);
+                menuItem.setCheckable(true);
+                menuItem.setChecked(value == this.value_);
+                menu.addChild(menuItem, true);
+            }
+            // Listen for mouse/keyboard events.
+            goog.events.listen(menu, goog.ui.Component.EventType.ACTION, callback);
+            // Listen for touch events (why doesn't Closure handle this already?).
+            function callbackTouchStart(e) {
+                var control = this.getOwnerControl(/** @type {Node} */ (e.target));
+                // Highlight the menu item.
+                control.handleMouseDown(e);
+            }
+            function callbackTouchEnd(e) {
+                var control = this.getOwnerControl(/** @type {Node} */ (e.target));
+                // Activate the menu item.
+                control.performActionInternal(e);
+            }
+            menu.getHandler().listen(menu.getElement(), goog.events.EventType.TOUCHSTART, callbackTouchStart);
+            menu.getHandler().listen(menu.getElement(), goog.events.EventType.TOUCHEND, callbackTouchEnd);
+            return menu;
+        };
+        /**
+         * Disposes the tooltip DOM elements.
+         * @private
+         */
+        FieldGridPicker.prototype.disposeTooltips = function () {
+            if (this.tooltips_ && this.tooltips_.length) {
+                this.tooltips_.forEach(function (t) { return t.dispose(); });
+                this.tooltips_ = [];
+            }
+        };
+        return FieldGridPicker;
+    }(Blockly.FieldDropdown));
+    pxtblockly.FieldGridPicker = FieldGridPicker;
+})(pxtblockly || (pxtblockly = {}));
+/// <reference path="../../localtypings/blockly.d.ts" />
+var pxtblockly;
+(function (pxtblockly) {
+    var PianoSize;
+    (function (PianoSize) {
+        PianoSize[PianoSize["small"] = 12] = "small";
+        PianoSize[PianoSize["medium"] = 36] = "medium";
+        PianoSize[PianoSize["large"] = 60] = "large";
+    })(PianoSize || (PianoSize = {}));
+    //  Class for a note input field.
+    var FieldNote = (function (_super) {
+        __extends(FieldNote, _super);
+        function FieldNote(text, options, validator) {
+            _super.call(this, text);
+            this.isFieldCustom_ = true;
+            /**
+             * default number of piano keys
+             * @type {number}
+             * @private
+             */
+            this.nKeys_ = PianoSize.medium;
+            /**
+             * Absolute error for note frequency identification (Hz)
+             * @type {number}
+             */
+            this.eps = 2;
+            /**
+             * array of notes frequency
+             * @type {Array.<number>}
+             * @private
+             */
+            this.noteFreq_ = [];
+            /**
+             * array of notes names
+             * @type {Array.<string>}
+             * @private
+             */
+            this.noteName_ = [];
+            FieldNote.superClass_.constructor.call(this, text, validator);
+            this.note_ = text;
+            this.colour_ = pxtblockly.parseColour(options.colour);
+        }
+        /**
+         * Ensure that only a non negative number may be entered.
+         * @param {string} text The user's text.
+         * @return {?string} A string representing a valid positive number, or null if invalid.
+         */
+        FieldNote.prototype.classValidator = function (text) {
+            if (text === null) {
+                return null;
+            }
+            text = String(text);
+            var n = parseFloat(text || "0");
+            if (isNaN(n) || n < 0) {
+                // Invalid number.
+                return null;
+            }
+            // Get the value in range.
+            return String(n);
+        };
+        /**
+         * Install this field on a block.
+         */
+        FieldNote.prototype.init = function () {
+            FieldNote.superClass_.init.call(this);
+            this.noteFreq_.length = 0;
+            this.noteName_.length = 0;
+            var thisField = this;
+            //  Create arrays of name/frequency of the notes
+            createNotesArray();
+            this.setValue(this.callValidator(this.getValue()));
+            /**
+             * return next note of a piano key
+             * @param {string} note current note
+             * @return {string} next note
+             * @private
+             */
+            function nextNote(note) {
+                switch (note) {
+                    case "A#":
+                        return "B";
+                    case "B":
+                        return "C";
+                    case "C#":
+                        return "D";
+                    case "D#":
+                        return "E";
+                    case "E":
+                        return "F";
+                    case "F#":
+                        return "G";
+                    case "G#":
+                        return "A";
+                }
+                return note + "#";
+            }
+            /**
+             * return next note prefix
+             * @param {string} prefix current note prefix
+             * @return {string} next note prefix
+             * @private
+             */
+            function nextNotePrefix(prefix) {
+                switch (prefix) {
+                    case "Deep":
+                        return "Low";
+                    case "Low":
+                        return "Middle";
+                    case "Middle":
+                        if (thisField.nKeys_ == PianoSize.medium)
+                            return "High";
+                        return "Tenor";
+                    case "Tenor":
+                        return "High";
+                }
+                return "";
+            }
+            /**
+             * create Array of notes name and frequencies
+             * @private
+             */
+            function createNotesArray() {
+                var prefix;
+                var curNote = "C";
+                var keyNumber;
+                // set piano start key number and key prefix (keyNumbers -> https://en.wikipedia.org/wiki/Piano_key_frequencies)
+                switch (thisField.nKeys_) {
+                    case PianoSize.small:
+                        keyNumber = 40;
+                        //  no prefix for a single octave
+                        prefix = "";
+                        break;
+                    case PianoSize.medium:
+                        keyNumber = 28;
+                        prefix = "Low";
+                        break;
+                    case PianoSize.large:
+                        keyNumber = 16;
+                        prefix = "Deep";
+                        break;
+                }
+                for (var i = 0; i < thisField.nKeys_; i++) {
+                    // set name of the i note
+                    thisField.noteName_.push(prefix + " " + curNote);
+                    // get frequency using math formula -> https://en.wikipedia.org/wiki/Piano_key_frequencies
+                    var curFreq = Math.pow(2, (keyNumber - 49) / 12) * 440;
+                    // set frequency of the i note
+                    thisField.noteFreq_.push(curFreq);
+                    // get name of the next note
+                    curNote = nextNote(curNote);
+                    if ((i + 1) % 12 == 0)
+                        prefix = nextNotePrefix(prefix);
+                    // increment keyNumber
+                    keyNumber++;
+                }
+            }
+        };
+        /**
+         * Return the current note frequency.
+         * @return {string} Current note in string format.
+         */
+        FieldNote.prototype.getValue = function () {
+            return this.note_;
+        };
+        /**
+         * Set the note.
+         * @param {string} note The new note in string format.
+         */
+        FieldNote.prototype.setValue = function (note) {
+            note = String(parseFloat(note || "0"));
+            if (isNaN(Number(note)) || Number(note) < 0)
+                return;
+            if (this.sourceBlock_ && Blockly.Events.isEnabled() &&
+                this.note_ != note) {
+                Blockly.Events.fire(new Blockly.Events.Change(this.sourceBlock_, "field", this.name, String(this.note_), String(note)));
+            }
+            this.note_ = this.callValidator(note);
+            this.setText(this.getNoteName_());
+        };
+        /**
+         * Get the text from this field.  Used when the block is collapsed.
+         * @return {string} Current text.
+         */
+        FieldNote.prototype.getText = function () {
+            if (Math.floor(Number(this.note_)) == Number(this.note_))
+                return Number(this.note_).toFixed(0);
+            return Number(this.note_).toFixed(2);
+        };
+        /**
+         * Set the text in this field and NOT fire a change event.
+         * @param {*} newText New text.
+         */
+        FieldNote.prototype.setText = function (newText) {
+            if (newText === null) {
+                // No change if null.
+                return;
+            }
+            newText = String(newText);
+            if (!isNaN(Number(newText)))
+                newText = this.getNoteName_();
+            if (newText === this.text_) {
+                // No change.
+                return;
+            }
+            Blockly.Field.prototype.setText.call(this, newText);
+        };
+        /**
+        * get the note name to be displayed in the field
+        * @return {string} note name
+        * @private
+        */
+        FieldNote.prototype.getNoteName_ = function () {
+            var note = this.getValue();
+            var text = note.toString();
+            for (var i = 0; i < this.nKeys_; i++) {
+                if (Math.abs(this.noteFreq_[i] - Number(note)) < this.eps)
+                    return this.noteName_[i];
+            }
+            if (!isNaN(Number(note)))
+                text += " Hz";
+            return text;
+        };
+        /**
+         * Set a custom number of keys for this field.
+         * @param {number} nkeys Number of keys for this block,
+         *     or 26 to use default.
+         * @return {!Blockly.FieldNote} Returns itself (for method chaining).
+         */
+        FieldNote.prototype.setNumberOfKeys = function (size) {
+            if (size != PianoSize.small && size != PianoSize.medium && size != PianoSize.large)
+                return this;
+            this.nKeys_ = size;
+            return this;
+        };
+        /**
+         * Create a piano under the note field.
+         */
+        FieldNote.prototype.showEditor_ = function (opt_quietInput) {
+            //  change Note name to number frequency
+            Blockly.FieldNumber.prototype.setText.call(this, this.getText());
+            FieldNote.superClass_.showEditor_.call(this, true);
+            var pianoWidth;
+            var pianoHeight;
+            var keyWidth = 22;
+            var keyHeight = 90;
+            var labelHeight;
+            var prevNextHeight;
+            var whiteKeyCounter = 0;
+            var selectedKeyColor = "yellowgreen";
+            var soundingKeys = 0;
+            var thisField = this;
+            //  Record windowSize and scrollOffset before adding the piano.
+            var windowSize = goog.dom.getViewportSize();
+            var pagination = false;
+            var mobile = false;
+            var editorWidth = windowSize.width;
+            var piano = [];
+            //  initializate
+            pianoWidth = keyWidth * (this.nKeys_ - (this.nKeys_ / 12 * 5));
+            pianoHeight = keyHeight;
+            //  Create the piano using Closure (CustomButton).
+            for (var i = 0; i < this.nKeys_; i++) {
+                piano.push(new goog.ui.CustomButton());
+            }
+            if (editorWidth < pianoWidth) {
+                pagination = true;
+                pianoWidth = 7 * keyWidth;
+            }
+            //  Check if Mobile, pagination -> true
+            var quietInput = opt_quietInput || false;
+            if (!quietInput && (goog.userAgent.MOBILE || goog.userAgent.ANDROID)) {
+                pagination = true;
+                mobile = true;
+                var r = keyWidth / keyHeight;
+                keyWidth = Math.ceil(windowSize.width / 7);
+                keyHeight = Math.ceil(keyWidth / r);
+                pianoWidth = 7 * keyWidth;
+                pianoHeight = keyHeight;
+                labelHeight = keyWidth / 1.5;
+                prevNextHeight = keyWidth / 1.5;
+            }
+            //  create piano div
+            var div = Blockly.WidgetDiv.DIV;
+            var pianoDiv = goog.dom.createDom("div", {});
+            pianoDiv.className = "blocklyPianoDiv";
+            div.appendChild(pianoDiv);
+            var scrollOffset = goog.style.getViewportPageOffset(document);
+            //let pianoHeight = keyHeight + div.scrollHeight + 5;
+            var xy = this.getAbsoluteXY_();
+            var borderBBox = this.getScaledBBox_();
+            var topPosition = 0, leftPosition = 0;
+            //  Flip the piano vertically if off the bottom (only in web view).
+            if (!mobile) {
+                if (xy.y + pianoHeight + borderBBox.height >=
+                    windowSize.height + scrollOffset.y) {
+                    topPosition = -(pianoHeight + borderBBox.height);
+                }
+                if (this.sourceBlock_.RTL) {
+                    xy.x += borderBBox.width;
+                    xy.x -= pianoWidth;
+                    leftPosition += borderBBox.width;
+                    leftPosition -= pianoWidth;
+                    // Don't go offscreen left.
+                    if (xy.x < scrollOffset.x) {
+                        leftPosition = scrollOffset.x - xy.x;
+                    }
+                }
+                else {
+                    // Don't go offscreen right.
+                    if (xy.x > windowSize.width + scrollOffset.x - pianoWidth) {
+                        leftPosition -= xy.x - (windowSize.width + scrollOffset.x - pianoWidth);
+                    }
+                }
+            }
+            else {
+                leftPosition = -document.getElementsByClassName("blocklyWidgetDiv")[0].offsetLeft; //+ ((windowSize.width - this.pianoWidth_) / 2);
+                topPosition = windowSize.height - (keyHeight + labelHeight + prevNextHeight) - document.getElementsByClassName("blocklyWidgetDiv")[0].offsetTop - borderBBox.height;
+            }
+            //  save all changes in the same group of events
+            Blockly.Events.setGroup(true);
+            //  render piano keys
+            var octaveCounter = 0;
+            var currentSelectedKey = null;
+            var previousColor;
+            for (var i = 0; i < this.nKeys_; i++) {
+                if (i > 0 && i % 12 == 0)
+                    octaveCounter++;
+                var key = piano[i];
+                //  What color is i key
+                var bgColor = (isWhite(i)) ? "white" : "black";
+                var width = getKeyWidth(i);
+                var height = getKeyHeight(i);
+                var position = getPosition(i);
+                //  modify original position in pagination
+                if (pagination && i >= 12)
+                    position -= 7 * octaveCounter * keyWidth;
+                var style = getKeyStyle(bgColor, width, height, position + leftPosition, topPosition, isWhite(i) ? 1000 : 1001, isWhite(i) ? this.colour_ : "black", mobile);
+                key.setContent(style);
+                key.setId(this.noteName_[i]);
+                key.render(pianoDiv);
+                var script = key.getContent();
+                script.setAttribute("tag", this.noteFreq_[i].toString());
+                //  highlight current selected key
+                if (Math.abs(this.noteFreq_[i] - Number(this.getValue())) < this.eps) {
+                    previousColor = script.style.backgroundColor;
+                    script.style.backgroundColor = selectedKeyColor;
+                    currentSelectedKey = key;
+                }
+                //  Listener when a new key is selected
+                if (!mobile) {
+                    goog.events.listen(key.getElement(), goog.events.EventType.MOUSEDOWN, soundKey, false, key);
+                }
+                else {
+                    /**  Listener when a new key is selected in MOBILE
+                     *   It is necessary to use TOUCHSTART event to allow passive event listeners
+                     *   to avoid preventDefault() call that blocks listener
+                     */
+                    goog.events.listen(key.getElement(), goog.events.EventType.TOUCHSTART, soundKey, false, key);
+                }
+                //  Listener when the mouse is over a key
+                goog.events.listen(key.getElement(), goog.events.EventType.MOUSEOVER, function () {
+                    var script = showNoteLabel.getContent();
+                    script.innerText = this.getId();
+                    this.labelHeight_ = document.getElementsByClassName("blocklyNoteLabel")[0].offsetHeight;
+                }, false, key);
+                //  increment white key counter
+                if (isWhite(i))
+                    whiteKeyCounter++;
+                // set octaves different from first octave invisible
+                if (pagination && i > 11)
+                    key.setVisible(false);
+            }
+            //  render note label
+            var showNoteLabel = new goog.ui.CustomButton();
+            var showNoteStyle = getShowNoteStyle(topPosition, leftPosition, mobile);
+            showNoteLabel.setContent(showNoteStyle);
+            showNoteLabel.render(pianoDiv);
+            var scriptLabel = showNoteLabel.getContent();
+            scriptLabel.innerText = "-";
+            labelHeight = document.getElementsByClassName("blocklyNoteLabel")[0].offsetHeight;
+            // create next and previous CustomButtons for pagination
+            var prevButton = new goog.ui.CustomButton();
+            var nextButton = new goog.ui.CustomButton();
+            var prevButtonStyle = getNextPrevStyle(topPosition, leftPosition, true, mobile);
+            var nextButtonStyle = getNextPrevStyle(topPosition, leftPosition, false, mobile);
+            if (pagination) {
+                scriptLabel.innerText = "Octave #1";
+                labelHeight = document.getElementsByClassName("blocklyNoteLabel")[0].offsetHeight;
+                //  render previous button
+                var script = void 0;
+                prevButton.setContent(prevButtonStyle);
+                prevButton.render(pianoDiv);
+                script = prevButton.getContent();
+                //  left arrow - previous button
+                script.innerText = "<";
+                //  render next button
+                nextButton.setContent(nextButtonStyle);
+                nextButton.render(pianoDiv);
+                script = nextButton.getContent();
+                //  right arrow - next button
+                script.innerText = ">";
+                var Npages_1 = this.nKeys_ / 12;
+                var currentPage_1 = 0;
+                goog.events.listen(prevButton.getElement(), goog.events.EventType.MOUSEDOWN, function () {
+                    if (currentPage_1 == 0) {
+                        scriptLabel.innerText = "Octave #" + (currentPage_1 + 1);
+                        return;
+                    }
+                    var curFirstKey = currentPage_1 * 12;
+                    var newFirstKey = currentPage_1 * 12 - 12;
+                    //  hide current octave
+                    for (var i = 0; i < 12; i++)
+                        piano[i + curFirstKey].setVisible(false);
+                    //  show new octave
+                    for (var i = 0; i < 12; i++)
+                        piano[i + newFirstKey].setVisible(true);
+                    currentPage_1--;
+                    scriptLabel.innerText = "Octave #" + (currentPage_1 + 1);
+                    this.labelHeight_ = document.getElementsByClassName("blocklyNoteLabel")[0].offsetHeight;
+                }, false, prevButton);
+                goog.events.listen(nextButton.getElement(), goog.events.EventType.MOUSEDOWN, function () {
+                    if (currentPage_1 == Npages_1 - 1) {
+                        scriptLabel.innerText = "Octave #" + (currentPage_1 + 1);
+                        return;
+                    }
+                    var curFirstKey = currentPage_1 * 12;
+                    var newFirstKey = currentPage_1 * 12 + 12;
+                    //  hide current octave
+                    for (var i = 0; i < 12; i++)
+                        piano[i + curFirstKey].setVisible(false);
+                    //  show new octave
+                    for (var i = 0; i < 12; i++)
+                        piano[i + newFirstKey].setVisible(true);
+                    currentPage_1++;
+                    scriptLabel.innerText = "Octave #" + (currentPage_1 + 1);
+                    this.labelHeight_ = document.getElementsByClassName("blocklyNoteLabel")[0].offsetHeight;
+                }, false, nextButton);
+            }
+            // create the key sound
+            function soundKey() {
+                var cnt = ++soundingKeys;
+                var freq = this.getContent().getAttribute("tag");
+                var script;
+                if (currentSelectedKey != null) {
+                    script = currentSelectedKey.getContent();
+                    script.style.backgroundColor = previousColor;
+                }
+                script = this.getContent();
+                if (currentSelectedKey !== this) {
+                    previousColor = script.style.backgroundColor;
+                    thisField.setValue(thisField.callValidator(freq));
+                    thisField.setText(thisField.callValidator(freq));
+                }
+                currentSelectedKey = this;
+                script.style.backgroundColor = selectedKeyColor;
+                Blockly.FieldTextInput.htmlInput_.value = thisField.getText();
+                pxtblockly.AudioContextManager.tone(freq);
+                setTimeout(function () {
+                    // compare current sound counter with listener sound counter (avoid async problems)
+                    if (soundingKeys == cnt)
+                        pxtblockly.AudioContextManager.stop();
+                }, 300);
+                FieldNote.superClass_.dispose.call(this);
+            }
+            /** get width of blockly editor space
+             * @return {number} width of the blockly editor workspace
+             * @private
+             */
+            function getEditorWidth() {
+                var windowSize = goog.dom.getViewportSize();
+                return windowSize.width;
+            }
+            /** get height of blockly editor space
+             * @return {number} Height of the blockly editor workspace
+             * @private
+             */
+            function getEditorHeight() {
+                var editorHeight = document.getElementById("blocklyDiv").offsetHeight;
+                return editorHeight;
+            }
+            /**
+             * create a DOM to assing a style to the button (piano Key)
+             * @param {string} bgColor color of the key background
+             * @param {number} width width of the key
+             * @param {number} heigth heigth of the key
+             * @param {number} leftPosition horizontal position of the key
+             * @param {number} topPosition vertical position of the key
+             * @param {number} z_index z-index of the key
+             * @param {string} keyBorderColour border color of the key
+             * @param {boolean} isMobile true if the device is a mobile
+             * @return {goog.dom} DOM with the new css style.
+             * @private
+             */
+            function getKeyStyle(bgColor, width, height, leftPosition, topPosition, z_index, keyBorderColour, isMobile) {
+                var div = goog.dom.createDom("div", {
+                    "style": "background-color: " + bgColor
+                        + "; width: " + width
+                        + "px; height: " + height
+                        + "px; left: " + leftPosition
+                        + "px; top: " + topPosition
+                        + "px; z-index: " + z_index
+                        + ";   border-color: " + keyBorderColour
+                        + ";"
+                });
+                div.className = "blocklyNote";
+                return div;
+            }
+            /**
+             * create a DOM to assing a style to the note label
+             * @param {number} topPosition vertical position of the label
+             * @param {number} leftPosition horizontal position of the label
+             * @param {boolean} isMobile true if the device is a mobile
+             * @return {goog.dom} DOM with the new css style.
+             * @private
+             */
+            function getShowNoteStyle(topPosition, leftPosition, isMobile) {
+                topPosition += keyHeight;
+                if (isMobile)
+                    topPosition += prevNextHeight;
+                var div = goog.dom.createDom("div", {
+                    "style": "top: " + topPosition
+                        + "px; left: " + leftPosition
+                        + "px; background-color: " + thisField.colour_
+                        + "; width: " + pianoWidth
+                        + "px; border-color: " + thisField.colour_
+                        + ";" + (isMobile ? " font-size: " + (labelHeight - 10) + "px; height: " + labelHeight + "px;" : "")
+                });
+                div.className = "blocklyNoteLabel";
+                return div;
+            }
+            /**
+             * create a DOM to assing a style to the previous and next buttons
+             * @param {number} topPosition vertical position of the label
+             * @param {number} leftPosition horizontal position of the label
+             * @param {boolean} isPrev true if is previous button, false otherwise
+             * @param {boolean} isMobile true if the device is a mobile
+             * @return {goog.dom} DOM with the new css style.
+             * @private
+             */
+            function getNextPrevStyle(topPosition, leftPosition, isPrev, isMobile) {
+                //  x position of the prev/next button
+                var xPosition = (isPrev ? 0 : (pianoWidth / 2)) + leftPosition;
+                //  y position of the prev/next button
+                var yPosition = (keyHeight + labelHeight + topPosition);
+                if (isMobile)
+                    yPosition = keyHeight + topPosition;
+                var div = goog.dom.createDom("div", {
+                    "style": "top: " + yPosition
+                        + "px; left: " + xPosition
+                        + "px; "
+                        + ";" + (isMobile ? "height: " + prevNextHeight + "px; font-size:" + (prevNextHeight - 10) + "px;" : "")
+                        + "width: " + Math.ceil(pianoWidth / 2) + "px;"
+                        + "background-color: " + thisField.colour_
+                        + ";" + (isPrev ? "border-left-color: " : "border-right-color: ") + thisField.colour_
+                        + ";" + (!isMobile ? "border-bottom-color: " + thisField.colour_ : "")
+                        + ";"
+                });
+                div.className = "blocklyNotePrevNext";
+                return div;
+            }
+            /**
+             * @param {number} idx index of the key
+             * @return {boolean} true if key_idx is white
+             * @private
+             */
+            function isWhite(idx) {
+                var octavePosition = idx % 12;
+                if (octavePosition == 1 || octavePosition == 3 || octavePosition == 6 ||
+                    octavePosition == 8 || octavePosition == 10)
+                    return false;
+                return true;
+            }
+            /**
+             * get width of the piano key
+             * @param {number} idx index of the key
+             * @return {number} width of the key
+             * @private
+             */
+            function getKeyWidth(idx) {
+                if (isWhite(idx))
+                    return keyWidth;
+                return keyWidth / 2;
+            }
+            /**
+             * get height of the piano key
+             * @param {number} idx index of the key
+             * @return {number} height of the key
+             * @private
+             */
+            function getKeyHeight(idx) {
+                if (isWhite(idx))
+                    return keyHeight;
+                return keyHeight / 2;
+            }
+            /**
+             * get the position of the key in the piano
+             * @param {number} idx index of the key
+             * @return {number} position of the key
+             */
+            function getPosition(idx) {
+                var pos = (whiteKeyCounter * keyWidth);
+                if (isWhite(idx))
+                    return pos;
+                return pos - (keyWidth / 4);
+            }
+        };
+        /**
+         * Close the note picker if this input is being deleted.
+         */
+        FieldNote.prototype.dispose = function () {
+            Blockly.WidgetDiv.hideIfOwner(this);
+            Blockly.FieldTextInput.superClass_.dispose.call(this);
+        };
+        return FieldNote;
+    }(Blockly.FieldNumber));
+    pxtblockly.FieldNote = FieldNote;
+})(pxtblockly || (pxtblockly = {}));
+var pxtblockly;
+(function (pxtblockly) {
+    function parseColour(colour) {
+        var hue = Number(colour);
+        if (!isNaN(hue)) {
+            return Blockly.hueToRgb(hue);
+        }
+        else if (goog.isString(colour) && colour.match(/^#[0-9a-fA-F]{6}$/)) {
+            return colour;
+        }
+        else {
+            return '#000';
+        }
+    }
+    pxtblockly.parseColour = parseColour;
+    var AudioContextManager;
+    (function (AudioContextManager) {
+        var _frequency = 0;
+        var _context; // AudioContext
+        var _vco; // OscillatorNode;
+        var _mute = false; //mute audio
+        function context() {
+            if (!_context)
+                _context = freshContext();
+            return _context;
+        }
+        function freshContext() {
+            window.AudioContext = window.AudioContext || window.webkitAudioContext;
+            if (window.AudioContext) {
+                try {
+                    // this call my crash.
+                    // SyntaxError: audio resources unavailable for AudioContext construction
+                    return new window.AudioContext();
+                }
+                catch (e) { }
+            }
+            return undefined;
+        }
+        function mute(mute) {
+            if (!_context)
+                return;
+            _mute = mute;
+            stop();
+        }
+        AudioContextManager.mute = mute;
+        function stop() {
+            if (!_context)
+                return;
+            _vco.disconnect();
+            _frequency = 0;
+        }
+        AudioContextManager.stop = stop;
+        function frequency() {
+            return _frequency;
+        }
+        AudioContextManager.frequency = frequency;
+        function tone(frequency) {
+            if (_mute)
+                return;
+            if (frequency <= 0)
+                return;
+            _frequency = frequency;
+            var ctx = context();
+            if (!ctx)
+                return;
+            try {
+                if (_vco) {
+                    _vco.disconnect();
+                    _vco = undefined;
+                }
+                _vco = ctx.createOscillator();
+                _vco.frequency.value = frequency;
+                _vco.type = 'triangle';
+                _vco.connect(ctx.destination);
+                _vco.start(0);
+            }
+            catch (e) {
+                _vco = undefined;
+                return;
+            }
+        }
+        AudioContextManager.tone = tone;
+    })(AudioContextManager = pxtblockly.AudioContextManager || (pxtblockly.AudioContextManager = {}));
+})(pxtblockly || (pxtblockly = {}));

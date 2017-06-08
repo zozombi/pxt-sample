@@ -2,6 +2,19 @@ var pxt;
 (function (pxt) {
     var editor;
     (function (editor) {
+        (function (FilterState) {
+            FilterState[FilterState["Hidden"] = 0] = "Hidden";
+            FilterState[FilterState["Visible"] = 1] = "Visible";
+            FilterState[FilterState["Disabled"] = 2] = "Disabled";
+        })(editor.FilterState || (editor.FilterState = {}));
+        var FilterState = editor.FilterState;
+    })(editor = pxt.editor || (pxt.editor = {}));
+})(pxt || (pxt = {}));
+var pxt;
+(function (pxt) {
+    var editor;
+    (function (editor_1) {
+        var pendingRequests = {};
         /**
          * Binds incoming window messages to the project view.
          * Requires the "allowParentController" flag in the pxtarget.json/appTheme object.
@@ -12,62 +25,168 @@ var pxt;
          * Some commands may be async, use the ``id`` field to correlate to the original request.
          */
         function bindEditorMessages(projectView) {
-            if (!window.parent)
+            if (!pxt.appTarget.appTheme.allowParentController || !pxt.BrowserUtils.isIFrame())
                 return;
             window.addEventListener("message", function (msg) {
                 var data = msg.data;
-                if (!data || data.type != "pxteditor" || !data.action)
+                if (!data || !/^pxt(host|editor)$/.test(data.type))
                     return false;
                 var p = Promise.resolve();
-                switch (data.action.toLowerCase()) {
-                    // TODO: make async
-                    case "switchjavascript":
-                        p = p.then(function () { return projectView.openJavaScript(); });
-                        break;
-                    case "switchblocks":
-                        p = p.then(function () { return projectView.openBlocks(); });
-                        break;
-                    case "startsimulator":
-                        p = p.then(function () { return projectView.startSimulator(); });
-                        break;
-                    case "restartsimulator":
-                        p = p.then(function () { return projectView.restartSimulator(); });
-                        break;
-                    case "hidesimulator":
-                        p = p.then(function () { return projectView.collapseSimulator(); });
-                        break;
-                    case "showsimulator":
-                        p = p.then(function () { return projectView.expandSimulator(); });
-                        break;
-                    case "stopsimulator": {
-                        var stop_1 = data;
-                        p = p.then(function () { return projectView.stopSimulator(stop_1.unload); });
-                        break;
+                var resp = undefined;
+                if (data.type == "pxthost") {
+                    var req_1 = pendingRequests[data.id];
+                    if (!req_1) {
+                        pxt.debug("pxthost: unknown request " + data.id);
                     }
-                    case "newproject": {
-                        var create_1 = data;
-                        p = p.then(function () { return projectView.newProject(create_1.options); });
-                        break;
-                    }
-                    case "proxytosim": {
-                        var simmsg_1 = data;
-                        p = p.then(function () { return projectView.proxySimulatorMessage(simmsg_1.content); });
-                        break;
+                    else {
+                        p = p.then(function () { return req_1.resolve(data); });
                     }
                 }
-                p.done(function () { return sendResponse(data, true, undefined); }, function (err) { return sendResponse(data, false, err); });
+                else {
+                    var req = data;
+                    pxt.debug("pxteditor: " + req.action);
+                    switch (req.action.toLowerCase()) {
+                        case "switchjavascript":
+                            p = p.then(function () { return projectView.openJavaScript(); });
+                            break;
+                        case "switchblocks":
+                            p = p.then(function () { return projectView.openBlocks(); });
+                            break;
+                        case "startsimulator":
+                            p = p.then(function () { return projectView.startSimulator(); });
+                            break;
+                        case "restartsimulator":
+                            p = p.then(function () { return projectView.restartSimulator(); });
+                            break;
+                        case "hidesimulator":
+                            p = p.then(function () { return projectView.collapseSimulator(); });
+                            break;
+                        case "showsimulator":
+                            p = p.then(function () { return projectView.expandSimulator(); });
+                            break;
+                        case "redo":
+                            p = p.then(function () {
+                                var editor = projectView.editor;
+                                if (editor && editor.hasRedo())
+                                    editor.redo();
+                            });
+                            break;
+                        case "undo":
+                            p = p.then(function () {
+                                var editor = projectView.editor;
+                                if (editor && editor.hasUndo())
+                                    editor.undo();
+                            });
+                            break;
+                        case "stopsimulator": {
+                            var stop_1 = data;
+                            p = p.then(function () { return projectView.stopSimulator(stop_1.unload); });
+                            break;
+                        }
+                        case "newproject": {
+                            var create_1 = data;
+                            p = p.then(function () { return projectView.newProject(create_1.options); });
+                            break;
+                        }
+                        case "importproject": {
+                            var load_1 = data;
+                            p = p.then(function () { return projectView.importProjectAsync(load_1.project, load_1.filters); });
+                            break;
+                        }
+                        case "proxytosim": {
+                            var simmsg_1 = data;
+                            p = p.then(function () { return projectView.proxySimulatorMessage(simmsg_1.content); });
+                            break;
+                        }
+                        case "renderblocks": {
+                            var rendermsg_1 = data;
+                            p = p.then(function () { return projectView.renderBlocksAsync(rendermsg_1); })
+                                .then(function (img) { resp = img; });
+                            break;
+                        }
+                    }
+                }
+                p.done(function () { return sendResponse(data, resp, true, undefined); }, function (err) { return sendResponse(data, resp, false, err); });
                 return true;
             }, false);
         }
-        editor.bindEditorMessages = bindEditorMessages;
-        function sendResponse(request, success, error) {
-            window.parent.postMessage({
-                type: "pxteditor",
-                id: request.id,
-                success: success,
-                error: error
-            }, "*");
+        editor_1.bindEditorMessages = bindEditorMessages;
+        /**
+         * Sends analytics messages upstream to container if any
+         */
+        function enableControllerAnalytics() {
+            if (!pxt.appTarget.appTheme.allowParentController || !pxt.BrowserUtils.isIFrame())
+                return;
+            var te = pxt.tickEvent;
+            pxt.tickEvent = function (id, data) {
+                if (te)
+                    te(id, data);
+                postHostMessageAsync({
+                    type: 'pxthost',
+                    action: 'event',
+                    tick: id,
+                    response: false,
+                    data: data
+                });
+            };
+            var rexp = pxt.reportException;
+            pxt.reportException = function (err, data) {
+                if (rexp)
+                    rexp(err, data);
+                try {
+                    postHostMessageAsync({
+                        type: 'pxthost',
+                        action: 'event',
+                        tick: 'error',
+                        message: err.message,
+                        response: false,
+                        data: data
+                    });
+                }
+                catch (e) {
+                }
+            };
+            var re = pxt.reportError;
+            pxt.reportError = function (cat, msg, data) {
+                if (re)
+                    re(cat, msg, data);
+                postHostMessageAsync({
+                    type: 'pxthost',
+                    action: 'event',
+                    tick: 'error',
+                    category: cat,
+                    message: msg,
+                    data: data
+                });
+            };
         }
+        editor_1.enableControllerAnalytics = enableControllerAnalytics;
+        function sendResponse(request, resp, success, error) {
+            if (request.response) {
+                window.parent.postMessage({
+                    type: request.type,
+                    id: request.id,
+                    resp: resp,
+                    success: success,
+                    error: error
+                }, "*");
+            }
+        }
+        /**
+         * Posts a message from the editor to the host
+         */
+        function postHostMessageAsync(msg) {
+            return new Promise(function (resolve, reject) {
+                var env = pxt.Util.clone(msg);
+                env.id = pxt.Util.guidGen();
+                if (msg.response)
+                    pendingRequests[env.id] = { resolve: resolve, reject: reject };
+                window.parent.postMessage(env, "*");
+                if (!msg.response)
+                    resolve(undefined);
+            });
+        }
+        editor_1.postHostMessageAsync = postHostMessageAsync;
     })(editor = pxt.editor || (pxt.editor = {}));
 })(pxt || (pxt = {}));
 var pxt;
@@ -181,11 +300,9 @@ var pxt;
     (function (vs) {
         function syncModels(mainPkg, libs, currFile, readOnly) {
             if (readOnly)
-                return monaco.Promise.as(undefined);
+                return;
             var extraLibs = monaco.languages.typescript.typescriptDefaults.getExtraLibs();
             var modelMap = {};
-            var toPopulate = [];
-            var definitions = {};
             mainPkg.sortedDeps().forEach(function (pkg) {
                 pkg.getFiles().forEach(function (f) {
                     var fp = pkg.id + "/" + f;
@@ -196,8 +313,6 @@ var pxt;
                             libs[fp] = monaco.languages.typescript.typescriptDefaults.addExtraLib(content, fp);
                         }
                         modelMap[fp] = "1";
-                        // store which files we need to populate definitions for the monaco toolbox
-                        toPopulate.push({ f: f, fp: fp });
                     }
                 });
             });
@@ -207,147 +322,8 @@ var pxt;
                 .forEach(function (lib) {
                 libs[lib].dispose();
             });
-            // populate definitions for the monaco toolbox
-            var promises = [];
-            toPopulate.forEach(function (populate) {
-                var promise = populateDefinitions(populate.f, populate.fp, definitions);
-                promises.push(promise);
-            });
-            return monaco.Promise.join(promises)
-                .then(function () {
-                return definitions;
-            });
         }
         vs.syncModels = syncModels;
-        function displayPartsToParameterSignature(parts) {
-            return "(" + parts.filter(function (part) { return part.kind == "parameterName"; }).map(function (part) { return part.text; }).join(", ") + ")";
-        }
-        function populateDefinitions(f, fp, definitions) {
-            var typeDefs = {};
-            return monaco.languages.typescript.getTypeScriptWorker().then(function (worker) {
-                return worker(monaco.Uri.parse(fp))
-                    .then(function (client) {
-                    return client.getNavigationBarItems(fp).then(function (items) {
-                        return populateDefinitionsForKind(client, ts.ScriptElementKind.interfaceElement, items)
-                            .then(function () { return populateDefinitionsForKind(client, ts.ScriptElementKind.classElement, items); })
-                            .then(function () { return populateDefinitionsForKind(client, ts.ScriptElementKind.moduleElement, items); });
-                    });
-                })
-                    .then(function () {
-                    Object.keys(definitions).forEach(function (name) {
-                        var moduleDef = definitions[name];
-                        if (moduleDef.vars) {
-                            Object.keys(moduleDef.vars).forEach(function (typeString) {
-                                var typeDef = typeDefs[typeString];
-                                if (typeDef) {
-                                    Object.keys(typeDef.fns).forEach(function (functionName) {
-                                        var qName = typeString + "." + functionName;
-                                        if (moduleDef.fns[qName]) {
-                                            return;
-                                        }
-                                        var fn = typeDef.fns[functionName];
-                                        if (fn) {
-                                            fn.snippet = moduleDef.vars[typeString] + "." + fn.snippet;
-                                            moduleDef.fns[qName] = fn;
-                                        }
-                                    });
-                                }
-                            });
-                        }
-                    });
-                });
-            });
-            function populateDefinitionsForKind(client, kind, items) {
-                return monaco.Promise.join(items.filter(function (item) { return item.kind == kind; }).map(function (item) {
-                    if (kind === ts.ScriptElementKind.moduleElement) {
-                        if (!definitions[item.text]) {
-                            definitions[item.text] = {
-                                fns: {}
-                            };
-                        }
-                        return populateNameDefinition(client, fp, item, definitions[item.text]);
-                    }
-                    else {
-                        if (!typeDefs[item.text]) {
-                            typeDefs[item.text] = {
-                                fns: {}
-                            };
-                        }
-                        return populateNameDefinition(client, fp, item, typeDefs[item.text]);
-                    }
-                }));
-                function populateNameDefinition(client, fp, parent, definition) {
-                    var promises = [];
-                    // metadata promise
-                    promises.push(client.getLeadingComments(fp, parent.spans[0].start)
-                        .then(function (comments) {
-                        if (comments) {
-                            var meta_1 = pxtc.parseCommentString(comments);
-                            if (meta_1) {
-                                if (!definition.metaData) {
-                                    definition.metaData = meta_1;
-                                }
-                                else {
-                                    Object.keys(meta_1).forEach(function (k) { return definition.metaData[k] = meta_1[k]; });
-                                }
-                            }
-                        }
-                    }));
-                    // function promises
-                    promises.push(monaco.Promise.join(parent.childItems
-                        .filter(function (item) { return (item.kind == ts.ScriptElementKind.functionElement ||
-                        item.kind === ts.ScriptElementKind.memberFunctionElement) && isExported(item); })
-                        .map(function (fn) {
-                        // exported function
-                        return client.getCompletionEntryDetailsAndSnippet(fp, fn.spans[0].start, fn.text, fn.text, parent.text)
-                            .then(function (details) {
-                            if (!details)
-                                return;
-                            return client.getLeadingComments(fp, fn.spans[0].start)
-                                .then(function (comments) {
-                                var meta;
-                                if (comments)
-                                    meta = pxtc.parseCommentString(comments);
-                                var comment = meta ? meta.jsDoc : ts.displayPartsToString(details[0].documentation);
-                                definition.fns[fn.text] = {
-                                    sig: displayPartsToParameterSignature(details[0].displayParts),
-                                    snippet: details[1],
-                                    comment: comment,
-                                    metaData: meta
-                                };
-                            });
-                        });
-                    })));
-                    if (kind === ts.ScriptElementKind.moduleElement) {
-                        if (!definition.vars) {
-                            definition.vars = {};
-                        }
-                        promises.push(monaco.Promise.join(parent.childItems.filter(function (v) { return v.kind === ts.ScriptElementKind.constElement && isExported(v); }).map(function (v) {
-                            return client.getQuickInfoAtPosition(fp, v.spans[0].start)
-                                .then(function (qInfo) {
-                                if (qInfo) {
-                                    var typePart = qInfo.displayParts.filter(function (part) { return part.kind === "interfaceName" || part.kind === "className"; })[0];
-                                    if (typePart && !definition.vars[typePart.text]) {
-                                        definition.vars[typePart.text] = v.text;
-                                    }
-                                }
-                            });
-                        })));
-                    }
-                    return monaco.Promise.join(promises);
-                    function isExported(item) {
-                        if (kind === ts.ScriptElementKind.interfaceElement) {
-                            return true;
-                        }
-                        if (item.kind === ts.ScriptElementKind.memberFunctionElement && !item.kindModifiers) {
-                            return true;
-                        }
-                        return item.kindModifiers.indexOf(ts.ScriptElementKindModifier.exportedModifier) !== -1 ||
-                            item.kindModifiers.indexOf(ts.ScriptElementKindModifier.ambientModifier) !== -1;
-                    }
-                }
-            }
-        }
         function initMonacoAsync(element) {
             return new Promise(function (resolve, reject) {
                 if (typeof (window.monaco) === 'object') {
@@ -355,10 +331,12 @@ var pxt;
                     resolve(createEditor(element));
                     return;
                 }
+                var monacoPaths = window.MonacoPaths;
                 var onGotAmdLoader = function () {
-                    window.require.config({ paths: { 'vs': pxt.webConfig.pxtCdnUrl + 'vs' } });
+                    var req = window.require;
+                    req.config({ paths: monacoPaths });
                     // Load monaco
-                    window.require(['vs/editor/editor.main'], function () {
+                    req(['vs/editor/editor.main'], function () {
                         setupMonaco();
                         resolve(createEditor(element));
                     });
@@ -367,7 +345,7 @@ var pxt;
                 if (!window.require) {
                     var loaderScript = document.createElement('script');
                     loaderScript.type = 'text/javascript';
-                    loaderScript.src = pxt.webConfig.pxtCdnUrl + 'vs/loader.js';
+                    loaderScript.src = monacoPaths['vs/loader'];
                     loaderScript.addEventListener('load', onGotAmdLoader);
                     document.body.appendChild(loaderScript);
                 }
@@ -383,8 +361,8 @@ var pxt;
             initAsmMonarchLanguage();
             // validation settings
             monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions({
-                noSyntaxValidation: false,
-                noSemanticValidation: false
+                noSyntaxValidation: true,
+                noSemanticValidation: true
             });
             // compiler options
             monaco.languages.typescript.typescriptDefaults.setCompilerOptions({
@@ -414,6 +392,7 @@ var pxt;
                 tabCompletion: true,
                 wordBasedSuggestions: true,
                 lineNumbersMinChars: 3,
+                formatOnPaste: true,
                 //automaticLayout: true,
                 mouseWheelScrollSensitivity: 0.5,
                 quickSuggestionsDelay: 200,

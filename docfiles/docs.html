@@ -12,16 +12,38 @@
 </head>
 
 <body id='root' class='root'>
-    
-<!-- @include header.html -->
 
-<div id="docs" class="ui main container mainbody">
-    @breadcrumb@
-    @body@
-    @github@
+<!-- @include tocheader.html -->
+
+<div class="pusher">
+
+<div class="full height">
+
+    <!-- @include toc.html -->
+    
+    <div class="article">
+        
+        <!-- @include header.html -->
+
+        <div id="docs" class="main ui container mainbody">
+            <button id="printbtn" class="circular ui icon right floated button hideprint">
+                <i class="icon print"></i>
+            </button>
+            @body@
+            <div class="hideprint">@github@</div>
+        </div>
+
+        <div class="hideprint">
+            @prev@
+            @next@
+        </div>
+    </div>
+</div>
+
 </div>
 
 <!-- @include footer.html -->
+
 <!-- @include macros.html -->
 <!-- @include tracking.html -->
 

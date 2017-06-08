@@ -7,12 +7,14 @@
     "workerjs": "/pxt-sample/worker.js",
     "tdworkerjs": "/pxt-sample/tdworker.js",
     "monacoworkerjs": "/pxt-sample/monacoworker.js",
-    "pxtVersion": "1.0.7",
+    "pxtVersion": "1.5.26",
     "pxtRelId": "",
     "pxtCdnUrl": "/pxt-sample/",
+    "commitCdnUrl": "/pxt-sample/",
+    "blobCdnUrl": "/pxt-sample/",
+    "cdnUrl": "/pxt-sample/",
     "targetVersion": "0.0.0",
     "targetRelId": "",
-    "targetCdnUrl": "/pxt-sample/",
     "targetUrl": "",
     "simUrl": "/pxt-sample/simulator.html",
     "partsUrl": "/pxt-sample/siminstructions.html",
@@ -21,27 +23,27 @@
     "isStatic": true
 };
 
-    var appCdnRoot = "/pxt-sample/";
     var scripts = [
-        "highlight.js/highlight.pack.js",
-        "bluebird.min.js",
-        "typescript.js",
-        "semantic.js",
-        "marked/marked.min.js",
-        "lzma/lzma_worker-min.js",
-        "blockly/blockly_compressed.js",
-        "blockly/blocks_compressed.js",
-        "blockly/msg/js/en.js",
-        "pxtlib.js",
-        "pxtblocks.js",
-        "pxteditor.js",
-        "pxtsim.js",
-        "target.js",
-        "pxtrunner.js"
-    ].map(function(s) { return appCdnRoot + s; })
+        "/pxt-sample/highlight.js/highlight.pack.js",
+        "/pxt-sample/bluebird.min.js",
+        "/pxt-sample/typescript.js",
+        "/pxt-sample/semantic.js",
+        "/pxt-sample/marked/marked.min.js",
+        "/pxt-sample/lzma/lzma_worker-min.js",
+        "/pxt-sample/blockly/blockly_compressed.js",
+        "/pxt-sample/blockly/blocks_compressed.js",
+        "/pxt-sample/blockly/msg/js/en.js",
+        "/pxt-sample/pxtlib.js",
+        "/pxt-sample/pxtcompiler.js",
+        "/pxt-sample/pxtblocks.js",
+        "/pxt-sample/pxteditor.js",
+        "/pxt-sample/pxtsim.js",
+        "/pxt-sample/target.js",
+        "/pxt-sample/pxtrunner.js"
+    ]
 
     if (typeof jQuery == "undefined")
-        scripts.unshift(appCdnRoot + "jquery.js")
+        scripts.unshift("/pxt-sample/jquery.js")
 
     var pxtCallbacks = []
 

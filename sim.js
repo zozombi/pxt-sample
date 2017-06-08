@@ -13,7 +13,7 @@ var pxsim;
          * @param steps number of steps to move, eg: 1
          */
         //% weight=90
-        //% blockId=sampleForward block="forward %steps"
+        //% block
         function forwardAsync(steps) {
             return pxsim.board().sprite.forwardAsync(steps);
         }
@@ -38,29 +38,29 @@ var pxsim;
 })(pxsim || (pxsim = {}));
 var pxsim;
 (function (pxsim) {
-    var control;
-    (function (control) {
+    var loops;
+    (function (loops) {
         /**
          * Repeats the code forever in the background. On each iteration, allows other code to run.
-         * @param body TODO
+         * @param body the code to repeat
          */
         //% help=functions/forever weight=55 blockGap=8
-        //% blockId=device_forever block="forever" icon="\uf01e" 
+        //% blockId=device_forever block="forever" 
         function forever(body) {
             pxsim.thread.forever(body);
         }
-        control.forever = forever;
+        loops.forever = forever;
         /**
          * Pause for the specified time in milliseconds
          * @param ms how long to pause for, eg: 100, 200, 500, 1000, 2000
          */
         //% help=functions/pause weight=54
-        //% block="pause (ms) %pause" blockId=device_pause icon="\uf110"
+        //% block="pause (ms) %pause" blockId=device_pause
         function pauseAsync(ms) {
             return Promise.delay(ms);
         }
-        control.pauseAsync = pauseAsync;
-    })(control = pxsim.control || (pxsim.control = {}));
+        loops.pauseAsync = pauseAsync;
+    })(loops = pxsim.loops || (pxsim.loops = {}));
 })(pxsim || (pxsim = {}));
 function logMsg(m) { console.log(m); }
 var pxsim;
@@ -86,10 +86,6 @@ var pxsim;
      */
     //%
     var Sprite = (function () {
-        /**
-         * Make new sprite
-         */
-        //%
         function Sprite() {
             /**
              * The X-coordiante
@@ -119,17 +115,41 @@ var pxsim;
     }());
     pxsim.Sprite = Sprite;
 })(pxsim || (pxsim = {}));
+var pxsim;
+(function (pxsim) {
+    var sprites;
+    (function (sprites) {
+        /**
+         * Creates a new sprite
+         */
+        //% block
+        function createSprite() {
+            return new pxsim.Sprite();
+        }
+        sprites.createSprite = createSprite;
+    })(sprites = pxsim.sprites || (pxsim.sprites = {}));
+})(pxsim || (pxsim = {}));
 /// <reference path="../node_modules/pxt-core/typings/globals/bluebird/index.d.ts"/>
 /// <reference path="../node_modules/pxt-core/built/pxtsim.d.ts"/>
 var pxsim;
 (function (pxsim) {
+    /**
+     * This function gets called each time the program restarts
+     */
     pxsim.initCurrentRuntime = function () {
         pxsim.runtime.board = new Board();
     };
+    /**
+     * Gets the current 'board', eg. program state.
+     */
     function board() {
         return pxsim.runtime.board;
     }
     pxsim.board = board;
+    /**
+     * Represents the entire state of the executing program.
+     * Do not store state anywhere else!
+     */
     var Board = (function (_super) {
         __extends(Board, _super);
         function Board() {
@@ -139,7 +159,6 @@ var pxsim;
             this.sprite = new pxsim.Sprite();
         }
         Board.prototype.initAsync = function (msg) {
-            pxsim.console.log('setting simulator');
             document.body.innerHTML = ''; // clear children
             document.body.appendChild(this.element);
             return Promise.resolve();
