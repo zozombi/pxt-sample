@@ -2990,7 +2990,7 @@ var pxsim;
         };
         RefCollection.prototype.pop = function () {
             var x = this.data.pop();
-            if (x != undefined) {
+            if (x == undefined) {
                 return 0;
             }
             return x;
@@ -3140,20 +3140,46 @@ var pxsim;
         Math_.sqrt = sqrt;
         function pow(x, y) { return Math.pow(x, y); }
         Math_.pow = pow;
+        function log(n) { return Math.log(n); }
+        Math_.log = log;
+        function exp(n) { return Math.exp(n); }
+        Math_.exp = exp;
+        function sin(n) { return Math.sin(n); }
+        Math_.sin = sin;
+        function cos(n) { return Math.cos(n); }
+        Math_.cos = cos;
+        function tan(n) { return Math.tan(n); }
+        Math_.tan = tan;
+        function asin(n) { return Math.asin(n); }
+        Math_.asin = asin;
+        function acos(n) { return Math.acos(n); }
+        Math_.acos = acos;
+        function atan(n) { return Math.atan(n); }
+        Math_.atan = atan;
+        function atan2(y, x) { return Math.atan2(y, x); }
+        Math_.atan2 = atan2;
         function trunc(x) {
             return x > 0 ? Math.floor(x) : Math.ceil(x);
         }
         Math_.trunc = trunc;
-        function random(max) {
-            if (max < 1)
-                return 0;
-            var r = 0;
-            do {
-                r = Math.floor(Math.random() * max);
-            } while (r == max);
-            return r;
+        function random() {
+            return Math.random();
         }
         Math_.random = random;
+        function randomRange(min, max) {
+            if (min == max)
+                return min;
+            if (min > max) {
+                var t = min;
+                min = max;
+                max = t;
+            }
+            if (Math.floor(min) == min && Math.floor(max) == max)
+                return min + Math.floor(Math.random() * (max - min + 1));
+            else
+                return min + Math.random() * (max - min);
+        }
+        Math_.randomRange = randomRange;
     })(Math_ = pxsim.Math_ || (pxsim.Math_ = {}));
     // for explanations see:
     // http://stackoverflow.com/questions/3428136/javascript-integer-math-incorrect-results (second answer)
@@ -3965,7 +3991,7 @@ var pxsim;
         function CoreBoard() {
             var _this = this;
             _super.call(this);
-            this.id = "b" + pxsim.Math_.random(2147483647);
+            this.id = "b" + Math.round(Math.random() * 2147483647);
             this.bus = new pxsim.EventBus(pxsim.runtime);
             // updates
             this.updateSubscribers = [];
@@ -4485,7 +4511,7 @@ var pxsim;
             }
             // dispatch to all iframe besides self
             var frames = this.container.getElementsByTagName("iframe");
-            if (source && (msg.type === 'eventbus' || msg.type == 'radiopacket')) {
+            if (source && (msg.type === 'eventbus' || msg.type == 'radiopacket' || msg.type == 'irpacket')) {
                 if (frames.length < 2) {
                     this.container.appendChild(this.createFrame());
                     frames = this.container.getElementsByTagName("iframe");
@@ -4613,7 +4639,8 @@ var pxsim;
                 code: js,
                 partDefinitions: opts.partDefinitions,
                 mute: opts.mute,
-                highContrast: opts.highContrast
+                highContrast: opts.highContrast,
+                cdnUrl: opts.cdnUrl
             };
             this.applyAspectRatio();
             this.scheduleFrameCleanup();

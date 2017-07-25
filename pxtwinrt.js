@@ -1,11 +1,11 @@
 /// <reference path="../typings/globals/bluebird/index.d.ts"/>
-/// <reference path="../typings/globals/winrt/index.d.ts"/>
+/// <reference path="./winrtrefs.d.ts"/>
 /// <reference path="../built/pxtlib.d.ts"/>
 var pxt;
 (function (pxt) {
     var winrt;
     (function (winrt) {
-        function deployCoreAsync(res) {
+        function driveDeployCoreAsync(res) {
             var drives = pxt.appTarget.compile.deployDrives;
             pxt.Util.assert(!!drives);
             pxt.debug("deploying to drives " + drives);
@@ -27,7 +27,7 @@ var pxt;
                 return all;
             }).then(function (r) { });
         }
-        winrt.deployCoreAsync = deployCoreAsync;
+        winrt.driveDeployCoreAsync = driveDeployCoreAsync;
         function browserDownloadAsync(text, name, contentType) {
             var file;
             return pxt.winrt.promisify(Windows.Storage.ApplicationData.current.temporaryFolder.createFileAsync(name, Windows.Storage.CreationCollisionOption.replaceExisting)
@@ -36,9 +36,150 @@ var pxt;
                 .then(function (b) { }));
         }
         winrt.browserDownloadAsync = browserDownloadAsync;
+        function saveOnlyAsync(res) {
+            var useUf2 = pxt.appTarget.compile.useUF2;
+            var fileTypes = useUf2 ? [".uf2"] : [".hex"];
+            var savePicker = new Windows.Storage.Pickers.FileSavePicker();
+            savePicker.suggestedStartLocation = Windows.Storage.Pickers.PickerLocationId.documentsLibrary;
+            savePicker.fileTypeChoices.insert("MakeCode binary file", fileTypes);
+            savePicker.suggestedFileName = res.downloadFileBaseName;
+            return pxt.winrt.promisify(savePicker.pickSaveFileAsync()
+                .then(function (file) {
+                if (file) {
+                    var fileContent = useUf2 ? res.outfiles[pxtc.BINARY_UF2] : res.outfiles[pxtc.BINARY_HEX];
+                    var ar_1 = [];
+                    var bytes = pxt.Util.stringToUint8Array(atob(fileContent));
+                    bytes.forEach(function (b) { return ar_1.push(b); });
+                    return Windows.Storage.FileIO.writeBytesAsync(file, ar_1)
+                        .then(function () { return true; });
+                }
+                // Save cancelled
+                return Promise.resolve(false);
+            }));
+        }
+        winrt.saveOnlyAsync = saveOnlyAsync;
     })(winrt = pxt.winrt || (pxt.winrt = {}));
 })(pxt || (pxt = {}));
-/// <reference path="../typings/globals/winrt/index.d.ts"/>
+/// <reference path="../typings/globals/bluebird/index.d.ts"/>
+/// <reference path="./winrtrefs.d.ts"/>
+/// <reference path="../built/pxtlib.d.ts"/>
+var pxt;
+(function (pxt) {
+    var winrt;
+    (function (winrt) {
+        var WindowsRuntimeIO = (function () {
+            function WindowsRuntimeIO() {
+                this.onData = function (v) { };
+                this.onEvent = function (v) { };
+                this.onError = function (e) { };
+            }
+            WindowsRuntimeIO.prototype.error = function (msg) {
+                throw new Error(pxt.U.lf("USB/HID error ({0})", msg));
+            };
+            WindowsRuntimeIO.prototype.reconnectAsync = function () {
+                var _this = this;
+                return this.disconnectAsync()
+                    .then(function () { return _this.initAsync(); });
+            };
+            WindowsRuntimeIO.prototype.disconnectAsync = function () {
+                if (this.dev) {
+                    this.dev.close();
+                    delete this.dev;
+                }
+                return Promise.resolve();
+            };
+            WindowsRuntimeIO.prototype.sendPacketAsync = function (pkt) {
+                if (!this.dev)
+                    return Promise.resolve();
+                var ar = [0];
+                for (var i = 0; i < 64; ++i)
+                    ar.push(pkt[i] || 0);
+                var dataWriter = new Windows.Storage.Streams.DataWriter();
+                dataWriter.writeBytes(ar);
+                var buffer = dataWriter.detachBuffer();
+                var report = this.dev.createOutputReport(0);
+                report.data = buffer;
+                return pxt.winrt.promisify(this.dev.sendOutputReportAsync(report)
+                    .then(function (value) {
+                    pxt.debug("hf2: " + value + " bytes written");
+                }));
+            };
+            WindowsRuntimeIO.prototype.initAsync = function () {
+                var _this = this;
+                pxt.Util.assert(!this.dev, "HID interface not properly reseted");
+                var wd = Windows.Devices;
+                var whid = wd.HumanInterfaceDevice.HidDevice;
+                if (!WindowsRuntimeIO.uf2Selectors) {
+                    this.initUf2Selectors();
+                }
+                var getDevicesPromise = WindowsRuntimeIO.uf2Selectors.reduce(function (soFar, currentSelector) {
+                    // Try all selectors, in order, until some devices are found
+                    return soFar.then(function (devices) {
+                        if (devices && devices.length) {
+                            return Promise.resolve(devices);
+                        }
+                        return wd.Enumeration.DeviceInformation.findAllAsync(currentSelector, null);
+                    });
+                }, Promise.resolve(null));
+                return getDevicesPromise
+                    .then(function (devices) {
+                    if (!devices || !devices[0]) {
+                        pxt.debug("no hid device found");
+                        return Promise.reject(new Error("no hid device found"));
+                    }
+                    pxt.debug("hid enumerate " + devices.length + " devices");
+                    var device = devices[0];
+                    pxt.debug("hid connect to " + device.name + " (" + device.id + ")");
+                    return whid.fromIdAsync(device.id, Windows.Storage.FileAccessMode.readWrite);
+                })
+                    .then(function (r) {
+                    _this.dev = r;
+                    if (!_this.dev) {
+                        pxt.debug("can't connect to hid device");
+                        return Promise.reject(new Error("can't connect to hid device"));
+                    }
+                    pxt.debug("hid device version " + _this.dev.version);
+                    _this.dev.addEventListener("inputreportreceived", function (e) {
+                        pxt.debug("input report");
+                        var dr = Windows.Storage.Streams.DataReader.fromBuffer(e.report.data);
+                        var values = [];
+                        while (dr.unconsumedBufferLength) {
+                            values.push(dr.readByte());
+                        }
+                        if (values.length == 65 && values[0] === 0) {
+                            values.shift();
+                        }
+                        _this.onData(new Uint8Array(values));
+                    });
+                    return Promise.resolve();
+                })
+                    .catch(function (e) {
+                    var err = new Error(pxt.U.lf("Device not found"));
+                    err.notifyUser = true;
+                    return Promise.reject(err);
+                });
+            };
+            WindowsRuntimeIO.prototype.initUf2Selectors = function () {
+                var whid = Windows.Devices.HumanInterfaceDevice.HidDevice;
+                WindowsRuntimeIO.uf2Selectors = [];
+                if (pxt.appTarget && pxt.appTarget.compile && pxt.appTarget.compile.hidSelectors) {
+                    pxt.appTarget.compile.hidSelectors.forEach(function (s) {
+                        var sel = whid.getDeviceSelector(parseInt(s.usagePage), parseInt(s.usageId), parseInt(s.vid), parseInt(s.pid));
+                        WindowsRuntimeIO.uf2Selectors.push(sel);
+                    });
+                }
+            };
+            return WindowsRuntimeIO;
+        }());
+        function mkPacketIOAsync() {
+            var b = new WindowsRuntimeIO();
+            return b.initAsync()
+                .then(function () { return b; });
+        }
+        winrt.mkPacketIOAsync = mkPacketIOAsync;
+    })(winrt = pxt.winrt || (pxt.winrt = {}));
+})(pxt || (pxt = {}));
+/// <reference path="./winrtrefs.d.ts"/>
 var pxt;
 (function (pxt) {
     var winrt;
@@ -108,7 +249,6 @@ var pxt;
         }
     })(winrt = pxt.winrt || (pxt.winrt = {}));
 })(pxt || (pxt = {}));
-/// <reference path="../typings/globals/bluebird/index.d.ts"/>
 var pxt;
 (function (pxt) {
     var winrt;
@@ -138,42 +278,84 @@ var pxt;
             return typeof Windows !== "undefined";
         }
         winrt.isWinRT = isWinRT;
-        function initAsync(onHexFileImported) {
+        function initAsync(importHexImpl) {
             if (!isWinRT())
                 return Promise.resolve();
+            var uiCore = Windows.UI.Core;
+            var navMgr = uiCore.SystemNavigationManager.getForCurrentView();
+            navMgr.onbackrequested = function (e) {
+                // Ignore the built-in back button; it tries to back-navigate the sidedoc panel, but it crashes the
+                // app if the sidedoc has been closed since the navigation happened
+                console.log("BACK NAVIGATION");
+                navMgr.appViewBackButtonVisibility = uiCore.AppViewBackButtonVisibility.collapsed;
+                e.handled = true;
+            };
             winrt.initSerial();
-            if (onHexFileImported)
-                initActivation(onHexFileImported);
-            return Promise.resolve();
+            return initialActivationPromise
+                .then(function (args) {
+                if (args && args.kind === Windows.ApplicationModel.Activation.ActivationKind.file) {
+                    winrt.hasActivationProject = true;
+                }
+                if (importHexImpl) {
+                    importHex = importHexImpl;
+                    var app = Windows.UI.WebUI.WebUIApplication;
+                    app.removeEventListener("activated", initialActivationHandler);
+                    app.addEventListener("activated", fileActivationHandler);
+                }
+            });
         }
         winrt.initAsync = initAsync;
-        function initActivation(onHexFileImported) {
-            // Subscribe to the Windows Activation Event
-            Windows.UI.WebUI.WebUIApplication.addEventListener("activated", function (args) {
-                var activation = Windows.ApplicationModel.Activation;
-                if (args.kind === activation.ActivationKind.file) {
-                    var info = args;
-                    var file = info.files.getAt(0);
-                    if (file && file.isOfType(Windows.Storage.StorageItemTypes.file)) {
-                        var f = file;
-                        Windows.Storage.FileIO.readBufferAsync(f)
-                            .done(function (buffer) {
-                            var ar = new Uint8Array(buffer.length);
-                            var dataReader = Windows.Storage.Streams.DataReader.fromBuffer(buffer);
-                            dataReader.readBytes(ar);
-                            dataReader.close();
-                            pxt.cpp.unpackSourceFromHexAsync(ar)
-                                .done(function (hex) { return onHexFileImported(hex); });
-                        });
-                    }
+        // Needed for when user double clicks a hex file without the app already running
+        function captureInitialActivation() {
+            if (!isWinRT()) {
+                return;
+            }
+            Windows.UI.WebUI.WebUIApplication.addEventListener("activated", initialActivationHandler);
+        }
+        winrt.captureInitialActivation = captureInitialActivation;
+        function loadActivationProject() {
+            return initialActivationPromise
+                .then(function (args) { return fileActivationHandler(args, /* createNewIfFailed */ true); });
+        }
+        winrt.loadActivationProject = loadActivationProject;
+        winrt.hasActivationProject = false;
+        function initialActivationHandler(args) {
+            Windows.UI.WebUI.WebUIApplication.removeEventListener("activated", initialActivationHandler);
+            resolveInitialActivationPromise(args);
+        }
+        var initialActivationPromise = new Promise(function (resolve, reject) {
+            resolveInitialActivationPromise = resolve;
+            // After a few seconds, consider we missed the initial activation event and ignore any double clicked file
+            setTimeout(function () { return resolve(null); }, 3500);
+        });
+        var resolveInitialActivationPromise;
+        var importHex;
+        function fileActivationHandler(args, createNewIfFailed) {
+            if (createNewIfFailed === void 0) { createNewIfFailed = false; }
+            if (args.kind === Windows.ApplicationModel.Activation.ActivationKind.file) {
+                var info = args;
+                var file = info.files.getAt(0);
+                if (file && file.isOfType(Windows.Storage.StorageItemTypes.file)) {
+                    var f = file;
+                    Windows.Storage.FileIO.readBufferAsync(f)
+                        .then(function (buffer) {
+                        var ar = [];
+                        var dataReader = Windows.Storage.Streams.DataReader.fromBuffer(buffer);
+                        while (dataReader.unconsumedBufferLength) {
+                            ar.push(dataReader.readByte());
+                        }
+                        dataReader.close();
+                        return pxt.cpp.unpackSourceFromHexAsync(new Uint8Array(ar));
+                    })
+                        .then(function (hex) { return importHex(hex, createNewIfFailed); });
                 }
-                ;
-            });
+            }
         }
     })(winrt = pxt.winrt || (pxt.winrt = {}));
 })(pxt || (pxt = {}));
 /// <reference path="../built/pxtlib.d.ts"/>
 /// <reference path="../built/pxteditor.d.ts"/>
+/// <reference path="./winrtrefs.d.ts"/>
 var pxt;
 (function (pxt) {
     var winrt;

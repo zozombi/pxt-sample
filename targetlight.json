@@ -13,6 +13,7 @@
     "logicBlocks": true,
     "variablesBlocks": true,
     "textBlocks": true,
+    "functionBlocks": true,
     "listsBlocks": true
   },
   "simulator": {
@@ -63,6 +64,6 @@
   },
   "versions": {
     "target": "1.0.4",
-    "pxt": "1.5.26"
+    "pxt": "1.7.17"
   }
 }

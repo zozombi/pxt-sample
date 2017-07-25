@@ -86,7 +86,7 @@
     "workerjs": "/pxt-sample/worker.js",
     "tdworkerjs": "/pxt-sample/tdworker.js",
     "monacoworkerjs": "/pxt-sample/monacoworker.js",
-    "pxtVersion": "1.5.26",
+    "pxtVersion": "1.7.17",
     "pxtRelId": "",
     "pxtCdnUrl": "/pxt-sample/",
     "commitCdnUrl": "/pxt-sample/",
@@ -111,7 +111,6 @@
         var content = document.getElementById('content');        
         ksRunnerReady(function() {
             pxt.docs.requireMarked = function() { return marked; }
-            pxt.docs.requireHighlightJs = function() { return hljs; }
             var projectid = /projectid=([^&?]+)/i.exec(window.location.href); 
             var code = /code=([^&?]+)/i.exec(window.location.href);
             var md = /md=([^&?]+)/i.exec(window.location.href);

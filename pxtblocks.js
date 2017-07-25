@@ -183,7 +183,7 @@ var pxt;
                         }
                     }
                 }
-                return tp || ground("number[]");
+                return tp || ground("Array");
             }
             else if (check === "T") {
                 var func_1 = e.stdCallTable[b.type];
@@ -597,21 +597,6 @@ var pxt;
             var expr = compileExpression(e, getInputTargetBlock(b, "BOOL"), comments);
             return blocks.mkPrefix("!", [blocks.H.mkParenthesizedExpression(expr)]);
         }
-        function extractNumberLit(e) {
-            if (e.type != blocks.NT.Prefix || !/^-?\d+$/.test(e.op))
-                return null;
-            var parsed = parseInt(e.op);
-            checkNumber(parsed);
-            return parsed;
-        }
-        function compileRandom(e, b, comments) {
-            var expr = compileExpression(e, getInputTargetBlock(b, "limit"), comments);
-            var v = extractNumberLit(expr);
-            if (v != null)
-                return blocks.H.mathCall("random", [blocks.H.mkNumberLiteral(v + 1)]);
-            else
-                return blocks.H.mathCall("random", [blocks.H.mkSimpleCall(opToTok["ADD"], [expr, blocks.H.mkNumberLiteral(1)])]);
-        }
         function compileCreateList(e, b, comments) {
             // collect argument
             var args = b.inputList.map(function (input) { return input.connection && input.connection.targetBlock() ? compileExpression(e, input.connection.targetBlock(), comments) : undefined; })
@@ -632,6 +617,18 @@ var pxt;
             var value = compileExpression(e, getInputTargetBlock(b, "VALUE"), comments);
             var res = blocks.mkGroup([listExpr, blocks.mkText("["), index, blocks.mkText("] = "), value]);
             return listBlock.type === "lists_create_with" ? prefixWithSemicolon(res) : res;
+        }
+        function compileProcedure(e, b, comments) {
+            var name = escapeVarName(b.getFieldValue("NAME"), e);
+            var stmts = getInputTargetBlock(b, "STACK");
+            return [
+                blocks.mkText("function " + name + "() "),
+                compileStatements(e, stmts)
+            ];
+        }
+        function compileProcedureCall(e, b, comments) {
+            var name = escapeVarName(b.getFieldValue("NAME"), e);
+            return blocks.mkStmt(blocks.mkText(name + "()"));
         }
         function defaultValueForType(t) {
             if (t.type == null) {
@@ -692,9 +689,6 @@ var pxt;
                         break;
                     case "math_op3":
                         expr = compileMathOp3(e, b, comments);
-                        break;
-                    case "device_random":
-                        expr = compileRandom(e, b, comments);
                         break;
                     case "math_arithmetic":
                     case "logic_compare":
@@ -1029,7 +1023,7 @@ var pxt;
                 callback = blocks.mkGroup([argumentDeclaration, body]);
             }
             else {
-                callback = blocks.mkGroup([blocks.mkText("() =>"), body]);
+                callback = blocks.mkGroup([blocks.mkText("function ()"), body]);
             }
             if (isExtension)
                 return blocks.mkStmt(blocks.H.extensionCall(f, args.concat([callback]), false));
@@ -1055,6 +1049,9 @@ var pxt;
             var compiledArgs = args.map(function (arg) { return compileArg(e, b, arg, comments); });
             var bBody = getInputTargetBlock(b, "HANDLER");
             var body = compileStatements(e, bBody);
+            if (pxt.appTarget.compile && pxt.appTarget.compile.emptyEventHandlerComments && body.children.length === 0) {
+                body.children.unshift(blocks.mkStmt(blocks.mkText("// " + pxtc.HANDLER_COMMENT)));
+            }
             var argumentDeclaration;
             if (isMutatingBlock(b) && b.mutation.getMutationType() === blocks.MutatorTypes.ObjectDestructuringMutator) {
                 argumentDeclaration = b.mutation.compileMutation(e, comments);
@@ -1108,6 +1105,12 @@ var pxt;
                     break;
                 case 'device_while':
                     r = compileWhile(e, b, comments);
+                    break;
+                case 'procedures_defnoreturn':
+                    r = compileProcedure(e, b, comments);
+                    break;
+                case 'procedures_callnoreturn':
+                    r = [compileProcedureCall(e, b, comments)];
                     break;
                 case ts.pxtc.ON_START_TYPE:
                     r = compileStartEvent(e, b).children;
@@ -1395,7 +1398,7 @@ var pxt;
                 // multiple calls allowed
                 if (b.type == ts.pxtc.ON_START_TYPE)
                     flagDuplicate(ts.pxtc.ON_START_TYPE, b);
-                else if (call && call.attrs.blockAllowMultiple)
+                else if (b.type === "procedures_defnoreturn" || call && call.attrs.blockAllowMultiple)
                     return;
                 else if (call && call.hasHandler) {
                     // compute key that identifies event call
@@ -1813,12 +1816,18 @@ var pxt;
                 flowBlocks(blocks, ratio);
             }
             layout.shuffle = shuffle;
-            function flow(ws, ratio) {
-                flowBlocks(ws.getTopBlocks(true), ratio);
+            function flow(ws, opts) {
+                if (opts) {
+                    flowBlocks(ws.getTopBlocks(true), opts.ratio, opts.maxWidth);
+                }
+                else {
+                    flowBlocks(ws.getTopBlocks(true));
+                }
             }
             layout.flow = flow;
             function screenshotEnabled() {
-                return !pxt.BrowserUtils.isIE();
+                return !pxt.BrowserUtils.isIE()
+                    && !pxt.BrowserUtils.isUwpEdge(); // TODO figure out why screenshots are not working in UWP; disable for now
             }
             layout.screenshotEnabled = screenshotEnabled;
             function screenshotAsync(ws) {
@@ -1923,19 +1932,25 @@ var pxt;
                 });
                 return Promise.all(p).then(function () { });
             }
-            function flowBlocks(blocks, ratio) {
+            function flowBlocks(blocks, ratio, maxWidth) {
                 if (ratio === void 0) { ratio = 1.62; }
                 var gap = 16;
                 var marginx = 20;
                 var marginy = 20;
-                // compute total block surface and infer width
-                var surface = 0;
-                for (var _i = 0, blocks_4 = blocks; _i < blocks_4.length; _i++) {
-                    var block = blocks_4[_i];
-                    var s = block.getHeightWidth();
-                    surface += s.width * s.height;
+                var maxx;
+                if (maxWidth > marginx) {
+                    maxx = maxWidth - marginx;
                 }
-                var maxx = Math.sqrt(surface) * ratio;
+                else {
+                    // compute total block surface and infer width
+                    var surface = 0;
+                    for (var _i = 0, blocks_4 = blocks; _i < blocks_4.length; _i++) {
+                        var block = blocks_4[_i];
+                        var s = block.getHeightWidth();
+                        surface += s.width * s.height;
+                    }
+                    maxx = Math.sqrt(surface) * ratio;
+                }
                 var insertx = marginx;
                 var inserty = marginy;
                 var endy = 0;
@@ -1998,6 +2013,7 @@ var pxt;
             math: '#712672',
             images: '#5C2D91',
             variables: '#A80000',
+            functions: '#005a9e',
             text: '#996600',
             arrays: '#A94400',
             advanced: '#3c3c3c'
@@ -2030,6 +2046,8 @@ var pxt;
                 defaultValue: "list"
             }
         };
+        // Matches arrays and tuple types
+        var arrayTypeRegex = /^(?:Array<.+>)|(?:.+\[\])|(?:\[.+\])$/;
         var usedBlocks = {};
         var updateUsedBlocks = false;
         // list of built-in blocks, should be touched.
@@ -2070,7 +2088,19 @@ var pxt;
             if (typeInfo) {
                 var field = document.createElement("field");
                 shadow.appendChild(field);
-                field.setAttribute("name", shadowType == "variables_get" ? "VAR" : typeInfo.field);
+                var fieldName = void 0;
+                switch (shadowType) {
+                    case "variables_get":
+                        fieldName = "VAR";
+                        break;
+                    case "math_number_minmax":
+                        fieldName = "SLIDER";
+                        break;
+                    default:
+                        fieldName = typeInfo.field;
+                        break;
+                }
+                field.setAttribute("name", fieldName);
                 var value_1;
                 if (type == "boolean") {
                     value_1 = document.createTextNode((v || typeInfo.defaultValue).toUpperCase());
@@ -2175,10 +2205,18 @@ var pxt;
                             appendToolboxIconCss(nsnIconClassName, nsn.attributes.icon);
                             category_1.setAttribute("iconclass", nsnIconClassName);
                             category_1.setAttribute("expandedclass", nsnIconClassName);
+                            category_1.setAttribute("web-icon", nsn.attributes.icon);
                         }
                         else {
                             category_1.setAttribute("iconclass", "blocklyTreeIconDefault");
                             category_1.setAttribute("expandedclass", "blocklyTreeIconDefault");
+                            category_1.setAttribute("web-icon", "\uf12e");
+                        }
+                        if (nsn && nsn.attributes.groups) {
+                            category_1.setAttribute("groups", nsn.attributes.groups.join(', '));
+                        }
+                        if (nsn && nsn.attributes.labelLineWidth) {
+                            category_1.setAttribute("labellinewidth", nsn.attributes.labelLineWidth);
                         }
                         insertTopLevelCategory(category_1, tb, nsWeight, isAdvanced);
                     }
@@ -2218,7 +2256,7 @@ var pxt;
                 }
                 else {
                     if (showCategories !== CategoryMode.None && !(showCategories === CategoryMode.Basic && isAdvanced)) {
-                        insertBlock(block, category_1, fn.attributes.weight);
+                        insertBlock(block, category_1, fn.attributes.weight, fn.attributes.group);
                         injectToolboxIconCss();
                     }
                     else if (showCategories === CategoryMode.None) {
@@ -2227,8 +2265,11 @@ var pxt;
                 }
             }
         }
-        function insertBlock(bl, cat, weight) {
+        function insertBlock(bl, cat, weight, group) {
             var isBuiltin = !!blocks_6.blockColors[cat.getAttribute("nameid")];
+            if (group) {
+                bl.setAttribute("group", group);
+            }
             if (isBuiltin && weight > 50) {
                 bl.setAttribute("loaded", "true");
                 var first = void 0;
@@ -2320,13 +2361,14 @@ var pxt;
             var ci = 0;
             for (ci = 0; ci < categories.length; ++ci) {
                 var cat = categories[ci];
+                var catAdvanced = cat.hasAttribute("advanced") && cat.getAttribute("advanced") !== "false";
                 // Advanced categories always come last
                 if (isAdvanced) {
-                    if (!cat.hasAttribute("advanced")) {
+                    if (!catAdvanced) {
                         continue;
                     }
                 }
-                else if (cat.hasAttribute("advanced")) {
+                else if (catAdvanced) {
                     tb.insertBefore(category, cat);
                     break;
                 }
@@ -2435,9 +2477,16 @@ var pxt;
                 i.appendField(pre);
             if (right)
                 i.setAlign(Blockly.ALIGN_RIGHT);
-            // ignore generic types
-            if (type && type != "T")
-                i.setCheck(type);
+            // Ignore generic types
+            if (type && type != "T") {
+                if (arrayTypeRegex.test(type)) {
+                    // All array types get the same check regardless of their subtype
+                    i.setCheck("Array");
+                }
+                else {
+                    i.setCheck(type);
+                }
+            }
             return i;
         }
         function cleanOuterHTML(el) {
@@ -2636,7 +2685,15 @@ var pxt;
                     }
                 }
             }
-            block.setInputsInline(!fn.attributes.blockExternalInputs && fn.parameters.length < 4 && !fn.attributes.imageLiteral);
+            if (fn.attributes.inlineInputMode === "external") {
+                block.setInputsInline(false);
+            }
+            else if (fn.attributes.inlineInputMode === "inline") {
+                block.setInputsInline(true);
+            }
+            else {
+                block.setInputsInline(fn.parameters.length < 4 && !fn.attributes.imageLiteral);
+            }
             switch (fn.retType) {
                 case "number":
                     block.setOutput(true, "Number");
@@ -2649,7 +2706,13 @@ var pxt;
                     break;
                 case "void": break; // do nothing
                 //TODO
-                default: block.setOutput(true, fn.retType !== "T" ? fn.retType : undefined);
+                default:
+                    if (arrayTypeRegex.test(fn.retType)) {
+                        block.setOutput(true, "Array");
+                    }
+                    else {
+                        block.setOutput(true, fn.retType !== "T" ? fn.retType : undefined);
+                    }
             }
             // hook up/down if return value is void
             var hasHandlers = hasArrowFunction(fn);
@@ -2767,51 +2830,17 @@ var pxt;
             if (tb && showCategories !== CategoryMode.None) {
                 // remove unused categories
                 var config = pxt.appTarget.runtime || {};
-                if (!config.mathBlocks)
-                    removeCategory(tb, "Math");
-                if (!config.variablesBlocks)
-                    removeCategory(tb, "Variables");
-                if (!config.logicBlocks)
-                    removeCategory(tb, "Logic");
-                if (!config.loopsBlocks)
-                    removeCategory(tb, "Loops");
-                // Advanced builtin categories
-                if (!config.textBlocks) {
-                    removeCategory(tb, "Text");
-                }
-                else {
-                    showAdvanced = true;
-                    var cat = categoryElement(tb, "Text");
+                initBuiltinCategoryXml("Math", !config.mathBlocks);
+                initBuiltinCategoryXml("Variables", !config.variablesBlocks);
+                initBuiltinCategoryXml("Logic", !config.logicBlocks);
+                initBuiltinCategoryXml("Loops", !config.loopsBlocks);
+                initBuiltinCategoryXml("Text", !config.textBlocks);
+                initBuiltinCategoryXml("Arrays", !config.listsBlocks);
+                initBuiltinCategoryXml("Functions", !config.functionBlocks);
+                if (!config.listsBlocks && config.loopsBlocks) {
+                    var cat = categoryElement(tb, "Loops");
                     if (cat) {
-                        var blockElements = cat.getElementsByTagName("block");
-                        for (var i = 0; i < blockElements.length; i++) {
-                            var b = blockElements.item(i);
-                            usedBlocks[b.getAttribute("type")] = true;
-                        }
-                    }
-                    if (showCategories === CategoryMode.Basic) {
-                        removeCategory(tb, "Text");
-                    }
-                }
-                if (!config.listsBlocks) {
-                    removeCategory(tb, "Arrays");
-                    if (config.loopsBlocks) {
-                        var cat = categoryElement(tb, "Loops");
                         cat.removeChild(blocks_6.getFirstChildWithAttr(cat, "block", "type", "controls_for_of"));
-                    }
-                }
-                else {
-                    showAdvanced = true;
-                    var cat = categoryElement(tb, "Arrays");
-                    if (cat) {
-                        var blockElements = cat.getElementsByTagName("block");
-                        for (var i = 0; i < blockElements.length; i++) {
-                            var b = blockElements.item(i);
-                            usedBlocks[b.getAttribute("type")] = true;
-                        }
-                    }
-                    if (showCategories === CategoryMode.Basic) {
-                        removeCategory(tb, "Arrays");
                     }
                 }
                 // Load localized names for default categories
@@ -2819,7 +2848,7 @@ var pxt;
                 for (var i = 0; i < cats.length; i++) {
                     cats[i].setAttribute('name', pxt.Util.rlf("{id:category}" + cats[i].getAttribute('name'), []));
                 }
-                // update category colors
+                // update category colors and add heading
                 var topCats = blocks_6.getDirectChildren(tb, "category");
                 for (var i = 0; i < topCats.length; i++) {
                     var nsColor = getNamespaceColor(topCats[i].getAttribute('nameid'));
@@ -2830,6 +2859,28 @@ var pxt;
                         for (var j = 0; j < childCats.length; j++) {
                             childCats[j].setAttribute('colour', nsColor);
                         }
+                    }
+                    if (!pxt.appTarget.appTheme.hideFlyoutHeadings && pxt.BrowserUtils.isMobile()) {
+                        // Add the Heading label
+                        var headingLabel = goog.dom.createDom('label');
+                        headingLabel.setAttribute('text', topCats[i].getAttribute('name'));
+                        headingLabel.setAttribute('web-class', 'blocklyFlyoutHeading');
+                        headingLabel.setAttribute('web-icon-color', topCats[i].getAttribute('colour'));
+                        var icon = topCats[i].getAttribute('web-icon');
+                        var iconClass = topCats[i].getAttribute('web-icon-class');
+                        if (icon) {
+                            if (icon.length === 1) {
+                                headingLabel.setAttribute('web-icon', icon);
+                                if (iconClass)
+                                    headingLabel.setAttribute('web-icon-class', iconClass);
+                            }
+                            else {
+                                toolboxStyleBuffer += "\n                                .blocklyFlyoutLabelIcon.blocklyFlyoutIcon" + topCats[i].getAttribute('name') + " {\n                                    display: inline-block !important;\n                                    background-image: url(\"" + (pxt.webConfig.commitCdnUrl + encodeURI(icon)) + "\")!important;\n                                    width: 1em;\n                                    height: 1em;\n                                    background-size: 1em!important;\n                                }\n                            ";
+                                injectToolboxIconCss();
+                                headingLabel.setAttribute('web-icon-class', "blocklyFlyoutIcon" + topCats[i].getAttribute('name'));
+                            }
+                        }
+                        topCats[i].insertBefore(headingLabel, topCats[i].firstChild);
                     }
                 }
             }
@@ -2842,6 +2893,7 @@ var pxt;
             // lf("{id:category}Text")
             // lf("{id:category}Math")
             // lf("{id:category}Advanced")
+            // lf("{id:category}Search")
             // lf("{id:category}More\u2026")
             // update shadow types
             if (tb) {
@@ -2872,8 +2924,70 @@ var pxt;
                 }
                 updateUsedBlocks = true;
             }
+            // Rearrange blocks in the flyout and add group labels
+            if (tb) {
+                var categories = tb.getElementsByTagName("category");
+                var _loop_1 = function(ci) {
+                    var cat = categories.item(ci);
+                    var catName = cat.getAttribute("nameid");
+                    if (catName === "advanced")
+                        return "continue";
+                    var blocks_8 = blocks_6.getDirectChildren(cat, "block");
+                    var groups = cat.getAttribute("groups");
+                    var labelLineWidth = cat.getAttribute("labellinewidth");
+                    var blockGroups = {};
+                    var sortedGroups = [];
+                    if (groups)
+                        sortedGroups = groups.split(', ');
+                    // Organize the blocks into the different groups
+                    for (var bi = 0; bi < blocks_8.length; ++bi) {
+                        var blk = blocks_8[bi];
+                        var group = blk.getAttribute("group") || 'other';
+                        if (!blockGroups[group])
+                            blockGroups[group] = [];
+                        blockGroups[group].push(blk);
+                    }
+                    if (Object.keys(blockGroups).length > 1) {
+                        // Add any missing groups to the sorted groups list
+                        Object.keys(blockGroups).sort().forEach(function (group) {
+                            if (sortedGroups.indexOf(group) == -1) {
+                                sortedGroups.push(group);
+                            }
+                        });
+                        // Add the blocks to the xmlList
+                        var xmlList_1 = [];
+                        for (var bg = 0; bg < sortedGroups.length; ++bg) {
+                            var group = sortedGroups[bg];
+                            // Add the group label
+                            if (group != 'other') {
+                                var groupLabel = goog.dom.createDom('label');
+                                groupLabel.setAttribute('text', pxt.Util.rlf("{id:group}" + group));
+                                groupLabel.setAttribute('web-class', 'blocklyFlyoutGroup');
+                                groupLabel.setAttribute('web-line', '1.5');
+                                if (labelLineWidth)
+                                    groupLabel.setAttribute('web-line-width', labelLineWidth);
+                                xmlList_1.push(groupLabel);
+                            }
+                            // Add the blocks in that group
+                            if (blockGroups[group])
+                                blockGroups[group].forEach(function (groupedBlock) {
+                                    cat.removeChild(groupedBlock);
+                                    xmlList_1.push(groupedBlock);
+                                });
+                        }
+                        // Add the blocks back into the category
+                        xmlList_1.forEach(function (arrangedBlock) {
+                            cat.appendChild(arrangedBlock);
+                        });
+                    }
+                };
+                for (var ci = 0; ci < categories.length; ++ci) {
+                    var state_1 = _loop_1(ci);
+                    if (state_1 === "continue") continue;
+                }
+            }
             // Filter the blocks
-            if (filters) {
+            if (tb && filters) {
                 function filterBlocks(blocks, defaultState) {
                     var hasChild = false;
                     for (var bi = 0; bi < blocks.length; ++bi) {
@@ -2904,9 +3018,18 @@ var pxt;
                         if (catName === "more" || catName === "advanced") {
                             continue;
                         }
+                        // The variables category is special and won't have any children so we
+                        // need to check manually
+                        if (catName === "variables" && (!filters.blocks ||
+                            filters.blocks["variables_set"] ||
+                            filters.blocks["variables_get"] ||
+                            filters.blocks["variables_change"]) &&
+                            (!filters.namespaces || filters.namespaces["variables"] !== FilterState.Disabled)) {
+                            continue;
+                        }
                         var categoryState = filters.namespaces && filters.namespaces[catName] != undefined ? filters.namespaces[catName] : filters.defaultState;
-                        var blocks_8 = cat.getElementsByTagName("block");
-                        var hasVisibleChildren = filterBlocks(blocks_8, categoryState);
+                        var blocks_9 = cat.getElementsByTagName("block");
+                        var hasVisibleChildren = filterBlocks(blocks_9, categoryState);
                         switch (categoryState) {
                             case FilterState.Disabled:
                                 if (!hasVisibleChildren) {
@@ -2944,8 +3067,8 @@ var pxt;
                     }
                 }
                 else {
-                    var blocks_9 = tb.getElementsByTagName("block");
-                    filterBlocks(blocks_9);
+                    var blocks_10 = tb.getElementsByTagName("block");
+                    filterBlocks(blocks_10);
                 }
                 if (showCategories !== CategoryMode.None) {
                     // Go through all categories, hide the ones that have no blocks inside
@@ -2965,6 +3088,29 @@ var pxt;
                 }
             }
             return tb;
+            function initBuiltinCategoryXml(name, remove) {
+                if (remove) {
+                    removeCategory(tb, name);
+                    return;
+                }
+                var cat = categoryElement(tb, name);
+                if (cat) {
+                    var attr = cat.getAttribute("advanced");
+                    if (attr && attr !== "false") {
+                        showAdvanced = true;
+                        // Record all block usages in case this category doesn't show up
+                        // in the toolbox (i.e. advanced is collapsed)
+                        var blockElements = cat.getElementsByTagName("block");
+                        for (var i = 0; i < blockElements.length; i++) {
+                            var b = blockElements.item(i);
+                            usedBlocks[b.getAttribute("type")] = true;
+                        }
+                        if (showCategories === CategoryMode.Basic) {
+                            removeCategory(tb, name);
+                        }
+                    }
+                }
+            }
         }
         blocks_6.createToolbox = createToolbox;
         function initBlocks(blockInfo, toolbox, showCategories, filters) {
@@ -2973,7 +3119,7 @@ var pxt;
             initTooltip(blockInfo);
             var tb = createToolbox(blockInfo, toolbox, showCategories, filters);
             // add trash icon to toolbox
-            if (!$('#blocklyTrashIcon').length) {
+            if (!document.getElementById("blocklyTrashIcon")) {
                 var trashDiv = document.createElement('div');
                 trashDiv.id = "blocklyTrashIcon";
                 trashDiv.style.opacity = '0';
@@ -2981,7 +3127,9 @@ var pxt;
                 var trashIcon = document.createElement('i');
                 trashIcon.className = 'trash icon';
                 trashDiv.appendChild(trashIcon);
-                $('.blocklyToolboxDiv').append(trashDiv);
+                var injectionDiv = document.getElementsByClassName('injectionDiv')[0];
+                if (injectionDiv)
+                    injectionDiv.appendChild(trashDiv);
             }
             return tb;
         }
@@ -3007,15 +3155,27 @@ var pxt;
                 blocklySearchInput.appendChild(blocklySearchInputField);
                 blocklySearchInput.appendChild(blocklySearchInputIcon);
                 blocklySearchArea.appendChild(blocklySearchInput);
-                $('.blocklyToolboxDiv').prepend(blocklySearchArea);
+                var toolboxDiv = document.getElementsByClassName('blocklyToolboxDiv')[0];
+                if (toolboxDiv)
+                    toolboxDiv.insertBefore(blocklySearchArea, toolboxDiv.firstChild);
             }
+            var hasSearchFlyout = function () {
+                return document.getElementsByClassName('blocklyTreeIconsearch').length > 0;
+            };
+            var showSearchFlyout = function () {
+                var tree = workspace.toolbox_.tree_;
+                // Show the search flyout
+                tree.setSelectedItem(tree.getChildren()[0]);
+            };
             pxt.blocks.cachedSearchTb = tb;
             pxt.blocks.cachedSearchTbAll = tbAll;
-            var searchHandler = pxt.Util.debounce(function () {
-                var searchField = $('.blocklySearchInputField');
-                var searchFor = searchField.val().toLowerCase();
-                blocklySearchInput.className += ' loading';
+            var previousSearchTerm = '';
+            var searchChangeHandler = pxt.Util.debounce(function () {
+                var searchField = document.getElementById('blocklySearchInputField');
+                var searchFor = searchField.value.toLowerCase();
                 if (searchFor != '') {
+                    blocklySearchInput.className += ' loading';
+                    previousSearchTerm = searchFor;
                     pxt.tickEvent("blocks.search");
                     var searchTb_1 = pxt.blocks.cachedSearchTb ? pxt.blocks.cachedSearchTb.cloneNode(true) : undefined;
                     var catName = 'Search';
@@ -3024,9 +3184,7 @@ var pxt;
                         var categories = getChildCategories(searchTb_1);
                         var parentCategoryList = searchTb_1;
                         var nsWeight = 101; // Show search category on top
-                        var locCatName = lf("Search");
-                        category_2 = createCategoryElement(locCatName, catName, nsWeight);
-                        category_2.setAttribute("expanded", 'true');
+                        category_2 = createCategoryElement(lf("{id:category}Search"), catName, nsWeight);
                         category_2.setAttribute("colour", '#000');
                         category_2.setAttribute("iconclass", 'blocklyTreeIconsearch');
                         category_2.setAttribute("expandedclass", 'blocklyTreeIconsearch');
@@ -3043,6 +3201,7 @@ var pxt;
                             parentCategoryList.appendChild(category_2);
                     }
                     searchAsync({ term: searchFor, subset: updateUsedBlocks ? usedBlocks : undefined }).then(function (blocks) {
+                        pxt.log("searching for: " + searchFor);
                         updateUsedBlocks = false;
                         if (!blocks)
                             return;
@@ -3072,22 +3231,57 @@ var pxt;
                         if (tb) {
                             updateToolbox(searchTb_1);
                             blocklySearchInput.className = origClassName;
+                            showSearchFlyout();
                         }
                     });
                 }
-                else {
+                else if (previousSearchTerm != '') {
                     // Clearing search
                     updateToolbox(pxt.blocks.cachedSearchTb);
                     blocklySearchInput.className = origClassName;
                 }
                 // Search
-            }, 1000, false);
-            blocklySearchInputField.oninput = searchHandler;
-            blocklySearchInputField.onchange = searchHandler;
-            blocklySearchInputField.onfocus = function () { return blocklySearchInputField.select(); };
-            pxt.BrowserUtils.isTouchEnabled() ?
-                blocklySearchInputField.ontouchstart = searchHandler
-                : blocklySearchInputField.onclick = searchHandler;
+            }, 300, false);
+            blocklySearchInputField.oninput = searchChangeHandler;
+            blocklySearchInputField.onfocus = function () {
+                blocklySearchInputField.select();
+                var searchFor = blocklySearchInputField.value.toLowerCase();
+                if (searchFor != '') {
+                    if (hasSearchFlyout())
+                        showSearchFlyout();
+                    else {
+                        previousSearchTerm = '';
+                        searchChangeHandler();
+                    }
+                }
+            };
+            if (pxt.BrowserUtils.isTouchEnabled()) {
+                blocklySearchInputField.ontouchstart = function () {
+                    blocklySearchInputField.focus();
+                };
+            }
+            // Override Blockly's toolbox keydown method to intercept characters typed and move the focus to the search input
+            var oldKeyDown = Blockly.Toolbox.TreeNode.prototype.onKeyDown;
+            Blockly.Toolbox.TreeNode.prototype.onKeyDown = function (e) {
+                var x = e.which || e.keyCode;
+                var interceptCharacter = x != 37 && x != 38 && x != 39 && x != 40 // Arrows (Handled by Blockly)
+                    && !e.ctrlKey && !e.metaKey && !e.altKey; // Meta keys
+                if (interceptCharacter) {
+                    var searchField = document.getElementById('blocklySearchInputField');
+                    if (x == 8) {
+                        searchField.focus();
+                        searchField.select();
+                    }
+                    else {
+                        var char = String.fromCharCode(x);
+                        searchField.value = searchField.value + char;
+                        searchField.focus();
+                    }
+                }
+                else {
+                    oldKeyDown.call(this, e);
+                }
+            };
         }
         blocks_6.initSearch = initSearch;
         function categoryElement(tb, nameid) {
@@ -3125,6 +3319,7 @@ var pxt;
             initOnStart();
             initMath();
             initVariables();
+            initFunctions();
             initLists();
             initLoops();
             initLogic();
@@ -3184,6 +3379,23 @@ var pxt;
             var listsLengthId = "lists_length";
             var listsLengthDef = pxt.blocks.getBlockDefinition(listsLengthId);
             msg.LISTS_LENGTH_TITLE = listsLengthDef.block["LISTS_LENGTH_TITLE"];
+            // We have to override this block definition because the builtin block
+            // allows both Strings and Arrays in its input check and that confuses
+            // our Blockly compiler
+            var block = Blockly.Blocks[listsLengthId];
+            block.init = function () {
+                this.jsonInit({
+                    "message0": msg.LISTS_LENGTH_TITLE,
+                    "args0": [
+                        {
+                            "type": "input_value",
+                            "name": "VALUE",
+                            "check": ['Array']
+                        }
+                    ],
+                    "output": 'Number'
+                });
+            };
             installBuiltinHelpInfo(listsLengthId);
         }
         function initLoops() {
@@ -3564,7 +3776,7 @@ var pxt;
         }
         function collapseSubcategories(cat, child) {
             while (cat) {
-                if (cat.isUserCollapsible_ && cat != child && (!child || !isChild(child, cat))) {
+                if (cat.isUserCollapsible_ && cat.getTree() && cat != child && (!child || !isChild(child, cat))) {
                     cat.setExpanded(false);
                     cat.updateRow();
                 }
@@ -3808,27 +4020,6 @@ var pxt;
                     setBuiltinHelpInfo(this, mathOp3Id);
                 }
             };
-            // device_random
-            var deviceRandomId = "device_random";
-            var deviceRandomDef = pxt.blocks.getBlockDefinition(deviceRandomId);
-            Blockly.Blocks[deviceRandomId] = {
-                init: function () {
-                    this.jsonInit({
-                        "message0": deviceRandomDef.block["message0"],
-                        "args0": [
-                            {
-                                "type": "input_value",
-                                "name": "limit",
-                                "check": "Number"
-                            }
-                        ],
-                        "inputsInline": true,
-                        "output": "Number",
-                        "colour": getNamespaceColor('math')
-                    });
-                    setBuiltinHelpInfo(this, deviceRandomId);
-                }
-            };
             // builtin math_number
             //XXX Integer validation needed.
             var mInfo = pxt.blocks.getBlockDefinition("math_number");
@@ -3866,12 +4057,22 @@ var pxt;
         blocks_6.getNamespaceColor = getNamespaceColor;
         function initFlyouts(workspace) {
             workspace.registerToolboxCategoryCallback(Blockly.VARIABLE_CATEGORY_NAME, Blockly.Variables.flyoutCategory);
+            workspace.registerToolboxCategoryCallback(Blockly.PROCEDURE_CATEGORY_NAME, Blockly.Procedures.flyoutCategory);
         }
         blocks_6.initFlyouts = initFlyouts;
         function initVariables() {
             var varname = lf("{id:var}item");
             Blockly.Variables.flyoutCategory = function (workspace) {
                 var xmlList = [];
+                if (!pxt.appTarget.appTheme.hideFlyoutHeadings && pxt.BrowserUtils.isMobile()) {
+                    // Add the Heading label
+                    var headingLabel = goog.dom.createDom('label');
+                    headingLabel.setAttribute('text', lf("Variables"));
+                    headingLabel.setAttribute('web-class', 'blocklyFlyoutHeading');
+                    headingLabel.setAttribute('web-icon', '\uf039');
+                    headingLabel.setAttribute('web-icon-color', getNamespaceColor('variables'));
+                    xmlList.push(headingLabel);
+                }
                 var button = goog.dom.createDom('button');
                 button.setAttribute('text', lf("Make a Variable"));
                 button.setAttribute('callbackKey', 'CREATE_VARIABLE');
@@ -3879,41 +4080,48 @@ var pxt;
                     Blockly.Variables.createVariable(button.getTargetWorkspace());
                 });
                 xmlList.push(button);
-                var variableList = Blockly.Variables.allVariables(workspace);
-                variableList.sort(goog.string.caseInsensitiveCompare);
+                var blockList = Blockly.Variables.flyoutCategoryBlocks(workspace);
+                xmlList = xmlList.concat(blockList);
+                return xmlList;
+            };
+            Blockly.Variables.flyoutCategoryBlocks = function (workspace) {
+                var variableModelList = workspace.getVariablesOfType('');
+                variableModelList.sort(Blockly.VariableModel.compareByName);
                 // In addition to the user's variables, we also want to display the default
                 // variable name at the top.  We also don't want this duplicated if the
                 // user has created a variable of the same name.
-                goog.array.remove(variableList, varname);
-                variableList.unshift(varname);
-                // variables getters first
-                for (var i = 0; i < variableList.length; i++) {
-                    // <block type="variables_get" gap="24">
-                    //   <field name="VAR">item</field>
-                    // </block>
-                    var block = goog.dom.createDom('block');
-                    block.setAttribute('type', 'variables_get');
-                    block.setAttribute('gap', '8');
-                    block.setAttribute('colour', getNamespaceColor('variables'));
-                    var field = goog.dom.createDom('field', null, variableList[i]);
-                    field.setAttribute('name', 'VAR');
-                    block.appendChild(field);
-                    xmlList.push(block);
+                for (var i = 0, tempVar = void 0; tempVar = variableModelList[i]; i++) {
+                    if (tempVar.name == varname) {
+                        variableModelList.splice(i, 1);
+                        break;
+                    }
                 }
-                xmlList[xmlList.length - 1].setAttribute('gap', '24');
-                for (var i = 0; i < Math.min(1, variableList.length); i++) {
-                    {
-                        // <block type="variables_set" gap="8">
-                        //   <field name="VAR">item</field>
-                        // </block>
-                        var block = goog.dom.createDom('block');
-                        block.setAttribute('type', 'variables_set');
-                        block.setAttribute('gap', '8');
-                        {
-                            var field = goog.dom.createDom('field', null, variableList[i]);
-                            field.setAttribute('name', 'VAR');
-                            block.appendChild(field);
+                var defaultVar = new Blockly.VariableModel(workspace, varname);
+                variableModelList.unshift(defaultVar);
+                var xmlList = [];
+                if (variableModelList.length > 0) {
+                    // variables getters first
+                    for (var i = 0, variable = void 0; variable = variableModelList[i]; i++) {
+                        if (Blockly.Blocks['variables_get']) {
+                            var blockText = '<xml>' +
+                                '<block type="variables_get" gap="8">' +
+                                Blockly.Variables.generateVariableFieldXml_(variable) +
+                                '</block>' +
+                                '</xml>';
+                            var block = Blockly.Xml.textToDom(blockText).firstChild;
+                            xmlList.push(block);
                         }
+                    }
+                    xmlList[xmlList.length - 1].setAttribute('gap', '24');
+                    var firstVariable = variableModelList[0];
+                    if (Blockly.Blocks['variables_set']) {
+                        var gap = Blockly.Blocks['variables_change'] ? 8 : 24;
+                        var blockText = '<xml>' +
+                            '<block type="variables_set" gap="' + gap + '">' +
+                            Blockly.Variables.generateVariableFieldXml_(firstVariable) +
+                            '</block>' +
+                            '</xml>';
+                        var block = Blockly.Xml.textToDom(blockText).firstChild;
                         {
                             var value = goog.dom.createDom('value');
                             value.setAttribute('name', 'VALUE');
@@ -3928,23 +4136,31 @@ var pxt;
                         }
                         xmlList.push(block);
                     }
-                    {
-                        // <block type="variables_get" gap="24">
-                        //   <field name="VAR">item</field>
-                        // </block>
-                        var block = goog.dom.createDom('block');
-                        block.setAttribute('type', 'variables_change');
-                        block.setAttribute('gap', '24');
-                        var value = goog.dom.createDom('value');
-                        value.setAttribute('name', 'VALUE');
-                        var shadow = goog.dom.createDom('shadow');
-                        shadow.setAttribute("type", "math_number");
-                        value.appendChild(shadow);
-                        var field = goog.dom.createDom('field');
-                        field.setAttribute('name', 'NUM');
-                        field.appendChild(document.createTextNode("1"));
-                        shadow.appendChild(field);
-                        block.appendChild(value);
+                    if (Blockly.Blocks['variables_change']) {
+                        var gap = Blockly.Blocks['variables_get'] ? 20 : 8;
+                        var blockText = '<xml>' +
+                            '<block type="variables_change" gap="' + gap + '">' +
+                            Blockly.Variables.generateVariableFieldXml_(firstVariable) +
+                            '<value name="DELTA">' +
+                            '<shadow type="math_number">' +
+                            '<field name="NUM">1</field>' +
+                            '</shadow>' +
+                            '</value>' +
+                            '</block>' +
+                            '</xml>';
+                        var block = Blockly.Xml.textToDom(blockText).firstChild;
+                        {
+                            var value = goog.dom.createDom('value');
+                            value.setAttribute('name', 'VALUE');
+                            var shadow = goog.dom.createDom('shadow');
+                            shadow.setAttribute("type", "math_number");
+                            value.appendChild(shadow);
+                            var field = goog.dom.createDom('field');
+                            field.setAttribute('name', 'NUM');
+                            field.appendChild(document.createTextNode("0"));
+                            shadow.appendChild(field);
+                            block.appendChild(value);
+                        }
                         xmlList.push(block);
                     }
                 }
@@ -3991,6 +4207,262 @@ var pxt;
                     });
                     setBuiltinHelpInfo(this, variablesChangeId);
                 }
+            };
+            // New variable dialog
+            msg.NEW_VARIABLE_TITLE = lf("New variable name:");
+        }
+        function initFunctions() {
+            var msg = Blockly.Msg;
+            // builtin procedures_defnoreturn
+            var proceduresDefId = "procedures_defnoreturn";
+            var proceduresDef = pxt.blocks.getBlockDefinition(proceduresDefId);
+            msg.PROCEDURES_DEFNORETURN_TITLE = proceduresDef.block["PROCEDURES_DEFNORETURN_TITLE"];
+            msg.PROCEDURE_ALREADY_EXISTS = proceduresDef.block["PROCEDURE_ALREADY_EXISTS"];
+            Blockly.Blocks['procedures_defnoreturn'].init = function () {
+                var nameField = new Blockly.FieldTextInput('', Blockly.Procedures.rename);
+                //nameField.setSpellcheck(false); //TODO
+                this.appendDummyInput()
+                    .appendField(Blockly.Msg.PROCEDURES_DEFNORETURN_TITLE)
+                    .appendField(nameField, 'NAME')
+                    .appendField('', 'PARAMS');
+                this.setColour(getNamespaceColor('functions'));
+                this.arguments_ = [];
+                this.setStatements_(true);
+                this.statementConnection_ = null;
+            };
+            installBuiltinHelpInfo(proceduresDefId);
+            // builtin procedures_defnoreturn
+            var proceduresCallId = "procedures_callnoreturn";
+            var proceduresCallDef = pxt.blocks.getBlockDefinition(proceduresCallId);
+            msg.PROCEDURES_CALLRETURN_TOOLTIP = proceduresDef.tooltip;
+            Blockly.Blocks['procedures_callnoreturn'] = {
+                init: function () {
+                    var nameField = new pxtblockly.FieldProcedure('');
+                    nameField.setSourceBlock(this);
+                    this.appendDummyInput('TOPROW')
+                        .appendField(proceduresCallDef.block['PROCEDURES_CALLNORETURN_TITLE'])
+                        .appendField(nameField, 'NAME');
+                    this.setPreviousStatement(true);
+                    this.setNextStatement(true);
+                    this.setColour(getNamespaceColor('functions'));
+                    this.arguments_ = [];
+                    this.quarkConnections_ = {};
+                    this.quarkIds_ = null;
+                },
+                /**
+                 * Returns the name of the procedure this block calls.
+                 * @return {string} Procedure name.
+                 * @this Blockly.Block
+                 */
+                getProcedureCall: function () {
+                    // The NAME field is guaranteed to exist, null will never be returned.
+                    return (this.getFieldValue('NAME'));
+                },
+                /**
+                 * Notification that a procedure is renaming.
+                 * If the name matches this block's procedure, rename it.
+                 * @param {string} oldName Previous name of procedure.
+                 * @param {string} newName Renamed procedure.
+                 * @this Blockly.Block
+                 */
+                renameProcedure: function (oldName, newName) {
+                    if (Blockly.Names.equals(oldName, this.getProcedureCall())) {
+                        this.setFieldValue(newName, 'NAME');
+                    }
+                },
+                /**
+                 * Procedure calls cannot exist without the corresponding procedure
+                 * definition.  Enforce this link whenever an event is fired.
+                 * @param {!Blockly.Events.Abstract} event Change event.
+                 * @this Blockly.Block
+                 */
+                onchange: function (event) {
+                    if (!this.workspace || this.workspace.isFlyout) {
+                        // Block is deleted or is in a flyout.
+                        return;
+                    }
+                    if (event.type == Blockly.Events.CREATE &&
+                        event.ids.indexOf(this.id) != -1) {
+                        // Look for the case where a procedure call was created (usually through
+                        // paste) and there is no matching definition.  In this case, create
+                        // an empty definition block with the correct signature.
+                        var name_2 = this.getProcedureCall();
+                        var def = Blockly.Procedures.getDefinition(name_2, this.workspace);
+                        if (def && (def.type != this.defType_ ||
+                            JSON.stringify(def.arguments_) != JSON.stringify(this.arguments_))) {
+                            // The signatures don't match.
+                            def = null;
+                        }
+                        if (!def) {
+                            Blockly.Events.setGroup(event.group);
+                            /**
+                             * Create matching definition block.
+                             * <xml>
+                             *   <block type="procedures_defreturn" x="10" y="20">
+                             *     <field name="NAME">test</field>
+                             *   </block>
+                             * </xml>
+                             */
+                            var xml = goog.dom.createDom('xml');
+                            var block = goog.dom.createDom('block');
+                            block.setAttribute('type', this.defType_);
+                            var xy = this.getRelativeToSurfaceXY();
+                            var x = xy.x + Blockly.SNAP_RADIUS * (this.RTL ? -1 : 1);
+                            var y = xy.y + Blockly.SNAP_RADIUS * 2;
+                            block.setAttribute('x', x);
+                            block.setAttribute('y', y);
+                            var field = goog.dom.createDom('field');
+                            field.setAttribute('name', 'NAME');
+                            field.appendChild(document.createTextNode(this.getProcedureCall()));
+                            block.appendChild(field);
+                            xml.appendChild(block);
+                            Blockly.Xml.domToWorkspace(xml, this.workspace);
+                            Blockly.Events.setGroup(false);
+                        }
+                    }
+                    else if (event.type == Blockly.Events.DELETE) {
+                        // Look for the case where a procedure definition has been deleted,
+                        // leaving this block (a procedure call) orphaned.  In this case, delete
+                        // the orphan.
+                        var name_3 = this.getProcedureCall();
+                        var def = Blockly.Procedures.getDefinition(name_3, this.workspace);
+                        if (!def) {
+                            Blockly.Events.setGroup(event.group);
+                            this.dispose(true, false);
+                            Blockly.Events.setGroup(false);
+                        }
+                    }
+                },
+                mutationToDom: function () {
+                    var mutationElement = document.createElement("mutation");
+                    mutationElement.setAttribute("name", this.getProcedureCall());
+                    return mutationElement;
+                },
+                domToMutation: function (element) {
+                    var name = element.getAttribute("name");
+                    this.renameProcedure(this.getProcedureCall(), name);
+                },
+                /**
+                 * Add menu option to find the definition block for this call.
+                 * @param {!Array} options List of menu options to add to.
+                 * @this Blockly.Block
+                 */
+                customContextMenu: function (options) {
+                    var option = { enabled: true };
+                    option.text = Blockly.Msg.PROCEDURES_HIGHLIGHT_DEF;
+                    var name = this.getProcedureCall();
+                    var workspace = this.workspace;
+                    option.callback = function () {
+                        var def = Blockly.Procedures.getDefinition(name, workspace);
+                        def && def.select();
+                    };
+                    options.push(option);
+                },
+                defType_: 'procedures_defnoreturn'
+            };
+            installBuiltinHelpInfo(proceduresCallId);
+            Blockly.Procedures.flyoutCategory = function (workspace) {
+                var xmlList = [];
+                if (!pxt.appTarget.appTheme.hideFlyoutHeadings && pxt.BrowserUtils.isMobile()) {
+                    // Add the Heading label
+                    var headingLabel = goog.dom.createDom('label');
+                    headingLabel.setAttribute('text', lf("Functions"));
+                    headingLabel.setAttribute('web-class', 'blocklyFlyoutHeading');
+                    headingLabel.setAttribute('web-icon', '\uf107');
+                    headingLabel.setAttribute('web-icon-class', 'blocklyFlyoutIconfunctions');
+                    headingLabel.setAttribute('web-icon-color', getNamespaceColor('functions'));
+                    xmlList.push(headingLabel);
+                }
+                var newFunction = lf("Make a Function");
+                var newFunctionTitle = lf("New function name:");
+                // Add the "Make a function" button
+                var button = goog.dom.createDom('button');
+                button.setAttribute('text', newFunction);
+                button.setAttribute('callbackKey', 'CREATE_FUNCTION');
+                var createFunction = function (name) {
+                    /**
+                     * Create matching definition block.
+                     * <xml>
+                     *   <block type="procedures_defreturn" x="10" y="20">
+                     *     <field name="NAME">test</field>
+                     *   </block>
+                     * </xml>
+                     */
+                    var topBlock = workspace.getTopBlocks(true)[0];
+                    var x = 0, y = 0;
+                    if (topBlock) {
+                        var xy = topBlock.getRelativeToSurfaceXY();
+                        x = xy.x + Blockly.SNAP_RADIUS * (topBlock.RTL ? -1 : 1);
+                        y = xy.y + Blockly.SNAP_RADIUS * 2;
+                    }
+                    var xml = goog.dom.createDom('xml');
+                    var block = goog.dom.createDom('block');
+                    block.setAttribute('type', 'procedures_defnoreturn');
+                    block.setAttribute('x', String(x));
+                    block.setAttribute('y', String(y));
+                    var field = goog.dom.createDom('field');
+                    field.setAttribute('name', 'NAME');
+                    field.appendChild(document.createTextNode(name));
+                    block.appendChild(field);
+                    xml.appendChild(block);
+                    var newBlockIds = Blockly.Xml.domToWorkspace(xml, workspace);
+                    // Close flyout and highlight block
+                    workspace.toolbox_.clearSelection();
+                    var newBlock = workspace.getBlockById(newBlockIds[0]);
+                    newBlock.select();
+                };
+                workspace.registerButtonCallback('CREATE_FUNCTION', function (button) {
+                    var promptAndCheckWithAlert = function (defaultName) {
+                        Blockly.prompt(newFunctionTitle, defaultName, function (newFunc) {
+                            // Merge runs of whitespace.  Strip leading and trailing whitespace.
+                            // Beyond this, all names are legal.
+                            if (newFunc) {
+                                newFunc = newFunc.replace(/[\s\xa0]+/g, ' ').replace(/^ | $/g, '');
+                                if (newFunc == newFunction) {
+                                    // Ok, not ALL names are legal...
+                                    newFunc = null;
+                                }
+                            }
+                            if (newFunc) {
+                                if (workspace.getVariable(newFunc)) {
+                                    Blockly.alert(Blockly.Msg.VARIABLE_ALREADY_EXISTS.replace('%1', newFunc.toLowerCase()), function () {
+                                        promptAndCheckWithAlert(newFunc); // Recurse
+                                    });
+                                }
+                                else if (!Blockly.Procedures.isLegalName_(newFunc, workspace)) {
+                                    Blockly.alert(Blockly.Msg.PROCEDURE_ALREADY_EXISTS.replace('%1', newFunc.toLowerCase()), function () {
+                                        promptAndCheckWithAlert(newFunc); // Recurse
+                                    });
+                                }
+                                else {
+                                    createFunction(newFunc);
+                                }
+                            }
+                        });
+                    };
+                    promptAndCheckWithAlert('doSomething');
+                });
+                xmlList.push(button);
+                function populateProcedures(procedureList, templateName) {
+                    for (var i = 0; i < procedureList.length; i++) {
+                        var name_4 = procedureList[i][0];
+                        var args = procedureList[i][1];
+                        // <block type="procedures_callnoreturn" gap="16">
+                        //   <field name="NAME">name</field>
+                        // </block>
+                        var block = goog.dom.createDom('block');
+                        block.setAttribute('type', templateName);
+                        block.setAttribute('gap', '16');
+                        block.setAttribute('colour', getNamespaceColor('functions'));
+                        var field = goog.dom.createDom('field', null, name_4);
+                        field.setAttribute('name', 'NAME');
+                        block.appendChild(field);
+                        xmlList.push(block);
+                    }
+                }
+                var tuple = Blockly.Procedures.allProcedures(workspace);
+                populateProcedures(tuple[0], 'procedures_callnoreturn');
+                return xmlList;
             };
         }
         function initLogic() {
@@ -4048,6 +4520,23 @@ var pxt;
             var textLengthId = "text_length";
             var textLengthDef = pxt.blocks.getBlockDefinition(textLengthId);
             msg.TEXT_LENGTH_TITLE = textLengthDef.block["TEXT_LENGTH_TITLE"];
+            // We have to override this block definition because the builtin block
+            // allows both Strings and Arrays in its input check and that confuses
+            // our Blockly compiler
+            var block = Blockly.Blocks[textLengthId];
+            block.init = function () {
+                this.jsonInit({
+                    "message0": msg.TEXT_LENGTH_TITLE,
+                    "args0": [
+                        {
+                            "type": "input_value",
+                            "name": "VALUE",
+                            "check": ['String']
+                        }
+                    ],
+                    "output": 'Number'
+                });
+            };
             installBuiltinHelpInfo(textLengthId);
             // builtin text_join
             var textJoinId = "text_join";
@@ -4243,7 +4732,7 @@ var pxt;
                 // Initialize flyout workspace's top block and add sub-blocks based on visible parameters
                 var topBlock = workspace.newBlock(this.topBlockType);
                 topBlock.initSvg();
-                var _loop_1 = function(input) {
+                var _loop_2 = function(input) {
                     if (input.name === MutatorHelper.mutatorStatmentInput) {
                         var currentConnection_1 = input.connection;
                         this_1.getVisibleBlockTypes().forEach(function (sub) {
@@ -4258,8 +4747,8 @@ var pxt;
                 var this_1 = this;
                 for (var _i = 0, _a = topBlock.inputList; _i < _a.length; _i++) {
                     var input = _a[_i];
-                    var state_1 = _loop_1(input);
-                    if (state_1 === "break") break;
+                    var state_2 = _loop_2(input);
+                    if (state_2 === "break") break;
                 }
                 return topBlock;
             };
@@ -4333,12 +4822,12 @@ var pxt;
                     }
                     return escapedParam;
                 }).join(", ");
-                var lambdaString = " ({ " + declarationString + " }) => ";
+                var functionString = "function ({ " + declarationString + " })";
                 if (this.info.attributes.mutatePropertyEnum) {
-                    return blocks.mkText(" [" + this.parameters.map(function (p) { return (_this.info.attributes.mutatePropertyEnum + "." + p); }).join(", ") + "]," + lambdaString);
+                    return blocks.mkText(" [" + this.parameters.map(function (p) { return (_this.info.attributes.mutatePropertyEnum + "." + p); }).join(", ") + "]," + functionString);
                 }
                 else {
-                    return blocks.mkText(lambdaString);
+                    return blocks.mkText(functionString);
                 }
             };
             DestructuringMutator.prototype.getDeclaredVariables = function () {
@@ -4458,10 +4947,10 @@ var pxt;
                 }
                 this.currentlyVisible.forEach(function (param) {
                     if (_this.parameters.indexOf(param) === -1) {
-                        var name_2 = _this.block.getFieldValue(param);
+                        var name_5 = _this.block.getFieldValue(param);
                         // Persist renames
-                        if (name_2 !== param) {
-                            _this.parameterRenames[param] = name_2;
+                        if (name_5 !== param) {
+                            _this.parameterRenames[param] = name_5;
                         }
                         dummyInput.removeField(param);
                     }
@@ -4650,7 +5139,7 @@ var pxt;
 var pxt;
 (function (pxt) {
     var blocks;
-    (function (blocks_10) {
+    (function (blocks_11) {
         var workspace;
         var blocklyDiv;
         function align(ws, emPixels) {
@@ -4667,8 +5156,8 @@ var pxt;
             BlockLayout[BlockLayout["Shuffle"] = 2] = "Shuffle";
             BlockLayout[BlockLayout["Clean"] = 3] = "Clean";
             BlockLayout[BlockLayout["Flow"] = 4] = "Flow";
-        })(blocks_10.BlockLayout || (blocks_10.BlockLayout = {}));
-        var BlockLayout = blocks_10.BlockLayout;
+        })(blocks_11.BlockLayout || (blocks_11.BlockLayout = {}));
+        var BlockLayout = blocks_11.BlockLayout;
         function render(blocksXml, options) {
             if (options === void 0) { options = { emPixels: 14, layout: BlockLayout.Flow }; }
             if (!workspace) {
@@ -4701,7 +5190,7 @@ var pxt;
                         pxt.blocks.layout.shuffle(workspace, options.aspectRatio);
                         break;
                     case BlockLayout.Flow:
-                        pxt.blocks.layout.flow(workspace, options.aspectRatio);
+                        pxt.blocks.layout.flow(workspace, { ratio: options.aspectRatio });
                         break;
                     case BlockLayout.Clean:
                         if (workspace.cleanUp_)
@@ -4728,7 +5217,7 @@ var pxt;
                 return undefined;
             }
         }
-        blocks_10.render = render;
+        blocks_11.render = render;
         function blocksMetrics(ws) {
             var blocks = ws.getTopBlocks(false);
             if (!blocks.length)
@@ -4750,7 +5239,7 @@ var pxt;
                 height: m.b - m.t
             };
         }
-        blocks_10.blocksMetrics = blocksMetrics;
+        blocks_11.blocksMetrics = blocksMetrics;
     })(blocks = pxt.blocks || (pxt.blocks = {}));
 })(pxt || (pxt = {}));
 var pxt;
@@ -4948,7 +5437,7 @@ var pxtblockly;
             // Add the tooltips and style the items
             var menuItemsDom = tableContainerDom.getElementsByClassName('goog-menuitem');
             var largestTextItem = -1;
-            var _loop_2 = function(i) {
+            var _loop_3 = function(i) {
                 var elem = menuItemsDom[i];
                 elem.style.borderColor = this_2.backgroundColour_;
                 elem.style.backgroundColor = this_2.itemColour_;
@@ -4979,7 +5468,7 @@ var pxtblockly;
             };
             var this_2 = this;
             for (var i = 0; i < menuItemsDom.length; ++i) {
-                _loop_2(i);
+                _loop_3(i);
             }
             // Resize text items so they have a uniform width
             if (largestTextItem > -1) {
@@ -5745,6 +6234,94 @@ var pxtblockly;
         return FieldNote;
     }(Blockly.FieldNumber));
     pxtblockly.FieldNote = FieldNote;
+})(pxtblockly || (pxtblockly = {}));
+/// <reference path="../../localtypings/blockly.d.ts" />
+var pxtblockly;
+(function (pxtblockly) {
+    var FieldProcedure = (function (_super) {
+        __extends(FieldProcedure, _super);
+        function FieldProcedure(funcname, opt_validator) {
+            _super.call(this, null, opt_validator);
+            this.setValue(funcname || '');
+        }
+        FieldProcedure.prototype.getOptions = function () {
+            return this.dropdownCreate();
+        };
+        ;
+        FieldProcedure.prototype.init = function () {
+            if (this.fieldGroup_) {
+                // Dropdown has already been initialized once.
+                return;
+            }
+            _super.prototype.init.call(this);
+        };
+        ;
+        FieldProcedure.prototype.setSourceBlock = function (block) {
+            goog.asserts.assert(!block.isShadow(), 'Procedure fields are not allowed to exist on shadow blocks.');
+            _super.prototype.setSourceBlock.call(this, block);
+        };
+        ;
+        FieldProcedure.prototype.getValue = function () {
+            return this.getText();
+        };
+        ;
+        FieldProcedure.prototype.setValue = function (newValue) {
+            if (this.sourceBlock_ && Blockly.Events.isEnabled()) {
+                Blockly.Events.fire(new Blockly.Events.Change(this.sourceBlock_, 'field', this.name, this.value_, newValue));
+            }
+            this.value_ = newValue;
+            this.setText(newValue);
+        };
+        ;
+        /**
+         * Return a sorted list of variable names for procedure dropdown menus.
+         * Include a special option at the end for creating a new function name.
+         * @return {!Array.<string>} Array of procedure names.
+         * @this {pxtblockly.FieldProcedure}
+         */
+        FieldProcedure.prototype.dropdownCreate = function () {
+            var functionList = [];
+            if (this.sourceBlock_ && this.sourceBlock_.workspace) {
+                var blocks = this.sourceBlock_.workspace.getAllBlocks();
+                // Iterate through every block and check the name.
+                for (var i = 0; i < blocks.length; i++) {
+                    if (blocks[i].getProcedureDef) {
+                        var procName = blocks[i].getProcedureDef();
+                        functionList.push(procName[0]);
+                    }
+                }
+            }
+            // Ensure that the currently selected variable is an option.
+            var name = this.getText();
+            if (name && functionList.indexOf(name) == -1) {
+                functionList.push(name);
+            }
+            functionList.sort(goog.string.caseInsensitiveCompare);
+            if (!functionList.length) {
+                // Add temporary list item so the dropdown doesn't break
+                functionList.push("Temp");
+            }
+            // Variables are not language-specific, use the name as both the user-facing
+            // text and the internal representation.
+            var options = [];
+            for (var i = 0; i < functionList.length; i++) {
+                options[i] = [functionList[i], functionList[i]];
+            }
+            return options;
+        };
+        FieldProcedure.prototype.onItemSelected = function (menu, menuItem) {
+            var itemText = menuItem.getValue();
+            if (this.sourceBlock_) {
+                // Call any validation function, and allow it to override.
+                itemText = this.callValidator(itemText);
+            }
+            if (itemText !== null) {
+                this.setValue(itemText);
+            }
+        };
+        return FieldProcedure;
+    }(Blockly.FieldDropdown));
+    pxtblockly.FieldProcedure = FieldProcedure;
 })(pxtblockly || (pxtblockly = {}));
 var pxtblockly;
 (function (pxtblockly) {

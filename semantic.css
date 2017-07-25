@@ -282,6 +282,12 @@
 /*-------------------
    Editor
 --------------------*/
+/*-------------------
+   Blockly
+--------------------*/
+/*-------------------
+   Flyout
+--------------------*/
 /* Component's site.variables */
 /*******************************
          Site Settings
@@ -1197,6 +1203,12 @@ th {
 /*-------------------
    Editor
 --------------------*/
+/*-------------------
+   Blockly
+--------------------*/
+/*-------------------
+   Flyout
+--------------------*/
 /* Component's site.variables */
 /*******************************
      User Global Variables
@@ -1234,6 +1246,12 @@ th {
 --------------------*/
 /*-------------------
    Editor
+--------------------*/
+/*-------------------
+   Blockly
+--------------------*/
+/*-------------------
+   Flyout
 --------------------*/
 /* Site theme site.variables */
 /*******************************
@@ -1511,6 +1529,12 @@ th {
 --------------------*/
 /*-------------------
    Editor
+--------------------*/
+/*-------------------
+   Blockly
+--------------------*/
+/*-------------------
+   Flyout
 --------------------*/
 /* Site Theme */
 /*******************************
@@ -1974,6 +1998,12 @@ input::selection {
 --------------------*/
 /*-------------------
    Editor
+--------------------*/
+/*-------------------
+   Blockly
+--------------------*/
+/*-------------------
+   Flyout
 --------------------*/
 /* Component's site.variables */
 /*******************************
@@ -3377,37 +3407,33 @@ input::selection {
 /*--- Grey ---*/
 .ui.grey.buttons .button,
 .ui.grey.button,
-.ui.ui.button.editortools-btn.buttons .button,
-.ui.ui.button.editortools-btn.button {
+.ui.button.editortools-btn {
   background-color: #9E9E9E;
   color: #FFFFFF;
   text-shadow: none;
   background-image: linear-gradient(transparent, rgba(0, 0, 0, 0.05));
 }
 .ui.grey.button,
-.ui.ui.button.editortools-btn.button {
+.ui.button.editortools-btn {
   box-shadow: 0px 0px 0px 1px rgba(0, 0, 0, 0.1) inset;
 }
 .ui.grey.buttons .button:hover,
 .ui.grey.button:hover,
-.ui.ui.button.editortools-btn.buttons .button:hover,
-.ui.ui.button.editortools-btn.button:hover {
+.ui.button.editortools-btn:hover {
   background-color: #ababab;
   color: #FFFFFF;
   text-shadow: none;
 }
 .ui.grey.buttons .button:focus,
 .ui.grey.button:focus,
-.ui.ui.button.editortools-btn.buttons .button:focus,
-.ui.ui.button.editortools-btn.button:focus {
+.ui.button.editortools-btn:focus {
   background-color: #b2b2b2;
   color: #FFFFFF;
   text-shadow: none;
 }
 .ui.grey.buttons .button:active,
 .ui.grey.button:active,
-.ui.ui.button.editortools-btn.buttons .button:active,
-.ui.ui.button.editortools-btn.button:active {
+.ui.button.editortools-btn:active {
   background-color: #b8b8b8;
   color: #FFFFFF;
   text-shadow: none;
@@ -3416,62 +3442,46 @@ input::selection {
 .ui.grey.buttons .active.button:active,
 .ui.grey.active.button,
 .ui.grey.button .active.button:active,
-.ui.ui.button.editortools-btn.buttons .active.button,
-.ui.ui.button.editortools-btn.buttons .active.button:active,
-.ui.ui.button.editortools-btn.active.button,
-.ui.ui.button.editortools-btn.button .active.button:active {
+.ui.button.editortools-btn .active.button:active {
   background-color: #919191;
   color: #FFFFFF;
   text-shadow: none;
 }
 /* Basic */
 .ui.basic.grey.buttons .button,
-.ui.basic.grey.button,
-.ui.basic.ui.button.editortools-btn.buttons .button,
-.ui.basic.ui.button.editortools-btn.button {
+.ui.basic.grey.button {
   box-shadow: 0px 0px 0px 0px #9E9E9E inset !important;
   color: #9E9E9E !important;
 }
 .ui.basic.grey.buttons .button:hover,
-.ui.basic.grey.button:hover,
-.ui.basic.ui.button.editortools-btn.buttons .button:hover,
-.ui.basic.ui.button.editortools-btn.button:hover {
+.ui.basic.grey.button:hover {
   background: transparent !important;
   box-shadow: 0px 0px 0px 1px #ababab inset !important;
   color: #ababab !important;
 }
 .ui.basic.grey.buttons .button:focus,
-.ui.basic.grey.button:focus,
-.ui.basic.ui.button.editortools-btn.buttons .button:focus,
-.ui.basic.ui.button.editortools-btn.button:focus {
+.ui.basic.grey.button:focus {
   background: transparent !important;
   box-shadow: 0px 0px 0px 1px #b2b2b2 inset !important;
   color: #ababab !important;
 }
 .ui.basic.grey.buttons .active.button,
-.ui.basic.grey.active.button,
-.ui.basic.ui.button.editortools-btn.buttons .active.button,
-.ui.basic.ui.button.editortools-btn.active.button {
+.ui.basic.grey.active.button {
   background: transparent !important;
   box-shadow: 0px 0px 0px 1px #919191 inset !important;
   color: #b8b8b8 !important;
 }
 .ui.basic.grey.buttons .button:active,
-.ui.basic.grey.button:active,
-.ui.basic.ui.button.editortools-btn.buttons .button:active,
-.ui.basic.ui.button.editortools-btn.button:active {
+.ui.basic.grey.button:active {
   box-shadow: 0px 0px 0px 1px #b8b8b8 inset !important;
   color: #b8b8b8 !important;
 }
-.ui.buttons:not(.vertical) > .basic.grey.button:not(:first-child),
-.ui.buttons:not(.vertical) > .basic.ui.button.editortools-btn.button:not(:first-child) {
+.ui.buttons:not(.vertical) > .basic.grey.button:not(:first-child) {
   margin-left: -1px;
 }
 /* Inverted */
 .ui.inverted.grey.buttons .button,
-.ui.inverted.grey.button,
-.ui.inverted.ui.button.editortools-btn.buttons .button,
-.ui.inverted.ui.button.editortools-btn.button {
+.ui.inverted.grey.button {
   background-color: transparent;
   box-shadow: 0px 0px 0px 1px #DDDDDD inset !important;
   color: #FFFFFF;
@@ -3483,86 +3493,55 @@ input::selection {
 .ui.inverted.grey.buttons .button.active,
 .ui.inverted.grey.button.active,
 .ui.inverted.grey.buttons .button:active,
-.ui.inverted.grey.button:active,
-.ui.inverted.ui.button.editortools-btn.buttons .button:hover,
-.ui.inverted.ui.button.editortools-btn.button:hover,
-.ui.inverted.ui.button.editortools-btn.buttons .button:focus,
-.ui.inverted.ui.button.editortools-btn.button:focus,
-.ui.inverted.ui.button.editortools-btn.buttons .button.active,
-.ui.inverted.ui.button.editortools-btn.button.active,
-.ui.inverted.ui.button.editortools-btn.buttons .button:active,
-.ui.inverted.ui.button.editortools-btn.button:active {
+.ui.inverted.grey.button:active {
   box-shadow: none !important;
   color: rgba(0, 0, 0, 0.6);
 }
 .ui.inverted.grey.buttons .button:hover,
-.ui.inverted.grey.button:hover,
-.ui.inverted.ui.button.editortools-btn.buttons .button:hover,
-.ui.inverted.ui.button.editortools-btn.button:hover {
+.ui.inverted.grey.button:hover {
   background-color: #cfd0d2;
 }
 .ui.inverted.grey.buttons .button:focus,
-.ui.inverted.grey.button:focus,
-.ui.inverted.ui.button.editortools-btn.buttons .button:focus,
-.ui.inverted.ui.button.editortools-btn.button:focus {
+.ui.inverted.grey.button:focus {
   background-color: #c7c9cb;
 }
 .ui.inverted.grey.buttons .active.button,
-.ui.inverted.grey.active.button,
-.ui.inverted.ui.button.editortools-btn.buttons .active.button,
-.ui.inverted.ui.button.editortools-btn.active.button {
+.ui.inverted.grey.active.button {
   background-color: #cfd0d2;
 }
 .ui.inverted.grey.buttons .button:active,
-.ui.inverted.grey.button:active,
-.ui.inverted.ui.button.editortools-btn.buttons .button:active,
-.ui.inverted.ui.button.editortools-btn.button:active {
+.ui.inverted.grey.button:active {
   background-color: #c2c4c5;
 }
 /* Inverted Basic */
 .ui.inverted.grey.basic.buttons .button,
 .ui.inverted.grey.buttons .basic.button,
-.ui.inverted.grey.basic.button,
-.ui.inverted.ui.button.editortools-btn.basic.buttons .button,
-.ui.inverted.ui.button.editortools-btn.buttons .basic.button,
-.ui.inverted.ui.button.editortools-btn.basic.button {
+.ui.inverted.grey.basic.button {
   background-color: transparent;
   box-shadow: 0px 0px 0px 1px rgba(255, 255, 255, 0.5) inset !important;
   color: #FFFFFF !important;
 }
 .ui.inverted.grey.basic.buttons .button:hover,
 .ui.inverted.grey.buttons .basic.button:hover,
-.ui.inverted.grey.basic.button:hover,
-.ui.inverted.ui.button.editortools-btn.basic.buttons .button:hover,
-.ui.inverted.ui.button.editortools-btn.buttons .basic.button:hover,
-.ui.inverted.ui.button.editortools-btn.basic.button:hover {
+.ui.inverted.grey.basic.button:hover {
   box-shadow: 0px 0px 0px 1px #cfd0d2 inset !important;
   color: #FFFFFF !important;
 }
 .ui.inverted.grey.basic.buttons .button:focus,
 .ui.inverted.grey.basic.buttons .button:focus,
-.ui.inverted.grey.basic.button:focus,
-.ui.inverted.ui.button.editortools-btn.basic.buttons .button:focus,
-.ui.inverted.ui.button.editortools-btn.basic.buttons .button:focus,
-.ui.inverted.ui.button.editortools-btn.basic.button:focus {
+.ui.inverted.grey.basic.button:focus {
   box-shadow: 0px 0px 0px 1px #c7c9cb inset !important;
   color: #DCDDDE !important;
 }
 .ui.inverted.grey.basic.buttons .active.button,
 .ui.inverted.grey.buttons .basic.active.button,
-.ui.inverted.grey.basic.active.button,
-.ui.inverted.ui.button.editortools-btn.basic.buttons .active.button,
-.ui.inverted.ui.button.editortools-btn.buttons .basic.active.button,
-.ui.inverted.ui.button.editortools-btn.basic.active.button {
+.ui.inverted.grey.basic.active.button {
   box-shadow: 0px 0px 0px 1px #cfd0d2 inset !important;
   color: #FFFFFF !important;
 }
 .ui.inverted.grey.basic.buttons .button:active,
 .ui.inverted.grey.buttons .basic.button:active,
-.ui.inverted.grey.basic.button:active,
-.ui.inverted.ui.button.editortools-btn.basic.buttons .button:active,
-.ui.inverted.ui.button.editortools-btn.buttons .basic.button:active,
-.ui.inverted.ui.button.editortools-btn.basic.button:active {
+.ui.inverted.grey.basic.button:active {
   box-shadow: 0px 0px 0px 1px #c2c4c5 inset !important;
   color: #FFFFFF !important;
 }
@@ -3839,37 +3818,33 @@ input::selection {
 /*--- Green ---*/
 .ui.green.buttons .button,
 .ui.green.button,
-.ui.ui.button.getting-started-btn.buttons .button,
-.ui.ui.button.getting-started-btn.button {
+.ui.button.getting-started-btn {
   background-color: #4CAF50;
   color: #FFFFFF;
   text-shadow: none;
   background-image: linear-gradient(transparent, rgba(0, 0, 0, 0.05));
 }
 .ui.green.button,
-.ui.ui.button.getting-started-btn.button {
+.ui.button.getting-started-btn {
   box-shadow: 0px 0px 0px 1px rgba(0, 0, 0, 0.1) inset;
 }
 .ui.green.buttons .button:hover,
 .ui.green.button:hover,
-.ui.ui.button.getting-started-btn.buttons .button:hover,
-.ui.ui.button.getting-started-btn.button:hover {
+.ui.button.getting-started-btn:hover {
   background-color: #40a244;
   color: #FFFFFF;
   text-shadow: none;
 }
 .ui.green.buttons .button:focus,
 .ui.green.button:focus,
-.ui.ui.button.getting-started-btn.buttons .button:focus,
-.ui.ui.button.getting-started-btn.button:focus {
+.ui.button.getting-started-btn:focus {
   background-color: #379b3b;
   color: #FFFFFF;
   text-shadow: none;
 }
 .ui.green.buttons .button:active,
 .ui.green.button:active,
-.ui.ui.button.getting-started-btn.buttons .button:active,
-.ui.ui.button.getting-started-btn.button:active {
+.ui.button.getting-started-btn:active {
   background-color: #3d8b40;
   color: #FFFFFF;
   text-shadow: none;
@@ -3878,62 +3853,46 @@ input::selection {
 .ui.green.buttons .active.button:active,
 .ui.green.active.button,
 .ui.green.button .active.button:active,
-.ui.ui.button.getting-started-btn.buttons .active.button,
-.ui.ui.button.getting-started-btn.buttons .active.button:active,
-.ui.ui.button.getting-started-btn.active.button,
-.ui.ui.button.getting-started-btn.button .active.button:active {
+.ui.button.getting-started-btn .active.button:active {
   background-color: #3ea442;
   color: #FFFFFF;
   text-shadow: none;
 }
 /* Basic */
 .ui.basic.green.buttons .button,
-.ui.basic.green.button,
-.ui.basic.ui.button.getting-started-btn.buttons .button,
-.ui.basic.ui.button.getting-started-btn.button {
+.ui.basic.green.button {
   box-shadow: 0px 0px 0px 0px #4CAF50 inset !important;
   color: #4CAF50 !important;
 }
 .ui.basic.green.buttons .button:hover,
-.ui.basic.green.button:hover,
-.ui.basic.ui.button.getting-started-btn.buttons .button:hover,
-.ui.basic.ui.button.getting-started-btn.button:hover {
+.ui.basic.green.button:hover {
   background: transparent !important;
   box-shadow: 0px 0px 0px 1px #40a244 inset !important;
   color: #40a244 !important;
 }
 .ui.basic.green.buttons .button:focus,
-.ui.basic.green.button:focus,
-.ui.basic.ui.button.getting-started-btn.buttons .button:focus,
-.ui.basic.ui.button.getting-started-btn.button:focus {
+.ui.basic.green.button:focus {
   background: transparent !important;
   box-shadow: 0px 0px 0px 1px #379b3b inset !important;
   color: #40a244 !important;
 }
 .ui.basic.green.buttons .active.button,
-.ui.basic.green.active.button,
-.ui.basic.ui.button.getting-started-btn.buttons .active.button,
-.ui.basic.ui.button.getting-started-btn.active.button {
+.ui.basic.green.active.button {
   background: transparent !important;
   box-shadow: 0px 0px 0px 1px #3ea442 inset !important;
   color: #3d8b40 !important;
 }
 .ui.basic.green.buttons .button:active,
-.ui.basic.green.button:active,
-.ui.basic.ui.button.getting-started-btn.buttons .button:active,
-.ui.basic.ui.button.getting-started-btn.button:active {
+.ui.basic.green.button:active {
   box-shadow: 0px 0px 0px 1px #3d8b40 inset !important;
   color: #3d8b40 !important;
 }
-.ui.buttons:not(.vertical) > .basic.green.button:not(:first-child),
-.ui.buttons:not(.vertical) > .basic.ui.button.getting-started-btn.button:not(:first-child) {
+.ui.buttons:not(.vertical) > .basic.green.button:not(:first-child) {
   margin-left: -1px;
 }
 /* Inverted */
 .ui.inverted.green.buttons .button,
-.ui.inverted.green.button,
-.ui.inverted.ui.button.getting-started-btn.buttons .button,
-.ui.inverted.ui.button.getting-started-btn.button {
+.ui.inverted.green.button {
   background-color: transparent;
   box-shadow: 0px 0px 0px 1px #00E676 inset !important;
   color: #00E676;
@@ -3945,86 +3904,55 @@ input::selection {
 .ui.inverted.green.buttons .button.active,
 .ui.inverted.green.button.active,
 .ui.inverted.green.buttons .button:active,
-.ui.inverted.green.button:active,
-.ui.inverted.ui.button.getting-started-btn.buttons .button:hover,
-.ui.inverted.ui.button.getting-started-btn.button:hover,
-.ui.inverted.ui.button.getting-started-btn.buttons .button:focus,
-.ui.inverted.ui.button.getting-started-btn.button:focus,
-.ui.inverted.ui.button.getting-started-btn.buttons .button.active,
-.ui.inverted.ui.button.getting-started-btn.button.active,
-.ui.inverted.ui.button.getting-started-btn.buttons .button:active,
-.ui.inverted.ui.button.getting-started-btn.button:active {
+.ui.inverted.green.button:active {
   box-shadow: none !important;
   color: #FFFFFF;
 }
 .ui.inverted.green.buttons .button:hover,
-.ui.inverted.green.button:hover,
-.ui.inverted.ui.button.getting-started-btn.buttons .button:hover,
-.ui.inverted.ui.button.getting-started-btn.button:hover {
+.ui.inverted.green.button:hover {
   background-color: #00cd69;
 }
 .ui.inverted.green.buttons .button:focus,
-.ui.inverted.green.button:focus,
-.ui.inverted.ui.button.getting-started-btn.buttons .button:focus,
-.ui.inverted.ui.button.getting-started-btn.button:focus {
+.ui.inverted.green.button:focus {
   background-color: #00bd61;
 }
 .ui.inverted.green.buttons .active.button,
-.ui.inverted.green.active.button,
-.ui.inverted.ui.button.getting-started-btn.buttons .active.button,
-.ui.inverted.ui.button.getting-started-btn.active.button {
+.ui.inverted.green.active.button {
   background-color: #00cd69;
 }
 .ui.inverted.green.buttons .button:active,
-.ui.inverted.green.button:active,
-.ui.inverted.ui.button.getting-started-btn.buttons .button:active,
-.ui.inverted.ui.button.getting-started-btn.button:active {
+.ui.inverted.green.button:active {
   background-color: #00b35c;
 }
 /* Inverted Basic */
 .ui.inverted.green.basic.buttons .button,
 .ui.inverted.green.buttons .basic.button,
-.ui.inverted.green.basic.button,
-.ui.inverted.ui.button.getting-started-btn.basic.buttons .button,
-.ui.inverted.ui.button.getting-started-btn.buttons .basic.button,
-.ui.inverted.ui.button.getting-started-btn.basic.button {
+.ui.inverted.green.basic.button {
   background-color: transparent;
   box-shadow: 0px 0px 0px 1px rgba(255, 255, 255, 0.5) inset !important;
   color: #FFFFFF !important;
 }
 .ui.inverted.green.basic.buttons .button:hover,
 .ui.inverted.green.buttons .basic.button:hover,
-.ui.inverted.green.basic.button:hover,
-.ui.inverted.ui.button.getting-started-btn.basic.buttons .button:hover,
-.ui.inverted.ui.button.getting-started-btn.buttons .basic.button:hover,
-.ui.inverted.ui.button.getting-started-btn.basic.button:hover {
+.ui.inverted.green.basic.button:hover {
   box-shadow: 0px 0px 0px 1px #00cd69 inset !important;
   color: #00E676 !important;
 }
 .ui.inverted.green.basic.buttons .button:focus,
 .ui.inverted.green.basic.buttons .button:focus,
-.ui.inverted.green.basic.button:focus,
-.ui.inverted.ui.button.getting-started-btn.basic.buttons .button:focus,
-.ui.inverted.ui.button.getting-started-btn.basic.buttons .button:focus,
-.ui.inverted.ui.button.getting-started-btn.basic.button:focus {
+.ui.inverted.green.basic.button:focus {
   box-shadow: 0px 0px 0px 1px #00bd61 inset !important;
   color: #00E676 !important;
 }
 .ui.inverted.green.basic.buttons .active.button,
 .ui.inverted.green.buttons .basic.active.button,
-.ui.inverted.green.basic.active.button,
-.ui.inverted.ui.button.getting-started-btn.basic.buttons .active.button,
-.ui.inverted.ui.button.getting-started-btn.buttons .basic.active.button,
-.ui.inverted.ui.button.getting-started-btn.basic.active.button {
+.ui.inverted.green.basic.active.button {
   box-shadow: 0px 0px 0px 1px #00cd69 inset !important;
   color: #00E676 !important;
 }
 .ui.inverted.green.basic.buttons .button:active,
 .ui.inverted.green.buttons .basic.button:active,
-.ui.inverted.green.basic.button:active,
-.ui.inverted.ui.button.getting-started-btn.basic.buttons .button:active,
-.ui.inverted.ui.button.getting-started-btn.buttons .basic.button:active,
-.ui.inverted.ui.button.getting-started-btn.basic.button:active {
+.ui.inverted.green.basic.button:active {
   box-shadow: 0px 0px 0px 1px #00b35c inset !important;
   color: #00E676 !important;
 }
@@ -5743,6 +5671,12 @@ input::selection {
 /*-------------------
    Editor
 --------------------*/
+/*-------------------
+   Blockly
+--------------------*/
+/*-------------------
+   Flyout
+--------------------*/
 /* Component's site.variables */
 /*******************************
      User Global Variables
@@ -5780,6 +5714,12 @@ input::selection {
 --------------------*/
 /*-------------------
    Editor
+--------------------*/
+/*-------------------
+   Blockly
+--------------------*/
+/*-------------------
+   Flyout
 --------------------*/
 /* Site theme site.variables */
 /*******************************
@@ -6254,6 +6194,12 @@ input::selection {
 /*-------------------
    Editor
 --------------------*/
+/*-------------------
+   Blockly
+--------------------*/
+/*-------------------
+   Flyout
+--------------------*/
 /* Component's site.variables */
 /*******************************
      User Global Variables
@@ -6291,6 +6237,12 @@ input::selection {
 --------------------*/
 /*-------------------
    Editor
+--------------------*/
+/*-------------------
+   Blockly
+--------------------*/
+/*-------------------
+   Flyout
 --------------------*/
 /* Site theme site.variables */
 /*******************************
@@ -6854,6 +6806,12 @@ input::selection {
 /*-------------------
    Editor
 --------------------*/
+/*-------------------
+   Blockly
+--------------------*/
+/*-------------------
+   Flyout
+--------------------*/
 /* Component's site.variables */
 /*******************************
      User Global Variables
@@ -6891,6 +6849,12 @@ input::selection {
 --------------------*/
 /*-------------------
    Editor
+--------------------*/
+/*-------------------
+   Blockly
+--------------------*/
+/*-------------------
+   Flyout
 --------------------*/
 /* Site theme site.variables */
 /*******************************
@@ -7273,6 +7237,12 @@ i.flag:not(.icon):before {
 /*-------------------
    Editor
 --------------------*/
+/*-------------------
+   Blockly
+--------------------*/
+/*-------------------
+   Flyout
+--------------------*/
 /* Component's site.variables */
 /*******************************
      User Global Variables
@@ -7310,6 +7280,12 @@ i.flag:not(.icon):before {
 --------------------*/
 /*-------------------
    Editor
+--------------------*/
+/*-------------------
+   Blockly
+--------------------*/
+/*-------------------
+   Flyout
 --------------------*/
 /* Site theme site.variables */
 /*******************************
@@ -7749,25 +7725,20 @@ a.ui.inverted.yellow.header:hover {
   color: #e6d300 !important;
 }
 /*--- Green ---*/
-.ui.green.header,
-.ui.ui.button.getting-started-btn.header {
+.ui.green.header {
   color: #4CAF50 !important;
 }
-a.ui.green.header:hover,
-a.ui.ui.button.getting-started-btn.header:hover {
+a.ui.green.header:hover {
   color: #40a244 !important;
 }
-.ui.green.dividing.header,
-.ui.ui.button.getting-started-btn.dividing.header {
+.ui.green.dividing.header {
   border-bottom: 2px solid #4CAF50;
 }
 /* Inverted */
-.ui.inverted.green.header,
-.ui.inverted.ui.button.getting-started-btn.header {
+.ui.inverted.green.header {
   color: #00E676 !important;
 }
-a.ui.inverted.green.header:hover,
-a.ui.inverted.ui.button.getting-started-btn.header:hover {
+a.ui.inverted.green.header:hover {
   color: #00cd69 !important;
 }
 /*--- Teal ---*/
@@ -7873,25 +7844,20 @@ a.ui.inverted.brown.header:hover {
   color: #c86f11 !important;
 }
 /*--- Grey ---*/
-.ui.grey.header,
-.ui.ui.button.editortools-btn.header {
+.ui.grey.header {
   color: #9E9E9E !important;
 }
-a.ui.grey.header:hover,
-a.ui.ui.button.editortools-btn.header:hover {
+a.ui.grey.header:hover {
   color: #ababab !important;
 }
-.ui.grey.dividing.header,
-.ui.ui.button.editortools-btn.dividing.header {
+.ui.grey.dividing.header {
   border-bottom: 2px solid #9E9E9E;
 }
 /* Inverted */
-.ui.inverted.grey.header,
-.ui.inverted.ui.button.editortools-btn.header {
+.ui.inverted.grey.header {
   color: #DCDDDE !important;
 }
-a.ui.inverted.grey.header:hover,
-a.ui.inverted.ui.button.editortools-btn.header:hover {
+a.ui.inverted.grey.header:hover {
   color: #cfd0d2 !important;
 }
 /*-------------------
@@ -8030,6 +7996,11 @@ a.ui.inverted.ui.button.editortools-btn.header:hover {
 /*******************************
          Site Overrides
 *******************************/
+@media only screen and (max-width: 767px) {
+  .ui.modal > .header {
+    padding-right: 0.75rem !important;
+  }
+}
 /*******************************
          Site Overrides
 *******************************/
@@ -8303,6 +8274,12 @@ a.ui.inverted.ui.button.editortools-btn.header:hover {
 --------------------*/
 /*-------------------
    Editor
+--------------------*/
+/*-------------------
+   Blockly
+--------------------*/
+/*-------------------
+   Flyout
 --------------------*/
 /* Component's site.variables */
 /*******************************
@@ -8779,18 +8756,14 @@ i.inverted.circular.olive.icon {
   color: #FFFFFF !important;
 }
 /* Green */
-i.green.icon,
-i.ui.button.getting-started-btn.icon {
+i.green.icon {
   color: #4CAF50 !important;
 }
-i.inverted.green.icon,
-i.inverted.ui.button.getting-started-btn.icon {
+i.inverted.green.icon {
   color: #00E676 !important;
 }
 i.inverted.bordered.green.icon,
-i.inverted.circular.green.icon,
-i.inverted.bordered.ui.button.getting-started-btn.icon,
-i.inverted.circular.ui.button.getting-started-btn.icon {
+i.inverted.circular.green.icon {
   background-color: #4CAF50 !important;
   color: #FFFFFF !important;
 }
@@ -8867,18 +8840,14 @@ i.inverted.circular.brown.icon {
   color: #FFFFFF !important;
 }
 /* Grey */
-i.grey.icon,
-i.ui.button.editortools-btn.icon {
+i.grey.icon {
   color: #9E9E9E !important;
 }
-i.inverted.grey.icon,
-i.inverted.ui.button.editortools-btn.icon {
+i.inverted.grey.icon {
   color: #DCDDDE !important;
 }
 i.inverted.bordered.grey.icon,
-i.inverted.circular.grey.icon,
-i.inverted.bordered.ui.button.editortools-btn.icon,
-i.inverted.circular.ui.button.editortools-btn.icon {
+i.inverted.circular.grey.icon {
   background-color: #9E9E9E !important;
   color: #FFFFFF !important;
 }
@@ -11878,6 +11847,12 @@ i.icon.fa:before {
 /*-------------------
    Editor
 --------------------*/
+/*-------------------
+   Blockly
+--------------------*/
+/*-------------------
+   Flyout
+--------------------*/
 /* Component's site.variables */
 /*******************************
      User Global Variables
@@ -11915,6 +11890,12 @@ i.icon.fa:before {
 --------------------*/
 /*-------------------
    Editor
+--------------------*/
+/*-------------------
+   Blockly
+--------------------*/
+/*-------------------
+   Flyout
 --------------------*/
 /* Site theme site.variables */
 /*******************************
@@ -12541,6 +12522,12 @@ img.ui.bordered.image {
 /*-------------------
    Editor
 --------------------*/
+/*-------------------
+   Blockly
+--------------------*/
+/*-------------------
+   Flyout
+--------------------*/
 /* Component's site.variables */
 /*******************************
      User Global Variables
@@ -12578,6 +12565,12 @@ img.ui.bordered.image {
 --------------------*/
 /*-------------------
    Editor
+--------------------*/
+/*-------------------
+   Blockly
+--------------------*/
+/*-------------------
+   Flyout
 --------------------*/
 /* Site theme site.variables */
 /*******************************
@@ -13375,6 +13368,12 @@ img.ui.bordered.image {
 /*-------------------
    Editor
 --------------------*/
+/*-------------------
+   Blockly
+--------------------*/
+/*-------------------
+   Flyout
+--------------------*/
 /* Component's site.variables */
 /*******************************
      User Global Variables
@@ -13412,6 +13411,12 @@ img.ui.bordered.image {
 --------------------*/
 /*-------------------
    Editor
+--------------------*/
+/*-------------------
+   Blockly
+--------------------*/
+/*-------------------
+   Flyout
 --------------------*/
 /* Site theme site.variables */
 /*******************************
@@ -14110,45 +14115,35 @@ a.ui.basic.olive.label:hover {
 }
 /*--- Green ---*/
 .ui.green.labels .label,
-.ui.green.label,
-.ui.ui.button.getting-started-btn.labels .label,
-.ui.ui.button.getting-started-btn.label {
+.ui.green.label {
   background-color: #4CAF50 !important;
   border-color: #4CAF50 !important;
   color: #FFFFFF !important;
 }
 /* Link */
 .ui.green.labels .label:hover,
-a.ui.green.label:hover,
-.ui.ui.button.getting-started-btn.labels .label:hover,
-a.ui.ui.button.getting-started-btn.label:hover {
+a.ui.green.label:hover {
   background-color: #40a244 !important;
   border-color: #40a244 !important;
   color: #FFFFFF !important;
 }
 /* Corner */
 .ui.green.corner.label,
-.ui.green.corner.label:hover,
-.ui.ui.button.getting-started-btn.corner.label,
-.ui.ui.button.getting-started-btn.corner.label:hover {
+.ui.green.corner.label:hover {
   background-color: transparent !important;
 }
 /* Ribbon */
-.ui.green.ribbon.label,
-.ui.ui.button.getting-started-btn.ribbon.label {
+.ui.green.ribbon.label {
   border-color: #3d8b40 !important;
 }
 /* Basic */
-.ui.basic.green.label,
-.ui.basic.ui.button.getting-started-btn.label {
+.ui.basic.green.label {
   background-color: #FFFFFF !important;
   color: #4CAF50 !important;
   border-color: #4CAF50 !important;
 }
 .ui.basic.green.labels a.label:hover,
-a.ui.basic.green.label:hover,
-.ui.basic.ui.button.getting-started-btn.labels a.label:hover,
-a.ui.basic.ui.button.getting-started-btn.label:hover {
+a.ui.basic.green.label:hover {
   background-color: #FFFFFF !important;
   color: #40a244 !important;
   border-color: #40a244 !important;
@@ -14365,45 +14360,35 @@ a.ui.basic.brown.label:hover {
 }
 /*--- Grey ---*/
 .ui.grey.labels .label,
-.ui.grey.label,
-.ui.ui.button.editortools-btn.labels .label,
-.ui.ui.button.editortools-btn.label {
+.ui.grey.label {
   background-color: #9E9E9E !important;
   border-color: #9E9E9E !important;
   color: #FFFFFF !important;
 }
 /* Link */
 .ui.grey.labels .label:hover,
-a.ui.grey.label:hover,
-.ui.ui.button.editortools-btn.labels .label:hover,
-a.ui.ui.button.editortools-btn.label:hover {
+a.ui.grey.label:hover {
   background-color: #ababab !important;
   border-color: #ababab !important;
   color: #FFFFFF !important;
 }
 /* Corner */
 .ui.grey.corner.label,
-.ui.grey.corner.label:hover,
-.ui.ui.button.editortools-btn.corner.label,
-.ui.ui.button.editortools-btn.corner.label:hover {
+.ui.grey.corner.label:hover {
   background-color: transparent !important;
 }
 /* Ribbon */
-.ui.grey.ribbon.label,
-.ui.ui.button.editortools-btn.ribbon.label {
+.ui.grey.ribbon.label {
   border-color: #0094bf !important;
 }
 /* Basic */
-.ui.basic.grey.label,
-.ui.basic.ui.button.editortools-btn.label {
+.ui.basic.grey.label {
   background-color: #FFFFFF !important;
   color: #9E9E9E !important;
   border-color: #9E9E9E !important;
 }
 .ui.basic.grey.labels a.label:hover,
-a.ui.basic.grey.label:hover,
-.ui.basic.ui.button.editortools-btn.labels a.label:hover,
-a.ui.basic.ui.button.editortools-btn.label:hover {
+a.ui.basic.grey.label:hover {
   background-color: #FFFFFF !important;
   color: #ababab !important;
   border-color: #ababab !important;
@@ -14935,6 +14920,12 @@ a.ui.basic.label:hover {
 /*-------------------
    Editor
 --------------------*/
+/*-------------------
+   Blockly
+--------------------*/
+/*-------------------
+   Flyout
+--------------------*/
 /* Component's site.variables */
 /*******************************
      User Global Variables
@@ -14972,6 +14963,12 @@ a.ui.basic.label:hover {
 --------------------*/
 /*-------------------
    Editor
+--------------------*/
+/*-------------------
+   Blockly
+--------------------*/
+/*-------------------
+   Flyout
 --------------------*/
 /* Site theme site.variables */
 /*******************************
@@ -16206,6 +16203,12 @@ ol.ui.horizontal.list li:before,
 /*-------------------
    Editor
 --------------------*/
+/*-------------------
+   Blockly
+--------------------*/
+/*-------------------
+   Flyout
+--------------------*/
 /* Component's site.variables */
 /* Site theme site.variables */
 /*******************************
@@ -16916,6 +16919,12 @@ ol.ui.horizontal.list li:before,
 /*-------------------
    Editor
 --------------------*/
+/*-------------------
+   Blockly
+--------------------*/
+/*-------------------
+   Flyout
+--------------------*/
 /* Component's site.variables */
 /*******************************
      User Global Variables
@@ -16953,6 +16962,12 @@ ol.ui.horizontal.list li:before,
 --------------------*/
 /*-------------------
    Editor
+--------------------*/
+/*-------------------
+   Blockly
+--------------------*/
+/*-------------------
+   Flyout
 --------------------*/
 /* Site theme site.variables */
 /*******************************
@@ -17432,6 +17447,12 @@ ol.ui.horizontal.list li:before,
 /*-------------------
    Editor
 --------------------*/
+/*-------------------
+   Blockly
+--------------------*/
+/*-------------------
+   Flyout
+--------------------*/
 /* Component's site.variables */
 /*******************************
      User Global Variables
@@ -17469,6 +17490,12 @@ ol.ui.horizontal.list li:before,
 --------------------*/
 /*-------------------
    Editor
+--------------------*/
+/*-------------------
+   Blockly
+--------------------*/
+/*-------------------
+   Flyout
 --------------------*/
 /* Site theme site.variables */
 /*******************************
@@ -18030,6 +18057,12 @@ ol.ui.horizontal.list li:before,
 /*-------------------
    Editor
 --------------------*/
+/*-------------------
+   Blockly
+--------------------*/
+/*-------------------
+   Flyout
+--------------------*/
 /* Component's site.variables */
 /*******************************
      User Global Variables
@@ -18067,6 +18100,12 @@ ol.ui.horizontal.list li:before,
 --------------------*/
 /*-------------------
    Editor
+--------------------*/
+/*-------------------
+   Blockly
+--------------------*/
+/*-------------------
+   Flyout
 --------------------*/
 /* Site theme site.variables */
 /*******************************
@@ -18609,12 +18648,10 @@ ol.ui.horizontal.list li:before,
   color: #FFFFFF !important;
 }
 /* Green */
-.ui.green.segment:not(.inverted),
-.ui.ui.button.getting-started-btn.segment:not(.inverted) {
+.ui.green.segment:not(.inverted) {
   border-top: 2px solid #4CAF50;
 }
-.ui.inverted.green.segment,
-.ui.inverted.ui.button.getting-started-btn.segment {
+.ui.inverted.green.segment {
   background-color: #4CAF50 !important;
   color: #FFFFFF !important;
 }
@@ -18667,12 +18704,10 @@ ol.ui.horizontal.list li:before,
   color: #FFFFFF !important;
 }
 /* Grey */
-.ui.grey.segment:not(.inverted),
-.ui.ui.button.editortools-btn.segment:not(.inverted) {
+.ui.grey.segment:not(.inverted) {
   border-top: 2px solid #9E9E9E;
 }
-.ui.inverted.grey.segment,
-.ui.inverted.ui.button.editortools-btn.segment {
+.ui.inverted.grey.segment {
   background-color: #9E9E9E !important;
   color: #FFFFFF !important;
 }
@@ -19107,6 +19142,12 @@ ol.ui.horizontal.list li:before,
 /*-------------------
    Editor
 --------------------*/
+/*-------------------
+   Blockly
+--------------------*/
+/*-------------------
+   Flyout
+--------------------*/
 /* Component's site.variables */
 /*******************************
      User Global Variables
@@ -19144,6 +19185,12 @@ ol.ui.horizontal.list li:before,
 --------------------*/
 /*-------------------
    Editor
+--------------------*/
+/*-------------------
+   Blockly
+--------------------*/
+/*-------------------
+   Flyout
 --------------------*/
 /* Site theme site.variables */
 /*******************************
@@ -19996,6 +20043,12 @@ ol.ui.horizontal.list li:before,
 /*-------------------
    Editor
 --------------------*/
+/*-------------------
+   Blockly
+--------------------*/
+/*-------------------
+   Flyout
+--------------------*/
 /* Component's site.variables */
 /*******************************
          Site Settings
@@ -20633,6 +20686,12 @@ ol.ui.horizontal.list li:before,
 --------------------*/
 /*-------------------
    Editor
+--------------------*/
+/*-------------------
+   Blockly
+--------------------*/
+/*-------------------
+   Flyout
 --------------------*/
 /* Component's site.variables */
 /*******************************
@@ -22158,6 +22217,12 @@ ol.ui.horizontal.list li:before,
 /*-------------------
    Editor
 --------------------*/
+/*-------------------
+   Blockly
+--------------------*/
+/*-------------------
+   Flyout
+--------------------*/
 /* Component's site.variables */
 /*******************************
      User Global Variables
@@ -22195,6 +22260,12 @@ ol.ui.horizontal.list li:before,
 --------------------*/
 /*-------------------
    Editor
+--------------------*/
+/*-------------------
+   Blockly
+--------------------*/
+/*-------------------
+   Flyout
 --------------------*/
 /* Site theme site.variables */
 /*******************************
@@ -23488,9 +23559,7 @@ ol.ui.horizontal.list li:before,
 .ui.grid > .row > .pink.column,
 .ui.grid > .row > .brown.column,
 .ui.grid > .row > .grey.column,
-.ui.grid > .row > .black.column,
-.ui.grid > .row > .ui.button.editortools-btn.column,
-.ui.grid > .row > .ui.button.getting-started-btn.column {
+.ui.grid > .row > .black.column {
   margin-top: -1rem;
   margin-bottom: -1rem;
   padding-top: 1rem;
@@ -23527,10 +23596,7 @@ ol.ui.horizontal.list li:before,
 /* Green */
 .ui.grid > .green.row,
 .ui.grid > .green.column,
-.ui.grid > .row > .green.column,
-.ui.grid > .ui.button.getting-started-btn.row,
-.ui.grid > .ui.button.getting-started-btn.column,
-.ui.grid > .row > .ui.button.getting-started-btn.column {
+.ui.grid > .row > .green.column {
   background-color: #4CAF50 !important;
   color: #FFFFFF;
 }
@@ -23579,10 +23645,7 @@ ol.ui.horizontal.list li:before,
 /* Grey */
 .ui.grid > .grey.row,
 .ui.grid > .grey.column,
-.ui.grid > .row > .grey.column,
-.ui.grid > .ui.button.editortools-btn.row,
-.ui.grid > .ui.button.editortools-btn.column,
-.ui.grid > .row > .ui.button.editortools-btn.column {
+.ui.grid > .row > .grey.column {
   background-color: #9E9E9E !important;
   color: #FFFFFF;
 }
@@ -24367,6 +24430,12 @@ ol.ui.horizontal.list li:before,
 /*-------------------
    Editor
 --------------------*/
+/*-------------------
+   Blockly
+--------------------*/
+/*-------------------
+   Flyout
+--------------------*/
 /* Component's site.variables */
 /*******************************
      User Global Variables
@@ -24404,6 +24473,12 @@ ol.ui.horizontal.list li:before,
 --------------------*/
 /*-------------------
    Editor
+--------------------*/
+/*-------------------
+   Blockly
+--------------------*/
+/*-------------------
+   Flyout
 --------------------*/
 /* Site theme site.variables */
 /*******************************
@@ -25628,9 +25703,7 @@ Floated Menu / Item
   color: #B5CC18 !important;
 }
 .ui.menu .green.active.item,
-.ui.green.menu .active.item,
-.ui.menu .ui.button.getting-started-btn.active.item,
-.ui.ui.button.getting-started-btn.menu .active.item {
+.ui.green.menu .active.item {
   border-color: #4CAF50 !important;
   color: #4CAF50 !important;
 }
@@ -25665,9 +25738,7 @@ Floated Menu / Item
   color: #00BCF2 !important;
 }
 .ui.menu .grey.active.item,
-.ui.grey.menu .active.item,
-.ui.menu .ui.button.editortools-btn.active.item,
-.ui.ui.button.editortools-btn.menu .active.item {
+.ui.grey.menu .active.item {
   border-color: #9E9E9E !important;
   color: #9E9E9E !important;
 }
@@ -25816,17 +25887,13 @@ Floated Menu / Item
 }
 /* Green */
 .ui.inverted.menu .green.active.item,
-.ui.inverted.green.menu,
-.ui.inverted.menu .ui.button.getting-started-btn.active.item,
-.ui.inverted.ui.button.getting-started-btn.menu {
+.ui.inverted.green.menu {
   background-color: #4CAF50;
 }
-.ui.inverted.green.menu .item:before,
-.ui.inverted.ui.button.getting-started-btn.menu .item:before {
+.ui.inverted.green.menu .item:before {
   background-color: rgba(34, 36, 38, 0.1);
 }
-.ui.inverted.green.menu .active.item,
-.ui.inverted.ui.button.getting-started-btn.menu .active.item {
+.ui.inverted.green.menu .active.item {
   background-color: rgba(0, 0, 0, 0.1) !important;
 }
 /* Teal */
@@ -25897,17 +25964,13 @@ Floated Menu / Item
 }
 /* Grey */
 .ui.inverted.menu .grey.active.item,
-.ui.inverted.grey.menu,
-.ui.inverted.menu .ui.button.editortools-btn.active.item,
-.ui.inverted.ui.button.editortools-btn.menu {
+.ui.inverted.grey.menu {
   background-color: #9E9E9E;
 }
-.ui.inverted.grey.menu .item:before,
-.ui.inverted.ui.button.editortools-btn.menu .item:before {
+.ui.inverted.grey.menu .item:before {
   background-color: rgba(34, 36, 38, 0.1);
 }
-.ui.inverted.grey.menu .active.item,
-.ui.inverted.ui.button.editortools-btn.menu .active.item {
+.ui.inverted.grey.menu .active.item {
   background-color: rgba(0, 0, 0, 0.1) !important;
 }
 /*--------------
@@ -26269,15 +26332,23 @@ Floated Menu / Item
 }
 #menubar .ui.menu {
   height: 4.5rem;
-  min-height: 2.85714286em !important;
+  min-height: 4.5rem !important;
 }
 #menubar .item > .button {
   margin-right: 0.25rem;
+  padding: 0.6rem;
 }
 @media only screen and (max-width: 991px) {
   #menubar .ui.menu {
     height: 4rem !important;
     min-height: 4rem !important;
+  }
+  .sandbox #menubar .ui.menu {
+    height: 2.5rem !important;
+    min-height: 2.5rem !important;
+  }
+  .ui.menu .item > i.icon {
+    margin: 0;
   }
 }
 .ui.inverted.menu .active.item {
@@ -26290,7 +26361,7 @@ Floated Menu / Item
 /*******************************
          Site Overrides
 *******************************/
-.ui.menu.inverted {
+#menubar .ui.menu.inverted {
   box-shadow: 0 0 4px rgba(0, 0, 0, 0.12), 0 4px 4px rgba(0, 0, 0, 0.24);
 }
 /*!
@@ -26563,6 +26634,12 @@ Floated Menu / Item
 --------------------*/
 /*-------------------
    Editor
+--------------------*/
+/*-------------------
+   Blockly
+--------------------*/
+/*-------------------
+   Flyout
 --------------------*/
 /* Component's site.variables */
 /*******************************
@@ -27172,14 +27249,12 @@ Floated Menu / Item
 .ui.olive.message .header {
   color: #7aa61a;
 }
-.ui.green.message,
-.ui.ui.button.getting-started-btn.message {
+.ui.green.message {
   background-color: #E5F9E7;
   color: #1EBC30;
   box-shadow: 0px 0px 0px 1px #1EBC30 inset, 0px 0px 0px 0px rgba(0, 0, 0, 0);
 }
-.ui.green.message .header,
-.ui.ui.button.getting-started-btn.message .header {
+.ui.green.message .header {
   color: #1aa62a;
 }
 .ui.teal.message {
@@ -27533,6 +27608,12 @@ Floated Menu / Item
 --------------------*/
 /*-------------------
    Editor
+--------------------*/
+/*-------------------
+   Blockly
+--------------------*/
+/*-------------------
+   Flyout
 --------------------*/
 /* Component's site.variables */
 /*******************************
@@ -28435,12 +28516,10 @@ Floated Menu / Item
   color: #FFFFFF !important;
 }
 /* Green */
-.ui.green.table,
-.ui.ui.button.getting-started-btn.table {
+.ui.green.table {
   border-top: 0.2em solid #4CAF50;
 }
-.ui.inverted.green.table,
-.ui.inverted.ui.button.getting-started-btn.table {
+.ui.inverted.green.table {
   background-color: #4CAF50 !important;
   color: #FFFFFF !important;
 }
@@ -28493,12 +28572,10 @@ Floated Menu / Item
   color: #FFFFFF !important;
 }
 /* Grey */
-.ui.grey.table,
-.ui.ui.button.editortools-btn.table {
+.ui.grey.table {
   border-top: 0.2em solid #9E9E9E;
 }
-.ui.inverted.grey.table,
-.ui.inverted.ui.button.editortools-btn.table {
+.ui.inverted.grey.table {
   background-color: #9E9E9E !important;
   color: #FFFFFF !important;
 }
@@ -29117,6 +29194,12 @@ Floated Menu / Item
 --------------------*/
 /*-------------------
    Editor
+--------------------*/
+/*-------------------
+   Blockly
+--------------------*/
+/*-------------------
+   Flyout
 --------------------*/
 /* Component's site.variables */
 /*******************************
@@ -29857,6 +29940,12 @@ Floated Menu / Item
 --------------------*/
 /*-------------------
    Editor
+--------------------*/
+/*-------------------
+   Blockly
+--------------------*/
+/*-------------------
+   Flyout
 --------------------*/
 /* Component's site.variables */
 /*******************************
@@ -30634,18 +30723,12 @@ a.ui.card:hover,
 /* Green */
 .ui.green.cards > .card,
 .ui.cards > .green.card,
-.ui.green.card,
-.ui.ui.button.getting-started-btn.cards > .card,
-.ui.cards > .ui.button.getting-started-btn.card,
-.ui.ui.button.getting-started-btn.card {
+.ui.green.card {
   box-shadow: 0px 0px 0px 1px #D4D4D5, 0px 2px 0px 0px #4CAF50, 0px 1px 3px 0px #D4D4D5;
 }
 .ui.green.cards > .card:hover,
 .ui.cards > .green.card:hover,
-.ui.green.card:hover,
-.ui.ui.button.getting-started-btn.cards > .card:hover,
-.ui.cards > .ui.button.getting-started-btn.card:hover,
-.ui.ui.button.getting-started-btn.card:hover {
+.ui.green.card:hover {
   box-shadow: 0px 0px 0px 1px #D4D4D5, 0px 2px 0px 0px #40a244, 0px 1px 3px 0px #BCBDBD;
 }
 /* Teal */
@@ -30717,18 +30800,12 @@ a.ui.card:hover,
 /* Grey */
 .ui.grey.cards > .card,
 .ui.cards > .grey.card,
-.ui.grey.card,
-.ui.ui.button.editortools-btn.cards > .card,
-.ui.cards > .ui.button.editortools-btn.card,
-.ui.ui.button.editortools-btn.card {
+.ui.grey.card {
   box-shadow: 0px 0px 0px 1px #D4D4D5, 0px 2px 0px 0px #9E9E9E, 0px 1px 3px 0px #D4D4D5;
 }
 .ui.grey.cards > .card:hover,
 .ui.cards > .grey.card:hover,
-.ui.grey.card:hover,
-.ui.ui.button.editortools-btn.cards > .card:hover,
-.ui.cards > .ui.button.editortools-btn.card:hover,
-.ui.ui.button.editortools-btn.card:hover {
+.ui.grey.card:hover {
   box-shadow: 0px 0px 0px 1px #D4D4D5, 0px 2px 0px 0px #ababab, 0px 1px 3px 0px #BCBDBD;
 }
 /* Black */
@@ -31306,6 +31383,12 @@ a.ui.card:hover,
 --------------------*/
 /*-------------------
    Editor
+--------------------*/
+/*-------------------
+   Blockly
+--------------------*/
+/*-------------------
+   Flyout
 --------------------*/
 /* Component's site.variables */
 /*******************************
@@ -32097,6 +32180,12 @@ a.ui.card:hover,
 --------------------*/
 /*-------------------
    Editor
+--------------------*/
+/*-------------------
+   Blockly
+--------------------*/
+/*-------------------
+   Flyout
 --------------------*/
 /* Component's site.variables */
 /*******************************
@@ -32914,6 +33003,12 @@ a.ui.card:hover,
 --------------------*/
 /*-------------------
    Editor
+--------------------*/
+/*-------------------
+   Blockly
+--------------------*/
+/*-------------------
+   Flyout
 --------------------*/
 /* Component's site.variables */
 /*******************************
@@ -33878,6 +33973,12 @@ a.ui.card:hover,
 /*-------------------
    Editor
 --------------------*/
+/*-------------------
+   Blockly
+--------------------*/
+/*-------------------
+   Flyout
+--------------------*/
 /* Component's site.variables */
 /*******************************
          Site Settings
@@ -34447,10 +34548,7 @@ a.ui.card:hover,
 }
 .ui.green.statistics .statistic > .value,
 .ui.statistics .green.statistic > .value,
-.ui.green.statistic > .value,
-.ui.ui.button.getting-started-btn.statistics .statistic > .value,
-.ui.statistics .ui.button.getting-started-btn.statistic > .value,
-.ui.ui.button.getting-started-btn.statistic > .value {
+.ui.green.statistic > .value {
   color: #4CAF50;
 }
 .ui.teal.statistics .statistic > .value,
@@ -34485,10 +34583,7 @@ a.ui.card:hover,
 }
 .ui.grey.statistics .statistic > .value,
 .ui.statistics .grey.statistic > .value,
-.ui.grey.statistic > .value,
-.ui.ui.button.editortools-btn.statistics .statistic > .value,
-.ui.statistics .ui.button.editortools-btn.statistic > .value,
-.ui.ui.button.editortools-btn.statistic > .value {
+.ui.grey.statistic > .value {
   color: #9E9E9E;
 }
 /*--------------
@@ -34524,10 +34619,7 @@ a.ui.card:hover,
 }
 .ui.inverted.green.statistics .statistic > .value,
 .ui.statistics .inverted.green.statistic > .value,
-.ui.inverted.green.statistic > .value,
-.ui.inverted.ui.button.getting-started-btn.statistics .statistic > .value,
-.ui.statistics .inverted.ui.button.getting-started-btn.statistic > .value,
-.ui.inverted.ui.button.getting-started-btn.statistic > .value {
+.ui.inverted.green.statistic > .value {
   color: #00E676;
 }
 .ui.inverted.teal.statistics .statistic > .value,
@@ -34562,10 +34654,7 @@ a.ui.card:hover,
 }
 .ui.inverted.grey.statistics .statistic > .value,
 .ui.statistics .inverted.grey.statistic > .value,
-.ui.inverted.grey.statistic > .value,
-.ui.inverted.ui.button.editortools-btn.statistics .statistic > .value,
-.ui.statistics .inverted.ui.button.editortools-btn.statistic > .value,
-.ui.inverted.ui.button.editortools-btn.statistic > .value {
+.ui.inverted.grey.statistic > .value {
   color: #DCDDDE;
 }
 /*--------------
@@ -34940,6 +35029,12 @@ a.ui.card:hover,
 --------------------*/
 /*-------------------
    Editor
+--------------------*/
+/*-------------------
+   Blockly
+--------------------*/
+/*-------------------
+   Flyout
 --------------------*/
 /* Component's site.variables */
 /*******************************
@@ -35704,6 +35799,12 @@ a.ui.card:hover,
 --------------------*/
 /*-------------------
    Editor
+--------------------*/
+/*-------------------
+   Blockly
+--------------------*/
+/*-------------------
+   Flyout
 --------------------*/
 /* Component's site.variables */
 /*******************************
@@ -36802,6 +36903,12 @@ a.ui.card:hover,
 /*-------------------
    Editor
 --------------------*/
+/*-------------------
+   Blockly
+--------------------*/
+/*-------------------
+   Flyout
+--------------------*/
 /* Component's site.variables */
 /*******************************
          Site Settings
@@ -37502,6 +37609,12 @@ body.dimmable > .dimmer {
 --------------------*/
 /*-------------------
    Editor
+--------------------*/
+/*-------------------
+   Blockly
+--------------------*/
+/*-------------------
+   Flyout
 --------------------*/
 /* Component's site.variables */
 /*******************************
@@ -39371,6 +39484,12 @@ select.ui.dropdown {
 /*-------------------
    Editor
 --------------------*/
+/*-------------------
+   Blockly
+--------------------*/
+/*-------------------
+   Flyout
+--------------------*/
 /* Component's site.variables */
 /*******************************
          Site Settings
@@ -40055,6 +40174,12 @@ select.ui.dropdown {
 /*-------------------
    Editor
 --------------------*/
+/*-------------------
+   Blockly
+--------------------*/
+/*-------------------
+   Flyout
+--------------------*/
 /* Component's site.variables */
 /*******************************
      User Global Variables
@@ -40092,6 +40217,12 @@ select.ui.dropdown {
 --------------------*/
 /*-------------------
    Editor
+--------------------*/
+/*-------------------
+   Blockly
+--------------------*/
+/*-------------------
+   Flyout
 --------------------*/
 /* Site theme site.variables */
 /*******************************
@@ -40874,6 +41005,12 @@ select.ui.dropdown {
 /*-------------------
    Editor
 --------------------*/
+/*-------------------
+   Blockly
+--------------------*/
+/*-------------------
+   Flyout
+--------------------*/
 /* Component's site.variables */
 /*******************************
          Site Settings
@@ -41552,6 +41689,12 @@ a.ui.nag {
 --------------------*/
 /*-------------------
    Editor
+--------------------*/
+/*-------------------
+   Blockly
+--------------------*/
+/*-------------------
+   Flyout
 --------------------*/
 /* Component's site.variables */
 /*******************************
@@ -42756,6 +42899,12 @@ a.ui.nag {
 /*-------------------
    Editor
 --------------------*/
+/*-------------------
+   Blockly
+--------------------*/
+/*-------------------
+   Flyout
+--------------------*/
 /* Component's site.variables */
 /*******************************
          Site Settings
@@ -43382,12 +43531,10 @@ a.ui.nag {
   background-color: #D9E778;
 }
 /* Green */
-.ui.green.progress .bar,
-.ui.ui.button.getting-started-btn.progress .bar {
+.ui.green.progress .bar {
   background-color: #4CAF50;
 }
-.ui.green.inverted.progress .bar,
-.ui.ui.button.getting-started-btn.inverted.progress .bar {
+.ui.green.inverted.progress .bar {
   background-color: #00E676;
 }
 /* Teal */
@@ -43433,12 +43580,10 @@ a.ui.nag {
   background-color: #D67C1C;
 }
 /* Grey */
-.ui.grey.progress .bar,
-.ui.ui.button.editortools-btn.progress .bar {
+.ui.grey.progress .bar {
   background-color: #9E9E9E;
 }
-.ui.grey.inverted.progress .bar,
-.ui.ui.button.editortools-btn.inverted.progress .bar {
+.ui.grey.inverted.progress .bar {
   background-color: #DCDDDE;
 }
 /* Black */
@@ -43757,6 +43902,12 @@ a.ui.nag {
 --------------------*/
 /*-------------------
    Editor
+--------------------*/
+/*-------------------
+   Blockly
+--------------------*/
+/*-------------------
+   Flyout
 --------------------*/
 /* Component's site.variables */
 /*******************************
@@ -44512,6 +44663,12 @@ a.ui.nag {
 --------------------*/
 /*-------------------
    Editor
+--------------------*/
+/*-------------------
+   Blockly
+--------------------*/
+/*-------------------
+   Flyout
 --------------------*/
 /* Component's site.variables */
 /*******************************
@@ -45427,6 +45584,12 @@ a.ui.nag {
 /*-------------------
    Editor
 --------------------*/
+/*-------------------
+   Blockly
+--------------------*/
+/*-------------------
+   Flyout
+--------------------*/
 /* Component's site.variables */
 /*******************************
          Site Settings
@@ -46078,6 +46241,12 @@ a.ui.nag {
 --------------------*/
 /*-------------------
    Editor
+--------------------*/
+/*-------------------
+   Blockly
+--------------------*/
+/*-------------------
+   Flyout
 --------------------*/
 /* Component's site.variables */
 /*******************************
@@ -47091,6 +47260,12 @@ html.ios body {
 /*-------------------
    Editor
 --------------------*/
+/*-------------------
+   Blockly
+--------------------*/
+/*-------------------
+   Flyout
+--------------------*/
 /* Component's site.variables */
 /*******************************
          Site Settings
@@ -47672,6 +47847,12 @@ html.ios body {
 --------------------*/
 /*-------------------
    Editor
+--------------------*/
+/*-------------------
+   Blockly
+--------------------*/
+/*-------------------
+   Flyout
 --------------------*/
 /* Component's site.variables */
 /*******************************
@@ -48270,6 +48451,12 @@ html.ios body {
 --------------------*/
 /*-------------------
    Editor
+--------------------*/
+/*-------------------
+   Blockly
+--------------------*/
+/*-------------------
+   Flyout
 --------------------*/
 /* Component's site.variables */
 /*******************************
@@ -49477,22 +49664,33 @@ html.ios body {
 /* Collections */
 /* Views */
 /* Modules */
+/* Import all components */
 /* Reference import */
 /*******************************
              Layout
 *******************************/
+html,
+body {
+  min-width: 320px;
+}
 /* Main Layout */
 #filelist,
 #maineditor,
 #sidedocs {
   position: absolute;
-  top: 4.5rem;
   bottom: 0rem;
+}
+#filelist,
+#maineditor,
+#sidedocs,
+#getting-started-btn {
+  top: 4.5rem;
 }
 .hideMenuBar #filelist,
 .hideMenuBar #maineditor,
-.hideMenuBar #sidedocs {
-  top: 0;
+.hideMenuBar #sidedocs,
+.hideMenuBar #getting-started-btn {
+  top: 0 !important;
 }
 .full-abs {
   position: absolute !important;
@@ -49507,9 +49705,28 @@ html.ios body {
   right: 0;
   overflow: visible;
 }
-.rtl #maineditor {
+/* Editor tools */
+#editortools {
+  position: fixed;
+  top: auto;
+  bottom: 0;
   left: 0;
-  right: 27rem;
+  right: 0;
+  z-index: 12;
+  height: 4.7rem;
+  background-color: #607D8B;
+}
+#blocksArea,
+#monacoEditor,
+#pxtJsonEditor,
+#filelist {
+  bottom: 4.7rem;
+}
+.hideEditorToolbar #blocksArea,
+.hideEditorToolbar #monacoEditor,
+.hideEditorToolbar #pxtJsonEditor,
+.hideEditorToolbar #filelist {
+  bottom: 0rem !important;
 }
 /* File list / Simulator layout */
 #simulator {
@@ -49520,10 +49737,6 @@ html.ios body {
   min-width: 27rem;
   max-width: 27rem;
   left: 0;
-}
-.rtl #filelist {
-  left: auto;
-  right: 0;
 }
 #filelist {
   padding: 1em 2em 1em 2em;
@@ -49571,106 +49784,13 @@ html.ios body {
   display: none;
   z-index: 9;
   position: absolute;
-  top: 4.5rem;
   right: 2rem;
-}
-.rtl #getting-started-btn {
-  right: auto;
-  left: 2rem;
 }
 #getting-started-btn:not(.sideDocs) {
   display: block;
 }
 .ui.button.getting-started-btn .ui.text {
   font-weight: 100 !important;
-}
-/* Side Docs layout */
-#sidedocs {
-  display: none;
-  overflow-y: auto;
-  right: 0;
-  border: none;
-  top: 0;
-  padding-top: 4.5rem;
-  height: 100%;
-}
-.rtl #sidedocs {
-  right: auto;
-  left: 0;
-}
-#sidedocspopout {
-  position: absolute;
-  top: 5.5rem;
-  right: 4.25rem;
-  display: none;
-}
-.rtl #sidedocspopout {
-  right: auto;
-  left: 4.25rem;
-}
-#sidedocsexpand {
-  position: absolute;
-  top: 5.5rem;
-  right: 1.25rem;
-  display: none;
-}
-.rtl #sidedocsexpand {
-  right: auto;
-  left: 1.25rem;
-}
-/* Tutorial Mode */
-.tutorial-menuitem > .selected {
-  background-color: #2196F3 !important;
-  padding: 1.3rem !important;
-  padding-left: 1.5rem !important;
-  padding-right: 1.5rem !important;
-}
-#tutorialcard {
-  position: absolute;
-  z-index: 9;
-  min-width: 320px;
-}
-#tutorialcard.top {
-  /* top right */
-  top: 1rem;
-  right: 1rem;
-}
-.rtl #tutorialcard.top {
-  /* bottom left */
-  right: auto;
-  left: 1rem;
-}
-#tutorialcard.bottom {
-  /* bottom right */
-  bottom: 6rem;
-  right: 1rem;
-}
-.rtl #tutorialcard.bottom {
-  /* bottom left */
-  right: auto;
-  left: 1rem;
-}
-#tutorialcard .ui.card {
-  padding: 2px;
-}
-#tutorialcontent {
-  display: block;
-  width: 100%;
-  overflow: hidden;
-  border: none;
-  height: 100%;
-}
-body#docs.tutorial {
-  overflow-y: hidden;
-}
-#docs.tutorial .ui.segment {
-  padding: 0;
-  margin: 0;
-  box-shadow: none;
-  border: none;
-}
-#docs.tutorial #content {
-  margin-bottom: 0.5rem !important;
 }
 /* Cookie Message */
 #cookiemsg {
@@ -49684,11 +49804,6 @@ body#docs.tutorial {
 #cookiemsg > a {
   color: white;
   text-decoration: underline;
-}
-.rtl #cookiemsg {
-  right: auto;
-  left: 2rem;
-  text-align: right;
 }
 .collapsedEditorTools #cookiemsg {
   bottom: 6rem;
@@ -49714,29 +49829,28 @@ div.simframe > iframe {
   width: 0 !important;
 }
 /* Menu */
-.ui.menu .item.editor-menuitem {
+#menubar .ui.menu .item.editor-menuitem {
   background: rgba(27, 28, 29, 0.3) !important;
-  margin: 0.5rem;
-  padding: 0.7rem;
+  margin: calc(0.45rem);
+  padding: calc(0.45rem);
   border-radius: 0.5rem !important;
 }
-.sandbox .ui.menu.fixed .item:first-child {
-  border-radius: 0.5rem !important;
+.ui.menu.fixed .item.editor-menuitem .item {
+  border-radius: 0px !important;
 }
-.ui.menu.fixed .item.blocks-menuitem,
-.ui.menu.fixed .item.javascript-menuitem {
-  border-radius: 0.2rem !important;
+.ui.inverted.menu.fixed .item.editor-menuitem :first-child {
+  border-top-left-radius: 0.2rem !important;
+  border-bottom-left-radius: 0.2rem !important;
 }
-.ui.inverted.menu .item.blocks-menuitem {
-  border-top-right-radius: 0px !important;
-  border-bottom-right-radius: 0px !important;
+.ui.inverted.menu.fixed .item.editor-menuitem :first-child[style*="display:none"] + .ui.inverted.menu.fixed .item.editor-menuitem :not([style*="display:none"]) {
+  border-top-left-radius: 0.2rem !important;
+  border-bottom-left-radius: 0.2rem !important;
 }
-.ui.inverted.menu .item.javascript-menuitem {
-  border-top-left-radius: 0px !important;
-  border-bottom-left-radius: 0px !important;
+.ui.inverted.menu.fixed .item.editor-menuitem :last-child {
+  border-top-right-radius: 0.2rem !important;
+  border-bottom-right-radius: 0.2rem !important;
 }
-.ui.inverted.menu .item.blocks-menuitem,
-.ui.inverted.menu .item.javascript-menuitem {
+.ui.inverted.menu .item.editor-menuitem .item {
   -webkit-transition: background 1s;
   /* Safari */
   -moz-transition: background 1s;
@@ -49748,23 +49862,6 @@ div.simframe > iframe {
   transition: background 1s;
   transition-timing-function: ease-in;
 }
-/* Editor tools */
-#editortools {
-  position: fixed;
-  top: auto;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  z-index: 3;
-  height: 5rem;
-  background-color: #607D8B;
-}
-#blocksArea,
-#monacoEditor,
-#pxtJsonEditor,
-#filelist {
-  bottom: 5rem !important;
-}
 /* Help card */
 #helpcard {
   position: absolute;
@@ -49774,9 +49871,13 @@ div.simframe > iframe {
   z-index: 5;
   font-size: 0.8rem;
 }
-.rtl #helpcard {
-  left: 7rem;
-  right: auto;
+/* Project code cards */
+.ui.cardimage {
+  background-color: #9E9E9E;
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-position: center;
+  height: 10rem;
 }
 /* Logo */
 .ui.menu .ui.item.logo {
@@ -49807,14 +49908,12 @@ div.simframe > iframe {
 .sandboxfooter {
   position: absolute;
   bottom: 0rem;
-  right: 1rem;
-  z-index: 5;
-  font-size: 0.7rem;
+  right: 0rem;
+  z-index: 100;
   margin-bottom: 0.2rem !important;
 }
-.rtl .sandboxfooter {
-  right: auto;
-  left: 1rem;
+.sandboxfooter .item {
+  font-size: 0.8rem !important;
 }
 /* code card */
 .ui.card .image pre {
@@ -49857,6 +49956,15 @@ div.simframe > iframe {
   -webkit-box-shadow: 0 0 1px #ccc;
 }
 /* Button Colors */
+/* Icon and text */
+#content .ui.button > .icon-and-text {
+  margin-right: 4px;
+  margin-left: -2px;
+}
+/* Beta */
+.ui.label.betalabel {
+  padding: 0.3em;
+}
 /*******************************
              Docs
 *******************************/
@@ -49898,11 +50006,28 @@ h6 {
 /*******************************
              Blockly
 *******************************/
+/* Lower Z index for BlocklyWidgetDiv and grid picker tooltips */
+.blocklyWidgetDiv {
+  z-index: 105;
+}
+.blocklyGridPickerTooltip {
+  z-index: 106;
+}
+.blocklyGridPickerPadder {
+  box-shadow: 0px 0px 8px 1px;
+}
+/* Set Z index of the Blockly scrollbars to be beneath the BlocklyWidgetDiv */
+.blocklyScrollbarHorizontal,
+.blocklyScrollbarVertical {
+  z-index: 8 !important;
+}
 .blocklyTooltipDiv {
   border: none !important;
   box-shadow: none !important;
   background-color: transparent !important;
   opacity: 1 !important;
+  /* wrap the JS text inside a blockly Tooltip */
+  overflow-wrap: break-word;
 }
 .blocklyToolboxDiv,
 .monacoToolboxDiv {
@@ -49936,6 +50061,11 @@ text.blocklyText {
 } */
 span.blocklyTreeLabel {
   font-size: 1.25rem;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
 }
 .blocklyFlyoutButtonShadow {
   fill: none !important;
@@ -49944,12 +50074,28 @@ span.blocklyTreeLabel {
   fill: white !important;
   font-size: 1rem;
 }
+.blocklyFlyoutHeading .blocklyFlyoutLabelText {
+  fill: white !important;
+  font-size: 1.5rem;
+}
 .blocklyFlyoutLabelText:hover {
   fill: white !important;
 }
+.blocklyFlyoutLabelIcon {
+  font-family: 'Icons';
+  font-size: 1.5rem;
+}
+line.blocklyFlyoutLine {
+  stroke: white;
+}
 /* Opacity of blockly flyout background */
 .blocklyFlyoutBackground {
+  fill: #9E9E9E;
   fill-opacity: 0.9 !important;
+}
+div.blocklyTreeRow,
+span.blocklyTreeLabel {
+  cursor: pointer;
 }
 /* This horrendous selector and the next are for subcategories in the Blockly toolbox */
 div.blocklyTreeRoot div div div div div.blocklyTreeRow {
@@ -49962,16 +50108,15 @@ div.blocklyTreeRoot div div div div div.blocklyTreeRow span.blocklyTreeLabel {
 /* The trash icon inside the toolbox */
 #blocklyTrashIcon {
   position: absolute;
-  top: 20%;
-  margin-left: auto;
-  margin-right: auto;
+  top: 30%;
   left: 0;
-  right: 0;
+  text-align: center;
   width: 100px;
   height: 80px;
   z-index: 8;
   font-size: 5rem;
   color: #2196F3;
+  margin: 0.5rem;
 }
 /* Blockly / Monaco Toolbox Buttons */
 #blocklyToolboxButtons,
@@ -50000,6 +50145,7 @@ span.blocklyTreeIcon {
   -webkit-font-smoothing: antialiased;
   backface-visibility: hidden;
   font-size: 1.2rem;
+  height: 15px;
   display: none;
 }
 .blocklyTreeSelected .blocklyTreeIcon {
@@ -50011,8 +50157,11 @@ span.blocklyTreeIcon {
 .blocklyTreeIcon.blocklyTreeIconDefault::before {
   content: "\f12e";
 }
-.blocklyTreeIcon.blocklyTreeIconadvanced::before {
-  content: "\f141";
+.blocklyTreeIcon.blocklyTreeIconadvancedcollapsed::before {
+  content: "\f078";
+}
+.blocklyTreeIcon.blocklyTreeIconadvancedexpanded::before {
+  content: "\f077";
 }
 .blocklyTreeIcon.blocklyTreeIconmore::before {
   content: "\f141";
@@ -50035,8 +50184,28 @@ span.blocklyTreeIcon {
 .blocklyTreeIcon.blocklyTreeIcontext::before {
   content: "\f035";
 }
-.blocklyTreeIcon.blocklyTreeIconlists::before {
+.blocklyTreeIcon.blocklyTreeIconarrays::before {
   content: "\f0cb";
+}
+.blocklyTreeIcon.blocklyTreeIconfunctions {
+  font-family: xicon !important;
+}
+.blocklyTreeIcon.blocklyTreeIconfunctions::before {
+  content: "\f107";
+}
+.blocklyFlyoutLabelIcon.blocklyFlyoutIconfunctions {
+  font-family: xicon !important;
+}
+/* Blockly Slider field */
+.blocklyWidgetDiv .goog-slider-horizontal {
+  background: white;
+  border: 2px solid black;
+  border-radius: 5px;
+}
+/* Fade out disabled blocks, but don't completely lose the colour */
+.blocklyDisabled > .blocklyPathDark {
+  display: block !important;
+  fill-opacity: 0.5;
 }
 /*******************************
         Monaco Editor
@@ -50050,37 +50219,33 @@ span.blocklyTreeIcon {
 }
 /* Monaco Editor Line number background, changed from the default light theme */
 .monaco-editor.vs .margin-view-overlays.monaco-editor-background {
-  background: rgba(0, 0, 0, 0.05);
+  background: rgba(0, 0, 0, 0.05) !important;
 }
 /* Monaco Editor Current line highlighting, only needed for the light theme */
 .monaco-editor.vs .current-line {
-  background: rgba(0, 0, 255, 0.1);
+  background: rgba(0, 0, 255, 0.1) !important;
 }
 /* Monaco Editor Suggest Widget, styling */
 .monaco-editor .suggest-widget {
   border-radius: 5px;
 }
 .monaco-list-row.focused {
-  background-color: #0078D7;
-  color: #fff;
+  background-color: #0078D7 !important;
+  color: #fff !important;
 }
 .monaco-editor.vs .suggest-widget:not(.frozen) .monaco-list .monaco-list-row .monaco-highlighted-label .highlight {
-  color: #0078D7;
+  color: #0078D7 !important;
 }
 .monaco-editor.vs .suggest-widget:not(.frozen) .monaco-list .monaco-list-row.focused .monaco-highlighted-label .highlight {
-  color: #fff;
+  color: #fff !important;
 }
 .monaco-editor.vs .suggest-widget .details > .monaco-scrollable-element > .body > .type,
 .monaco-editor .suggest-widget .monaco-list .monaco-list-row .type-label {
-  color: #FFB900;
-}
-.monaco-editor.vs .suggest-widget .details > .monaco-scrollable-element > .body > .docs,
-.monaco-editor .suggest-widget .monaco-list .monaco-list-row .docs {
-  color: #fff;
+  color: #FFB900 !important;
 }
 /* Monaco Editor Main tokens */
 .monaco-editor .highlight-statement {
-  background-color: #FFB900;
+  background-color: #FF8B27;
 }
 /* Monaco Toolbox */
 .monacoFlyout {
@@ -50091,8 +50256,33 @@ span.blocklyTreeIcon {
   border-top-right-radius: 8px;
   border-bottom-right-radius: 8px;
 }
-.monacoFlyout div {
-  margin: 1.1rem;
+.monacoFlyout > div {
+  margin: 1rem;
+}
+.monacoFlyoutLabel {
+  vertical-align: middle;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  -webkit-user-select: none;
+  user-select: none;
+  color: white;
+  font-size: 15px;
+}
+.monacoFlyoutHeading {
+  padding-bottom: 0.4rem;
+}
+.monacoFlyoutHeading .monacoFlyoutHeadingText {
+  color: white;
+}
+.monacoFlyoutHeadingIcon {
+  vertical-align: middle !important;
+  font-size: 1.5rem !important;
+  margin: -0.7em 0.2em 0em 0.5em !important;
+}
+.monacoFlyoutLabelLine {
+  border: none;
+  border-top: 1px dotted white;
+  height: 1px;
 }
 .monacoDraggableBlock {
   color: #FFFFFF;
@@ -50100,6 +50290,7 @@ span.blocklyTreeIcon {
   border-radius: 8px;
   border: solid 3px #FFFFFF;
   cursor: pointer;
+  display: inline-block;
   -moz-user-select: none;
   -ms-user-select: none;
   -webkit-user-select: none;
@@ -50124,18 +50315,30 @@ Avatar
 .avatar {
   position: relative;
 }
-#root .avatar .message {
+#docs .avatar .message {
   margin-left: 4em;
   margin-bottom: 1em;
 }
-.avatar .avatar-image {
-  position: absolute;
-  left: 0;
-  top: 1em;
-  width: 3em;
-  height: 3em;
-  background-size: contain;
-  background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20128%20128%22%20preserveAspectRatio%3D%22xMinYMin%22%20width%3D%2235%22%20height%3D%2235%22%3E%0A%20%20%20%3Cpath%20fill%3D%22%23ff7d00%22%20d%3D%22M%200%2C0L%20128%2C0L%20128%2C128L%200%2C128L%200%2C0%20Z%22%2F%3E%0A%20%20%20%3Cpath%20fill%3D%22%23ffffff%22%20d%3D%22M%2051.985%2C58.1691C%2051.985%2C59.6357%2051.4567%2C60.8842%2050.3998%2C61.9164C%2049.3429%2C62.9477%2048.0762%2C63.4634%2046.5998%2C63.4634C%2045.1232%2C63.4634%2043.8713%2C62.9477%2042.8447%2C61.9164C%2041.8185%2C60.8842%2041.305%2C59.6357%2041.305%2C58.1691C%2041.305%2C56.6723%2041.8185%2C55.4001%2042.8447%2C54.3539C%2043.8713%2C53.307%2045.1232%2C52.784%2046.5998%2C52.784C%2048.0762%2C52.784%2049.3429%2C53.307%2050.3998%2C54.3539C%2051.4567%2C55.4001%2051.985%2C56.6723%2051.985%2C58.1691%20Z%20M%2085.7388%2C58.1693C%2085.7388%2C59.6359%2085.2105%2C60.8852%2084.1536%2C61.9166C%2083.0969%2C62.9487%2081.8301%2C63.4636%2080.3536%2C63.4636C%2078.8771%2C63.4636%2077.6252%2C62.9487%2076.5986%2C61.9166C%2075.5724%2C60.8852%2075.0589%2C59.6359%2075.0589%2C58.1693C%2075.0589%2C56.6732%2075.5724%2C55.401%2076.5986%2C54.3549C%2077.6252%2C53.308%2078.8771%2C52.7841%2080.3536%2C52.7841C%2081.8301%2C52.7841%2083.0969%2C53.308%2084.1536%2C54.3549C%2085.2105%2C55.401%2085.7388%2C56.6732%2085.7388%2C58.1693%20Z%20M%2035.7868%2C96.2088C%2033.7134%2C96.2018%2031.755%2C95.75%2030.0008%2C94.9148C%2025.1335%2C93.0967%2022.6999%2C89.0302%2022.6999%2C82.715L%2022.6999%2C69.8285C%2022.6999%2C64.0491%2020.2045%2C61.0169%2015.2137%2C60.7321L%2015.2137%2C55.4396C%2020.2045%2C55.1548%2022.6999%2C52.0629%2022.6999%2C46.1641L%2022.6999%2C33.6357C%2022.6999%2C25.9603%2026.1988%2C21.5623%2033.1965%2C20.4417C%2034.3478%2C20.1696%2035.5564%2C20.0414%2036.7986%2C20.0749L%2044.4647%2C20.0749L%2050.7208%2C20.1307L%2055.0306%2C20.1985L%2056.4995%2C20.2541L%2057.025%2C20.2541L%2057.3948%2C20.3219L%2057.9201%2C20.5008L%2058.1827%2C20.68L%2058.5421%2C20.9824L%2059.1264%2C21.7108L%2059.4374%2C23.2233L%2059.4374%2C23.6493L%2059.3302%2C24.1307L%2058.7566%2C25.5198L%2057.9685%2C27.5136L%2056.3441%2C31.3225L%2056.2851%2C31.5137L%2056.2369%2C31.6251C%2056.2453%2C31.6081%2056.0141%2C32.7599%2056.4407%2C33.9893C%2056.8758%2C35.2186%2057.7309%2C36.4649%2059.1264%2C37.1932C%2060.6856%2C37.9966%2060.7676%2C38.2798%2063.4848%2C38.1007L%2063.5333%2C38.1007C%2065.0525%2C38.0256%2065.702%2C37.6845%2066.0632%2C37.4401L%2067.1141%2C36.4091C%2067.86%2C35.7%2068.2046%2C33.2246%2067.8433%2C32.2302L%2067.8433%2C32.1745L%2065.0127%2C23.8838L%2064.7982%2C23.3465L%2064.7982%2C22.7974L%2065.0127%2C21.7108L%2065.3719%2C20.9824L%2065.7419%2C20.5564L%2066.0632%2C20.3219L%2066.6854%2C20.0193L%2067.1141%2C19.8959L%2067.5805%2C19.8281L%2068.6314%2C19.8281L%2071.6764%2C19.8281L%2074.6729%2C19.8959L%2075.7238%2C19.8959L%2076.0936%2C19.8959L%2091.0665%2C19.8959L%2094.2441%2C20.259C%20100.977%2C21.4657%20104.344%2C25.7827%20104.344%2C33.2102L%20104.344%2C46.0969C%20104.344%2C51.8763%20106.839%2C54.9084%20111.83%2C55.1932L%20111.83%2C60.4857C%20106.839%2C60.7705%20104.344%2C63.8624%20104.344%2C69.7612L%20104.344%2C82.2894C%20104.344%2C89.4443%20101.303%2C93.7511%2095.2228%2C95.2102L%2092.0735%2C96.0279L%2072.0893%2C95.9722L%2073.617%2C100.33L%2073.617%2C100.386C%2074.9137%2C104.035%2074.2896%2C108.505%2071.3601%2C111.276L%2071.3012%2C111.331L%2071.1941%2C111.455C%2071.8604%2C110.944%2070.8411%2C111.956%2069.7252%2C112.732C%2068.6262%2C113.487%2067.0416%2C114.121%2064.8415%2C114.245C%2061.5421%2C114.443%2059.6299%2C113.591%2058.1672%2C112.843L%2058.1188%2C112.788C%2055.4751%2C111.389%2053.7352%2C108.989%2052.8653%2C106.491C%2052.0183%2C104.081%2051.8545%2C101.577%2052.9135%2C99.2995L%2052.9725%2C99.0528L%2054.0714%2C96.3303L%2035.7868%2C96.2088%20Z%20M%2050.5712%2C90.4492L%2056.1247%2C90.528L%2057.5936%2C90.5837L%2058.1191%2C90.5837L%2058.4888%2C90.6513L%2059.0142%2C90.8304L%2059.2769%2C91.0096L%2059.6363%2C91.3119L%2060.2205%2C92.0403L%2060.5316%2C93.5529L%2060.5316%2C93.9788L%2060.4244%2C94.4603L%2059.8507%2C95.8493L%2059.0626%2C97.8432L%2057.4381%2C101.652L%2057.3792%2C101.843L%2057.331%2C101.955C%2057.3395%2C101.938%2057.1082%2C103.089%2057.5349%2C104.319C%2057.9698%2C105.548%2058.8251%2C106.794%2060.2205%2C107.523C%2061.7798%2C108.326%2061.8618%2C108.609%2064.5788%2C108.43L%2064.6273%2C108.43C%2066.1467%2C108.355%2066.796%2C108.014%2067.1574%2C107.77L%2068.2081%2C106.739C%2068.9542%2C106.03%2069.2988%2C103.554%2068.9373%2C102.56L%2068.9373%2C102.504L%2066.1067%2C94.2134L%2065.8923%2C93.6762L%2065.8923%2C93.1269L%2066.1067%2C92.0403L%2066.466%2C91.3119L%2066.8359%2C90.886L%2067.1574%2C90.6513L%2067.7794%2C90.3488L%2068.2081%2C90.2254L%2068.6747%2C90.1577L%2069.7254%2C90.1577L%2072.7704%2C90.1577L%2090.9482%2C90.2254C%2092.3861%2C90.1718%2093.6567%2C89.8274%2094.7279%2C89.2805C%2096.7717%2C87.94%2097.7934%2C85.4766%2097.7934%2C81.8899L%2097.7934%2C69.1688C%2097.7934%2C63.0954%20100.103%2C59.365%20104.724%2C57.9775L%20104.724%2C57.7983C%20100.103%2C56.5028%2097.7934%2C52.809%2097.7934%2C46.7172L%2097.7934%2C34.2027C%2097.7934%2C31.0053%2097.2352%2C28.7197%2096.1193%2C27.346L%2095.7772%2C26.9707C%2094.4815%2C26.1881%2092.8576%2C25.6986%2091.067%2C25.6986L%2071.6284%2C25.643L%2070.9958%2C25.643L%2072.5236%2C30.0012L%2072.5236%2C30.057C%2073.8201%2C33.706%2073.196%2C38.1755%2070.2666%2C40.9464L%2070.2076%2C41.002L%2070.1006%2C41.1255C%2070.7668%2C40.6149%2069.7476%2C41.6263%2068.6316%2C42.403C%2067.5327%2C43.1581%2065.9481%2C43.7921%2063.7479%2C43.9155C%2060.4486%2C44.1139%2058.5363%2C43.2621%2057.0737%2C42.5144L%2057.0253%2C42.4587C%2054.3817%2C41.0599%2052.6418%2C38.6596%2051.7718%2C36.1622C%2050.9249%2C33.752%2050.761%2C31.2474%2051.82%2C28.9703L%2051.8789%2C28.7235L%2052.9779%2C26.0012L%2050.6623%2C25.9456L%2044.4651%2C25.8778L%2036.6917%2C25.8778C%2034.7627%2C25.8178%2033.1042%2C26.2681%2031.7849%2C27.0379C%2030.0955%2C28.4421%2029.2508%2C30.7746%2029.2508%2C34.0356L%2029.2508%2C46.7569C%2029.2508%2C52.8304%2026.9405%2C56.5608%2022.32%2C57.9482L%2022.32%2C58.1275C%2026.9405%2C59.423%2029.2508%2C63.1166%2029.2508%2C69.2083L%2029.2508%2C81.7229C%2029.2508%2C84.9205%2029.8088%2C87.2059%2030.9249%2C88.5796L%2032.2888%2C89.719C%2033.3447%2C90.1529%2034.5474%2C90.4065%2035.8363%2C90.4065L%2050.5712%2C90.4492%20Z%22%2F%3E%0A%3C%2Fsvg%3E%0A");
+#docs code.lang-typescript {
+  overflow-wrap: break-word;
+}
+@media only screen {
+  .avatar .avatar-image {
+    position: absolute;
+    left: 0;
+    top: 1em;
+    width: 3em;
+    height: 3em;
+    background-size: contain;
+    background-image: url("data:image/svg+xml,%3C%3Fxml%20version%3D%221.0%22%20encoding%3D%22UTF-8%22%20standalone%3D%22no%22%3F%3E%0A%3C!--%20Generator%3A%20Adobe%20Illustrator%2021.0.2%2C%20SVG%20Export%20Plug-In%20.%20SVG%20Version%3A%206.00%20Build%200)%20%20--%3E%0A%0A%3Csvg%0A%20%20%20xmlns%3Adc%3D%22http%3A%2F%2Fpurl.org%2Fdc%2Felements%2F1.1%2F%22%0A%20%20%20xmlns%3Acc%3D%22http%3A%2F%2Fcreativecommons.org%2Fns%23%22%0A%20%20%20xmlns%3Ardf%3D%22http%3A%2F%2Fwww.w3.org%2F1999%2F02%2F22-rdf-syntax-ns%23%22%0A%20%20%20xmlns%3Asvg%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%0A%20%20%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%0A%20%20%20xmlns%3Asodipodi%3D%22http%3A%2F%2Fsodipodi.sourceforge.net%2FDTD%2Fsodipodi-0.dtd%22%0A%20%20%20xmlns%3Ainkscape%3D%22http%3A%2F%2Fwww.inkscape.org%2Fnamespaces%2Finkscape%22%0A%20%20%20version%3D%221.1%22%0A%20%20%20x%3D%220px%22%0A%20%20%20y%3D%220px%22%0A%20%20%20viewBox%3D%220%200%2032%2032%22%0A%20%20%20style%3D%22enable-background%3Anew%200%200%2032%2032%3B%22%0A%20%20%20xml%3Aspace%3D%22preserve%22%0A%20%20%20id%3D%22svg2%22%0A%20%20%20inkscape%3Aversion%3D%220.91%20r13725%22%0A%20%20%20sodipodi%3Adocname%3D%22avatar.svg%22%3E%3Cmetadata%0A%20%20%20%20%20id%3D%22metadata19%22%3E%3Crdf%3ARDF%3E%3Ccc%3AWork%0A%20%20%20%20%20%20%20%20%20rdf%3Aabout%3D%22%22%3E%3Cdc%3Aformat%3Eimage%2Fsvg%2Bxml%3C%2Fdc%3Aformat%3E%3Cdc%3Atype%0A%20%20%20%20%20%20%20%20%20%20%20rdf%3Aresource%3D%22http%3A%2F%2Fpurl.org%2Fdc%2Fdcmitype%2FStillImage%22%20%2F%3E%3Cdc%3Atitle%3E%3C%2Fdc%3Atitle%3E%3C%2Fcc%3AWork%3E%3C%2Frdf%3ARDF%3E%3C%2Fmetadata%3E%3Cdefs%0A%20%20%20%20%20id%3D%22defs17%22%20%2F%3E%3Csodipodi%3Anamedview%0A%20%20%20%20%20pagecolor%3D%22%23ffffff%22%0A%20%20%20%20%20bordercolor%3D%22%23666666%22%0A%20%20%20%20%20borderopacity%3D%221%22%0A%20%20%20%20%20objecttolerance%3D%2210%22%0A%20%20%20%20%20gridtolerance%3D%2210%22%0A%20%20%20%20%20guidetolerance%3D%2210%22%0A%20%20%20%20%20inkscape%3Apageopacity%3D%220%22%0A%20%20%20%20%20inkscape%3Apageshadow%3D%222%22%0A%20%20%20%20%20inkscape%3Awindow-width%3D%22997%22%0A%20%20%20%20%20inkscape%3Awindow-height%3D%22661%22%0A%20%20%20%20%20id%3D%22namedview15%22%0A%20%20%20%20%20showgrid%3D%22false%22%0A%20%20%20%20%20inkscape%3Azoom%3D%225.2149125%22%0A%20%20%20%20%20inkscape%3Acx%3D%2216%22%0A%20%20%20%20%20inkscape%3Acy%3D%2216%22%0A%20%20%20%20%20inkscape%3Awindow-x%3D%220%22%0A%20%20%20%20%20inkscape%3Awindow-y%3D%220%22%0A%20%20%20%20%20inkscape%3Awindow-maximized%3D%220%22%0A%20%20%20%20%20inkscape%3Acurrent-layer%3D%22svg2%22%20%2F%3E%3Cstyle%0A%20%20%20%20%20type%3D%22text%2Fcss%22%0A%20%20%20%20%20id%3D%22style4%22%3E%0A%09.icon_x002D_canvas_x002D_transparent%7Bopacity%3A0%3Bfill%3A%23F6F6F6%3B%7D%0A%09.st0%7Bfill%3A%23AA278F%3B%7D%0A%09.st1%7Bfill%3A%23FFFFFF%3B%7D%0A%3C%2Fstyle%3E%3Cg%0A%20%20%20%20%20id%3D%22canvas%22%3E%3Cpath%0A%20%20%20%20%20%20%20class%3D%22icon_x002D_canvas_x002D_transparent%22%0A%20%20%20%20%20%20%20d%3D%22M16-20H0v-16h16V-20z%20M32%2C0H0v32h32V0z%20M48%2C100H0V52h48V100z%20M64%2C184H0v-64%20%20%20h64V184z%20M116%2C32H84V0h32V32z%20M100-36H84v16h16V-36z%20M132%2C52H84v48h48V52z%20M148%2C120H84v64h64V120z%22%0A%20%20%20%20%20%20%20id%3D%22path7%22%20%2F%3E%3C%2Fg%3E%3Cg%0A%20%20%20%20%20id%3D%22iconBg%22%3E%3Cpath%0A%20%20%20%20%20%20%20class%3D%22st0%22%0A%20%20%20%20%20%20%20d%3D%22m%2032%2C15.994%200%2C-0.005%200%2C-0.006%20c%200%2C-0.108%20-0.005%2C-0.209%20-0.016%2C-0.303%20l%20-0.001%2C0%20C%2031.951%2C15.395%2031.871%2C15.176%2031.744%2C15.024%2031.573%2C14.82%2031.285%2C14.589%2030.88%2C14.333%2030.474%2C14.077%2030.145%2C13.801%2029.894%2C13.506%2029.642%2C13.21%2029.452%2C12.772%2029.324%2C12.19%2029.275%2C11.963%2029.237%2C11.471%2029.212%2C10.717%20l%200%2C-2.021%20c%200%2C-0.38%20-0.031%2C-0.723%20-0.076%2C-1.049%20C%2029.135%2C7.584%2029.134%2C7.524%2029.132%2C7.459%2029.123%2C6.677%2028.952%2C5.984%2028.619%2C5.381%2028.286%2C4.777%2027.814%2C4.31%2027.203%2C3.98%2026.592%2C3.65%2025.898%2C3.485%2025.122%2C3.485%20l%20-18.846%2C0%20-0.005%2C0%20c%200%2C0%20-0.674%2C0.067%20-0.962%2C0.201%20C%205.125%2C3.771%204.954%2C3.872%204.788%2C3.981%204.496%2C4.14%204.229%2C4.334%203.99%2C4.571%203.297%2C5.259%202.929%2C6.172%202.877%2C7.305%202.821%2C7.703%202.789%2C8.128%202.789%2C8.588%20l%200%2C2.558%20c%20-0.019%2C0.495%20-0.079%2C0.953%20-0.183%2C1.373%20-0.104%2C0.419%20-0.282%2C0.762%20-0.532%2C1.033%20-0.071%2C0.062%20-0.138%2C0.127%20-0.202%2C0.196%20-0.265%2C0.238%20-0.638%2C0.511%20-1.13%2C0.823%20-0.404%2C0.262%20-0.64%2C0.633%20-0.715%2C1.108%20l%200%2C0%20C%200.026%2C15.686%200.026%2C15.694%200.025%2C15.702%200.012%2C15.794%200.003%2C15.889%200.002%2C15.989%200.001%2C15.995%200%2C16%200%2C16.006%20l%200%2C0.005%200%2C0.006%20c%200%2C0.108%200.005%2C0.209%200.016%2C0.303%20l%200.001%2C0%20c%200.032%2C0.285%200.112%2C0.504%200.239%2C0.656%200.171%2C0.204%200.459%2C0.435%200.864%2C0.691%200.406%2C0.256%200.735%2C0.532%200.986%2C0.827%200.252%2C0.296%200.442%2C0.734%200.57%2C1.316%200.049%2C0.227%200.087%2C0.719%200.112%2C1.473%20l%200%2C2.019%20c%200%2C0.38%200.031%2C0.723%200.076%2C1.049%200.001%2C0.063%200.002%2C0.123%200.004%2C0.188%200.009%2C0.782%200.18%2C1.475%200.513%2C2.078%200.333%2C0.604%200.805%2C1.071%201.416%2C1.401%200.611%2C0.33%201.305%2C0.495%202.081%2C0.495%20l%2018.852%2C0%20c%200.35%2C0%200.673%2C-0.067%200.961%2C-0.201%200.184%2C-0.085%200.356%2C-0.187%200.521%2C-0.296%200.291%2C-0.159%200.559%2C-0.353%200.798%2C-0.59%200.693%2C-0.688%201.061%2C-1.601%201.113%2C-2.734%200.056%2C-0.398%200.088%2C-0.823%200.088%2C-1.283%20l%200%2C-2.558%20c%200.019%2C-0.495%200.079%2C-0.953%200.183%2C-1.373%200.104%2C-0.419%200.282%2C-0.762%200.532%2C-1.033%200.071%2C-0.062%200.138%2C-0.127%200.202%2C-0.196%200.265%2C-0.238%200.638%2C-0.511%201.13%2C-0.823%200.404%2C-0.262%200.64%2C-0.633%200.715%2C-1.108%20l%200.002%2C0%20c%2010e-4%2C-0.007%2010e-4%2C-0.015%200.002%2C-0.023%20C%2031.99%2C16.203%2031.999%2C16.108%2032%2C16.008%2031.999%2C16.005%2032%2C16%2032%2C15.994%20Z%22%0A%20%20%20%20%20%20%20id%3D%22path10%22%0A%20%20%20%20%20%20%20inkscape%3Aconnector-curvature%3D%220%22%0A%20%20%20%20%20%20%20style%3D%22fill%3A%23aa278f%22%0A%20%20%20%20%20%20%20sodipodi%3Anodetypes%3D%22scscccccccscccssccccccscccccccccscscccccccscccsssccccscccccccccs%22%20%2F%3E%3C%2Fg%3E%3Cg%0A%20%20%20%20%20id%3D%22iconFg%22%3E%3Cpath%0A%20%20%20%20%20%20%20class%3D%22st1%22%0A%20%20%20%20%20%20%20d%3D%22m%2027.366%2C16.522%200.819%2C-0.518%20-0.821%2C-0.516%20c%20-0.382%2C-0.24%20-0.693%2C-0.49%20-0.927%2C-0.744%20-0.221%2C-0.241%20-0.408%2C-0.543%20-0.554%2C-0.896%20-0.153%2C-0.368%20-0.264%2C-0.819%20-0.328%2C-1.339%20-0.068%2C-0.551%20-0.103%2C-1.21%20-0.103%2C-1.961%200%2C-0.781%20-0.016%2C-1.365%20-0.05%2C-1.786%20C%2025.363%2C8.273%2025.279%2C7.91%2025.144%2C7.65%2024.98%2C7.335%2024.738%2C7.112%2024.426%2C6.989%2024.203%2C6.9%2023.899%2C6.835%2023.502%2C6.79%2023.361%2C6.771%2023.251%2C6.705%2023.146%2C6.577%2023.036%2C6.444%2022.981%2C6.233%2022.981%2C5.95%20c%200%2C-0.41%200.086%2C-0.811%201.121%2C-0.811%200.636%2C0%201.196%2C0.127%201.666%2C0.376%200.464%2C0.247%200.818%2C0.589%201.085%2C1.046%200.267%2C0.458%200.406%2C0.995%200.413%2C1.597%200.064%2C3.554%200.129%2C4.265%200.184%2C4.492%200.153%2C0.63%200.382%2C1.109%200.701%2C1.464%200.287%2C0.319%200.635%2C0.602%201.035%2C0.843%200.29%2C0.175%200.501%2C0.341%200.627%2C0.493%200.035%2C0.043%200.116%2C0.181%200.116%2C0.554%200%2C0.383%20-0.12%2C0.628%20-0.39%2C0.794%20-0.606%2C0.373%20-1.041%2C0.699%20-1.331%2C0.997%20-0.324%2C0.334%20-0.552%2C0.752%20-0.678%2C1.24%20-0.112%2C0.437%20-0.177%2C1.05%20-0.198%2C1.875%20-0.02%2C0.773%20-0.042%2C1.741%20-0.066%2C2.904%20-0.021%2C0.941%20-0.306%2C1.668%20-0.873%2C2.222%20-0.568%2C0.554%20-1.317%2C0.823%20-2.291%2C0.823%20-0.409%2C0%20-0.71%2C-0.077%20-0.895%2C-0.23%20-0.155%2C-0.128%20-0.226%2C-0.32%20-0.226%2C-0.604%200%2C-0.179%200.03%2C-0.336%200.093%2C-0.479%200.053%2C-0.122%200.117%2C-0.212%200.188%2C-0.268%200.068%2C-0.053%200.143%2C-0.082%200.24%2C-0.094%200.414%2C-0.055%200.725%2C-0.127%200.951%2C-0.219%200.317%2C-0.131%200.567%2C-0.378%200.723%2C-0.716%200.124%2C-0.269%200.2%2C-0.625%200.233%2C-1.089%200.029%2C-0.402%200.044%2C-0.968%200.044%2C-1.725%200.016%2C-1.061%200.077%2C-1.896%200.182%2C-2.481%200.095%2C-0.53%200.274%2C-0.987%200.533%2C-1.359%200.261%2C-0.375%200.665%2C-0.736%201.198%2C-1.073%20z%20m%20-16.618%2C6.519%2010.458%2C0%20c%200.415%2C0%200.751%2C-0.336%200.751%2C-0.751%20l%20-0.001%2C-3.709%20c%20-0.134%2C-0.449%20-0.518%2C-0.492%20-0.878%2C-0.15%20-0.033%2C0%20-0.393%2C0.443%20-1.22%2C0.443%20-0.988%2C-0.031%20-1.794%2C-0.763%20-1.944%2C-1.715%20l%20-0.011%2C0%20c%20-0.007%2C-0.07%20-0.007%2C-0.456%200%2C-0.526%20l%200.011%2C0%20c%200.15%2C-0.953%200.956%2C-1.685%201.944%2C-1.715%200.827%2C0%201.187%2C0.443%201.22%2C0.443%200.35%2C0.332%200.738%2C0.252%200.879%2C-0.147%20l%2010e-4%2C-3.432%20c%200%2C-0.349%20-0.239%2C-0.657%20-0.562%2C-0.741%20-0.061%2C0.016%20-3.259%2C0%20-3.259%2C0%20-0.786%2C0.065%20-1.063%2C-0.466%20-0.624%2C-0.928%200%2C-0.033%200.443%2C-0.393%200.443%2C-1.22%20C%2017.925%2C7.905%2017.193%2C7.099%2016.241%2C6.949%20l%200%2C-0.011%20c%20-0.07%2C-0.007%20-0.456%2C-0.007%20-0.526%2C0%20l%200%2C0.011%20C%2014.762%2C7.099%2014.03%2C7.905%2014%2C8.893%20c%200%2C0.827%200.443%2C1.187%200.443%2C1.22%200.439%2C0.462%200.254%2C0.97%20-0.624%2C0.928%200%2C0%20-3.198%2C0.016%20-3.259%2C0%20-0.323%2C0.084%20-0.562%2C0.393%20-0.562%2C0.741%20l%200%2C10.508%20c%20-10e-4%2C0.415%200.335%2C0.751%200.75%2C0.751%20z%20M%204.551%2C19.349%20c%200.055%2C0.227%200.12%2C0.938%200.184%2C4.492%200.007%2C0.602%200.146%2C1.138%200.413%2C1.597%200.267%2C0.458%200.622%2C0.8%201.085%2C1.046%200.47%2C0.25%201.03%2C0.376%201.666%2C0.376%201.035%2C0%201.121%2C-0.4%201.121%2C-0.811%200%2C-0.283%20-0.056%2C-0.493%20-0.165%2C-0.627%20C%208.749%2C25.294%208.639%2C25.228%208.499%2C25.209%208.102%2C25.164%207.798%2C25.099%207.574%2C25.01%207.262%2C24.886%207.021%2C24.664%206.856%2C24.349%206.721%2C24.09%206.637%2C23.726%206.598%2C23.237%206.565%2C22.816%206.548%2C22.232%206.548%2C21.451%206.548%2C20.7%206.513%2C20.041%206.445%2C19.49%206.38%2C18.97%206.27%2C18.52%206.116%2C18.151%205.969%2C17.797%205.783%2C17.495%205.562%2C17.255%205.329%2C17.001%205.017%2C16.751%204.635%2C16.511%20L%203.814%2C15.995%204.633%2C15.477%20C%205.166%2C15.14%205.569%2C14.779%205.832%2C14.402%206.091%2C14.03%206.27%2C13.573%206.365%2C13.043%206.47%2C12.458%206.531%2C11.624%206.547%2C10.562%206.547%2C9.805%206.561%2C9.239%206.591%2C8.837%206.624%2C8.373%206.7%2C8.017%206.824%2C7.748%206.98%2C7.411%207.23%2C7.164%207.547%2C7.033%207.773%2C6.941%208.084%2C6.87%208.498%2C6.814%208.595%2C6.802%208.67%2C6.773%208.738%2C6.72%208.81%2C6.665%208.874%2C6.575%208.927%2C6.453%208.989%2C6.31%209.02%2C6.154%209.02%2C5.974%209.02%2C5.69%208.948%2C5.498%208.794%2C5.37%208.608%2C5.217%208.307%2C5.14%207.899%2C5.14%206.925%2C5.14%206.176%2C5.409%205.608%2C5.963%205.041%2C6.517%204.756%2C7.244%204.735%2C8.185%204.711%2C9.348%204.69%2C10.316%204.67%2C11.089%20c%20-0.021%2C0.825%20-0.086%2C1.438%20-0.198%2C1.875%20-0.126%2C0.488%20-0.354%2C0.905%20-0.679%2C1.24%20-0.289%2C0.298%20-0.725%2C0.624%20-1.331%2C0.997%20-0.27%2C0.166%20-0.39%2C0.41%20-0.39%2C0.794%200%2C0.373%200.081%2C0.511%200.116%2C0.554%200.127%2C0.153%200.338%2C0.319%200.627%2C0.493%200.4%2C0.24%200.748%2C0.524%201.035%2C0.843%200.319%2C0.355%200.548%2C0.834%200.701%2C1.464%20z%22%0A%20%20%20%20%20%20%20id%3D%22path13%22%0A%20%20%20%20%20%20%20inkscape%3Aconnector-curvature%3D%220%22%0A%20%20%20%20%20%20%20style%3D%22fill%3A%23ffffff%22%0A%20%20%20%20%20%20%20sodipodi%3Anodetypes%3D%22ccccccscccccsscccccccsccccccscsccccccccccssccccccccccccccccccccccccscsccccsscccccscccccccccccccccscsccccccscccc%22%20%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E");
+  }
+}
+@media only print {
+  .avatar .avatar-image {
+    display: list-item;
+    list-style-image: url("data:image/svg+xml,%3C%3Fxml%20version%3D%221.0%22%20encoding%3D%22UTF-8%22%20standalone%3D%22no%22%3F%3E%0A%3C!--%20Generator%3A%20Adobe%20Illustrator%2021.0.2%2C%20SVG%20Export%20Plug-In%20.%20SVG%20Version%3A%206.00%20Build%200)%20%20--%3E%0A%0A%3Csvg%0A%20%20%20xmlns%3Adc%3D%22http%3A%2F%2Fpurl.org%2Fdc%2Felements%2F1.1%2F%22%0A%20%20%20xmlns%3Acc%3D%22http%3A%2F%2Fcreativecommons.org%2Fns%23%22%0A%20%20%20xmlns%3Ardf%3D%22http%3A%2F%2Fwww.w3.org%2F1999%2F02%2F22-rdf-syntax-ns%23%22%0A%20%20%20xmlns%3Asvg%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%0A%20%20%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%0A%20%20%20xmlns%3Asodipodi%3D%22http%3A%2F%2Fsodipodi.sourceforge.net%2FDTD%2Fsodipodi-0.dtd%22%0A%20%20%20xmlns%3Ainkscape%3D%22http%3A%2F%2Fwww.inkscape.org%2Fnamespaces%2Finkscape%22%0A%20%20%20version%3D%221.1%22%0A%20%20%20x%3D%220px%22%0A%20%20%20y%3D%220px%22%0A%20%20%20viewBox%3D%220%200%2032%2032%22%0A%20%20%20style%3D%22enable-background%3Anew%200%200%2032%2032%3B%22%0A%20%20%20xml%3Aspace%3D%22preserve%22%0A%20%20%20id%3D%22svg2%22%0A%20%20%20inkscape%3Aversion%3D%220.91%20r13725%22%0A%20%20%20sodipodi%3Adocname%3D%22avatar.svg%22%3E%3Cmetadata%0A%20%20%20%20%20id%3D%22metadata19%22%3E%3Crdf%3ARDF%3E%3Ccc%3AWork%0A%20%20%20%20%20%20%20%20%20rdf%3Aabout%3D%22%22%3E%3Cdc%3Aformat%3Eimage%2Fsvg%2Bxml%3C%2Fdc%3Aformat%3E%3Cdc%3Atype%0A%20%20%20%20%20%20%20%20%20%20%20rdf%3Aresource%3D%22http%3A%2F%2Fpurl.org%2Fdc%2Fdcmitype%2FStillImage%22%20%2F%3E%3Cdc%3Atitle%3E%3C%2Fdc%3Atitle%3E%3C%2Fcc%3AWork%3E%3C%2Frdf%3ARDF%3E%3C%2Fmetadata%3E%3Cdefs%0A%20%20%20%20%20id%3D%22defs17%22%20%2F%3E%3Csodipodi%3Anamedview%0A%20%20%20%20%20pagecolor%3D%22%23ffffff%22%0A%20%20%20%20%20bordercolor%3D%22%23666666%22%0A%20%20%20%20%20borderopacity%3D%221%22%0A%20%20%20%20%20objecttolerance%3D%2210%22%0A%20%20%20%20%20gridtolerance%3D%2210%22%0A%20%20%20%20%20guidetolerance%3D%2210%22%0A%20%20%20%20%20inkscape%3Apageopacity%3D%220%22%0A%20%20%20%20%20inkscape%3Apageshadow%3D%222%22%0A%20%20%20%20%20inkscape%3Awindow-width%3D%22997%22%0A%20%20%20%20%20inkscape%3Awindow-height%3D%22661%22%0A%20%20%20%20%20id%3D%22namedview15%22%0A%20%20%20%20%20showgrid%3D%22false%22%0A%20%20%20%20%20inkscape%3Azoom%3D%225.2149125%22%0A%20%20%20%20%20inkscape%3Acx%3D%2216%22%0A%20%20%20%20%20inkscape%3Acy%3D%2216%22%0A%20%20%20%20%20inkscape%3Awindow-x%3D%220%22%0A%20%20%20%20%20inkscape%3Awindow-y%3D%220%22%0A%20%20%20%20%20inkscape%3Awindow-maximized%3D%220%22%0A%20%20%20%20%20inkscape%3Acurrent-layer%3D%22svg2%22%20%2F%3E%3Cstyle%0A%20%20%20%20%20type%3D%22text%2Fcss%22%0A%20%20%20%20%20id%3D%22style4%22%3E%0A%09.icon_x002D_canvas_x002D_transparent%7Bopacity%3A0%3Bfill%3A%23F6F6F6%3B%7D%0A%09.st0%7Bfill%3A%23AA278F%3B%7D%0A%09.st1%7Bfill%3A%23FFFFFF%3B%7D%0A%3C%2Fstyle%3E%3Cg%0A%20%20%20%20%20id%3D%22canvas%22%3E%3Cpath%0A%20%20%20%20%20%20%20class%3D%22icon_x002D_canvas_x002D_transparent%22%0A%20%20%20%20%20%20%20d%3D%22M16-20H0v-16h16V-20z%20M32%2C0H0v32h32V0z%20M48%2C100H0V52h48V100z%20M64%2C184H0v-64%20%20%20h64V184z%20M116%2C32H84V0h32V32z%20M100-36H84v16h16V-36z%20M132%2C52H84v48h48V52z%20M148%2C120H84v64h64V120z%22%0A%20%20%20%20%20%20%20id%3D%22path7%22%20%2F%3E%3C%2Fg%3E%3Cg%0A%20%20%20%20%20id%3D%22iconBg%22%3E%3Cpath%0A%20%20%20%20%20%20%20class%3D%22st0%22%0A%20%20%20%20%20%20%20d%3D%22m%2032%2C15.994%200%2C-0.005%200%2C-0.006%20c%200%2C-0.108%20-0.005%2C-0.209%20-0.016%2C-0.303%20l%20-0.001%2C0%20C%2031.951%2C15.395%2031.871%2C15.176%2031.744%2C15.024%2031.573%2C14.82%2031.285%2C14.589%2030.88%2C14.333%2030.474%2C14.077%2030.145%2C13.801%2029.894%2C13.506%2029.642%2C13.21%2029.452%2C12.772%2029.324%2C12.19%2029.275%2C11.963%2029.237%2C11.471%2029.212%2C10.717%20l%200%2C-2.021%20c%200%2C-0.38%20-0.031%2C-0.723%20-0.076%2C-1.049%20C%2029.135%2C7.584%2029.134%2C7.524%2029.132%2C7.459%2029.123%2C6.677%2028.952%2C5.984%2028.619%2C5.381%2028.286%2C4.777%2027.814%2C4.31%2027.203%2C3.98%2026.592%2C3.65%2025.898%2C3.485%2025.122%2C3.485%20l%20-18.846%2C0%20-0.005%2C0%20c%200%2C0%20-0.674%2C0.067%20-0.962%2C0.201%20C%205.125%2C3.771%204.954%2C3.872%204.788%2C3.981%204.496%2C4.14%204.229%2C4.334%203.99%2C4.571%203.297%2C5.259%202.929%2C6.172%202.877%2C7.305%202.821%2C7.703%202.789%2C8.128%202.789%2C8.588%20l%200%2C2.558%20c%20-0.019%2C0.495%20-0.079%2C0.953%20-0.183%2C1.373%20-0.104%2C0.419%20-0.282%2C0.762%20-0.532%2C1.033%20-0.071%2C0.062%20-0.138%2C0.127%20-0.202%2C0.196%20-0.265%2C0.238%20-0.638%2C0.511%20-1.13%2C0.823%20-0.404%2C0.262%20-0.64%2C0.633%20-0.715%2C1.108%20l%200%2C0%20C%200.026%2C15.686%200.026%2C15.694%200.025%2C15.702%200.012%2C15.794%200.003%2C15.889%200.002%2C15.989%200.001%2C15.995%200%2C16%200%2C16.006%20l%200%2C0.005%200%2C0.006%20c%200%2C0.108%200.005%2C0.209%200.016%2C0.303%20l%200.001%2C0%20c%200.032%2C0.285%200.112%2C0.504%200.239%2C0.656%200.171%2C0.204%200.459%2C0.435%200.864%2C0.691%200.406%2C0.256%200.735%2C0.532%200.986%2C0.827%200.252%2C0.296%200.442%2C0.734%200.57%2C1.316%200.049%2C0.227%200.087%2C0.719%200.112%2C1.473%20l%200%2C2.019%20c%200%2C0.38%200.031%2C0.723%200.076%2C1.049%200.001%2C0.063%200.002%2C0.123%200.004%2C0.188%200.009%2C0.782%200.18%2C1.475%200.513%2C2.078%200.333%2C0.604%200.805%2C1.071%201.416%2C1.401%200.611%2C0.33%201.305%2C0.495%202.081%2C0.495%20l%2018.852%2C0%20c%200.35%2C0%200.673%2C-0.067%200.961%2C-0.201%200.184%2C-0.085%200.356%2C-0.187%200.521%2C-0.296%200.291%2C-0.159%200.559%2C-0.353%200.798%2C-0.59%200.693%2C-0.688%201.061%2C-1.601%201.113%2C-2.734%200.056%2C-0.398%200.088%2C-0.823%200.088%2C-1.283%20l%200%2C-2.558%20c%200.019%2C-0.495%200.079%2C-0.953%200.183%2C-1.373%200.104%2C-0.419%200.282%2C-0.762%200.532%2C-1.033%200.071%2C-0.062%200.138%2C-0.127%200.202%2C-0.196%200.265%2C-0.238%200.638%2C-0.511%201.13%2C-0.823%200.404%2C-0.262%200.64%2C-0.633%200.715%2C-1.108%20l%200.002%2C0%20c%2010e-4%2C-0.007%2010e-4%2C-0.015%200.002%2C-0.023%20C%2031.99%2C16.203%2031.999%2C16.108%2032%2C16.008%2031.999%2C16.005%2032%2C16%2032%2C15.994%20Z%22%0A%20%20%20%20%20%20%20id%3D%22path10%22%0A%20%20%20%20%20%20%20inkscape%3Aconnector-curvature%3D%220%22%0A%20%20%20%20%20%20%20style%3D%22fill%3A%23aa278f%22%0A%20%20%20%20%20%20%20sodipodi%3Anodetypes%3D%22scscccccccscccssccccccscccccccccscscccccccscccsssccccscccccccccs%22%20%2F%3E%3C%2Fg%3E%3Cg%0A%20%20%20%20%20id%3D%22iconFg%22%3E%3Cpath%0A%20%20%20%20%20%20%20class%3D%22st1%22%0A%20%20%20%20%20%20%20d%3D%22m%2027.366%2C16.522%200.819%2C-0.518%20-0.821%2C-0.516%20c%20-0.382%2C-0.24%20-0.693%2C-0.49%20-0.927%2C-0.744%20-0.221%2C-0.241%20-0.408%2C-0.543%20-0.554%2C-0.896%20-0.153%2C-0.368%20-0.264%2C-0.819%20-0.328%2C-1.339%20-0.068%2C-0.551%20-0.103%2C-1.21%20-0.103%2C-1.961%200%2C-0.781%20-0.016%2C-1.365%20-0.05%2C-1.786%20C%2025.363%2C8.273%2025.279%2C7.91%2025.144%2C7.65%2024.98%2C7.335%2024.738%2C7.112%2024.426%2C6.989%2024.203%2C6.9%2023.899%2C6.835%2023.502%2C6.79%2023.361%2C6.771%2023.251%2C6.705%2023.146%2C6.577%2023.036%2C6.444%2022.981%2C6.233%2022.981%2C5.95%20c%200%2C-0.41%200.086%2C-0.811%201.121%2C-0.811%200.636%2C0%201.196%2C0.127%201.666%2C0.376%200.464%2C0.247%200.818%2C0.589%201.085%2C1.046%200.267%2C0.458%200.406%2C0.995%200.413%2C1.597%200.064%2C3.554%200.129%2C4.265%200.184%2C4.492%200.153%2C0.63%200.382%2C1.109%200.701%2C1.464%200.287%2C0.319%200.635%2C0.602%201.035%2C0.843%200.29%2C0.175%200.501%2C0.341%200.627%2C0.493%200.035%2C0.043%200.116%2C0.181%200.116%2C0.554%200%2C0.383%20-0.12%2C0.628%20-0.39%2C0.794%20-0.606%2C0.373%20-1.041%2C0.699%20-1.331%2C0.997%20-0.324%2C0.334%20-0.552%2C0.752%20-0.678%2C1.24%20-0.112%2C0.437%20-0.177%2C1.05%20-0.198%2C1.875%20-0.02%2C0.773%20-0.042%2C1.741%20-0.066%2C2.904%20-0.021%2C0.941%20-0.306%2C1.668%20-0.873%2C2.222%20-0.568%2C0.554%20-1.317%2C0.823%20-2.291%2C0.823%20-0.409%2C0%20-0.71%2C-0.077%20-0.895%2C-0.23%20-0.155%2C-0.128%20-0.226%2C-0.32%20-0.226%2C-0.604%200%2C-0.179%200.03%2C-0.336%200.093%2C-0.479%200.053%2C-0.122%200.117%2C-0.212%200.188%2C-0.268%200.068%2C-0.053%200.143%2C-0.082%200.24%2C-0.094%200.414%2C-0.055%200.725%2C-0.127%200.951%2C-0.219%200.317%2C-0.131%200.567%2C-0.378%200.723%2C-0.716%200.124%2C-0.269%200.2%2C-0.625%200.233%2C-1.089%200.029%2C-0.402%200.044%2C-0.968%200.044%2C-1.725%200.016%2C-1.061%200.077%2C-1.896%200.182%2C-2.481%200.095%2C-0.53%200.274%2C-0.987%200.533%2C-1.359%200.261%2C-0.375%200.665%2C-0.736%201.198%2C-1.073%20z%20m%20-16.618%2C6.519%2010.458%2C0%20c%200.415%2C0%200.751%2C-0.336%200.751%2C-0.751%20l%20-0.001%2C-3.709%20c%20-0.134%2C-0.449%20-0.518%2C-0.492%20-0.878%2C-0.15%20-0.033%2C0%20-0.393%2C0.443%20-1.22%2C0.443%20-0.988%2C-0.031%20-1.794%2C-0.763%20-1.944%2C-1.715%20l%20-0.011%2C0%20c%20-0.007%2C-0.07%20-0.007%2C-0.456%200%2C-0.526%20l%200.011%2C0%20c%200.15%2C-0.953%200.956%2C-1.685%201.944%2C-1.715%200.827%2C0%201.187%2C0.443%201.22%2C0.443%200.35%2C0.332%200.738%2C0.252%200.879%2C-0.147%20l%2010e-4%2C-3.432%20c%200%2C-0.349%20-0.239%2C-0.657%20-0.562%2C-0.741%20-0.061%2C0.016%20-3.259%2C0%20-3.259%2C0%20-0.786%2C0.065%20-1.063%2C-0.466%20-0.624%2C-0.928%200%2C-0.033%200.443%2C-0.393%200.443%2C-1.22%20C%2017.925%2C7.905%2017.193%2C7.099%2016.241%2C6.949%20l%200%2C-0.011%20c%20-0.07%2C-0.007%20-0.456%2C-0.007%20-0.526%2C0%20l%200%2C0.011%20C%2014.762%2C7.099%2014.03%2C7.905%2014%2C8.893%20c%200%2C0.827%200.443%2C1.187%200.443%2C1.22%200.439%2C0.462%200.254%2C0.97%20-0.624%2C0.928%200%2C0%20-3.198%2C0.016%20-3.259%2C0%20-0.323%2C0.084%20-0.562%2C0.393%20-0.562%2C0.741%20l%200%2C10.508%20c%20-10e-4%2C0.415%200.335%2C0.751%200.75%2C0.751%20z%20M%204.551%2C19.349%20c%200.055%2C0.227%200.12%2C0.938%200.184%2C4.492%200.007%2C0.602%200.146%2C1.138%200.413%2C1.597%200.267%2C0.458%200.622%2C0.8%201.085%2C1.046%200.47%2C0.25%201.03%2C0.376%201.666%2C0.376%201.035%2C0%201.121%2C-0.4%201.121%2C-0.811%200%2C-0.283%20-0.056%2C-0.493%20-0.165%2C-0.627%20C%208.749%2C25.294%208.639%2C25.228%208.499%2C25.209%208.102%2C25.164%207.798%2C25.099%207.574%2C25.01%207.262%2C24.886%207.021%2C24.664%206.856%2C24.349%206.721%2C24.09%206.637%2C23.726%206.598%2C23.237%206.565%2C22.816%206.548%2C22.232%206.548%2C21.451%206.548%2C20.7%206.513%2C20.041%206.445%2C19.49%206.38%2C18.97%206.27%2C18.52%206.116%2C18.151%205.969%2C17.797%205.783%2C17.495%205.562%2C17.255%205.329%2C17.001%205.017%2C16.751%204.635%2C16.511%20L%203.814%2C15.995%204.633%2C15.477%20C%205.166%2C15.14%205.569%2C14.779%205.832%2C14.402%206.091%2C14.03%206.27%2C13.573%206.365%2C13.043%206.47%2C12.458%206.531%2C11.624%206.547%2C10.562%206.547%2C9.805%206.561%2C9.239%206.591%2C8.837%206.624%2C8.373%206.7%2C8.017%206.824%2C7.748%206.98%2C7.411%207.23%2C7.164%207.547%2C7.033%207.773%2C6.941%208.084%2C6.87%208.498%2C6.814%208.595%2C6.802%208.67%2C6.773%208.738%2C6.72%208.81%2C6.665%208.874%2C6.575%208.927%2C6.453%208.989%2C6.31%209.02%2C6.154%209.02%2C5.974%209.02%2C5.69%208.948%2C5.498%208.794%2C5.37%208.608%2C5.217%208.307%2C5.14%207.899%2C5.14%206.925%2C5.14%206.176%2C5.409%205.608%2C5.963%205.041%2C6.517%204.756%2C7.244%204.735%2C8.185%204.711%2C9.348%204.69%2C10.316%204.67%2C11.089%20c%20-0.021%2C0.825%20-0.086%2C1.438%20-0.198%2C1.875%20-0.126%2C0.488%20-0.354%2C0.905%20-0.679%2C1.24%20-0.289%2C0.298%20-0.725%2C0.624%20-1.331%2C0.997%20-0.27%2C0.166%20-0.39%2C0.41%20-0.39%2C0.794%200%2C0.373%200.081%2C0.511%200.116%2C0.554%200.127%2C0.153%200.338%2C0.319%200.627%2C0.493%200.4%2C0.24%200.748%2C0.524%201.035%2C0.843%200.319%2C0.355%200.548%2C0.834%200.701%2C1.464%20z%22%0A%20%20%20%20%20%20%20id%3D%22path13%22%0A%20%20%20%20%20%20%20inkscape%3Aconnector-curvature%3D%220%22%0A%20%20%20%20%20%20%20style%3D%22fill%3A%23ffffff%22%0A%20%20%20%20%20%20%20sodipodi%3Anodetypes%3D%22ccccccscccccsscccccccsccccccscsccccccccccssccccccccccccccccccccccccscsccccsscccccscccccccccccccccscsccccccscccc%22%20%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E");
+    list-style-position: inside;
+  }
 }
 .avatar .message:after {
   top: 1.1em;
@@ -50149,6 +50352,28 @@ Avatar
   display: block;
   width: 0;
 }
+/* Modulator */
+#modulatorWrapper,
+#modulatorAudioOutput {
+  display: none;
+}
+/*******************************
+Field editors
+*******************************/
+.hidden {
+  display: none !important;
+}
+/*******************************
+        Social Buttons
+*******************************/
+.social-icons a.facebook {
+  color: white;
+  background-color: #3b5998;
+}
+.social-icons a.twitter {
+  color: white;
+  background-color: #00aced;
+}
 /*******************************
         Layout Variables
 *******************************/
@@ -50156,6 +50381,9 @@ Avatar
   display: none !important;
 }
 .ui.tablet.only {
+  display: none !important;
+}
+.ui.mobile.only {
   display: none !important;
 }
 @media only screen and (min-width: 1200px) and (min-height: 30em) {
@@ -50198,19 +50426,23 @@ Avatar
     display: none !important;
   }
 }
-/* Screens with decent vertical space */
+/* Mobile only */
+@media only screen and (max-width: 767px) {
+  .ui.mobile.only {
+    display: inherit !important;
+  }
+  .ui.mobile.hide {
+    display: none !important;
+  }
+}
+/* Scren heights */
 @media only screen and (max-height: 44rem) {
   .ui.tall.only {
     display: none !important;
   }
 }
-@media only screen and (min-width: 320px) {
+@media only screen and (min-height: 24rem) {
   .ui.thin.only {
-    display: none !important;
-  }
-}
-@media only screen and (max-width: 320px) {
-  .ui.wide.only {
     display: none !important;
   }
 }
@@ -50219,45 +50451,36 @@ Avatar
 *******************************/
 /* Large Monitor */
 @media only screen and (min-width: 1200px) {
-  /* Layout */
-  .sideDocs #maineditor,
-  .sideDocs #editortools {
-    right: 22rem;
-  }
-  .rtl .sideDocs #maineditor {
-    left: 22rem;
-    right: 27rem;
-  }
-  .rtl .sideDocs #editortools {
-    left: 22rem;
-    right: 0;
-  }
-  .sideDocs #sidedocs {
-    display: block;
-    width: 22rem;
-  }
-  #sidedocspopout,
-  #sidedocsexpand {
-    display: block;
-  }
   /* Blockly */
   div.blocklyTreeRow {
     min-width: 200px;
+  }
+  #blocklyTrashIcon {
+    width: 200px;
   }
 }
 /* Small Monitor */
 @media only screen and (min-width: 992px) and (max-width: 1199px) {
   /* Blockly row */
   div.blocklyTreeRow {
-    min-width: 200px;
+    min-width: 180px;
+  }
+  #blocklyTrashIcon {
+    width: 180px;
   }
 }
 /* Tablet */
 @media only screen and (min-width: 768px) and (max-width: 991px) {
   /* Blockly */
   div.blocklyTreeRow {
-    padding-top: 0.25rem !important;
-    padding-bottom: 1.5rem !important;
+    min-width: 150px;
+  }
+  #blocklyTrashIcon {
+    width: 150px;
+  }
+  div.blocklyTreeRow {
+    padding-top: 0.5rem !important;
+    padding-bottom: 2.0rem !important;
     border-left-width: 12px !important;
   }
   div.blocklyTreeRoot div div div div div.blocklyTreeRow {
@@ -50267,6 +50490,14 @@ Avatar
   }
 }
 /* Mobile */
+@media only screen and (max-width: 767px) {
+  div.blocklyTreeRow {
+    min-width: 45px;
+  }
+  #blocklyTrashIcon {
+    width: 45px;
+  }
+}
 /* >= Small Monitor (Small Monitor + Large Monitor + Wide Monitor) */
 @media only screen and (min-width: 992px) {
   /* Blockly */
@@ -50288,10 +50519,6 @@ Avatar
   }
   .collapsedEditorTools #maineditor {
     left: 0;
-  }
-  .rtl .collapsedEditorTools #maineditor {
-    left: inherit;
-    right: 0 !important;
   }
   #cookiemsg {
     bottom: 7.5rem;
@@ -50384,10 +50611,6 @@ Avatar
   #maineditor {
     left: 20rem;
   }
-  .rtl #maineditor {
-    right: 20rem;
-    left: 0;
-  }
   /* Logo */
   #logo .name {
     display: none !important;
@@ -50420,7 +50643,7 @@ Avatar
     position: absolute;
     padding: 0;
     margin: 1em;
-    z-index: 5;
+    z-index: 15;
     bottom: 0rem !important;
     left: 4rem !important;
     top: auto;
@@ -50429,17 +50652,11 @@ Avatar
     max-width: inherit;
     background: transparent !important;
   }
-  .rtl #filelist {
-    left: auto;
-    right: 0;
-  }
-  #maineditor,
-  .rtl #maineditor {
+  #maineditor {
     left: 0;
     right: 0;
   }
-  #maineditor:not(.sandbox),
-  .rtl #maineditor:not(.sandbox) {
+  #maineditor:not(.sandbox) {
     bottom: 0rem;
   }
   #editortools {
@@ -50449,27 +50666,28 @@ Avatar
   #monacoEditor,
   #pxtJsonEditor,
   #msg {
-    bottom: 10rem !important;
+    bottom: 10rem;
   }
   #tutorialcard.bottom {
-    bottom: 11rem !important;
+    bottom: 11rem;
   }
   .hideEditorFloats #editortools {
-    height: 5rem !important;
+    height: 4.7rem;
   }
   .hideEditorFloats #blocksArea,
   .hideEditorFloats #monacoEditor,
   .hideEditorFloats #msg {
-    bottom: 5rem !important;
+    bottom: 4.7rem;
   }
   .hideEditorFloats #tutorialcard.bottom {
-    bottom: 5rem !important;
+    bottom: 4.7rem;
   }
   /* Simulator */
   div.simframe {
     display: inline-block;
     width: 10rem;
     margin-right: 0.5rem;
+    padding-bottom: 81.96% !important;
   }
   div.simframe:not(:first-child) {
     display: none !important;
@@ -50482,19 +50700,29 @@ Avatar
     display: none;
   }
   /* Menu spacing */
-  .ui.menu .item {
+  #root:not(.sandbox) #menubar .ui.menu .item {
+    padding: 0.3em !important;
+  }
+  #menubar .ui.menu .item.editor-menuitem {
+    margin: calc(0.4rem);
+    padding: calc(0.4rem);
+  }
+  #menubar .ui.menu .item.editor-menuitem .item {
     padding: 0.4em !important;
   }
-  .ui.menu .item.editor-menuitem {
-    margin-top: 0.75rem !important;
-    margin-bottom: 0.75rem !important;
+  .sandbox #menubar .ui.menu .item.editor-menuitem {
+    margin: calc(0.25rem);
+    padding: calc(0.25rem);
   }
   /* Top Menu */
   #maineditor {
-    top: 4rem !important;
-  }
-  #getting-started-btn {
     top: 4rem;
+  }
+  .hideMenuBar #maineditor {
+    top: 0;
+  }
+  .sandbox #maineditor {
+    top: 2.5rem;
   }
   /* Logo */
   .ui.item.logo img {
@@ -50509,7 +50737,8 @@ Avatar
 /* Mobile */
 @media only screen and (max-width: 767px) {
   /* Logo */
-  #logo {
+  #logo,
+  #organization {
     font-size: 0rem;
     padding-right: 0;
   }
@@ -50529,7 +50758,8 @@ Avatar
   }
   div.blocklyTreeRow {
     padding-right: 0;
-    height: 2rem;
+    padding-top: 0.25rem;
+    height: 2.5rem;
     text-align: center;
   }
   div.blocklyTreeRoot div div div div div.blocklyTreeRow {
@@ -50548,13 +50778,525 @@ Avatar
     display: none !important;
   }
   .hideEditorFloats #editortools {
-    height: 5rem !important;
+    height: 4.7rem;
   }
   .hideEditorFloats #blocksArea,
   .hideEditorFloats #monacoEditor {
-    bottom: 5rem !important;
+    bottom: 4.7rem;
   }
 }
+/* Mobile, Tablet AND thin screen */
+@media only screen and (max-width: 991px) and (max-height: 24rem) {
+  /* Mobile embedded view */
+  .sandbox #simulators {
+    display: none;
+  }
+  .sandbox #maineditor {
+    overflow: hidden;
+  }
+  .sandbox #blocksArea,
+  .sandbox #monacoEditor,
+  .sandbox #pxtJsonEditor,
+  .sandbox #editortools,
+  .sandbox #msg {
+    bottom: 1.5rem !important;
+  }
+  .sandbox #cookiemsg {
+    bottom: 3rem;
+  }
+  .sandbox #editortools {
+    display: none;
+  }
+  .simView #simulators {
+    display: inherit;
+  }
+  .simView #filelist {
+    position: fixed;
+    z-index: 100;
+    top: 0 !important;
+    left: 0 !important;
+    bottom: 0 !important;
+    right: 0 !important;
+    padding: 0;
+    margin: 0;
+    max-width: 100%;
+    min-width: 100%;
+    height: 100%;
+  }
+  .simView #boardview {
+    position: relative;
+    height: 100%;
+    background-color: white;
+    padding-top: 2.5rem;
+    padding-left: 2em;
+    padding-right: 2em;
+    padding-bottom: 2em;
+    background-color: #E91E63;
+    background: #E91E63;
+    /* For browsers that do not support gradients */
+    background: -webkit-linear-gradient(#E91E63 50%, #607D8B);
+    /* For Safari 5.1 to 6.0 */
+    background: -o-linear-gradient(#E91E63 50%, #607D8B);
+    /* For Opera 11.1 to 12.0 */
+    background: -moz-linear-gradient(#E91E63 50%, #607D8B);
+    /* For Firefox 3.6 to 15 */
+    background: linear-gradient(#E91E63 50%, #607D8B);
+    /* Standard syntax */
+  }
+  .simView #simulator .ui.item,
+  .simView #maineditor {
+    display: none !important;
+    z-index: -10;
+  }
+  .sandboxfooter {
+    left: 0.5em !important;
+    right: 0.5em !important;
+    margin: 0rem !important;
+    right: auto;
+    text-align: center;
+  }
+  .sandboxfooter .item {
+    font-size: 0.7rem !important;
+  }
+  .simView .sandboxfooter {
+    z-index: 100;
+  }
+  .simView .ui.menu {
+    background: transparent !important;
+  }
+  .simView #simulators {
+    position: relative;
+    width: 100%;
+    height: 100%;
+  }
+  .simView div.simframe {
+    position: relative;
+    width: 50%;
+    height: 100%;
+    float: left;
+    padding-bottom: 0 !important;
+  }
+  .simView div.simframe > iframe {
+    position: relative;
+    max-width: 90%;
+  }
+  .simView div.simframe:only-child {
+    width: 100%;
+  }
+  .simView div.simframe:only-child > iframe {
+    max-width: 100%;
+  }
+  .sandbox #cookiemsg {
+    left: 0;
+    right: 0;
+    margin-left: 0.2rem;
+    margin-right: 0.2rem;
+    width: inherit;
+    bottom: 1.5rem;
+    padding: 0.3rem;
+  }
+}
+/* Import all components */
+/* Reference import */
+/*******************************
+             Layout
+*******************************/
+.tutorial #maineditor .full-abs {
+  top: 5.5rem;
+}
+/* Tutorial Mode */
+#menubar .ui.menu .item.tutorial-menuitem {
+  background: rgba(27, 28, 29, 0.3) !important;
+  margin: calc(0.45rem);
+  padding: calc(0.45rem);
+  border-radius: 0.5rem !important;
+}
+#menubar .ui.menu .item.tutorial-menuitem > .step-label {
+  margin-left: 0.4em;
+  margin-right: 0.4em;
+}
+#menubar .ui.menu .item.tutorial-menuitem > .label {
+  background: white;
+  margin-left: 0em;
+}
+.tutorial-menuitem > .selected {
+  background-color: #2196F3 !important;
+  padding: 1.0rem !important;
+  padding-left: 1.3rem !important;
+  padding-right: 1.3rem !important;
+}
+#tutorialcard {
+  position: relative;
+  z-index: 0;
+  height: 6rem;
+  width: 100%;
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+#root.dimmable.dimmed #tutorialcard.tutorialReady {
+  z-index: 1001;
+}
+#tutorialhint {
+  height: 100%;
+}
+#tutorialcontent {
+  position: fixed;
+  top: 0;
+  left: 0;
+}
+body#docs.tutorial {
+  overflow-y: hidden;
+}
+#docs.tutorial .ui.segment {
+  padding: 0;
+  margin: 0;
+  box-shadow: none;
+  border: none;
+}
+#docs.tutorial #content {
+  margin-bottom: 0.5rem !important;
+}
+/******************************
+    Tutorial Avatar
+******************************/
+#tutorialcard .ui.message {
+  width: 100%;
+  position: relative;
+  padding: 0;
+  border: 0;
+  border-radius: 5px 0px 0px 5px;
+}
+#tutorialcard .ui.message .avatar-image {
+  position: absolute;
+  top: 0.7rem;
+  left: 0.7rem;
+  width: 3rem;
+  height: 3rem;
+  background-repeat: no-repeat;
+  background-size: contain;
+  background-image: url("data:image/svg+xml,%3C%3Fxml%20version%3D%221.0%22%20encoding%3D%22UTF-8%22%20standalone%3D%22no%22%3F%3E%0A%3C!--%20Generator%3A%20Adobe%20Illustrator%2021.0.2%2C%20SVG%20Export%20Plug-In%20.%20SVG%20Version%3A%206.00%20Build%200)%20%20--%3E%0A%0A%3Csvg%0A%20%20%20xmlns%3Adc%3D%22http%3A%2F%2Fpurl.org%2Fdc%2Felements%2F1.1%2F%22%0A%20%20%20xmlns%3Acc%3D%22http%3A%2F%2Fcreativecommons.org%2Fns%23%22%0A%20%20%20xmlns%3Ardf%3D%22http%3A%2F%2Fwww.w3.org%2F1999%2F02%2F22-rdf-syntax-ns%23%22%0A%20%20%20xmlns%3Asvg%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%0A%20%20%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%0A%20%20%20xmlns%3Asodipodi%3D%22http%3A%2F%2Fsodipodi.sourceforge.net%2FDTD%2Fsodipodi-0.dtd%22%0A%20%20%20xmlns%3Ainkscape%3D%22http%3A%2F%2Fwww.inkscape.org%2Fnamespaces%2Finkscape%22%0A%20%20%20version%3D%221.1%22%0A%20%20%20x%3D%220px%22%0A%20%20%20y%3D%220px%22%0A%20%20%20viewBox%3D%220%200%2032%2032%22%0A%20%20%20style%3D%22enable-background%3Anew%200%200%2032%2032%3B%22%0A%20%20%20xml%3Aspace%3D%22preserve%22%0A%20%20%20id%3D%22svg2%22%0A%20%20%20inkscape%3Aversion%3D%220.91%20r13725%22%0A%20%20%20sodipodi%3Adocname%3D%22avatar.svg%22%3E%3Cmetadata%0A%20%20%20%20%20id%3D%22metadata19%22%3E%3Crdf%3ARDF%3E%3Ccc%3AWork%0A%20%20%20%20%20%20%20%20%20rdf%3Aabout%3D%22%22%3E%3Cdc%3Aformat%3Eimage%2Fsvg%2Bxml%3C%2Fdc%3Aformat%3E%3Cdc%3Atype%0A%20%20%20%20%20%20%20%20%20%20%20rdf%3Aresource%3D%22http%3A%2F%2Fpurl.org%2Fdc%2Fdcmitype%2FStillImage%22%20%2F%3E%3Cdc%3Atitle%3E%3C%2Fdc%3Atitle%3E%3C%2Fcc%3AWork%3E%3C%2Frdf%3ARDF%3E%3C%2Fmetadata%3E%3Cdefs%0A%20%20%20%20%20id%3D%22defs17%22%20%2F%3E%3Csodipodi%3Anamedview%0A%20%20%20%20%20pagecolor%3D%22%23ffffff%22%0A%20%20%20%20%20bordercolor%3D%22%23666666%22%0A%20%20%20%20%20borderopacity%3D%221%22%0A%20%20%20%20%20objecttolerance%3D%2210%22%0A%20%20%20%20%20gridtolerance%3D%2210%22%0A%20%20%20%20%20guidetolerance%3D%2210%22%0A%20%20%20%20%20inkscape%3Apageopacity%3D%220%22%0A%20%20%20%20%20inkscape%3Apageshadow%3D%222%22%0A%20%20%20%20%20inkscape%3Awindow-width%3D%22997%22%0A%20%20%20%20%20inkscape%3Awindow-height%3D%22661%22%0A%20%20%20%20%20id%3D%22namedview15%22%0A%20%20%20%20%20showgrid%3D%22false%22%0A%20%20%20%20%20inkscape%3Azoom%3D%225.2149125%22%0A%20%20%20%20%20inkscape%3Acx%3D%2216%22%0A%20%20%20%20%20inkscape%3Acy%3D%2216%22%0A%20%20%20%20%20inkscape%3Awindow-x%3D%220%22%0A%20%20%20%20%20inkscape%3Awindow-y%3D%220%22%0A%20%20%20%20%20inkscape%3Awindow-maximized%3D%220%22%0A%20%20%20%20%20inkscape%3Acurrent-layer%3D%22svg2%22%20%2F%3E%3Cstyle%0A%20%20%20%20%20type%3D%22text%2Fcss%22%0A%20%20%20%20%20id%3D%22style4%22%3E%0A%09.icon_x002D_canvas_x002D_transparent%7Bopacity%3A0%3Bfill%3A%23F6F6F6%3B%7D%0A%09.st0%7Bfill%3A%23AA278F%3B%7D%0A%09.st1%7Bfill%3A%23FFFFFF%3B%7D%0A%3C%2Fstyle%3E%3Cg%0A%20%20%20%20%20id%3D%22canvas%22%3E%3Cpath%0A%20%20%20%20%20%20%20class%3D%22icon_x002D_canvas_x002D_transparent%22%0A%20%20%20%20%20%20%20d%3D%22M16-20H0v-16h16V-20z%20M32%2C0H0v32h32V0z%20M48%2C100H0V52h48V100z%20M64%2C184H0v-64%20%20%20h64V184z%20M116%2C32H84V0h32V32z%20M100-36H84v16h16V-36z%20M132%2C52H84v48h48V52z%20M148%2C120H84v64h64V120z%22%0A%20%20%20%20%20%20%20id%3D%22path7%22%20%2F%3E%3C%2Fg%3E%3Cg%0A%20%20%20%20%20id%3D%22iconBg%22%3E%3Cpath%0A%20%20%20%20%20%20%20class%3D%22st0%22%0A%20%20%20%20%20%20%20d%3D%22m%2032%2C15.994%200%2C-0.005%200%2C-0.006%20c%200%2C-0.108%20-0.005%2C-0.209%20-0.016%2C-0.303%20l%20-0.001%2C0%20C%2031.951%2C15.395%2031.871%2C15.176%2031.744%2C15.024%2031.573%2C14.82%2031.285%2C14.589%2030.88%2C14.333%2030.474%2C14.077%2030.145%2C13.801%2029.894%2C13.506%2029.642%2C13.21%2029.452%2C12.772%2029.324%2C12.19%2029.275%2C11.963%2029.237%2C11.471%2029.212%2C10.717%20l%200%2C-2.021%20c%200%2C-0.38%20-0.031%2C-0.723%20-0.076%2C-1.049%20C%2029.135%2C7.584%2029.134%2C7.524%2029.132%2C7.459%2029.123%2C6.677%2028.952%2C5.984%2028.619%2C5.381%2028.286%2C4.777%2027.814%2C4.31%2027.203%2C3.98%2026.592%2C3.65%2025.898%2C3.485%2025.122%2C3.485%20l%20-18.846%2C0%20-0.005%2C0%20c%200%2C0%20-0.674%2C0.067%20-0.962%2C0.201%20C%205.125%2C3.771%204.954%2C3.872%204.788%2C3.981%204.496%2C4.14%204.229%2C4.334%203.99%2C4.571%203.297%2C5.259%202.929%2C6.172%202.877%2C7.305%202.821%2C7.703%202.789%2C8.128%202.789%2C8.588%20l%200%2C2.558%20c%20-0.019%2C0.495%20-0.079%2C0.953%20-0.183%2C1.373%20-0.104%2C0.419%20-0.282%2C0.762%20-0.532%2C1.033%20-0.071%2C0.062%20-0.138%2C0.127%20-0.202%2C0.196%20-0.265%2C0.238%20-0.638%2C0.511%20-1.13%2C0.823%20-0.404%2C0.262%20-0.64%2C0.633%20-0.715%2C1.108%20l%200%2C0%20C%200.026%2C15.686%200.026%2C15.694%200.025%2C15.702%200.012%2C15.794%200.003%2C15.889%200.002%2C15.989%200.001%2C15.995%200%2C16%200%2C16.006%20l%200%2C0.005%200%2C0.006%20c%200%2C0.108%200.005%2C0.209%200.016%2C0.303%20l%200.001%2C0%20c%200.032%2C0.285%200.112%2C0.504%200.239%2C0.656%200.171%2C0.204%200.459%2C0.435%200.864%2C0.691%200.406%2C0.256%200.735%2C0.532%200.986%2C0.827%200.252%2C0.296%200.442%2C0.734%200.57%2C1.316%200.049%2C0.227%200.087%2C0.719%200.112%2C1.473%20l%200%2C2.019%20c%200%2C0.38%200.031%2C0.723%200.076%2C1.049%200.001%2C0.063%200.002%2C0.123%200.004%2C0.188%200.009%2C0.782%200.18%2C1.475%200.513%2C2.078%200.333%2C0.604%200.805%2C1.071%201.416%2C1.401%200.611%2C0.33%201.305%2C0.495%202.081%2C0.495%20l%2018.852%2C0%20c%200.35%2C0%200.673%2C-0.067%200.961%2C-0.201%200.184%2C-0.085%200.356%2C-0.187%200.521%2C-0.296%200.291%2C-0.159%200.559%2C-0.353%200.798%2C-0.59%200.693%2C-0.688%201.061%2C-1.601%201.113%2C-2.734%200.056%2C-0.398%200.088%2C-0.823%200.088%2C-1.283%20l%200%2C-2.558%20c%200.019%2C-0.495%200.079%2C-0.953%200.183%2C-1.373%200.104%2C-0.419%200.282%2C-0.762%200.532%2C-1.033%200.071%2C-0.062%200.138%2C-0.127%200.202%2C-0.196%200.265%2C-0.238%200.638%2C-0.511%201.13%2C-0.823%200.404%2C-0.262%200.64%2C-0.633%200.715%2C-1.108%20l%200.002%2C0%20c%2010e-4%2C-0.007%2010e-4%2C-0.015%200.002%2C-0.023%20C%2031.99%2C16.203%2031.999%2C16.108%2032%2C16.008%2031.999%2C16.005%2032%2C16%2032%2C15.994%20Z%22%0A%20%20%20%20%20%20%20id%3D%22path10%22%0A%20%20%20%20%20%20%20inkscape%3Aconnector-curvature%3D%220%22%0A%20%20%20%20%20%20%20style%3D%22fill%3A%23aa278f%22%0A%20%20%20%20%20%20%20sodipodi%3Anodetypes%3D%22scscccccccscccssccccccscccccccccscscccccccscccsssccccscccccccccs%22%20%2F%3E%3C%2Fg%3E%3Cg%0A%20%20%20%20%20id%3D%22iconFg%22%3E%3Cpath%0A%20%20%20%20%20%20%20class%3D%22st1%22%0A%20%20%20%20%20%20%20d%3D%22m%2027.366%2C16.522%200.819%2C-0.518%20-0.821%2C-0.516%20c%20-0.382%2C-0.24%20-0.693%2C-0.49%20-0.927%2C-0.744%20-0.221%2C-0.241%20-0.408%2C-0.543%20-0.554%2C-0.896%20-0.153%2C-0.368%20-0.264%2C-0.819%20-0.328%2C-1.339%20-0.068%2C-0.551%20-0.103%2C-1.21%20-0.103%2C-1.961%200%2C-0.781%20-0.016%2C-1.365%20-0.05%2C-1.786%20C%2025.363%2C8.273%2025.279%2C7.91%2025.144%2C7.65%2024.98%2C7.335%2024.738%2C7.112%2024.426%2C6.989%2024.203%2C6.9%2023.899%2C6.835%2023.502%2C6.79%2023.361%2C6.771%2023.251%2C6.705%2023.146%2C6.577%2023.036%2C6.444%2022.981%2C6.233%2022.981%2C5.95%20c%200%2C-0.41%200.086%2C-0.811%201.121%2C-0.811%200.636%2C0%201.196%2C0.127%201.666%2C0.376%200.464%2C0.247%200.818%2C0.589%201.085%2C1.046%200.267%2C0.458%200.406%2C0.995%200.413%2C1.597%200.064%2C3.554%200.129%2C4.265%200.184%2C4.492%200.153%2C0.63%200.382%2C1.109%200.701%2C1.464%200.287%2C0.319%200.635%2C0.602%201.035%2C0.843%200.29%2C0.175%200.501%2C0.341%200.627%2C0.493%200.035%2C0.043%200.116%2C0.181%200.116%2C0.554%200%2C0.383%20-0.12%2C0.628%20-0.39%2C0.794%20-0.606%2C0.373%20-1.041%2C0.699%20-1.331%2C0.997%20-0.324%2C0.334%20-0.552%2C0.752%20-0.678%2C1.24%20-0.112%2C0.437%20-0.177%2C1.05%20-0.198%2C1.875%20-0.02%2C0.773%20-0.042%2C1.741%20-0.066%2C2.904%20-0.021%2C0.941%20-0.306%2C1.668%20-0.873%2C2.222%20-0.568%2C0.554%20-1.317%2C0.823%20-2.291%2C0.823%20-0.409%2C0%20-0.71%2C-0.077%20-0.895%2C-0.23%20-0.155%2C-0.128%20-0.226%2C-0.32%20-0.226%2C-0.604%200%2C-0.179%200.03%2C-0.336%200.093%2C-0.479%200.053%2C-0.122%200.117%2C-0.212%200.188%2C-0.268%200.068%2C-0.053%200.143%2C-0.082%200.24%2C-0.094%200.414%2C-0.055%200.725%2C-0.127%200.951%2C-0.219%200.317%2C-0.131%200.567%2C-0.378%200.723%2C-0.716%200.124%2C-0.269%200.2%2C-0.625%200.233%2C-1.089%200.029%2C-0.402%200.044%2C-0.968%200.044%2C-1.725%200.016%2C-1.061%200.077%2C-1.896%200.182%2C-2.481%200.095%2C-0.53%200.274%2C-0.987%200.533%2C-1.359%200.261%2C-0.375%200.665%2C-0.736%201.198%2C-1.073%20z%20m%20-16.618%2C6.519%2010.458%2C0%20c%200.415%2C0%200.751%2C-0.336%200.751%2C-0.751%20l%20-0.001%2C-3.709%20c%20-0.134%2C-0.449%20-0.518%2C-0.492%20-0.878%2C-0.15%20-0.033%2C0%20-0.393%2C0.443%20-1.22%2C0.443%20-0.988%2C-0.031%20-1.794%2C-0.763%20-1.944%2C-1.715%20l%20-0.011%2C0%20c%20-0.007%2C-0.07%20-0.007%2C-0.456%200%2C-0.526%20l%200.011%2C0%20c%200.15%2C-0.953%200.956%2C-1.685%201.944%2C-1.715%200.827%2C0%201.187%2C0.443%201.22%2C0.443%200.35%2C0.332%200.738%2C0.252%200.879%2C-0.147%20l%2010e-4%2C-3.432%20c%200%2C-0.349%20-0.239%2C-0.657%20-0.562%2C-0.741%20-0.061%2C0.016%20-3.259%2C0%20-3.259%2C0%20-0.786%2C0.065%20-1.063%2C-0.466%20-0.624%2C-0.928%200%2C-0.033%200.443%2C-0.393%200.443%2C-1.22%20C%2017.925%2C7.905%2017.193%2C7.099%2016.241%2C6.949%20l%200%2C-0.011%20c%20-0.07%2C-0.007%20-0.456%2C-0.007%20-0.526%2C0%20l%200%2C0.011%20C%2014.762%2C7.099%2014.03%2C7.905%2014%2C8.893%20c%200%2C0.827%200.443%2C1.187%200.443%2C1.22%200.439%2C0.462%200.254%2C0.97%20-0.624%2C0.928%200%2C0%20-3.198%2C0.016%20-3.259%2C0%20-0.323%2C0.084%20-0.562%2C0.393%20-0.562%2C0.741%20l%200%2C10.508%20c%20-10e-4%2C0.415%200.335%2C0.751%200.75%2C0.751%20z%20M%204.551%2C19.349%20c%200.055%2C0.227%200.12%2C0.938%200.184%2C4.492%200.007%2C0.602%200.146%2C1.138%200.413%2C1.597%200.267%2C0.458%200.622%2C0.8%201.085%2C1.046%200.47%2C0.25%201.03%2C0.376%201.666%2C0.376%201.035%2C0%201.121%2C-0.4%201.121%2C-0.811%200%2C-0.283%20-0.056%2C-0.493%20-0.165%2C-0.627%20C%208.749%2C25.294%208.639%2C25.228%208.499%2C25.209%208.102%2C25.164%207.798%2C25.099%207.574%2C25.01%207.262%2C24.886%207.021%2C24.664%206.856%2C24.349%206.721%2C24.09%206.637%2C23.726%206.598%2C23.237%206.565%2C22.816%206.548%2C22.232%206.548%2C21.451%206.548%2C20.7%206.513%2C20.041%206.445%2C19.49%206.38%2C18.97%206.27%2C18.52%206.116%2C18.151%205.969%2C17.797%205.783%2C17.495%205.562%2C17.255%205.329%2C17.001%205.017%2C16.751%204.635%2C16.511%20L%203.814%2C15.995%204.633%2C15.477%20C%205.166%2C15.14%205.569%2C14.779%205.832%2C14.402%206.091%2C14.03%206.27%2C13.573%206.365%2C13.043%206.47%2C12.458%206.531%2C11.624%206.547%2C10.562%206.547%2C9.805%206.561%2C9.239%206.591%2C8.837%206.624%2C8.373%206.7%2C8.017%206.824%2C7.748%206.98%2C7.411%207.23%2C7.164%207.547%2C7.033%207.773%2C6.941%208.084%2C6.87%208.498%2C6.814%208.595%2C6.802%208.67%2C6.773%208.738%2C6.72%208.81%2C6.665%208.874%2C6.575%208.927%2C6.453%208.989%2C6.31%209.02%2C6.154%209.02%2C5.974%209.02%2C5.69%208.948%2C5.498%208.794%2C5.37%208.608%2C5.217%208.307%2C5.14%207.899%2C5.14%206.925%2C5.14%206.176%2C5.409%205.608%2C5.963%205.041%2C6.517%204.756%2C7.244%204.735%2C8.185%204.711%2C9.348%204.69%2C10.316%204.67%2C11.089%20c%20-0.021%2C0.825%20-0.086%2C1.438%20-0.198%2C1.875%20-0.126%2C0.488%20-0.354%2C0.905%20-0.679%2C1.24%20-0.289%2C0.298%20-0.725%2C0.624%20-1.331%2C0.997%20-0.27%2C0.166%20-0.39%2C0.41%20-0.39%2C0.794%200%2C0.373%200.081%2C0.511%200.116%2C0.554%200.127%2C0.153%200.338%2C0.319%200.627%2C0.493%200.4%2C0.24%200.748%2C0.524%201.035%2C0.843%200.319%2C0.355%200.548%2C0.834%200.701%2C1.464%20z%22%0A%20%20%20%20%20%20%20id%3D%22path13%22%0A%20%20%20%20%20%20%20inkscape%3Aconnector-curvature%3D%220%22%0A%20%20%20%20%20%20%20style%3D%22fill%3A%23ffffff%22%0A%20%20%20%20%20%20%20sodipodi%3Anodetypes%3D%22ccccccscccccsscccccccsccccccscsccccccccccssccccccccccccccccccccccccscsccccsscccccscccccccccccccccscsccccccscccc%22%20%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E");
+  cursor: pointer;
+}
+#tutorialcard {
+  padding: 0.5rem;
+}
+#tutorialcard .ui.buttons {
+  width: 100%;
+  height: 4.5rem;
+}
+#tutorialcard .ui.message {
+  width: 100%;
+}
+#tutorialcard .tutorialmessage .content {
+  width: 100%;
+  font-size: 16px;
+  height: 3.5rem;
+  margin-bottom: 1rem;
+  overflow: auto;
+  cursor: pointer;
+}
+#tutorialcard .tutorialmessage .content p {
+  line-height: 25px !important;
+}
+#tutorialcard .tutorialmessage {
+  width: 100%;
+  padding: 0.5rem;
+  padding-left: 7rem;
+  height: 4.5rem;
+  margin-bottom: 1rem;
+}
+#root.dimmable.dimmed #tutorialcard .ui.message {
+  border-radius: 3px;
+}
+#root.dimmable.dimmed #tutorialcard .tutorialmessage {
+  border: solid white 2px;
+}
+/* Show / Hide in dimmer */
+.ui.showlightbox {
+  display: none;
+}
+#root.dimmable.dimmed #tutorialcard.tutorialReady .ui.showlightbox {
+  display: block;
+}
+#root.dimmable.dimmed #tutorialcard.tutorialReady .ui.hidelightbox {
+  display: none;
+}
+#root.dimmable.dimmed #tutorialcard.tutorialReady .ui.prevbutton,
+#root.dimmable.dimmed #tutorialcard.tutorialReady .ui.nextbutton {
+  opacity: 0 !important;
+}
+#tutorialcard .ui.button.okbutton {
+  border-radius: 0.28571429rem;
+}
+i.icon.avatar-image {
+  background-repeat: no-repeat;
+  background-size: contain;
+  background-image: url("data:image/svg+xml,%3C%3Fxml%20version%3D%221.0%22%20encoding%3D%22UTF-8%22%20standalone%3D%22no%22%3F%3E%0A%3C!--%20Generator%3A%20Adobe%20Illustrator%2021.0.2%2C%20SVG%20Export%20Plug-In%20.%20SVG%20Version%3A%206.00%20Build%200)%20%20--%3E%0A%0A%3Csvg%0A%20%20%20xmlns%3Adc%3D%22http%3A%2F%2Fpurl.org%2Fdc%2Felements%2F1.1%2F%22%0A%20%20%20xmlns%3Acc%3D%22http%3A%2F%2Fcreativecommons.org%2Fns%23%22%0A%20%20%20xmlns%3Ardf%3D%22http%3A%2F%2Fwww.w3.org%2F1999%2F02%2F22-rdf-syntax-ns%23%22%0A%20%20%20xmlns%3Asvg%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%0A%20%20%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%0A%20%20%20xmlns%3Asodipodi%3D%22http%3A%2F%2Fsodipodi.sourceforge.net%2FDTD%2Fsodipodi-0.dtd%22%0A%20%20%20xmlns%3Ainkscape%3D%22http%3A%2F%2Fwww.inkscape.org%2Fnamespaces%2Finkscape%22%0A%20%20%20version%3D%221.1%22%0A%20%20%20x%3D%220px%22%0A%20%20%20y%3D%220px%22%0A%20%20%20viewBox%3D%220%200%2032%2032%22%0A%20%20%20style%3D%22enable-background%3Anew%200%200%2032%2032%3B%22%0A%20%20%20xml%3Aspace%3D%22preserve%22%0A%20%20%20id%3D%22svg2%22%0A%20%20%20inkscape%3Aversion%3D%220.91%20r13725%22%0A%20%20%20sodipodi%3Adocname%3D%22avatar.svg%22%3E%3Cmetadata%0A%20%20%20%20%20id%3D%22metadata19%22%3E%3Crdf%3ARDF%3E%3Ccc%3AWork%0A%20%20%20%20%20%20%20%20%20rdf%3Aabout%3D%22%22%3E%3Cdc%3Aformat%3Eimage%2Fsvg%2Bxml%3C%2Fdc%3Aformat%3E%3Cdc%3Atype%0A%20%20%20%20%20%20%20%20%20%20%20rdf%3Aresource%3D%22http%3A%2F%2Fpurl.org%2Fdc%2Fdcmitype%2FStillImage%22%20%2F%3E%3Cdc%3Atitle%3E%3C%2Fdc%3Atitle%3E%3C%2Fcc%3AWork%3E%3C%2Frdf%3ARDF%3E%3C%2Fmetadata%3E%3Cdefs%0A%20%20%20%20%20id%3D%22defs17%22%20%2F%3E%3Csodipodi%3Anamedview%0A%20%20%20%20%20pagecolor%3D%22%23ffffff%22%0A%20%20%20%20%20bordercolor%3D%22%23666666%22%0A%20%20%20%20%20borderopacity%3D%221%22%0A%20%20%20%20%20objecttolerance%3D%2210%22%0A%20%20%20%20%20gridtolerance%3D%2210%22%0A%20%20%20%20%20guidetolerance%3D%2210%22%0A%20%20%20%20%20inkscape%3Apageopacity%3D%220%22%0A%20%20%20%20%20inkscape%3Apageshadow%3D%222%22%0A%20%20%20%20%20inkscape%3Awindow-width%3D%22997%22%0A%20%20%20%20%20inkscape%3Awindow-height%3D%22661%22%0A%20%20%20%20%20id%3D%22namedview15%22%0A%20%20%20%20%20showgrid%3D%22false%22%0A%20%20%20%20%20inkscape%3Azoom%3D%225.2149125%22%0A%20%20%20%20%20inkscape%3Acx%3D%2216%22%0A%20%20%20%20%20inkscape%3Acy%3D%2216%22%0A%20%20%20%20%20inkscape%3Awindow-x%3D%220%22%0A%20%20%20%20%20inkscape%3Awindow-y%3D%220%22%0A%20%20%20%20%20inkscape%3Awindow-maximized%3D%220%22%0A%20%20%20%20%20inkscape%3Acurrent-layer%3D%22svg2%22%20%2F%3E%3Cstyle%0A%20%20%20%20%20type%3D%22text%2Fcss%22%0A%20%20%20%20%20id%3D%22style4%22%3E%0A%09.icon_x002D_canvas_x002D_transparent%7Bopacity%3A0%3Bfill%3A%23F6F6F6%3B%7D%0A%09.st0%7Bfill%3A%23AA278F%3B%7D%0A%09.st1%7Bfill%3A%23FFFFFF%3B%7D%0A%3C%2Fstyle%3E%3Cg%0A%20%20%20%20%20id%3D%22canvas%22%3E%3Cpath%0A%20%20%20%20%20%20%20class%3D%22icon_x002D_canvas_x002D_transparent%22%0A%20%20%20%20%20%20%20d%3D%22M16-20H0v-16h16V-20z%20M32%2C0H0v32h32V0z%20M48%2C100H0V52h48V100z%20M64%2C184H0v-64%20%20%20h64V184z%20M116%2C32H84V0h32V32z%20M100-36H84v16h16V-36z%20M132%2C52H84v48h48V52z%20M148%2C120H84v64h64V120z%22%0A%20%20%20%20%20%20%20id%3D%22path7%22%20%2F%3E%3C%2Fg%3E%3Cg%0A%20%20%20%20%20id%3D%22iconBg%22%3E%3Cpath%0A%20%20%20%20%20%20%20class%3D%22st0%22%0A%20%20%20%20%20%20%20d%3D%22m%2032%2C15.994%200%2C-0.005%200%2C-0.006%20c%200%2C-0.108%20-0.005%2C-0.209%20-0.016%2C-0.303%20l%20-0.001%2C0%20C%2031.951%2C15.395%2031.871%2C15.176%2031.744%2C15.024%2031.573%2C14.82%2031.285%2C14.589%2030.88%2C14.333%2030.474%2C14.077%2030.145%2C13.801%2029.894%2C13.506%2029.642%2C13.21%2029.452%2C12.772%2029.324%2C12.19%2029.275%2C11.963%2029.237%2C11.471%2029.212%2C10.717%20l%200%2C-2.021%20c%200%2C-0.38%20-0.031%2C-0.723%20-0.076%2C-1.049%20C%2029.135%2C7.584%2029.134%2C7.524%2029.132%2C7.459%2029.123%2C6.677%2028.952%2C5.984%2028.619%2C5.381%2028.286%2C4.777%2027.814%2C4.31%2027.203%2C3.98%2026.592%2C3.65%2025.898%2C3.485%2025.122%2C3.485%20l%20-18.846%2C0%20-0.005%2C0%20c%200%2C0%20-0.674%2C0.067%20-0.962%2C0.201%20C%205.125%2C3.771%204.954%2C3.872%204.788%2C3.981%204.496%2C4.14%204.229%2C4.334%203.99%2C4.571%203.297%2C5.259%202.929%2C6.172%202.877%2C7.305%202.821%2C7.703%202.789%2C8.128%202.789%2C8.588%20l%200%2C2.558%20c%20-0.019%2C0.495%20-0.079%2C0.953%20-0.183%2C1.373%20-0.104%2C0.419%20-0.282%2C0.762%20-0.532%2C1.033%20-0.071%2C0.062%20-0.138%2C0.127%20-0.202%2C0.196%20-0.265%2C0.238%20-0.638%2C0.511%20-1.13%2C0.823%20-0.404%2C0.262%20-0.64%2C0.633%20-0.715%2C1.108%20l%200%2C0%20C%200.026%2C15.686%200.026%2C15.694%200.025%2C15.702%200.012%2C15.794%200.003%2C15.889%200.002%2C15.989%200.001%2C15.995%200%2C16%200%2C16.006%20l%200%2C0.005%200%2C0.006%20c%200%2C0.108%200.005%2C0.209%200.016%2C0.303%20l%200.001%2C0%20c%200.032%2C0.285%200.112%2C0.504%200.239%2C0.656%200.171%2C0.204%200.459%2C0.435%200.864%2C0.691%200.406%2C0.256%200.735%2C0.532%200.986%2C0.827%200.252%2C0.296%200.442%2C0.734%200.57%2C1.316%200.049%2C0.227%200.087%2C0.719%200.112%2C1.473%20l%200%2C2.019%20c%200%2C0.38%200.031%2C0.723%200.076%2C1.049%200.001%2C0.063%200.002%2C0.123%200.004%2C0.188%200.009%2C0.782%200.18%2C1.475%200.513%2C2.078%200.333%2C0.604%200.805%2C1.071%201.416%2C1.401%200.611%2C0.33%201.305%2C0.495%202.081%2C0.495%20l%2018.852%2C0%20c%200.35%2C0%200.673%2C-0.067%200.961%2C-0.201%200.184%2C-0.085%200.356%2C-0.187%200.521%2C-0.296%200.291%2C-0.159%200.559%2C-0.353%200.798%2C-0.59%200.693%2C-0.688%201.061%2C-1.601%201.113%2C-2.734%200.056%2C-0.398%200.088%2C-0.823%200.088%2C-1.283%20l%200%2C-2.558%20c%200.019%2C-0.495%200.079%2C-0.953%200.183%2C-1.373%200.104%2C-0.419%200.282%2C-0.762%200.532%2C-1.033%200.071%2C-0.062%200.138%2C-0.127%200.202%2C-0.196%200.265%2C-0.238%200.638%2C-0.511%201.13%2C-0.823%200.404%2C-0.262%200.64%2C-0.633%200.715%2C-1.108%20l%200.002%2C0%20c%2010e-4%2C-0.007%2010e-4%2C-0.015%200.002%2C-0.023%20C%2031.99%2C16.203%2031.999%2C16.108%2032%2C16.008%2031.999%2C16.005%2032%2C16%2032%2C15.994%20Z%22%0A%20%20%20%20%20%20%20id%3D%22path10%22%0A%20%20%20%20%20%20%20inkscape%3Aconnector-curvature%3D%220%22%0A%20%20%20%20%20%20%20style%3D%22fill%3A%23aa278f%22%0A%20%20%20%20%20%20%20sodipodi%3Anodetypes%3D%22scscccccccscccssccccccscccccccccscscccccccscccsssccccscccccccccs%22%20%2F%3E%3C%2Fg%3E%3Cg%0A%20%20%20%20%20id%3D%22iconFg%22%3E%3Cpath%0A%20%20%20%20%20%20%20class%3D%22st1%22%0A%20%20%20%20%20%20%20d%3D%22m%2027.366%2C16.522%200.819%2C-0.518%20-0.821%2C-0.516%20c%20-0.382%2C-0.24%20-0.693%2C-0.49%20-0.927%2C-0.744%20-0.221%2C-0.241%20-0.408%2C-0.543%20-0.554%2C-0.896%20-0.153%2C-0.368%20-0.264%2C-0.819%20-0.328%2C-1.339%20-0.068%2C-0.551%20-0.103%2C-1.21%20-0.103%2C-1.961%200%2C-0.781%20-0.016%2C-1.365%20-0.05%2C-1.786%20C%2025.363%2C8.273%2025.279%2C7.91%2025.144%2C7.65%2024.98%2C7.335%2024.738%2C7.112%2024.426%2C6.989%2024.203%2C6.9%2023.899%2C6.835%2023.502%2C6.79%2023.361%2C6.771%2023.251%2C6.705%2023.146%2C6.577%2023.036%2C6.444%2022.981%2C6.233%2022.981%2C5.95%20c%200%2C-0.41%200.086%2C-0.811%201.121%2C-0.811%200.636%2C0%201.196%2C0.127%201.666%2C0.376%200.464%2C0.247%200.818%2C0.589%201.085%2C1.046%200.267%2C0.458%200.406%2C0.995%200.413%2C1.597%200.064%2C3.554%200.129%2C4.265%200.184%2C4.492%200.153%2C0.63%200.382%2C1.109%200.701%2C1.464%200.287%2C0.319%200.635%2C0.602%201.035%2C0.843%200.29%2C0.175%200.501%2C0.341%200.627%2C0.493%200.035%2C0.043%200.116%2C0.181%200.116%2C0.554%200%2C0.383%20-0.12%2C0.628%20-0.39%2C0.794%20-0.606%2C0.373%20-1.041%2C0.699%20-1.331%2C0.997%20-0.324%2C0.334%20-0.552%2C0.752%20-0.678%2C1.24%20-0.112%2C0.437%20-0.177%2C1.05%20-0.198%2C1.875%20-0.02%2C0.773%20-0.042%2C1.741%20-0.066%2C2.904%20-0.021%2C0.941%20-0.306%2C1.668%20-0.873%2C2.222%20-0.568%2C0.554%20-1.317%2C0.823%20-2.291%2C0.823%20-0.409%2C0%20-0.71%2C-0.077%20-0.895%2C-0.23%20-0.155%2C-0.128%20-0.226%2C-0.32%20-0.226%2C-0.604%200%2C-0.179%200.03%2C-0.336%200.093%2C-0.479%200.053%2C-0.122%200.117%2C-0.212%200.188%2C-0.268%200.068%2C-0.053%200.143%2C-0.082%200.24%2C-0.094%200.414%2C-0.055%200.725%2C-0.127%200.951%2C-0.219%200.317%2C-0.131%200.567%2C-0.378%200.723%2C-0.716%200.124%2C-0.269%200.2%2C-0.625%200.233%2C-1.089%200.029%2C-0.402%200.044%2C-0.968%200.044%2C-1.725%200.016%2C-1.061%200.077%2C-1.896%200.182%2C-2.481%200.095%2C-0.53%200.274%2C-0.987%200.533%2C-1.359%200.261%2C-0.375%200.665%2C-0.736%201.198%2C-1.073%20z%20m%20-16.618%2C6.519%2010.458%2C0%20c%200.415%2C0%200.751%2C-0.336%200.751%2C-0.751%20l%20-0.001%2C-3.709%20c%20-0.134%2C-0.449%20-0.518%2C-0.492%20-0.878%2C-0.15%20-0.033%2C0%20-0.393%2C0.443%20-1.22%2C0.443%20-0.988%2C-0.031%20-1.794%2C-0.763%20-1.944%2C-1.715%20l%20-0.011%2C0%20c%20-0.007%2C-0.07%20-0.007%2C-0.456%200%2C-0.526%20l%200.011%2C0%20c%200.15%2C-0.953%200.956%2C-1.685%201.944%2C-1.715%200.827%2C0%201.187%2C0.443%201.22%2C0.443%200.35%2C0.332%200.738%2C0.252%200.879%2C-0.147%20l%2010e-4%2C-3.432%20c%200%2C-0.349%20-0.239%2C-0.657%20-0.562%2C-0.741%20-0.061%2C0.016%20-3.259%2C0%20-3.259%2C0%20-0.786%2C0.065%20-1.063%2C-0.466%20-0.624%2C-0.928%200%2C-0.033%200.443%2C-0.393%200.443%2C-1.22%20C%2017.925%2C7.905%2017.193%2C7.099%2016.241%2C6.949%20l%200%2C-0.011%20c%20-0.07%2C-0.007%20-0.456%2C-0.007%20-0.526%2C0%20l%200%2C0.011%20C%2014.762%2C7.099%2014.03%2C7.905%2014%2C8.893%20c%200%2C0.827%200.443%2C1.187%200.443%2C1.22%200.439%2C0.462%200.254%2C0.97%20-0.624%2C0.928%200%2C0%20-3.198%2C0.016%20-3.259%2C0%20-0.323%2C0.084%20-0.562%2C0.393%20-0.562%2C0.741%20l%200%2C10.508%20c%20-10e-4%2C0.415%200.335%2C0.751%200.75%2C0.751%20z%20M%204.551%2C19.349%20c%200.055%2C0.227%200.12%2C0.938%200.184%2C4.492%200.007%2C0.602%200.146%2C1.138%200.413%2C1.597%200.267%2C0.458%200.622%2C0.8%201.085%2C1.046%200.47%2C0.25%201.03%2C0.376%201.666%2C0.376%201.035%2C0%201.121%2C-0.4%201.121%2C-0.811%200%2C-0.283%20-0.056%2C-0.493%20-0.165%2C-0.627%20C%208.749%2C25.294%208.639%2C25.228%208.499%2C25.209%208.102%2C25.164%207.798%2C25.099%207.574%2C25.01%207.262%2C24.886%207.021%2C24.664%206.856%2C24.349%206.721%2C24.09%206.637%2C23.726%206.598%2C23.237%206.565%2C22.816%206.548%2C22.232%206.548%2C21.451%206.548%2C20.7%206.513%2C20.041%206.445%2C19.49%206.38%2C18.97%206.27%2C18.52%206.116%2C18.151%205.969%2C17.797%205.783%2C17.495%205.562%2C17.255%205.329%2C17.001%205.017%2C16.751%204.635%2C16.511%20L%203.814%2C15.995%204.633%2C15.477%20C%205.166%2C15.14%205.569%2C14.779%205.832%2C14.402%206.091%2C14.03%206.27%2C13.573%206.365%2C13.043%206.47%2C12.458%206.531%2C11.624%206.547%2C10.562%206.547%2C9.805%206.561%2C9.239%206.591%2C8.837%206.624%2C8.373%206.7%2C8.017%206.824%2C7.748%206.98%2C7.411%207.23%2C7.164%207.547%2C7.033%207.773%2C6.941%208.084%2C6.87%208.498%2C6.814%208.595%2C6.802%208.67%2C6.773%208.738%2C6.72%208.81%2C6.665%208.874%2C6.575%208.927%2C6.453%208.989%2C6.31%209.02%2C6.154%209.02%2C5.974%209.02%2C5.69%208.948%2C5.498%208.794%2C5.37%208.608%2C5.217%208.307%2C5.14%207.899%2C5.14%206.925%2C5.14%206.176%2C5.409%205.608%2C5.963%205.041%2C6.517%204.756%2C7.244%204.735%2C8.185%204.711%2C9.348%204.69%2C10.316%204.67%2C11.089%20c%20-0.021%2C0.825%20-0.086%2C1.438%20-0.198%2C1.875%20-0.126%2C0.488%20-0.354%2C0.905%20-0.679%2C1.24%20-0.289%2C0.298%20-0.725%2C0.624%20-1.331%2C0.997%20-0.27%2C0.166%20-0.39%2C0.41%20-0.39%2C0.794%200%2C0.373%200.081%2C0.511%200.116%2C0.554%200.127%2C0.153%200.338%2C0.319%200.627%2C0.493%200.4%2C0.24%200.748%2C0.524%201.035%2C0.843%200.319%2C0.355%200.548%2C0.834%200.701%2C1.464%20z%22%0A%20%20%20%20%20%20%20id%3D%22path13%22%0A%20%20%20%20%20%20%20inkscape%3Aconnector-curvature%3D%220%22%0A%20%20%20%20%20%20%20style%3D%22fill%3A%23ffffff%22%0A%20%20%20%20%20%20%20sodipodi%3Anodetypes%3D%22ccccccscccccsscccccccsccccccscsccccccccccssccccccccccccccccccccccccscsccccsscccccscccccccccccccccscsccccccscccc%22%20%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E");
+}
+/******************************
+    Hint button
+******************************/
+#tutorialcard .ui.button.hintbutton {
+  position: absolute;
+  bottom: 2rem;
+  left: 4rem;
+  font-size: 0.8rem;
+  border-radius: 0.28571429rem;
+  padding: 0.4rem;
+  background-color: #2196F3;
+  color: white;
+}
+#tutorialcard .ui.button.hintbutton:after {
+  content: ' ';
+  position: absolute;
+  width: 0;
+  height: 0;
+  left: -10px;
+  right: auto;
+  top: 0px;
+  bottom: auto;
+  border: 10px solid;
+  border-color: #2196F3 transparent transparent transparent;
+}
+/******************************
+    Inline Blocks and Buttons
+******************************/
+span.docs.inlinebutton {
+  padding: 0.15rem 0.3rem;
+  border-radius: 0.3rem;
+  white-space: nowrap;
+  background-color: #2196F3;
+  border: 1px solid #82c4f8;
+  color: #FFFFFF;
+}
+span.docs.inlineblock {
+  padding: 0.15rem 0.3rem;
+  border-radius: 0.4rem 0 0 0.4rem;
+  white-space: nowrap;
+  background-color: #ffad33;
+  border: 1px solid #FF9800;
+  color: #FFFFFF;
+}
+.tutorialmessage code,
+.tutorialmessage pre {
+  font-weight: bold;
+}
+code.lang-filterblocks {
+  display: none;
+}
+/*******************************
+        Tutorial Hint
+*******************************/
+.ui.modal.hintdialog .content p {
+  font-size: 16px;
+  line-height: 25px;
+}
+/*******************************
+        Media Adjustments
+*******************************/
+/* Large Monitor */
+/* Small Monitor */
+/* Tablet */
+/* Mobile */
+@media only screen and (max-width: 767px) {
+  #tutorialcard .ui.message .avatar-image {
+    display: none;
+  }
+  #tutorialcard .ui.button.hintbutton {
+    display: none;
+  }
+  #tutorialcard .ui.button.prevbutton {
+    display: none;
+  }
+  #tutorialcard .tutorialmessage {
+    padding-left: 0.5rem;
+  }
+}
+/* >= Small Monitor (Small Monitor + Large Monitor + Wide Monitor) */
+/* <= Small Monitor (Mobile + Tablet + Small Monitor) */
+/* <= Tablet (Mobile + Tablet) */
+/* Mobile */
+/* Import all components */
+/* Reference import */
+/* Side Docs layout */
+#sidedocs {
+  height: 100%;
+  top: 0;
+  z-index: 10;
+  visibility: hidden;
+  opacity: 0;
+  right: 0;
+  width: 0;
+}
+#sidedocsbar {
+  position: absolute;
+  right: 1rem;
+}
+#sidedocsframe {
+  width: 0;
+  height: 0;
+  border: none;
+  overflow-y: hidden;
+  background: white;
+}
+/* Side docs toggle button */
+#sidedocstoggle {
+  position: absolute;
+  border-top-left-radius: 100px;
+  border-bottom-left-radius: 100px;
+  right: 0;
+  top: 40%;
+  bottom: 40%;
+  height: 20%;
+  z-index: 10;
+  padding: 0;
+  margin: 0;
+  background: grey;
+  box-shadow: none !important;
+  transition: none;
+}
+.sideDocs #sidedocsframe {
+  width: 22rem;
+  height: 100%;
+  overflow-y: auto;
+  -webkit-box-shadow: 0px 0px 20px 0px rgba(0, 0, 0, 0.41);
+  -moz-box-shadow: 0px 0px 20px 0px rgba(0, 0, 0, 0.41);
+  box-shadow: 0px 0px 20px 0px rgba(0, 0, 0, 0.41);
+}
+.sideDocs #sidedocstoggle {
+  right: 22rem;
+  transition: right 0.5s, opacity 0.5s linear;
+}
+/* Show chevron icon on hover when collapsed */
+#sidedocstoggle > i.icon.hover {
+  display: none;
+}
+#root:not(.sideDocs) #sidedocstoggle.ui.button:hover > i.icon {
+  display: none !important;
+}
+#root:not(.sideDocs) #sidedocstoggle.ui.button:hover > i.icon.hover {
+  display: inherit !important;
+}
+.sideDocs #sidedocsbar {
+  top: calc(6rem);
+}
+.sideDocs #sidedocs {
+  visibility: visible;
+  opacity: 1;
+  width: 22rem;
+  padding-top: calc(5.5rem);
+  padding-bottom: calc(5.7rem);
+}
+#sidedocsbar .ui.link .icon {
+  cursor: pointer;
+}
+/* Large Monitor */
+/* Small Monitor */
+/* Tablet */
+/* Mobile */
+/* >= Small Monitor (Small Monitor + Large Monitor + Wide Monitor) */
+/* <= Small Monitor (Mobile + Tablet + Small Monitor) */
+/* <= Tablet (Mobile + Tablet) */
+@media only screen and (max-width: 991px) {
+  .sideDocs #sidedocs {
+    padding-top: calc(5rem);
+    padding-bottom: calc(11rem);
+  }
+  .collapsedEditorTools #sidedocs {
+    padding-bottom: calc(5.7rem);
+  }
+  .sideDocs #sidedocsbar {
+    top: calc(5.5rem);
+  }
+}
+/* Mobile */
+@media only screen and (max-width: 767px) {
+  .sideDocs #sidedocs,
+  #sidedocsframe {
+    width: 18rem;
+  }
+  .sideDocs #sidedocstoggle {
+    right: 18rem;
+  }
+}
+/* Import all components */
+/* Reference import */
+.blocklyWidgetDiv .blocklyPianoDiv {
+  position: relative;
+}
+.blocklyWidgetDiv .blocklyNote {
+  border: solid 0.5px;
+  cursor: pointer;
+  display: inline-block;
+  position: absolute;
+  top: 0px;
+  border-bottom-left-radius: 3px;
+  border-bottom-right-radius: 3px;
+}
+.blocklyWidgetDiv .blocklyNote:hover {
+  background-color: yellow !important;
+}
+.blocklyWidgetDiv .blocklyNoteLabel {
+  border: solid 0.5px;
+  color: white;
+  display: inline-block;
+  line-height: normal;
+  position: absolute;
+  text-align: center;
+}
+.blocklyWidgetDiv .blocklyNotePrevNext {
+  border: solid 0.5px;
+  cursor: pointer;
+  color: white;
+  display: inline-block;
+  font-weight: bold;
+  line-height: normal;
+  position: absolute;
+  text-align: center;
+}
+.blocklyWidgetDiv .blocklyGridPickerMenu {
+  display: table;
+  outline: none;
+}
+.blocklyGridPickerScroller {
+  outline: none;
+  padding: 4px;
+  border-radius: 10px;
+}
+.blocklyGridPickerPadder {
+  border-radius: 10px;
+  outline: none;
+}
+.blocklyWidgetDiv .blocklyGridPickerRow {
+  display: table-row;
+}
+.blocklyWidgetDiv .blocklyGridPickerMenu .goog-menuitem {
+  background: white;
+  cursor: pointer;
+}
+.blocklyWidgetDiv .blocklyGridPickerMenu .goog-menuitem-highlight,
+.blocklyWidgetDiv .blocklyGridPickerMenu .goog-menuitem-hover {
+  background: #d6e9f8;
+}
+.blocklyWidgetDiv .blocklyGridPickerMenu .goog-option {
+  border: solid 4px black;
+  border-radius: 10px;
+  display: table-cell;
+  padding: 4px;
+  text-align: center;
+  vertical-align: top;
+}
+.blocklyWidgetDiv .blocklyGridPickerMenu .goog-option.goog-option-selected {
+  outline: solid 3px #fc3;
+}
+.blocklyWidgetDiv .blocklyGridPickerMenu .goog-menuitem .goog-menuitem-checkbox {
+  display: none;
+}
+.blocklyGridPickerTooltip {
+  z-index: 100000;
+  /* big value for bootstrap3 compatibility */
+}
+/* Reference import */
 /*******************************
          Site Settings
 *******************************/
@@ -50773,6 +51515,12 @@ Avatar
 --------------------*/
 /*-------------------
    Editor
+--------------------*/
+/*-------------------
+   Blockly
+--------------------*/
+/*-------------------
+   Flyout
 --------------------*/
 /*******************************
      User Global Variables
