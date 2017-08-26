@@ -1,5 +1,5 @@
-<!doctype html>
-<html lang="en" data-manifest="" data-framework="typescript">
+<!DOCTYPE html>
+<html lang="en" manifest="/pxt-sample/release.manifest" data-framework="typescript">
 
 <head>
     <meta charset="utf-8">
@@ -21,6 +21,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="MakeCode Editor Sample">
 <meta name="apple-mobile-web-app-status-bar-style" content="translucent-black">
+<meta name="format-detection" content="telephone=no">
 <meta name="application-name" content="MakeCode Editor Sample">
 
 <meta name="msapplication-TileColor" content="">
@@ -46,8 +47,8 @@
 <!-- end include appmeta.html -->
 
 
-    <link rel="stylesheet" data-rtl="/pxt-sample/rtlsemantic.css" href="/pxt-sample/semantic.css" type="text/css">
     <link id="blocklycss" rel="stylesheet" data-rtl="/pxt-sample/rtlblockly.css" href="/pxt-sample/blockly.css" type="text/css">
+    <link rel="stylesheet" data-rtl="/pxt-sample/rtlsemantic.css" href="/pxt-sample/semantic.css" type="text/css">
     <style type="text/css">
         @import "/pxt-sample/custom.css";
         @import "/pxt-sample/icons.css";
@@ -57,6 +58,9 @@
 <body class="main">
     <div id='loading' class="ui active dimmer">
         <div class="ui large loader"></div>
+    </div>
+
+    <div id='custom-content'>
     </div>
 
     <div id='content' class="ui dimmable full-abs">
@@ -76,7 +80,7 @@
     "workerjs": "/pxt-sample/worker.js",
     "tdworkerjs": "/pxt-sample/tdworker.js",
     "monacoworkerjs": "/pxt-sample/monacoworker.js",
-    "pxtVersion": "0.12.130",
+    "pxtVersion": "2.0.27",
     "pxtRelId": "",
     "pxtCdnUrl": "/pxt-sample/",
     "commitCdnUrl": "/pxt-sample/",
@@ -85,6 +89,7 @@
     "targetVersion": "0.0.0",
     "targetRelId": "",
     "targetUrl": "",
+    "targetId": "sample",
     "simUrl": "/pxt-sample/simulator.html",
     "partsUrl": "/pxt-sample/siminstructions.html",
     "runUrl": "/pxt-sample/run.html",

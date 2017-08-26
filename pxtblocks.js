@@ -25,189 +25,8 @@ var pxt;
             return iface.opAsync(op, arg);
         }
         blocks.workerOpAsync = workerOpAsync;
-        (function (NT) {
-            NT[NT["Prefix"] = 0] = "Prefix";
-            NT[NT["Infix"] = 1] = "Infix";
-            NT[NT["Block"] = 2] = "Block";
-            NT[NT["NewLine"] = 3] = "NewLine";
-        })(blocks.NT || (blocks.NT = {}));
-        var NT = blocks.NT;
-        (function (GlueMode) {
-            GlueMode[GlueMode["None"] = 0] = "None";
-            GlueMode[GlueMode["WithSpace"] = 1] = "WithSpace";
-            GlueMode[GlueMode["NoSpace"] = 2] = "NoSpace";
-        })(blocks.GlueMode || (blocks.GlueMode = {}));
-        var GlueMode = blocks.GlueMode;
-        var MAX_COMMENT_LINE_LENGTH = 50;
-        var reservedWords = ["break", "case", "catch", "class", "const", "continue", "debugger",
-            "default", "delete", "do", "else", "enum", "export", "extends", "false", "finally",
-            "for", "function", "if", "import", "in", "instanceof", "new", "null", "return",
-            "super", "switch", "this", "throw", "true", "try", "typeof", "var", "void", "while",
-            "with"];
         var placeholders = {};
-        function stringLit(s) {
-            if (s.length > 20 && /\n/.test(s))
-                return "`" + s.replace(/[\\`${}]/g, function (f) { return "\\" + f; }) + "`";
-            else
-                return JSON.stringify(s);
-        }
-        function mkNode(tp, pref, children) {
-            return {
-                type: tp,
-                op: pref,
-                children: children
-            };
-        }
-        function mkNewLine() {
-            return mkNode(NT.NewLine, "", []);
-        }
-        function mkPrefix(pref, children) {
-            return mkNode(NT.Prefix, pref, children);
-        }
-        function mkInfix(child0, op, child1) {
-            return mkNode(NT.Infix, op, [child0, child1]);
-        }
-        function mkText(s) {
-            return mkPrefix(s, []);
-        }
-        blocks.mkText = mkText;
-        function mkBlock(nodes) {
-            return mkNode(NT.Block, "", nodes);
-        }
-        function mkGroup(nodes) {
-            return mkPrefix("", nodes);
-        }
-        blocks.mkGroup = mkGroup;
-        function mkStmt() {
-            var nodes = [];
-            for (var _i = 0; _i < arguments.length; _i++) {
-                nodes[_i - 0] = arguments[_i];
-            }
-            nodes.push(mkNewLine());
-            return mkGroup(nodes);
-        }
-        function mkCommaSep(nodes, externalInputs) {
-            var r = [];
-            for (var _i = 0, nodes_1 = nodes; _i < nodes_1.length; _i++) {
-                var n = nodes_1[_i];
-                if (externalInputs) {
-                    if (r.length > 0)
-                        r.push(mkText(","));
-                    r.push(mkNewLine());
-                }
-                else if (r.length > 0) {
-                    r.push(mkText(", "));
-                }
-                r.push(n);
-            }
-            if (externalInputs)
-                r.push(mkNewLine());
-            return mkGroup(r);
-        }
-        // A series of utility functions for constructing various J* AST nodes.
-        var Helpers;
-        (function (Helpers) {
-            function mkArrayLiteral(args) {
-                return mkGroup([
-                    mkText("["),
-                    mkCommaSep(args, false),
-                    mkText("]")
-                ]);
-            }
-            Helpers.mkArrayLiteral = mkArrayLiteral;
-            function mkNumberLiteral(x) {
-                return mkText(x.toString());
-            }
-            Helpers.mkNumberLiteral = mkNumberLiteral;
-            function mkBooleanLiteral(x) {
-                return mkText(x ? "true" : "false");
-            }
-            Helpers.mkBooleanLiteral = mkBooleanLiteral;
-            function mkStringLiteral(x) {
-                return mkText(stringLit(x));
-            }
-            Helpers.mkStringLiteral = mkStringLiteral;
-            function mkPropertyAccess(name, thisArg) {
-                return mkGroup([
-                    mkInfix(thisArg, ".", mkText(name)),
-                ]);
-            }
-            Helpers.mkPropertyAccess = mkPropertyAccess;
-            function mkCall(name, args, externalInputs, method) {
-                if (method === void 0) { method = false; }
-                if (method)
-                    return mkGroup([
-                        mkInfix(args[0], ".", mkText(name)),
-                        mkText("("),
-                        mkCommaSep(args.slice(1), externalInputs),
-                        mkText(")")
-                    ]);
-                else
-                    return mkGroup([
-                        mkText(name),
-                        mkText("("),
-                        mkCommaSep(args, externalInputs),
-                        mkText(")")
-                    ]);
-            }
-            Helpers.mkCall = mkCall;
-            // Call function [name] from the standard device library with arguments
-            // [args].
-            function stdCall(name, args, externalInputs) {
-                return mkCall(name, args, externalInputs);
-            }
-            Helpers.stdCall = stdCall;
-            // Call extension method [name] on the first argument
-            function extensionCall(name, args, externalInputs) {
-                return mkCall(name, args, externalInputs, true);
-            }
-            Helpers.extensionCall = extensionCall;
-            // Call function [name] from the specified [namespace] in the micro:bit
-            // library.
-            function namespaceCall(namespace, name, args, externalInputs) {
-                return mkCall(namespace + "." + name, args, externalInputs);
-            }
-            Helpers.namespaceCall = namespaceCall;
-            function mathCall(name, args) {
-                return namespaceCall("Math", name, args, false);
-            }
-            Helpers.mathCall = mathCall;
-            function mkGlobalRef(name) {
-                return mkText(name);
-            }
-            Helpers.mkGlobalRef = mkGlobalRef;
-            function mkSimpleCall(p, args) {
-                assert(args.length == 2);
-                return mkInfix(args[0], p, args[1]);
-            }
-            Helpers.mkSimpleCall = mkSimpleCall;
-            function mkWhile(condition, body) {
-                return mkGroup([
-                    mkText("while ("),
-                    condition,
-                    mkText(")"),
-                    mkBlock(body)
-                ]);
-            }
-            Helpers.mkWhile = mkWhile;
-            function mkComment(text) {
-                return mkStmt(mkText("// " + text));
-            }
-            Helpers.mkComment = mkComment;
-            function mkAssign(x, e) {
-                return mkStmt(mkSimpleCall("=", [x, e]));
-            }
-            Helpers.mkAssign = mkAssign;
-            function mkParenthesizedExpression(expression) {
-                return mkGroup([
-                    mkText("("),
-                    expression,
-                    mkText(")")
-                ]);
-            }
-            Helpers.mkParenthesizedExpression = mkParenthesizedExpression;
-        })(Helpers || (Helpers = {}));
-        var H = Helpers;
+        var MAX_COMMENT_LINE_LENGTH = 50;
         ///////////////////////////////////////////////////////////////////////////////
         // Miscellaneous utility functions
         ///////////////////////////////////////////////////////////////////////////////
@@ -653,21 +472,21 @@ var pxt;
         // each property ref, the right value for its [parent] property.
         ///////////////////////////////////////////////////////////////////////////////
         function extractNumber(b) {
-            var v = b.getFieldValue("NUM");
+            var v = b.getFieldValue(b.type === "math_number_minmax" ? "SLIDER" : "NUM");
             var parsed = parseFloat(v);
             checkNumber(parsed);
             return parsed;
         }
         function checkNumber(n) {
-            if (n === Infinity || n === NaN) {
+            if (n === Infinity || isNaN(n)) {
                 pxt.U.userError(lf("Number entered is either too large or too small"));
             }
         }
         function extractTsExpression(e, b, comments) {
-            return mkText(b.getFieldValue("EXPRESSION"));
+            return blocks.mkText(b.getFieldValue("EXPRESSION"));
         }
         function compileNumber(e, b, comments) {
-            return H.mkNumberLiteral(extractNumber(b));
+            return blocks.H.mkNumberLiteral(extractNumber(b));
         }
         var opToTok = {
             // POWER gets a special treatment because there's no operator for it in
@@ -693,38 +512,38 @@ var pxt;
             var t = returnType(e, left).type;
             if (t == pString.type) {
                 if (bOp == "EQ")
-                    return H.mkSimpleCall("==", args);
+                    return blocks.H.mkSimpleCall("==", args);
                 else if (bOp == "NEQ")
-                    return H.mkSimpleCall("!=", args);
+                    return blocks.H.mkSimpleCall("!=", args);
             }
             else if (t == pBoolean.type)
-                return H.mkSimpleCall(opToTok[bOp], args);
+                return blocks.H.mkSimpleCall(opToTok[bOp], args);
             // Compilation of math operators.
             if (bOp == "POWER")
-                return H.mathCall("pow", args);
+                return blocks.H.mathCall("pow", args);
             else {
                 assert(bOp in opToTok);
-                return H.mkSimpleCall(opToTok[bOp], args);
+                return blocks.H.mkSimpleCall(opToTok[bOp], args);
             }
         }
         function compileModulo(e, b, comments) {
             var left = getInputTargetBlock(b, "DIVIDEND");
             var right = getInputTargetBlock(b, "DIVISOR");
             var args = [compileExpression(e, left, comments), compileExpression(e, right, comments)];
-            return H.mkSimpleCall("%", args);
+            return blocks.H.mkSimpleCall("%", args);
         }
         function compileMathOp2(e, b, comments) {
             var op = b.getFieldValue("op");
             var x = compileExpression(e, getInputTargetBlock(b, "x"), comments);
             var y = compileExpression(e, getInputTargetBlock(b, "y"), comments);
-            return H.mathCall(op, [x, y]);
+            return blocks.H.mathCall(op, [x, y]);
         }
         function compileMathOp3(e, b, comments) {
             var x = compileExpression(e, getInputTargetBlock(b, "x"), comments);
-            return H.mathCall("abs", [x]);
+            return blocks.H.mathCall("abs", [x]);
         }
         function compileText(e, b, comments) {
-            return H.mkStringLiteral(b.getFieldValue("TEXT"));
+            return blocks.H.mkStringLiteral(b.getFieldValue("TEXT"));
         }
         function compileTextJoin(e, b, comments) {
             var last;
@@ -748,51 +567,36 @@ var pxt;
                     else {
                         // If we don't start with a string, then the TS won't match
                         // the implied semantics of the blocks
-                        last = H.mkSimpleCall("+", [H.mkStringLiteral(""), compiled]);
+                        last = blocks.H.mkSimpleCall("+", [blocks.H.mkStringLiteral(""), compiled]);
                     }
                 }
                 else {
-                    last = H.mkSimpleCall("+", [last, compiled]);
+                    last = blocks.H.mkSimpleCall("+", [last, compiled]);
                 }
             }
             if (!last) {
-                return H.mkStringLiteral("");
+                return blocks.H.mkStringLiteral("");
             }
             return last;
         }
         function compileBoolean(e, b, comments) {
-            return H.mkBooleanLiteral(b.getFieldValue("BOOL") == "TRUE");
+            return blocks.H.mkBooleanLiteral(b.getFieldValue("BOOL") == "TRUE");
         }
         function compileNot(e, b, comments) {
             var expr = compileExpression(e, getInputTargetBlock(b, "BOOL"), comments);
-            return mkPrefix("!", [H.mkParenthesizedExpression(expr)]);
-        }
-        function extractNumberLit(e) {
-            if (e.type != NT.Prefix || !/^-?\d+$/.test(e.op))
-                return null;
-            var parsed = parseInt(e.op);
-            checkNumber(parsed);
-            return parsed;
-        }
-        function compileRandom(e, b, comments) {
-            var expr = compileExpression(e, getInputTargetBlock(b, "limit"), comments);
-            var v = extractNumberLit(expr);
-            if (v != null)
-                return H.mathCall("random", [H.mkNumberLiteral(v + 1)]);
-            else
-                return H.mathCall("random", [H.mkSimpleCall(opToTok["ADD"], [expr, H.mkNumberLiteral(1)])]);
+            return blocks.mkPrefix("!", [blocks.H.mkParenthesizedExpression(expr)]);
         }
         function compileCreateList(e, b, comments) {
             // collect argument
             var args = b.inputList.map(function (input) { return input.connection && input.connection.targetBlock() ? compileExpression(e, input.connection.targetBlock(), comments) : undefined; })
                 .filter(function (e) { return !!e; });
-            return H.mkArrayLiteral(args);
+            return blocks.H.mkArrayLiteral(args);
         }
         function compileListGet(e, b, comments) {
             var listBlock = getInputTargetBlock(b, "LIST");
             var listExpr = compileExpression(e, listBlock, comments);
             var index = compileExpression(e, getInputTargetBlock(b, "INDEX"), comments);
-            var res = mkGroup([listExpr, mkText("["), index, mkText("]")]);
+            var res = blocks.mkGroup([listExpr, blocks.mkText("["), index, blocks.mkText("]")]);
             return res;
         }
         function compileListSet(e, b, comments) {
@@ -800,20 +604,20 @@ var pxt;
             var listExpr = compileExpression(e, listBlock, comments);
             var index = compileExpression(e, getInputTargetBlock(b, "INDEX"), comments);
             var value = compileExpression(e, getInputTargetBlock(b, "VALUE"), comments);
-            var res = mkGroup([listExpr, mkText("["), index, mkText("] = "), value]);
+            var res = blocks.mkGroup([listExpr, blocks.mkText("["), index, blocks.mkText("] = "), value]);
             return listBlock.type === "lists_create_with" ? prefixWithSemicolon(res) : res;
         }
         function compileProcedure(e, b, comments) {
             var name = escapeVarName(b.getFieldValue("NAME"), e);
             var stmts = getInputTargetBlock(b, "STACK");
             return [
-                mkText("function " + name + "() "),
+                blocks.mkText("function " + name + "() "),
                 compileStatements(e, stmts)
             ];
         }
         function compileProcedureCall(e, b, comments) {
             var name = escapeVarName(b.getFieldValue("NAME"), e);
-            return mkStmt(mkText(name + "()"));
+            return blocks.mkStmt(blocks.mkText(name + "()"));
         }
         function defaultValueForType(t) {
             if (t.type == null) {
@@ -821,17 +625,17 @@ var pxt;
                 t = find(t);
             }
             if (isArrayType(t.type)) {
-                return mkText("[]");
+                return blocks.mkText("[]");
             }
             switch (t.type) {
                 case "boolean":
-                    return H.mkBooleanLiteral(false);
+                    return blocks.H.mkBooleanLiteral(false);
                 case "number":
-                    return H.mkNumberLiteral(0);
+                    return blocks.H.mkNumberLiteral(0);
                 case "string":
-                    return H.mkStringLiteral("");
+                    return blocks.H.mkStringLiteral("");
                 default:
-                    return mkText("null");
+                    return blocks.mkText("null");
             }
         }
         // [t] is the expected type; we assume that we never null block children
@@ -854,7 +658,7 @@ var pxt;
                         var call = e.stdCallTable[b.parentBlock_.type];
                         isExpression = call && call.isExpression;
                     }
-                    var arrayNode = mkText("[0]");
+                    var arrayNode = blocks.mkText("[0]");
                     expr = isExpression ? arrayNode : prefixWithSemicolon(arrayNode);
                 }
                 else {
@@ -874,9 +678,6 @@ var pxt;
                         break;
                     case "math_op3":
                         expr = compileMathOp3(e, b, comments);
-                        break;
-                    case "device_random":
-                        expr = compileRandom(e, b, comments);
                         break;
                     case "math_arithmetic":
                     case "logic_compare":
@@ -987,21 +788,21 @@ var pxt;
             for (var i = 0; i <= b.elseifCount_; ++i) {
                 var cond = compileExpression(e, getInputTargetBlock(b, "IF" + i), comments);
                 var thenBranch = compileStatements(e, getInputTargetBlock(b, "DO" + i));
-                var startNode = mkText("if (");
+                var startNode = blocks.mkText("if (");
                 if (i > 0) {
-                    startNode = mkText("else if (");
-                    startNode.glueToBlock = GlueMode.WithSpace;
+                    startNode = blocks.mkText("else if (");
+                    startNode.glueToBlock = blocks.GlueMode.WithSpace;
                 }
                 append(stmts, [
                     startNode,
                     cond,
-                    mkText(")"),
+                    blocks.mkText(")"),
                     thenBranch
                 ]);
             }
             if (b.elseCount_) {
-                var elseNode = mkText("else");
-                elseNode.glueToBlock = GlueMode.WithSpace;
+                var elseNode = blocks.mkText("else");
+                elseNode.glueToBlock = blocks.GlueMode.WithSpace;
                 append(stmts, [
                     elseNode,
                     compileStatements(e, getInputTargetBlock(b, "ELSE"))
@@ -1019,13 +820,13 @@ var pxt;
             var binding = lookup(e, bVar);
             assert(binding.declaredInLocalScope > 0);
             return [
-                mkText("for (let " + bVar + " = "),
-                bFrom ? compileExpression(e, bFrom, comments) : mkText("0"),
-                mkText("; "),
-                mkInfix(mkText(bVar), "<=", compileExpression(e, bTo, comments)),
-                mkText("; "),
-                incOne ? mkText(bVar + "++") : mkInfix(mkText(bVar), "+=", compileExpression(e, bBy, comments)),
-                mkText(")"),
+                blocks.mkText("for (let " + bVar + " = "),
+                bFrom ? compileExpression(e, bFrom, comments) : blocks.mkText("0"),
+                blocks.mkText("; "),
+                blocks.mkInfix(blocks.mkText(bVar), "<=", compileExpression(e, bTo, comments)),
+                blocks.mkText("; "),
+                incOne ? blocks.mkText(bVar + "++") : blocks.mkInfix(blocks.mkText(bVar), "+=", compileExpression(e, bBy, comments)),
+                blocks.mkText(")"),
                 compileStatements(e, bDo)
             ];
         }
@@ -1037,9 +838,9 @@ var pxt;
             for (var i = 0; !valid(name); i++)
                 name = "i" + i;
             return [
-                mkText("for (let " + name + " = 0; "),
-                mkInfix(mkText(name), "<", bound),
-                mkText("; " + name + "++)"),
+                blocks.mkText("for (let " + name + " = 0; "),
+                blocks.mkInfix(blocks.mkText(name), "<", bound),
+                blocks.mkText("; " + name + "++)"),
                 body
             ];
         }
@@ -1047,9 +848,9 @@ var pxt;
             var cond = compileExpression(e, getInputTargetBlock(b, "COND"), comments);
             var body = compileStatements(e, getInputTargetBlock(b, "DO"));
             return [
-                mkText("while ("),
+                blocks.mkText("while ("),
                 cond,
-                mkText(")"),
+                blocks.mkText(")"),
                 body
             ];
         }
@@ -1060,9 +861,9 @@ var pxt;
             var binding = lookup(e, bVar);
             assert(binding.declaredInLocalScope > 0);
             return [
-                mkText("for (let " + bVar + " of "),
+                blocks.mkText("for (let " + bVar + " of "),
                 compileExpression(e, bOf, comments),
-                mkText(")"),
+                blocks.mkText(")"),
                 compileStatements(e, bDo)
             ];
         }
@@ -1078,12 +879,7 @@ var pxt;
             if (e.renames.oldToNew[name]) {
                 return e.renames.oldToNew[name];
             }
-            var n = name.replace(/\s+/g, "_").replace(/[^a-zA-Z0-9_$]/g, function (a) {
-                return ts.pxtc.isIdentifierPart(a.charCodeAt(0), ts.pxtc.ScriptTarget.ES5) ? a : "";
-            });
-            if (!n || !ts.pxtc.isIdentifierStart(n.charCodeAt(0), ts.pxtc.ScriptTarget.ES5)) {
-                n = "_" + n;
-            }
+            var n = ts.pxtc.escapeIdentifier(name);
             if (e.renames.takenNames[n]) {
                 var i = 2;
                 while (e.renames.takenNames[n + i]) {
@@ -1102,7 +898,7 @@ var pxt;
             if (!binding.assigned)
                 binding.assigned = VarUsage.Read;
             assert(binding != null && binding.type != null);
-            return mkText(name);
+            return blocks.mkText(name);
         }
         function compileSet(e, b, comments) {
             var bVar = escapeVarName(b.getFieldValue("VAR"), e);
@@ -1119,7 +915,7 @@ var pxt;
                     isDef = true;
                 }
             var expr = compileExpression(e, bExpr, comments);
-            return mkStmt(mkText(isDef ? "let " : ""), mkText(bVar + " = "), expr);
+            return blocks.mkStmt(blocks.mkText(isDef ? "let " : ""), blocks.mkText(bVar + " = "), expr);
         }
         function compileChange(e, b, comments) {
             var bVar = escapeVarName(b.getFieldValue("VAR"), e);
@@ -1128,8 +924,8 @@ var pxt;
             if (!binding.assigned)
                 binding.assigned = VarUsage.Read;
             var expr = compileExpression(e, bExpr, comments);
-            var ref = mkText(bVar);
-            return mkStmt(mkInfix(ref, "+=", expr));
+            var ref = blocks.mkText(bVar);
+            return blocks.mkStmt(blocks.mkInfix(ref, "+=", expr));
         }
         function eventArgs(call) {
             return call.args.map(function (ar) { return ar.field; }).filter(function (ar) { return !!ar; });
@@ -1137,20 +933,20 @@ var pxt;
         function compileCall(e, b, comments) {
             var call = e.stdCallTable[b.type];
             if (call.imageLiteral)
-                return mkStmt(compileImage(e, b, call.imageLiteral, call.namespace, call.f, call.args.map(function (ar) { return compileArgument(e, b, ar, comments); })));
+                return blocks.mkStmt(compileImage(e, b, call.imageLiteral, call.namespace, call.f, call.args.map(function (ar) { return compileArgument(e, b, ar, comments); })));
             else if (call.hasHandler)
                 return compileEvent(e, b, call, eventArgs(call), call.namespace, comments);
             else
-                return mkStmt(compileStdCall(e, b, call, comments));
+                return blocks.mkStmt(compileStdCall(e, b, call, comments));
         }
         function compileArgument(e, b, p, comments, beginningOfStatement) {
             if (beginningOfStatement === void 0) { beginningOfStatement = false; }
             var lit = p.literal;
             if (lit)
-                return lit instanceof String ? H.mkStringLiteral(lit) : H.mkNumberLiteral(lit);
+                return lit instanceof String ? blocks.H.mkStringLiteral(lit) : blocks.H.mkNumberLiteral(lit);
             var f = b.getFieldValue(p.field);
-            if (f)
-                return mkText(f);
+            if (f != null)
+                return blocks.mkText(f);
             else {
                 attachPlaceholderIf(e, b, p.field);
                 var target = getInputTargetBlock(b, p.field);
@@ -1176,7 +972,7 @@ var pxt;
             if (func.isIdentity)
                 return args[0];
             else if (func.property) {
-                return H.mkPropertyAccess(func.f, args[0]);
+                return blocks.H.mkPropertyAccess(func.f, args[0]);
             }
             else if (func.isExtensionMethod) {
                 if (func.attrs.defaultInstance) {
@@ -1188,48 +984,48 @@ var pxt;
                         args.unshift(instance);
                     }
                     else {
-                        args.unshift(mkText(func.attrs.defaultInstance));
+                        args.unshift(blocks.mkText(func.attrs.defaultInstance));
                     }
                 }
-                return H.extensionCall(func.f, args, externalInputs);
+                return blocks.H.extensionCall(func.f, args, externalInputs);
             }
             else if (func.namespace) {
-                return H.namespaceCall(func.namespace, func.f, args, externalInputs);
+                return blocks.H.namespaceCall(func.namespace, func.f, args, externalInputs);
             }
             else {
-                return H.stdCall(func.f, args, externalInputs);
+                return blocks.H.stdCall(func.f, args, externalInputs);
             }
         }
         function compileStdBlock(e, b, f, comments) {
-            return mkStmt(compileStdCall(e, b, f, comments));
+            return blocks.mkStmt(compileStdCall(e, b, f, comments));
         }
         function mkCallWithCallback(e, n, f, args, body, argumentDeclaration, isExtension) {
             if (isExtension === void 0) { isExtension = false; }
             body.noFinalNewline = true;
             var callback;
             if (argumentDeclaration) {
-                callback = mkGroup([argumentDeclaration, body]);
+                callback = blocks.mkGroup([argumentDeclaration, body]);
             }
             else {
-                callback = mkGroup([mkText("() =>"), body]);
+                callback = blocks.mkGroup([blocks.mkText("function ()"), body]);
             }
             if (isExtension)
-                return mkStmt(H.extensionCall(f, args.concat([callback]), false));
+                return blocks.mkStmt(blocks.H.extensionCall(f, args.concat([callback]), false));
             else
-                return mkStmt(H.namespaceCall(n, f, args.concat([callback]), false));
+                return blocks.mkStmt(blocks.H.namespaceCall(n, f, args.concat([callback]), false));
         }
         function compileArg(e, b, arg, comments) {
             // b.getFieldValue may be string, numbers
             var argb = getInputTargetBlock(b, arg);
             if (argb)
                 return compileExpression(e, argb, comments);
-            return mkText(b.getFieldValue(arg));
+            return blocks.mkText(b.getFieldValue(arg));
         }
         function compileStartEvent(e, b) {
             var bBody = getInputTargetBlock(b, "HANDLER");
             var body = compileStatements(e, bBody);
             if (pxt.appTarget.compile && pxt.appTarget.compile.onStartText && body && body.children) {
-                body.children.unshift(mkStmt(mkText("// " + pxtc.ON_START_COMMENT + "\n")));
+                body.children.unshift(blocks.mkStmt(blocks.mkText("// " + pxtc.ON_START_COMMENT + "\n")));
             }
             return body;
         }
@@ -1237,6 +1033,9 @@ var pxt;
             var compiledArgs = args.map(function (arg) { return compileArg(e, b, arg, comments); });
             var bBody = getInputTargetBlock(b, "HANDLER");
             var body = compileStatements(e, bBody);
+            if (pxt.appTarget.compile && pxt.appTarget.compile.emptyEventHandlerComments && body.children.length === 0) {
+                body.children.unshift(blocks.mkStmt(blocks.mkText("// " + pxtc.HANDLER_COMMENT)));
+            }
             var argumentDeclaration;
             if (isMutatingBlock(b) && b.mutation.getMutationType() === blocks.MutatorTypes.ObjectDestructuringMutator) {
                 argumentDeclaration = b.mutation.compileMutation(e, comments);
@@ -1259,9 +1058,9 @@ var pxt;
                 }
                 state += '\n';
             }
-            var lit = H.mkStringLiteral(state);
+            var lit = blocks.H.mkStringLiteral(state);
             lit.canIndentInside = true;
-            return H.namespaceCall(n, f, [lit].concat(args), false);
+            return blocks.H.namespaceCall(n, f, [lit].concat(args), false);
         }
         function compileStatementBlock(e, b) {
             var r;
@@ -1308,20 +1107,20 @@ var pxt;
                     if (call)
                         r = [compileCall(e, b, comments)];
                     else
-                        r = [mkStmt(compileExpression(e, b, comments))];
+                        r = [blocks.mkStmt(compileExpression(e, b, comments))];
                     break;
             }
             var l = r[r.length - 1];
             if (l)
                 l.id = b.id;
-            r.forEach(function (l) {
-                if (l.type === NT.Block) {
-                    l.id = b.id;
-                }
-            });
             if (comments.length) {
                 addCommentNodes(comments, r);
             }
+            r.forEach(function (l) {
+                if (l.type === blocks.NT.Block || l.type === blocks.NT.Prefix && pxt.Util.startsWith(l.op, "//")) {
+                    l.id = b.id;
+                }
+            });
             return r;
         }
         function compileStatements(e, b) {
@@ -1331,7 +1130,7 @@ var pxt;
                     append(stmts, compileStatementBlock(e, b));
                 b = b.getNextBlock();
             }
-            return mkBlock(stmts);
+            return blocks.mkBlock(stmts);
         }
         function compileTypescriptBlock(e, b) {
             var res = [];
@@ -1340,7 +1139,7 @@ var pxt;
                 var value = b.getFieldValue("LINE" + i);
                 i++;
                 if (value !== null) {
-                    res.push(mkText(value + "\n"));
+                    res.push(blocks.mkText(value + "\n"));
                     var declaredVars = b.declaredVariables;
                     if (declaredVars) {
                         var varNames = declaredVars.split(",");
@@ -1369,9 +1168,9 @@ var pxt;
             return res;
         }
         function prefixWithSemicolon(n) {
-            var emptyStatement = mkStmt(mkText(";"));
-            emptyStatement.glueToBlock = GlueMode.NoSpace;
-            return mkGroup([emptyStatement, n]);
+            var emptyStatement = blocks.mkStmt(blocks.mkText(";"));
+            emptyStatement.glueToBlock = blocks.GlueMode.NoSpace;
+            return blocks.mkGroup([emptyStatement, n]);
         }
         // This function creates an empty environment where type inference has NOT yet
         // been performed.
@@ -1382,13 +1181,22 @@ var pxt;
             // The to-be-returned environment.
             var e = emptyEnv(w);
             // append functions in stdcalltable
-            if (blockInfo)
+            if (blockInfo) {
+                // Enums are not enclosed in namespaces, so add them to the taken names
+                // to avoid collision
+                Object.keys(blockInfo.apis.byQName).forEach(function (name) {
+                    var info = blockInfo.apis.byQName[name];
+                    if (info.kind === pxtc.SymbolKind.Enum) {
+                        e.renames.takenNames[info.qName] = true;
+                    }
+                });
                 blockInfo.blocks
                     .forEach(function (fn) {
                     if (e.stdCallTable[fn.attributes.blockId]) {
                         pxt.reportError("blocks", "function already defined", { "details": fn.attributes.blockId });
                         return;
                     }
+                    e.renames.takenNames[fn.namespace] = true;
                     var fieldMap = pxt.blocks.parameterNames(fn);
                     var instance = fn.kind == pxtc.SymbolKind.Method || fn.kind == pxtc.SymbolKind.Property;
                     var args = (fn.parameters || []).map(function (p) {
@@ -1415,6 +1223,7 @@ var pxt;
                         isIdentity: fn.attributes.shim == "TD_ID"
                     };
                 });
+            }
             if (skipVariables)
                 return e;
             var variableIsScoped = function (b, name) {
@@ -1440,25 +1249,26 @@ var pxt;
                     lookup(e, name).mustBeGlobal = true;
             }
             // collect local variables.
-            w.getAllBlocks().filter(function (b) { return !b.disabled; }).forEach(function (b) {
-                if (b.type == "controls_for" || b.type == "controls_simple_for" || b.type == "controls_for_of") {
-                    var x = escapeVarName(b.getFieldValue("VAR"), e);
-                    if (b.type == "controls_for_of") {
-                        trackLocalDeclaration(x, null);
-                    }
-                    else {
-                        trackLocalDeclaration(x, pNumber.type);
-                    }
-                }
-                else if (isMutatingBlock(b)) {
-                    var declarations = b.mutation.getDeclaredVariables();
-                    if (declarations) {
-                        for (var varName in declarations) {
-                            trackLocalDeclaration(escapeVarName(varName, e), declarations[varName]);
+            if (w)
+                w.getAllBlocks().filter(function (b) { return !b.disabled; }).forEach(function (b) {
+                    if (b.type == "controls_for" || b.type == "controls_simple_for" || b.type == "controls_for_of") {
+                        var x = escapeVarName(b.getFieldValue("VAR"), e);
+                        if (b.type == "controls_for_of") {
+                            trackLocalDeclaration(x, null);
+                        }
+                        else {
+                            trackLocalDeclaration(x, pNumber.type);
                         }
                     }
-                }
-            });
+                    else if (isMutatingBlock(b)) {
+                        var declarations = b.mutation.getDeclaredVariables();
+                        if (declarations) {
+                            for (var varName in declarations) {
+                                trackLocalDeclaration(escapeVarName(varName, e), declarations[varName]);
+                            }
+                        }
+                    }
+                });
             // determine for-loop compatibility: for each get or
             // set block, 1) make sure that the variable is bound, then 2) mark the variable if needed.
             w.getAllBlocks().filter(function (b) { return !b.disabled; }).forEach(function (b) {
@@ -1498,7 +1308,7 @@ var pxt;
                         append(stmtsMain_1, compileStartEvent(e, b).children);
                     else {
                         var compiled = compileStatements(e, b);
-                        if (compiled.type == NT.Block)
+                        if (compiled.type == blocks.NT.Block)
                             append(stmtsMain_1, compiled.children);
                         else
                             stmtsMain_1.push(compiled);
@@ -1510,7 +1320,7 @@ var pxt;
                     var t = getConcreteType(b.type);
                     var defl;
                     if (t.type === "Array") {
-                        defl = mkText("[]");
+                        defl = blocks.mkText("[]");
                     }
                     else {
                         defl = defaultValueForType(t);
@@ -1525,11 +1335,11 @@ var pxt;
                         }
                         var tpinfo = blockInfo.apis.byQName[tpname];
                         if (tpinfo && tpinfo.attributes.autoCreate)
-                            defl = mkText(tpinfo.attributes.autoCreate + "()");
+                            defl = blocks.mkText(tpinfo.attributes.autoCreate + "()");
                         else
                             tp = ": " + tpname;
                     }
-                    return mkStmt(mkText("let " + b.name + tp + " = "), defl);
+                    return blocks.mkStmt(blocks.mkText("let " + b.name + tp + " = "), defl);
                 });
                 return stmtsVariables.concat(stmtsMain_1);
             }
@@ -1573,9 +1383,9 @@ var pxt;
                 // multiple calls allowed
                 if (b.type == ts.pxtc.ON_START_TYPE)
                     flagDuplicate(ts.pxtc.ON_START_TYPE, b);
-                else if (b.type === "procedures_defnoreturn" || call && call.attrs.blockAllowMultiple)
+                else if (b.type === "procedures_defnoreturn" || call && call.attrs.blockAllowMultiple && !call.attrs.handlerStatement)
                     return;
-                else if (call && call.hasHandler) {
+                else if (call && call.hasHandler && !call.attrs.handlerStatement) {
                     // compute key that identifies event call
                     // detect if same event is registered already
                     var key = callKey(e, b);
@@ -1616,192 +1426,16 @@ var pxt;
             return result;
         }
         blocks.compileAsync = compileAsync;
-        // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Operator_Precedence
-        var infixPriTable = {
-            // 0 = comma/sequence
-            // 1 = spread (...)
-            // 2 = yield, yield*
-            // 3 = assignment
-            "=": 3,
-            "+=": 3,
-            "-=": 3,
-            // 4 = conditional (?:)
-            "||": 5,
-            "&&": 6,
-            "|": 7,
-            "^": 8,
-            "&": 9,
-            // 10 = equality
-            "==": 10,
-            "!=": 10,
-            "===": 10,
-            "!==": 10,
-            // 11 = comparison (excludes in, instanceof)
-            "<": 11,
-            ">": 11,
-            "<=": 11,
-            ">=": 11,
-            // 12 = bitise shift
-            ">>": 12,
-            ">>>": 12,
-            "<<": 12,
-            "+": 13,
-            "-": 13,
-            "*": 14,
-            "/": 14,
-            "%": 14,
-            "!": 15,
-            ".": 18,
-        };
         function tdASTtoTS(env, app) {
-            var sourceMap = [];
-            var sourceMapById = {};
-            var output = "";
-            var indent = "";
-            var variables = [{}];
-            function flatten(e0) {
-                function rec(e, outPrio) {
-                    if (e.type != NT.Infix) {
-                        for (var _i = 0, _a = e.children; _i < _a.length; _i++) {
-                            var c = _a[_i];
-                            rec(c, -1);
-                        }
-                        return;
-                    }
-                    var r = [];
-                    function pushOp(c) {
-                        r.push(mkText(c));
-                    }
-                    var infixPri = pxt.U.lookup(infixPriTable, e.op);
-                    if (infixPri == null)
-                        pxt.U.oops("bad infix op: " + e.op);
-                    if (infixPri < outPrio)
-                        pushOp("(");
-                    if (e.children.length == 1) {
-                        pushOp(e.op);
-                        rec(e.children[0], infixPri);
-                    }
-                    else {
-                        var bindLeft = infixPri != 3 && e.op != "**";
-                        var letType = undefined;
-                        /*
-                        if (e.name == "=" && e.args[0].nodeType == 'localRef') {
-                            let varloc = <TDev.AST.Json.JLocalRef>e.args[0];
-                            let varname = varloc.name;
-                            if (!variables[variables.length - 1][varname]) {
-                                variables[variables.length - 1][varname] = "1";
-                                pushOp("let")
-                                letType = varloc.type as any as string;
-                            }
-                        }
-                        */
-                        rec(e.children[0], bindLeft ? infixPri : infixPri + 0.1);
-                        r.push(e.children[0]);
-                        if (letType && letType != "number") {
-                            pushOp(": ");
-                            pushOp(letType);
-                        }
-                        if (e.op == ".")
-                            pushOp(".");
-                        else
-                            pushOp(" " + e.op + " ");
-                        rec(e.children[1], !bindLeft ? infixPri : infixPri + 0.1);
-                        r.push(e.children[1]);
-                    }
-                    if (infixPri < outPrio)
-                        pushOp(")");
-                    e.type = NT.Prefix;
-                    e.op = "";
-                    e.children = r;
-                }
-                rec(e0, -1);
-            }
-            var root = mkGroup(app);
-            flatten(root);
-            emit(root);
-            // never return empty string - TS compiler service thinks it's an error
-            if (!output)
-                output += "\n";
-            // outformat async
-            return workerOpAsync("format", { format: { input: output, pos: 1 } }).then(function () {
+            var res = blocks.flattenNode(app);
+            // Note: the result of format is not used!
+            return workerOpAsync("format", { format: { input: res.output, pos: 1 } }).then(function () {
                 return {
-                    source: output,
-                    sourceMap: sourceMap,
+                    source: res.output,
+                    sourceMap: res.sourceMap,
                     stats: env.stats
                 };
             });
-            function emit(n) {
-                if (n.glueToBlock) {
-                    removeLastIndent();
-                    if (n.glueToBlock === GlueMode.WithSpace) {
-                        output += " ";
-                    }
-                }
-                var start = getCurrentLine();
-                switch (n.type) {
-                    case NT.Infix:
-                        pxt.U.oops("no infix should be left");
-                        break;
-                    case NT.NewLine:
-                        output += "\n" + indent;
-                        break;
-                    case NT.Block:
-                        block(n);
-                        break;
-                    case NT.Prefix:
-                        if (n.canIndentInside)
-                            output += n.op.replace(/\n/g, "\n" + indent + "    ");
-                        else
-                            output += n.op;
-                        n.children.forEach(emit);
-                        break;
-                    default:
-                        break;
-                }
-                var end = getCurrentLine();
-                if (n.id && start != end) {
-                    if (sourceMapById[n.id]) {
-                        var node = sourceMapById[n.id];
-                        node.start = Math.min(node.start, start);
-                        node.end = Math.max(node.end, end);
-                    }
-                    else {
-                        var interval = { id: n.id, start: start, end: end };
-                        sourceMapById[n.id] = interval;
-                        sourceMap.push(interval);
-                    }
-                }
-            }
-            function getCurrentLine() {
-                var i = 0;
-                output.replace(/\n/g, function (a) { i++; return a; });
-                return i;
-            }
-            function write(s) {
-                output += s.replace(/\n/g, "\n" + indent);
-            }
-            function removeLastIndent() {
-                output = output.replace(/\n *$/, "");
-            }
-            function block(n) {
-                var finalNl = n.noFinalNewline ? "" : "\n";
-                if (n.children.length == 0) {
-                    write(" {\n\t\n}" + finalNl);
-                    return;
-                }
-                var vars = pxt.U.clone(variables[variables.length - 1] || {});
-                variables.push(vars);
-                indent += "    ";
-                write(" {\n");
-                for (var _i = 0, _a = n.children; _i < _a.length; _i++) {
-                    var nn = _a[_i];
-                    emit(nn);
-                }
-                indent = indent.slice(4);
-                removeLastIndent();
-                write("\n}" + finalNl);
-                variables.pop();
-            }
         }
         function maybeAddComment(b, comments) {
             if (b.comment) {
@@ -1833,8 +1467,8 @@ var pxt;
                         currentLine = word;
                     }
                     else if (currentLine.length + word.length > MAX_COMMENT_LINE_LENGTH) {
-                        commentNodes.push(mkText("// " + currentLine));
-                        commentNodes.push(mkNewLine());
+                        commentNodes.push(blocks.mkText("// " + currentLine));
+                        commentNodes.push(blocks.mkNewLine());
                         currentLine = word;
                     }
                     else {
@@ -1842,13 +1476,13 @@ var pxt;
                     }
                 }
                 if (currentLine) {
-                    commentNodes.push(mkText("// " + currentLine));
-                    commentNodes.push(mkNewLine());
+                    commentNodes.push(blocks.mkText("// " + currentLine));
+                    commentNodes.push(blocks.mkNewLine());
                 }
                 // The decompiler expects an empty comment line between paragraphs
                 if (i !== paragraphs.length - 1) {
-                    commentNodes.push(mkText("//"));
-                    commentNodes.push(mkNewLine());
+                    commentNodes.push(blocks.mkText("//"));
+                    commentNodes.push(blocks.mkNewLine());
                 }
             }
             for (var _d = 0, _e = commentNodes.reverse(); _d < _e.length; _d++) {
@@ -1861,9 +1495,6 @@ var pxt;
                 return false;
             }
             return text.substr(text.length - suffix.length) === suffix;
-        }
-        function isReservedWord(str) {
-            return reservedWords.indexOf(str) !== -1;
         }
     })(blocks = pxt.blocks || (pxt.blocks = {}));
 })(pxt || (pxt = {}));
@@ -1889,6 +1520,9 @@ var pxt;
             };
             registerFieldEditor('note', pxtblockly.FieldNote, noteValidator);
             registerFieldEditor('gridpicker', pxtblockly.FieldGridPicker);
+            registerFieldEditor('textdropdown', pxtblockly.FieldTextDropdown);
+            registerFieldEditor('numberdropdown', pxtblockly.FieldNumberDropdown);
+            registerFieldEditor('imagedropdown', pxtblockly.FieldImageDropdown);
         }
         blocks.initFieldEditors = initFieldEditors;
         function registerFieldEditor(selector, field, validator) {
@@ -2170,12 +1804,26 @@ var pxt;
                 flowBlocks(blocks, ratio);
             }
             layout.shuffle = shuffle;
-            function flow(ws, ratio) {
-                flowBlocks(ws.getTopBlocks(true), ratio);
+            function flow(ws, opts) {
+                if (opts) {
+                    if (opts.useViewWidth) {
+                        var metrics = ws.getMetrics();
+                        // Only use the width if in portrait, otherwise the blocks are too spread out
+                        if (metrics.viewHeight > metrics.viewWidth) {
+                            flowBlocks(ws.getTopBlocks(true), undefined, metrics.viewWidth);
+                            return;
+                        }
+                    }
+                    flowBlocks(ws.getTopBlocks(true), opts.ratio);
+                }
+                else {
+                    flowBlocks(ws.getTopBlocks(true));
+                }
             }
             layout.flow = flow;
             function screenshotEnabled() {
-                return !pxt.BrowserUtils.isIE();
+                return !pxt.BrowserUtils.isIE()
+                    && !pxt.BrowserUtils.isUwpEdge(); // TODO figure out why screenshots are not working in UWP; disable for now
             }
             layout.screenshotEnabled = screenshotEnabled;
             function screenshotAsync(ws) {
@@ -2283,19 +1931,25 @@ var pxt;
                 });
                 return Promise.all(p).then(function () { });
             }
-            function flowBlocks(blocks, ratio) {
+            function flowBlocks(blocks, ratio, maxWidth) {
                 if (ratio === void 0) { ratio = 1.62; }
                 var gap = 16;
                 var marginx = 20;
                 var marginy = 20;
-                // compute total block surface and infer width
-                var surface = 0;
-                for (var _i = 0, blocks_4 = blocks; _i < blocks_4.length; _i++) {
-                    var block = blocks_4[_i];
-                    var s = block.getHeightWidth();
-                    surface += s.width * s.height;
+                var maxx;
+                if (maxWidth > marginx) {
+                    maxx = maxWidth - marginx;
                 }
-                var maxx = Math.sqrt(surface) * ratio;
+                else {
+                    // compute total block surface and infer width
+                    var surface = 0;
+                    for (var _i = 0, blocks_4 = blocks; _i < blocks_4.length; _i++) {
+                        var block = blocks_4[_i];
+                        var s = block.getHeightWidth();
+                        surface += s.width * s.height;
+                    }
+                    maxx = Math.sqrt(surface) * ratio;
+                }
                 var insertx = marginx;
                 var inserty = marginy;
                 var endy = 0;
@@ -2430,10 +2084,23 @@ var pxt;
             value.appendChild(shadow);
             var typeInfo = typeDefaults[type];
             shadow.setAttribute("type", shadowType || typeInfo && typeInfo.block || type);
+            shadow.setAttribute("colour", Blockly.Colours.textField);
             if (typeInfo) {
                 var field = document.createElement("field");
                 shadow.appendChild(field);
-                field.setAttribute("name", shadowType == "variables_get" ? "VAR" : typeInfo.field);
+                var fieldName = void 0;
+                switch (shadowType) {
+                    case "variables_get":
+                        fieldName = "VAR";
+                        break;
+                    case "math_number_minmax":
+                        fieldName = "SLIDER";
+                        break;
+                    default:
+                        fieldName = typeInfo.field;
+                        break;
+                }
+                field.setAttribute("name", fieldName);
                 var value_1;
                 if (type == "boolean") {
                     value_1 = document.createTextNode((v || typeInfo.defaultValue).toUpperCase());
@@ -2530,18 +2197,26 @@ var pxt;
                         if (nsn && nsn.attributes.color) {
                             category_1.setAttribute("colour", nsn.attributes.color);
                         }
-                        else if (blocks_6.blockColors[ns]) {
-                            category_1.setAttribute("colour", blocks_6.blockColors[ns].toString());
+                        else if (getNamespaceColor(ns)) {
+                            category_1.setAttribute("colour", getNamespaceColor(ns));
                         }
                         if (nsn && nsn.attributes.icon) {
                             var nsnIconClassName = ("blocklyTreeIcon" + nsn.name.toLowerCase()).replace(/\s/g, '');
                             appendToolboxIconCss(nsnIconClassName, nsn.attributes.icon);
                             category_1.setAttribute("iconclass", nsnIconClassName);
                             category_1.setAttribute("expandedclass", nsnIconClassName);
+                            category_1.setAttribute("web-icon", nsn.attributes.icon);
                         }
                         else {
                             category_1.setAttribute("iconclass", "blocklyTreeIconDefault");
                             category_1.setAttribute("expandedclass", "blocklyTreeIconDefault");
+                            category_1.setAttribute("web-icon", "\uf12e");
+                        }
+                        if (nsn && nsn.attributes.groups) {
+                            category_1.setAttribute("groups", nsn.attributes.groups.join(', '));
+                        }
+                        if (nsn && nsn.attributes.labelLineWidth) {
+                            category_1.setAttribute("labellinewidth", nsn.attributes.labelLineWidth);
                         }
                         insertTopLevelCategory(category_1, tb, nsWeight, isAdvanced);
                     }
@@ -2572,7 +2247,7 @@ var pxt;
                         var mutatedBlock = block.cloneNode(true);
                         blocks_6.mutateToolboxBlock(mutatedBlock, fn.attributes.mutate, mutation);
                         if (showCategories !== CategoryMode.None) {
-                            category_1.appendChild(mutatedBlock);
+                            insertBlock(mutatedBlock, category_1, fn.attributes.weight);
                         }
                         else {
                             tb.appendChild(mutatedBlock);
@@ -2581,13 +2256,39 @@ var pxt;
                 }
                 else {
                     if (showCategories !== CategoryMode.None && !(showCategories === CategoryMode.Basic && isAdvanced)) {
-                        category_1.appendChild(block);
+                        insertBlock(block, category_1, fn.attributes.weight, fn.attributes.group);
                         injectToolboxIconCss();
                     }
                     else if (showCategories === CategoryMode.None) {
                         tb.appendChild(block);
                     }
                 }
+            }
+        }
+        function insertBlock(bl, cat, weight, group) {
+            var isBuiltin = !!blocks_6.blockColors[cat.getAttribute("nameid")];
+            if (group) {
+                bl.setAttribute("group", group);
+            }
+            if (isBuiltin && weight > 50) {
+                bl.setAttribute("loaded", "true");
+                var first = void 0;
+                for (var i = 0; i < cat.childNodes.length; i++) {
+                    var n = cat.childNodes.item(i);
+                    if (n.tagName === "block" && !n.getAttribute("loaded")) {
+                        first = n;
+                        break;
+                    }
+                }
+                if (first) {
+                    cat.insertBefore(bl, first);
+                }
+                else {
+                    cat.appendChild(bl);
+                }
+            }
+            else {
+                cat.appendChild(bl);
             }
         }
         var toolboxStyle;
@@ -2600,7 +2301,7 @@ var pxt;
                 toolboxStyleBuffer += "\n                .blocklyTreeIcon." + className + "::before {\n                    content: \"" + icon + "\";\n                }\n            ";
             }
             else {
-                toolboxStyleBuffer += "\n                .blocklyTreeIcon." + className + " {\n                    display: inline-block !important;\n                    background-image: url(\"" + (pxt.webConfig.commitCdnUrl + encodeURI(i)) + "\")!important;\n                    width: 1em;\n                    height: 1em;\n                    background-size: 1em!important;\n                }\n            ";
+                toolboxStyleBuffer += "\n                .blocklyTreeIcon." + className + " {\n                    background-image: url(\"" + (pxt.webConfig.commitCdnUrl + encodeURI(i)) + "\")!important;\n                    width: 30px;\n                    height: 100%;\n                    background-size: 20px !important;\n                    background-repeat: no-repeat !important;\n                    background-position: 50% 50% !important;\n                }\n            ";
             }
         }
         blocks_6.appendToolboxIconCss = appendToolboxIconCss;
@@ -2669,13 +2370,14 @@ var pxt;
             var ci = 0;
             for (ci = 0; ci < categories.length; ++ci) {
                 var cat = categories[ci];
+                var catAdvanced = cat.hasAttribute("advanced") && cat.getAttribute("advanced") !== "false";
                 // Advanced categories always come last
                 if (isAdvanced) {
-                    if (!cat.hasAttribute("advanced")) {
+                    if (!catAdvanced) {
                         continue;
                     }
                 }
-                else if (cat.hasAttribute("advanced")) {
+                else if (catAdvanced) {
                     tb.insertBefore(category, cat);
                     break;
                 }
@@ -2775,7 +2477,7 @@ var pxt;
             return true;
         }
         function initField(i, ni, fn, ns, pre, right, type, nsinfo) {
-            if (ni == 0) {
+            if (ni == 0 && !pxt.appTarget.appTheme.disableBlockIcons) {
                 var icon = ns && ns.attributes.icon ? ns.attributes.icon : null;
                 if (icon)
                     i.appendField(iconToFieldImage(icon));
@@ -2783,7 +2485,7 @@ var pxt;
             if (pre)
                 i.appendField(pre);
             if (right)
-                i.setAlign(Blockly.ALIGN_RIGHT);
+                i.setAlign(Blockly.ALIGN_LEFT);
             // Ignore generic types
             if (type && type != "T") {
                 if (arrayTypeRegex.test(type)) {
@@ -2824,7 +2526,7 @@ var pxt;
             var nsinfo = info.apis.byQName[ns];
             var color = fn.attributes.color
                 || (nsinfo ? nsinfo.attributes.color : undefined)
-                || blocks_6.blockColors[ns.toLowerCase()]
+                || getNamespaceColor(ns.toLowerCase())
                 || 255;
             if (fn.attributes.help)
                 block.setHelpUrl("/reference/" + fn.attributes.help.replace(/^\//, ''));
@@ -2835,7 +2537,22 @@ var pxt;
                 block.setHelpUrl("/pkg/" + fn.pkg + "#" + encodeURIComponent(anchor.join('-')));
             }
             block.setTooltip(fn.attributes.jsDoc);
-            block.setColour(color);
+            block.setColour(color, fn.attributes.colorSecondary, fn.attributes.colorTertiary);
+            var blockShape = Blockly.OUTPUT_SHAPE_ROUND;
+            switch (fn.retType) {
+                case "number":
+                    blockShape = Blockly.OUTPUT_SHAPE_ROUND;
+                    break;
+                case "boolean":
+                    blockShape = Blockly.OUTPUT_SHAPE_HEXAGONAL;
+                    break;
+                case "string":
+                    blockShape = Blockly.OUTPUT_SHAPE_SQUARE;
+                    break;
+            }
+            block.setOutputShape(blockShape);
+            if (fn.attributes.undeletable)
+                block.setDeletable(false);
             blocks_6.parseFields(fn.attributes.block).map(function (field) {
                 var i;
                 if (!field.p) {
@@ -2872,8 +2589,9 @@ var pxt;
                                 v.attributes.blockImage ? {
                                     src: pxt.webConfig.commitCdnUrl + ("blocks/" + v.namespace.toLowerCase() + "/" + v.name.toLowerCase() + ".png"),
                                     alt: k,
-                                    width: 32,
-                                    height: 32
+                                    width: 36,
+                                    height: 36,
+                                    value: v.name
                                 } : k,
                                 v.namespace + "." + v.name
                             ];
@@ -2973,11 +2691,6 @@ var pxt;
                     });
                 });
             };
-            var body = fn.parameters ? fn.parameters.filter(function (pr) { return pr.type == "() => void"; })[0] : undefined;
-            if (body) {
-                block.appendStatementInput("HANDLER")
-                    .setCheck("null");
-            }
             if (fn.attributes.imageLiteral) {
                 for (var r = 0; r < 5; ++r) {
                     var ri = block.appendDummyInput();
@@ -2990,7 +2703,21 @@ var pxt;
                     }
                 }
             }
-            block.setInputsInline(!fn.attributes.blockExternalInputs && fn.parameters.length < 4 && !fn.attributes.imageLiteral);
+            if (fn.attributes.inlineInputMode === "external") {
+                block.setInputsInline(false);
+            }
+            else if (fn.attributes.inlineInputMode === "inline") {
+                block.setInputsInline(true);
+            }
+            else {
+                block.setInputsInline(fn.parameters.length < 4 && !fn.attributes.imageLiteral);
+            }
+            var body = fn.parameters ? fn.parameters.filter(function (pr) { return pr.type == "() => void"; })[0] : undefined;
+            if (body) {
+                block.appendStatementInput("HANDLER")
+                    .setCheck("null");
+                block.setInputsInline(true);
+            }
             switch (fn.retType) {
                 case "number":
                     block.setOutput(true, "Number");
@@ -3013,8 +2740,8 @@ var pxt;
             }
             // hook up/down if return value is void
             var hasHandlers = hasArrowFunction(fn);
-            block.setPreviousStatement(!hasHandlers && fn.retType == "void");
-            block.setNextStatement(!hasHandlers && fn.retType == "void");
+            block.setPreviousStatement(!(hasHandlers && !fn.attributes.handlerStatement) && fn.retType == "void");
+            block.setNextStatement(!(hasHandlers && !fn.attributes.handlerStatement) && fn.retType == "void");
             block.setTooltip(fn.attributes.jsDoc);
         }
         function hasArrowFunction(fn) {
@@ -3113,7 +2840,7 @@ var pxt;
                     if (showCategories !== CategoryMode.None) {
                         var cat = categoryElement(tb, eb.namespace);
                         if (cat) {
-                            cat.appendChild(el);
+                            insertBlock(el, cat, eb.weight);
                         }
                         else {
                             console.error("trying to add block " + eb.type + " to unknown category " + eb.namespace);
@@ -3127,68 +2854,17 @@ var pxt;
             if (tb && showCategories !== CategoryMode.None) {
                 // remove unused categories
                 var config = pxt.appTarget.runtime || {};
-                if (!config.mathBlocks)
-                    removeCategory(tb, "Math");
-                if (!config.variablesBlocks)
-                    removeCategory(tb, "Variables");
-                if (!config.logicBlocks)
-                    removeCategory(tb, "Logic");
-                if (!config.loopsBlocks)
-                    removeCategory(tb, "Loops");
-                // Advanced builtin categories
-                if (!config.textBlocks) {
-                    removeCategory(tb, "Text");
-                }
-                else {
-                    showAdvanced = true;
-                    var cat = categoryElement(tb, "Text");
+                initBuiltinCategoryXml("Math", !config.mathBlocks);
+                initBuiltinCategoryXml("Variables", !config.variablesBlocks);
+                initBuiltinCategoryXml("Logic", !config.logicBlocks);
+                initBuiltinCategoryXml("Loops", !config.loopsBlocks);
+                initBuiltinCategoryXml("Text", !config.textBlocks);
+                initBuiltinCategoryXml("Arrays", !config.listsBlocks);
+                initBuiltinCategoryXml("Functions", !config.functionBlocks);
+                if (!config.listsBlocks && config.loopsBlocks) {
+                    var cat = categoryElement(tb, "Loops");
                     if (cat) {
-                        var blockElements = cat.getElementsByTagName("block");
-                        for (var i = 0; i < blockElements.length; i++) {
-                            var b = blockElements.item(i);
-                            usedBlocks[b.getAttribute("type")] = true;
-                        }
-                    }
-                    if (showCategories === CategoryMode.Basic) {
-                        removeCategory(tb, "Text");
-                    }
-                }
-                if (!config.functionBlocks) {
-                    removeCategory(tb, "Functions");
-                }
-                else {
-                    showAdvanced = true;
-                    var cat = categoryElement(tb, "Functions");
-                    if (cat) {
-                        var blockElements = cat.getElementsByTagName("block");
-                        for (var i = 0; i < blockElements.length; i++) {
-                            var b = blockElements.item(i);
-                            usedBlocks[b.getAttribute("type")] = true;
-                        }
-                    }
-                    if (showCategories === CategoryMode.Basic) {
-                        removeCategory(tb, "Functions");
-                    }
-                }
-                if (!config.listsBlocks) {
-                    removeCategory(tb, "Arrays");
-                    if (config.loopsBlocks) {
-                        var cat = categoryElement(tb, "Loops");
                         cat.removeChild(blocks_6.getFirstChildWithAttr(cat, "block", "type", "controls_for_of"));
-                    }
-                }
-                else {
-                    showAdvanced = true;
-                    var cat = categoryElement(tb, "Arrays");
-                    if (cat) {
-                        var blockElements = cat.getElementsByTagName("block");
-                        for (var i = 0; i < blockElements.length; i++) {
-                            var b = blockElements.item(i);
-                            usedBlocks[b.getAttribute("type")] = true;
-                        }
-                    }
-                    if (showCategories === CategoryMode.Basic) {
-                        removeCategory(tb, "Arrays");
                     }
                 }
                 // Load localized names for default categories
@@ -3197,6 +2873,41 @@ var pxt;
                     cats[i].setAttribute('name', pxt.Util.rlf("{id:category}" + cats[i].getAttribute('name'), []));
                     // Append Namespace CSS
                     appendNamespaceCss(cats[i].getAttribute('name'), cats[i].getAttribute('colour'));
+                }
+                // update category colors and add heading
+                var topCats = blocks_6.getDirectChildren(tb, "category");
+                for (var i = 0; i < topCats.length; i++) {
+                    var nsColor = getNamespaceColor(topCats[i].getAttribute('nameid'));
+                    if (nsColor && nsColor != "") {
+                        topCats[i].setAttribute('colour', nsColor);
+                        // update children colors
+                        var childCats = topCats[i].getElementsByTagName('category');
+                        for (var j = 0; j < childCats.length; j++) {
+                            childCats[j].setAttribute('colour', nsColor);
+                        }
+                    }
+                    if (!pxt.appTarget.appTheme.hideFlyoutHeadings && pxt.BrowserUtils.isMobile()) {
+                        // Add the Heading label
+                        var headingLabel = goog.dom.createDom('label');
+                        headingLabel.setAttribute('text', topCats[i].getAttribute('name'));
+                        headingLabel.setAttribute('web-class', 'blocklyFlyoutHeading');
+                        headingLabel.setAttribute('web-icon-color', topCats[i].getAttribute('colour'));
+                        var icon = topCats[i].getAttribute('web-icon');
+                        var iconClass = topCats[i].getAttribute('web-icon-class');
+                        if (icon) {
+                            if (icon.length === 1) {
+                                headingLabel.setAttribute('web-icon', icon);
+                                if (iconClass)
+                                    headingLabel.setAttribute('web-icon-class', iconClass);
+                            }
+                            else {
+                                toolboxStyleBuffer += "\n                                .blocklyFlyoutLabelIcon.blocklyFlyoutIcon" + topCats[i].getAttribute('name') + " {\n                                    display: inline-block !important;\n                                    background-image: url(\"" + (pxt.webConfig.commitCdnUrl + encodeURI(icon)) + "\")!important;\n                                    width: 1em;\n                                    height: 1em;\n                                    background-size: 1em!important;\n                                }\n                            ";
+                                injectToolboxIconCss();
+                                headingLabel.setAttribute('web-icon-class', "blocklyFlyoutIcon" + topCats[i].getAttribute('name'));
+                            }
+                        }
+                        topCats[i].insertBefore(headingLabel, topCats[i].firstChild);
+                    }
                 }
             }
             // Do not remove this comment.
@@ -3222,7 +2933,7 @@ var pxt;
             }
             // Add the "Advanced" category
             if (showAdvanced && tb && showCategories !== CategoryMode.None) {
-                var cat = createCategoryElement(pxt.Util.lf("{id:category}Advanced"), "Advanced", 1, "#3c3c3c", showCategories === CategoryMode.Basic ? 'blocklyTreeIconadvancedcollapsed' : 'blocklyTreeIconadvancedexpanded');
+                var cat = createCategoryElement(pxt.Util.lf("{id:category}Advanced"), "Advanced", 1, getNamespaceColor('advanced'), showCategories === CategoryMode.Basic ? 'blocklyTreeIconadvancedcollapsed' : 'blocklyTreeIconadvancedexpanded');
                 insertTopLevelCategory(document.createElement("sep"), tb, 1.5, false);
                 insertTopLevelCategory(cat, tb, 1, false);
             }
@@ -3240,8 +2951,70 @@ var pxt;
                 }
                 updateUsedBlocks = true;
             }
+            // Rearrange blocks in the flyout and add group labels
+            if (tb) {
+                var categories = tb.getElementsByTagName("category");
+                var _loop_1 = function(ci) {
+                    var cat = categories.item(ci);
+                    var catName = cat.getAttribute("nameid");
+                    if (catName === "advanced")
+                        return "continue";
+                    var blocks_8 = blocks_6.getDirectChildren(cat, "block");
+                    var groups = cat.getAttribute("groups");
+                    var labelLineWidth = cat.getAttribute("labellinewidth");
+                    var blockGroups = {};
+                    var sortedGroups = [];
+                    if (groups)
+                        sortedGroups = groups.split(', ');
+                    // Organize the blocks into the different groups
+                    for (var bi = 0; bi < blocks_8.length; ++bi) {
+                        var blk = blocks_8[bi];
+                        var group = blk.getAttribute("group") || 'other';
+                        if (!blockGroups[group])
+                            blockGroups[group] = [];
+                        blockGroups[group].push(blk);
+                    }
+                    if (Object.keys(blockGroups).length > 1) {
+                        // Add any missing groups to the sorted groups list
+                        Object.keys(blockGroups).sort().forEach(function (group) {
+                            if (sortedGroups.indexOf(group) == -1) {
+                                sortedGroups.push(group);
+                            }
+                        });
+                        // Add the blocks to the xmlList
+                        var xmlList_1 = [];
+                        for (var bg = 0; bg < sortedGroups.length; ++bg) {
+                            var group = sortedGroups[bg];
+                            // Add the group label
+                            if (group != 'other') {
+                                var groupLabel = goog.dom.createDom('label');
+                                groupLabel.setAttribute('text', pxt.Util.rlf("{id:group}" + group));
+                                groupLabel.setAttribute('web-class', 'blocklyFlyoutGroup');
+                                groupLabel.setAttribute('web-line', '1.5');
+                                if (labelLineWidth)
+                                    groupLabel.setAttribute('web-line-width', labelLineWidth);
+                                xmlList_1.push(groupLabel);
+                            }
+                            // Add the blocks in that group
+                            if (blockGroups[group])
+                                blockGroups[group].forEach(function (groupedBlock) {
+                                    cat.removeChild(groupedBlock);
+                                    xmlList_1.push(groupedBlock);
+                                });
+                        }
+                        // Add the blocks back into the category
+                        xmlList_1.forEach(function (arrangedBlock) {
+                            cat.appendChild(arrangedBlock);
+                        });
+                    }
+                };
+                for (var ci = 0; ci < categories.length; ++ci) {
+                    var state_1 = _loop_1(ci);
+                    if (state_1 === "continue") continue;
+                }
+            }
             // Filter the blocks
-            if (filters) {
+            if (tb && filters) {
                 function filterBlocks(blocks, defaultState) {
                     var hasChild = false;
                     for (var bi = 0; bi < blocks.length; ++bi) {
@@ -3272,9 +3045,18 @@ var pxt;
                         if (catName === "more" || catName === "advanced") {
                             continue;
                         }
+                        // The variables category is special and won't have any children so we
+                        // need to check manually
+                        if (catName === "variables" && (!filters.blocks ||
+                            filters.blocks["variables_set"] ||
+                            filters.blocks["variables_get"] ||
+                            filters.blocks["variables_change"]) &&
+                            (!filters.namespaces || filters.namespaces["variables"] !== FilterState.Disabled)) {
+                            continue;
+                        }
                         var categoryState = filters.namespaces && filters.namespaces[catName] != undefined ? filters.namespaces[catName] : filters.defaultState;
-                        var blocks_8 = cat.getElementsByTagName("block");
-                        var hasVisibleChildren = filterBlocks(blocks_8, categoryState);
+                        var blocks_9 = cat.getElementsByTagName("block");
+                        var hasVisibleChildren = filterBlocks(blocks_9, categoryState);
                         switch (categoryState) {
                             case FilterState.Disabled:
                                 if (!hasVisibleChildren) {
@@ -3312,8 +3094,8 @@ var pxt;
                     }
                 }
                 else {
-                    var blocks_9 = tb.getElementsByTagName("block");
-                    filterBlocks(blocks_9);
+                    var blocks_10 = tb.getElementsByTagName("block");
+                    filterBlocks(blocks_10);
                 }
                 if (showCategories !== CategoryMode.None) {
                     // Go through all categories, hide the ones that have no blocks inside
@@ -3333,6 +3115,29 @@ var pxt;
                 }
             }
             return tb;
+            function initBuiltinCategoryXml(name, remove) {
+                if (remove) {
+                    removeCategory(tb, name);
+                    return;
+                }
+                var cat = categoryElement(tb, name);
+                if (cat) {
+                    var attr = cat.getAttribute("advanced");
+                    if (attr && attr !== "false") {
+                        showAdvanced = true;
+                        // Record all block usages in case this category doesn't show up
+                        // in the toolbox (i.e. advanced is collapsed)
+                        var blockElements = cat.getElementsByTagName("block");
+                        for (var i = 0; i < blockElements.length; i++) {
+                            var b = blockElements.item(i);
+                            usedBlocks[b.getAttribute("type")] = true;
+                        }
+                        if (showCategories === CategoryMode.Basic) {
+                            removeCategory(tb, name);
+                        }
+                    }
+                }
+            }
         }
         blocks_6.createToolbox = createToolbox;
         function initBlocks(blockInfo, toolbox, showCategories, filters) {
@@ -3526,7 +3331,7 @@ var pxt;
             blocklyInitialized = true;
             goog.provide('Blockly.Blocks.device');
             goog.require('Blockly.Blocks');
-            if (window.navigator.pointerEnabled) {
+            if (window.PointerEvent) {
                 Blockly.bindEvent_.TOUCH_MAP = {
                     mousedown: 'pointerdown',
                     mousemove: 'pointermove',
@@ -3550,19 +3355,21 @@ var pxt;
         }
         function setBuiltinHelpInfo(block, id) {
             var info = pxt.blocks.getBlockDefinition(id);
-            setHelpResources(block, id, info.name, info.tooltip, info.url, String(blocks_6.blockColors[info.category]));
+            setHelpResources(block, id, info.name, info.tooltip, info.url, getNamespaceColor(info.category));
         }
         function installBuiltinHelpInfo(id) {
             var info = pxt.blocks.getBlockDefinition(id);
-            installHelpResources(id, info.name, info.tooltip, info.url, String(blocks_6.blockColors[info.category]));
+            installHelpResources(id, info.name, info.tooltip, info.url, getNamespaceColor(info.category));
         }
-        function setHelpResources(block, id, name, tooltip, url, colour) {
+        function setHelpResources(block, id, name, tooltip, url, colour, colourSecondary, colourTertiary, undeletable) {
             if (tooltip && (typeof tooltip === "string" || typeof tooltip === "function"))
                 block.setTooltip(tooltip);
             if (url)
                 block.setHelpUrl(url);
             if (colour)
-                block.setColour(colour);
+                block.setColour(colour, colourSecondary, colourTertiary);
+            if (undeletable)
+                block.setDeletable(false);
             var tb = document.getElementById('blocklyToolboxDefinition');
             var xml = tb ? blocks_6.getFirstChildWithAttr(tb, "block", "type", id) : undefined;
             block.codeCard = {
@@ -3574,7 +3381,7 @@ var pxt;
                 url: url
             };
         }
-        function installHelpResources(id, name, tooltip, url, colour) {
+        function installHelpResources(id, name, tooltip, url, colour, colourSecondary, colourTertiary) {
             var block = Blockly.Blocks[id];
             var old = block.init;
             if (!old)
@@ -3582,7 +3389,7 @@ var pxt;
             block.init = function () {
                 old.call(this);
                 var block = this;
-                setHelpResources(this, id, name, tooltip, url, colour);
+                setHelpResources(this, id, name, tooltip, url, colour, colourSecondary, colourTertiary);
             };
         }
         function initLists() {
@@ -3613,7 +3420,8 @@ var pxt;
                             "check": ['Array']
                         }
                     ],
-                    "output": 'Number'
+                    "output": 'Number',
+                    "outputShape": Blockly.OUTPUT_SHAPE_ROUND
                 });
             };
             installBuiltinHelpInfo(listsLengthId);
@@ -3642,7 +3450,7 @@ var pxt;
                         ],
                         "previousStatement": null,
                         "nextStatement": null,
-                        "colour": blocks_6.blockColors['loops']
+                        "colour": getNamespaceColor('loops')
                     });
                     this.appendStatementInput("DO")
                         .appendField(deviceWhileDef.block["appendField"]);
@@ -3674,7 +3482,7 @@ var pxt;
                         ],
                         "previousStatement": null,
                         "nextStatement": null,
-                        "colour": blocks_6.blockColors['loops'],
+                        "colour": getNamespaceColor('loops'),
                         "inputsInline": true
                     });
                     this.appendStatementInput('DO')
@@ -3682,7 +3490,7 @@ var pxt;
                     var thisBlock = this;
                     setHelpResources(this, controlsSimpleForId, controlsSimpleForDef.name, function () {
                         return pxt.U.rlf(controlsSimpleForDef.tooltip, thisBlock.getFieldValue('VAR'));
-                    }, controlsSimpleForDef.url, String(blocks_6.blockColors['loops']));
+                    }, controlsSimpleForDef.url, String(getNamespaceColor('loops')));
                 },
                 /**
                  * Return all variables referenced by this block.
@@ -3734,12 +3542,16 @@ var pxt;
                 return Math.floor(mouseX - (elemBounds.left + (elemBounds.width / 2)));
             };
             /**
-             * Track a drag of an object on this workspace.
-             * @param {!Event} e Mouse move event.
-             * @return {!goog.math.Coordinate} New location of object.
+             * Execute a step of block dragging, based on the given event.  Update the
+             * display accordingly.
+             * @param {!Event} e The most recent move event.
+             * @param {!goog.math.Coordinate} currentDragDeltaXY How far the pointer has
+             *     moved from the position at the start of the drag, in pixel units.
+             * @package
              */
-            var moveDrag = Blockly.WorkspaceSvg.prototype.moveDrag;
-            Blockly.WorkspaceSvg.prototype.moveDrag = function (e) {
+            var blockDrag = Blockly.BlockDragger.prototype.dragBlock;
+            Blockly.BlockDragger.prototype.dragBlock = function (e, currentDragDeltaXY) {
+                var blocklyToolboxDiv = document.getElementsByClassName('blocklyToolboxDiv')[0];
                 var blocklyTreeRoot = document.getElementsByClassName('blocklyTreeRoot')[0];
                 var trashIcon = document.getElementById("blocklyTrashIcon");
                 if (blocklyTreeRoot && trashIcon) {
@@ -3749,27 +3561,35 @@ var pxt;
                         trashIcon.style.opacity = "" + (1 - opacity);
                         trashIcon.style.display = 'block';
                         blocklyTreeRoot.style.opacity = "" + opacity;
+                        if (distance < 50) {
+                            blocklyToolboxDiv.classList.add('blocklyToolboxDeleting');
+                        }
                     }
                     else {
                         trashIcon.style.display = 'none';
                         blocklyTreeRoot.style.opacity = '1';
+                        blocklyToolboxDiv.classList.remove('blocklyToolboxDeleting');
                     }
                 }
-                return moveDrag.call(this, e);
+                return blockDrag.call(this, e, currentDragDeltaXY);
             };
             /**
-             * Stop binding to the global mouseup and mousemove events.
-             * @private
+             * Finish dragging the workspace and put everything back where it belongs.
+             * @param {!goog.math.Coordinate} currentDragDeltaXY How far the pointer has
+             *     moved from the position at the start of the drag, in pixel coordinates.
+             * @package
              */
-            var terminateDrag_ = Blockly.terminateDrag_;
-            Blockly.terminateDrag_ = function () {
+            var blockEndDrag = Blockly.BlockDragger.prototype.endBlockDrag;
+            Blockly.BlockDragger.prototype.endBlockDrag = function (e, currentDragDeltaXY) {
+                blockEndDrag.call(this, e, currentDragDeltaXY);
+                var blocklyToolboxDiv = document.getElementsByClassName('blocklyToolboxDiv')[0];
                 var blocklyTreeRoot = document.getElementsByClassName('blocklyTreeRoot')[0];
                 var trashIcon = document.getElementById("blocklyTrashIcon");
                 if (trashIcon) {
                     trashIcon.style.display = 'none';
                     blocklyTreeRoot.style.opacity = '1';
+                    blocklyToolboxDiv.classList.remove('blocklyToolboxDeleting');
                 }
-                terminateDrag_.call(this);
             };
         }
         function initContextMenu() {
@@ -3905,7 +3725,7 @@ var pxt;
                     enabled: true,
                     callback: function () {
                         pxt.tickEvent("blocks.context.format");
-                        pxt.blocks.layout.flow(_this);
+                        pxt.blocks.layout.flow(_this, { useViewWidth: true });
                     }
                 };
                 menuOptions.push(formatCodeOption);
@@ -3973,12 +3793,15 @@ var pxt;
                 }
                 oldSetSelectedItem.call(that, a);
             };
+            // TODO: look into porting this code over to pxt-blockly
             // Fix highlighting bug in edge
             Blockly.Flyout.prototype.addBlockListeners_ = function (root, block, rect) {
                 this.listeners_.push(Blockly.bindEventWithChecks_(root, 'mousedown', null, this.blockMouseDown_(block)));
                 this.listeners_.push(Blockly.bindEventWithChecks_(rect, 'mousedown', null, this.blockMouseDown_(block)));
-                this.listeners_.push(Blockly.bindEvent_(root, 'mouseover', block, select));
-                this.listeners_.push(Blockly.bindEvent_(rect, 'mouseover', block, select));
+                this.listeners_.push(Blockly.bindEvent_(root, 'mouseover', block, block.addSelect));
+                this.listeners_.push(Blockly.bindEvent_(root, 'mouseout', block, block.removeSelect));
+                this.listeners_.push(Blockly.bindEvent_(rect, 'mouseover', block, block.addSelect));
+                this.listeners_.push(Blockly.bindEvent_(rect, 'mouseout', block, block.removeSelect));
                 var that = this;
                 function select() {
                     if (that._selectedItem && that._selectedItem.svgGroup_) {
@@ -3991,7 +3814,7 @@ var pxt;
         }
         function collapseSubcategories(cat, child) {
             while (cat) {
-                if (cat.isUserCollapsible_ && cat != child && (!child || !isChild(child, cat))) {
+                if (cat.isUserCollapsible_ && cat.getTree() && cat != child && (!child || !isChild(child, cat))) {
                     cat.setExpanded(false);
                     cat.updateRow();
                 }
@@ -4021,9 +3844,9 @@ var pxt;
                                 "name": "HANDLER"
                             }
                         ],
-                        "colour": (pxt.appTarget.runtime ? pxt.appTarget.runtime.onStartColor : '') || blocks_6.blockColors['loops']
+                        "colour": (pxt.appTarget.runtime ? pxt.appTarget.runtime.onStartColor : '') || getNamespaceColor('loops')
                     });
-                    setHelpResources(this, ts.pxtc.ON_START_TYPE, onStartDef.name, onStartDef.tooltip, onStartDef.url, String((pxt.appTarget.runtime ? pxt.appTarget.runtime.onStartColor : '') || blocks_6.blockColors['loops']));
+                    setHelpResources(this, ts.pxtc.ON_START_TYPE, onStartDef.name, onStartDef.tooltip, onStartDef.url, String((pxt.appTarget.runtime ? pxt.appTarget.runtime.onStartColor : '') || getNamespaceColor('loops')), undefined, undefined, pxt.appTarget.runtime ? pxt.appTarget.runtime.onStartUnDeletable : false);
                 }
             };
             Blockly.Blocks[pxtc.TS_STATEMENT_TYPE] = {
@@ -4111,7 +3934,7 @@ var pxt;
                     var thisBlock = this;
                     setHelpResources(this, controlsForOfId, controlsForOfDef.name, function () {
                         return pxt.U.rlf(controlsForOfDef.tooltip, thisBlock.getFieldValue('VAR'));
-                    }, controlsForOfDef.url, String(blocks_6.blockColors['loops']));
+                    }, controlsForOfDef.url, String(getNamespaceColor('loops')));
                 }
             };
             // lists_index_get
@@ -4206,12 +4029,13 @@ var pxt;
                         ],
                         "inputsInline": true,
                         "output": "Number",
-                        "colour": blocks_6.blockColors['math']
+                        "outputShape": mathOp2Def.outputShape,
+                        "colour": getNamespaceColor('math')
                     });
                     var thisBlock = this;
                     setHelpResources(this, mathOp2Id, mathOp2Def.name, function (block) {
                         return mathOp2Tooltips[block.getFieldValue('op')];
-                    }, mathOp2Def.url, String(blocks_6.blockColors[mathOp2Def.category]));
+                    }, mathOp2Def.url, getNamespaceColor(mathOp2Def.category));
                 }
             };
             // math_op3
@@ -4230,40 +4054,20 @@ var pxt;
                         ],
                         "inputsInline": true,
                         "output": "Number",
-                        "colour": blocks_6.blockColors['math']
+                        "outputShape": mathOp3Def.outputShape,
+                        "colour": getNamespaceColor('math')
                     });
                     setBuiltinHelpInfo(this, mathOp3Id);
-                }
-            };
-            // device_random
-            var deviceRandomId = "device_random";
-            var deviceRandomDef = pxt.blocks.getBlockDefinition(deviceRandomId);
-            Blockly.Blocks[deviceRandomId] = {
-                init: function () {
-                    this.jsonInit({
-                        "message0": deviceRandomDef.block["message0"],
-                        "args0": [
-                            {
-                                "type": "input_value",
-                                "name": "limit",
-                                "check": "Number"
-                            }
-                        ],
-                        "inputsInline": true,
-                        "output": "Number",
-                        "colour": blocks_6.blockColors['math']
-                    });
-                    setBuiltinHelpInfo(this, deviceRandomId);
                 }
             };
             // builtin math_number
             //XXX Integer validation needed.
             var mInfo = pxt.blocks.getBlockDefinition("math_number");
-            installHelpResources('math_number', mInfo.name, (pxt.appTarget.compile && pxt.appTarget.compile.floatingPoint) ? lf("a decimal number") : lf("an integer number"), mInfo.url, String(blocks_6.blockColors[mInfo.category]));
+            installHelpResources('math_number', mInfo.name, (pxt.appTarget.compile && pxt.appTarget.compile.floatingPoint) ? lf("a decimal number") : lf("an integer number"), mInfo.url, Blockly.Colours.textField, Blockly.Colours.textField, Blockly.Colours.textField);
             // builtin math_number_minmax
             //XXX Integer validation needed.
             var mMInfo = pxt.blocks.getBlockDefinition("math_number_minmax");
-            installHelpResources('math_number_minmax', mMInfo.name, (pxt.appTarget.compile && pxt.appTarget.compile.floatingPoint) ? lf("a decimal number") : lf("an integer number"), mMInfo.url, String(blocks_6.blockColors[mMInfo.category]));
+            installHelpResources('math_number_minmax', mMInfo.name, (pxt.appTarget.compile && pxt.appTarget.compile.floatingPoint) ? lf("a decimal number") : lf("an integer number"), mMInfo.url, Blockly.Colours.textField, Blockly.Colours.textField, Blockly.Colours.textField);
             // builtin math_arithmetic
             var msg = Blockly.Msg;
             var mathArithmeticId = "math_arithmetic";
@@ -4276,17 +4080,39 @@ var pxt;
             msg.MATH_POWER_SYMBOL = mathArithmeticDef.block["MATH_POWER_SYMBOL"];
             installHelpResources(mathArithmeticId, mathArithmeticDef.name, function (block) {
                 return mathArithmeticTooltips[block.getFieldValue('OP')];
-            }, mathArithmeticDef.url, String(blocks_6.blockColors[mathArithmeticDef.category]));
+            }, mathArithmeticDef.url, getNamespaceColor(mathArithmeticDef.category));
             // builtin math_modulo
             var mathModuloId = "math_modulo";
             var mathModuloDef = pxt.blocks.getBlockDefinition(mathModuloId);
             msg.MATH_MODULO_TITLE = mathModuloDef.block["MATH_MODULO_TITLE"];
             installBuiltinHelpInfo(mathModuloId);
         }
+        function getNamespaceColor(ns) {
+            if (pxt.appTarget.appTheme.blockColors && pxt.appTarget.appTheme.blockColors[ns])
+                return pxt.appTarget.appTheme.blockColors[ns];
+            if (blocks_6.blockColors[ns])
+                return blocks_6.blockColors[ns];
+            return "";
+        }
+        blocks_6.getNamespaceColor = getNamespaceColor;
+        function initFlyouts(workspace) {
+            workspace.registerToolboxCategoryCallback(Blockly.VARIABLE_CATEGORY_NAME, Blockly.Variables.flyoutCategory);
+            workspace.registerToolboxCategoryCallback(Blockly.PROCEDURE_CATEGORY_NAME, Blockly.Procedures.flyoutCategory);
+        }
+        blocks_6.initFlyouts = initFlyouts;
         function initVariables() {
             var varname = lf("{id:var}item");
             Blockly.Variables.flyoutCategory = function (workspace) {
                 var xmlList = [];
+                if (!pxt.appTarget.appTheme.hideFlyoutHeadings && pxt.BrowserUtils.isMobile()) {
+                    // Add the Heading label
+                    var headingLabel = goog.dom.createDom('label');
+                    headingLabel.setAttribute('text', lf("Variables"));
+                    headingLabel.setAttribute('web-class', 'blocklyFlyoutHeading');
+                    headingLabel.setAttribute('web-icon', '\uf039');
+                    headingLabel.setAttribute('web-icon-color', getNamespaceColor('variables'));
+                    xmlList.push(headingLabel);
+                }
                 var button = goog.dom.createDom('button');
                 button.setAttribute('text', lf("Make a Variable"));
                 button.setAttribute('callbackKey', 'CREATE_VARIABLE');
@@ -4294,41 +4120,48 @@ var pxt;
                     Blockly.Variables.createVariable(button.getTargetWorkspace());
                 });
                 xmlList.push(button);
-                var variableList = Blockly.Variables.allVariables(workspace);
-                variableList.sort(goog.string.caseInsensitiveCompare);
+                var blockList = Blockly.Variables.flyoutCategoryBlocks(workspace);
+                xmlList = xmlList.concat(blockList);
+                return xmlList;
+            };
+            Blockly.Variables.flyoutCategoryBlocks = function (workspace) {
+                var variableModelList = workspace.getVariablesOfType('');
+                variableModelList.sort(Blockly.VariableModel.compareByName);
                 // In addition to the user's variables, we also want to display the default
                 // variable name at the top.  We also don't want this duplicated if the
                 // user has created a variable of the same name.
-                goog.array.remove(variableList, varname);
-                variableList.unshift(varname);
-                // variables getters first
-                for (var i = 0; i < variableList.length; i++) {
-                    // <block type="variables_get" gap="24">
-                    //   <field name="VAR">item</field>
-                    // </block>
-                    var block = goog.dom.createDom('block');
-                    block.setAttribute('type', 'variables_get');
-                    block.setAttribute('gap', '8');
-                    block.setAttribute('colour', String(blocks_6.blockColors['variables']));
-                    var field = goog.dom.createDom('field', null, variableList[i]);
-                    field.setAttribute('name', 'VAR');
-                    block.appendChild(field);
-                    xmlList.push(block);
+                for (var i = 0, tempVar = void 0; tempVar = variableModelList[i]; i++) {
+                    if (tempVar.name == varname) {
+                        variableModelList.splice(i, 1);
+                        break;
+                    }
                 }
-                xmlList[xmlList.length - 1].setAttribute('gap', '24');
-                for (var i = 0; i < Math.min(1, variableList.length); i++) {
-                    {
-                        // <block type="variables_set" gap="8">
-                        //   <field name="VAR">item</field>
-                        // </block>
-                        var block = goog.dom.createDom('block');
-                        block.setAttribute('type', 'variables_set');
-                        block.setAttribute('gap', '8');
-                        {
-                            var field = goog.dom.createDom('field', null, variableList[i]);
-                            field.setAttribute('name', 'VAR');
-                            block.appendChild(field);
+                var defaultVar = new Blockly.VariableModel(workspace, varname);
+                variableModelList.unshift(defaultVar);
+                var xmlList = [];
+                if (variableModelList.length > 0) {
+                    // variables getters first
+                    for (var i = 0, variable = void 0; variable = variableModelList[i]; i++) {
+                        if (Blockly.Blocks['variables_get']) {
+                            var blockText = '<xml>' +
+                                '<block type="variables_get" gap="8">' +
+                                Blockly.Variables.generateVariableFieldXml_(variable) +
+                                '</block>' +
+                                '</xml>';
+                            var block = Blockly.Xml.textToDom(blockText).firstChild;
+                            xmlList.push(block);
                         }
+                    }
+                    xmlList[xmlList.length - 1].setAttribute('gap', '24');
+                    var firstVariable = variableModelList[0];
+                    if (Blockly.Blocks['variables_set']) {
+                        var gap = Blockly.Blocks['variables_change'] ? 8 : 24;
+                        var blockText = '<xml>' +
+                            '<block type="variables_set" gap="' + gap + '">' +
+                            Blockly.Variables.generateVariableFieldXml_(firstVariable) +
+                            '</block>' +
+                            '</xml>';
+                        var block = Blockly.Xml.textToDom(blockText).firstChild;
                         {
                             var value = goog.dom.createDom('value');
                             value.setAttribute('name', 'VALUE');
@@ -4343,23 +4176,31 @@ var pxt;
                         }
                         xmlList.push(block);
                     }
-                    {
-                        // <block type="variables_get" gap="24">
-                        //   <field name="VAR">item</field>
-                        // </block>
-                        var block = goog.dom.createDom('block');
-                        block.setAttribute('type', 'variables_change');
-                        block.setAttribute('gap', '24');
-                        var value = goog.dom.createDom('value');
-                        value.setAttribute('name', 'VALUE');
-                        var shadow = goog.dom.createDom('shadow');
-                        shadow.setAttribute("type", "math_number");
-                        value.appendChild(shadow);
-                        var field = goog.dom.createDom('field');
-                        field.setAttribute('name', 'NUM');
-                        field.appendChild(document.createTextNode("1"));
-                        shadow.appendChild(field);
-                        block.appendChild(value);
+                    if (Blockly.Blocks['variables_change']) {
+                        var gap = Blockly.Blocks['variables_get'] ? 20 : 8;
+                        var blockText = '<xml>' +
+                            '<block type="variables_change" gap="' + gap + '">' +
+                            Blockly.Variables.generateVariableFieldXml_(firstVariable) +
+                            '<value name="DELTA">' +
+                            '<shadow type="math_number">' +
+                            '<field name="NUM">1</field>' +
+                            '</shadow>' +
+                            '</value>' +
+                            '</block>' +
+                            '</xml>';
+                        var block = Blockly.Xml.textToDom(blockText).firstChild;
+                        {
+                            var value = goog.dom.createDom('value');
+                            value.setAttribute('name', 'VALUE');
+                            var shadow = goog.dom.createDom('shadow');
+                            shadow.setAttribute("type", "math_number");
+                            value.appendChild(shadow);
+                            var field = goog.dom.createDom('field');
+                            field.setAttribute('name', 'NUM');
+                            field.appendChild(document.createTextNode("1"));
+                            shadow.appendChild(field);
+                            block.appendChild(value);
+                        }
                         xmlList.push(block);
                     }
                 }
@@ -4403,11 +4244,13 @@ var pxt;
                         "inputsInline": true,
                         "previousStatement": null,
                         "nextStatement": null,
-                        "colour": blocks_6.blockColors['variables']
+                        "colour": getNamespaceColor('variables')
                     });
                     setBuiltinHelpInfo(this, variablesChangeId);
                 }
             };
+            // New variable dialog
+            msg.NEW_VARIABLE_TITLE = lf("New variable name:");
         }
         function initFunctions() {
             var msg = Blockly.Msg;
@@ -4423,8 +4266,9 @@ var pxt;
                     .appendField(Blockly.Msg.PROCEDURES_DEFNORETURN_TITLE)
                     .appendField(nameField, 'NAME')
                     .appendField('', 'PARAMS');
-                this.setColour(blocks_6.blockColors['functions']);
+                this.setColour(getNamespaceColor('functions'));
                 this.arguments_ = [];
+                this.setStartHat(true);
                 this.setStatements_(true);
                 this.statementConnection_ = null;
             };
@@ -4442,7 +4286,7 @@ var pxt;
                         .appendField(nameField, 'NAME');
                     this.setPreviousStatement(true);
                     this.setNextStatement(true);
-                    this.setColour(blocks_6.blockColors['functions']);
+                    this.setColour(getNamespaceColor('functions'));
                     this.arguments_ = [];
                     this.quarkConnections_ = {};
                     this.quarkIds_ = null;
@@ -4475,8 +4319,8 @@ var pxt;
                  * @this Blockly.Block
                  */
                 onchange: function (event) {
-                    if (!this.workspace || this.workspace.isFlyout) {
-                        // Block is deleted or is in a flyout.
+                    if (!this.workspace || this.workspace.isFlyout || this.isInsertionMarker()) {
+                        // Block is deleted or is in a flyout or insertion marker.
                         return;
                     }
                     if (event.type == Blockly.Events.CREATE &&
@@ -4561,6 +4405,16 @@ var pxt;
             installBuiltinHelpInfo(proceduresCallId);
             Blockly.Procedures.flyoutCategory = function (workspace) {
                 var xmlList = [];
+                if (!pxt.appTarget.appTheme.hideFlyoutHeadings && pxt.BrowserUtils.isMobile()) {
+                    // Add the Heading label
+                    var headingLabel = goog.dom.createDom('label');
+                    headingLabel.setAttribute('text', lf("Functions"));
+                    headingLabel.setAttribute('web-class', 'blocklyFlyoutHeading');
+                    headingLabel.setAttribute('web-icon', '\uf107');
+                    headingLabel.setAttribute('web-icon-class', 'blocklyFlyoutIconfunctions');
+                    headingLabel.setAttribute('web-icon-color', getNamespaceColor('functions'));
+                    xmlList.push(headingLabel);
+                }
                 var newFunction = lf("Make a Function");
                 var newFunctionTitle = lf("New function name:");
                 // Add the "Make a function" button
@@ -4593,9 +4447,11 @@ var pxt;
                     field.appendChild(document.createTextNode(name));
                     block.appendChild(field);
                     xml.appendChild(block);
-                    Blockly.Xml.domToWorkspace(xml, workspace);
-                    // Close the flyout
+                    var newBlockIds = Blockly.Xml.domToWorkspace(xml, workspace);
+                    // Close flyout and highlight block
                     workspace.toolbox_.clearSelection();
+                    var newBlock = workspace.getBlockById(newBlockIds[0]);
+                    newBlock.select();
                 };
                 workspace.registerButtonCallback('CREATE_FUNCTION', function (button) {
                     var promptAndCheckWithAlert = function (defaultName) {
@@ -4610,7 +4466,7 @@ var pxt;
                                 }
                             }
                             if (newFunc) {
-                                if (workspace.variableIndexOf(newFunc) != -1) {
+                                if (workspace.getVariable(newFunc)) {
                                     Blockly.alert(Blockly.Msg.VARIABLE_ALREADY_EXISTS.replace('%1', newFunc.toLowerCase()), function () {
                                         promptAndCheckWithAlert(newFunc); // Recurse
                                     });
@@ -4639,7 +4495,7 @@ var pxt;
                         var block = goog.dom.createDom('block');
                         block.setAttribute('type', templateName);
                         block.setAttribute('gap', '16');
-                        block.setAttribute('colour', String(blocks_6.blockColors['functions']));
+                        block.setAttribute('colour', getNamespaceColor('functions'));
                         var field = goog.dom.createDom('field', null, name_4);
                         field.setAttribute('name', 'NAME');
                         block.appendChild(field);
@@ -4700,7 +4556,8 @@ var pxt;
         }
         function initText() {
             // builtin text
-            installBuiltinHelpInfo('text');
+            var textInfo = pxt.blocks.getBlockDefinition('text');
+            installHelpResources('text', textInfo.name, textInfo.tooltip, textInfo.url, Blockly.Colours.textField, Blockly.Colours.textField, Blockly.Colours.textField);
             // builtin text_length
             var msg = Blockly.Msg;
             var textLengthId = "text_length";
@@ -4720,7 +4577,8 @@ var pxt;
                             "check": ['String']
                         }
                     ],
-                    "output": 'Number'
+                    "output": 'Number',
+                    "outputShape": Blockly.OUTPUT_SHAPE_ROUND
                 });
             };
             installBuiltinHelpInfo(textLengthId);
@@ -4918,7 +4776,7 @@ var pxt;
                 // Initialize flyout workspace's top block and add sub-blocks based on visible parameters
                 var topBlock = workspace.newBlock(this.topBlockType);
                 topBlock.initSvg();
-                var _loop_1 = function(input) {
+                var _loop_2 = function(input) {
                     if (input.name === MutatorHelper.mutatorStatmentInput) {
                         var currentConnection_1 = input.connection;
                         this_1.getVisibleBlockTypes().forEach(function (sub) {
@@ -4933,8 +4791,8 @@ var pxt;
                 var this_1 = this;
                 for (var _i = 0, _a = topBlock.inputList; _i < _a.length; _i++) {
                     var input = _a[_i];
-                    var state_1 = _loop_1(input);
-                    if (state_1 === "break") break;
+                    var state_2 = _loop_2(input);
+                    if (state_2 === "break") break;
                 }
                 return topBlock;
             };
@@ -5008,12 +4866,12 @@ var pxt;
                     }
                     return escapedParam;
                 }).join(", ");
-                var lambdaString = " ({ " + declarationString + " }) => ";
+                var functionString = "function ({ " + declarationString + " })";
                 if (this.info.attributes.mutatePropertyEnum) {
-                    return blocks.mkText(" [" + this.parameters.map(function (p) { return (_this.info.attributes.mutatePropertyEnum + "." + p); }).join(", ") + "]," + lambdaString);
+                    return blocks.mkText(" [" + this.parameters.map(function (p) { return (_this.info.attributes.mutatePropertyEnum + "." + p); }).join(", ") + "]," + functionString);
                 }
                 else {
-                    return blocks.mkText(lambdaString);
+                    return blocks.mkText(functionString);
                 }
             };
             DestructuringMutator.prototype.getDeclaredVariables = function () {
@@ -5325,7 +5183,7 @@ var pxt;
 var pxt;
 (function (pxt) {
     var blocks;
-    (function (blocks_10) {
+    (function (blocks_11) {
         var workspace;
         var blocklyDiv;
         function align(ws, emPixels) {
@@ -5342,8 +5200,8 @@ var pxt;
             BlockLayout[BlockLayout["Shuffle"] = 2] = "Shuffle";
             BlockLayout[BlockLayout["Clean"] = 3] = "Clean";
             BlockLayout[BlockLayout["Flow"] = 4] = "Flow";
-        })(blocks_10.BlockLayout || (blocks_10.BlockLayout = {}));
-        var BlockLayout = blocks_10.BlockLayout;
+        })(blocks_11.BlockLayout || (blocks_11.BlockLayout = {}));
+        var BlockLayout = blocks_11.BlockLayout;
         function render(blocksXml, options) {
             if (options === void 0) { options = { emPixels: 14, layout: BlockLayout.Flow }; }
             if (!workspace) {
@@ -5376,7 +5234,7 @@ var pxt;
                         pxt.blocks.layout.shuffle(workspace, options.aspectRatio);
                         break;
                     case BlockLayout.Flow:
-                        pxt.blocks.layout.flow(workspace, options.aspectRatio);
+                        pxt.blocks.layout.flow(workspace, { ratio: options.aspectRatio, useViewWidth: options.useViewWidth });
                         break;
                     case BlockLayout.Clean:
                         if (workspace.cleanUp_)
@@ -5403,7 +5261,7 @@ var pxt;
                 return undefined;
             }
         }
-        blocks_10.render = render;
+        blocks_11.render = render;
         function blocksMetrics(ws) {
             var blocks = ws.getTopBlocks(false);
             if (!blocks.length)
@@ -5425,7 +5283,7 @@ var pxt;
                 height: m.b - m.t
             };
         }
-        blocks_10.blocksMetrics = blocksMetrics;
+        blocks_11.blocksMetrics = blocksMetrics;
     })(blocks = pxt.blocks || (pxt.blocks = {}));
 })(pxt || (pxt = {}));
 var pxt;
@@ -5514,6 +5372,12 @@ var pxt;
                     image.src = card.imageUrl;
                     img.appendChild(image);
                 }
+                if (card.youTubeId) {
+                    var screenshot = document.createElement("img");
+                    screenshot.className = "ui image";
+                    screenshot.src = "https://img.youtube.com/vi/" + card.youTubeId + "/maxresdefault.jpg";
+                    img.appendChild(screenshot);
+                }
                 var name = (options.shortName ? card.shortName : '') || card.name;
                 if (name || card.description) {
                     var ct = div(r, "ui content");
@@ -5559,6 +5423,8 @@ var pxtblockly;
                 yOffset: parseInt(options.tooltipsYOffset) || -10
             };
             this.tooltipConfig_ = tooltipCfg;
+            this.hasSearchBar_ = !!options.hasSearchBar || false;
+            this.hideRect_ = !!options.hideRect || false;
         }
         /**
          * When disposing the grid picker, make sure the tooltips are disposed too.
@@ -5569,59 +5435,44 @@ var pxtblockly;
             this.disposeTooltips();
         };
         /**
-         * Create a dropdown menu under the text.
-         * @private
+         * Create blocklyGridPickerRows and add them to table container
+         * @param options
+         * @param tableContainer
          */
-        FieldGridPicker.prototype.showEditor_ = function () {
-            var _this = this;
-            Blockly.WidgetDiv.show(this, this.sourceBlock_.RTL, null);
+        FieldGridPicker.prototype.populateTableContainer = function (options, tableContainer) {
             this.disposeTooltips();
-            var options = this.getOptions_();
-            // Container for the menu rows
-            var tableContainer = new goog.ui.Control();
-            // Container used to limit the height of the tableContainer, because the tableContainer uses
-            // display: table, which ignores height and maxHeight
-            var scrollContainer = new goog.ui.Control();
-            // Needed to correctly style borders and padding around the scrollContainer, because the padding around the
-            // scrollContainer is part of the scrollable area and will not be correctly shown at the top and bottom
-            // when scrolling
-            var paddingContainer = new goog.ui.Control();
+            tableContainer.removeChildren(true);
             for (var i = 0; i < options.length / this.columns_; i++) {
                 var row = this.createRow(i, options);
                 tableContainer.addChild(row, true);
             }
-            // Record windowSize and scrollOffset before adding menu.
-            var windowSize = goog.dom.getViewportSize();
-            var scrollOffset = goog.style.getViewportPageOffset(document);
-            var xy = this.getAbsoluteXY_();
-            var borderBBox = this.getScaledBBox_();
-            var div = Blockly.WidgetDiv.DIV;
-            scrollContainer.addChild(tableContainer, true);
-            paddingContainer.addChild(scrollContainer, true);
-            paddingContainer.render(div);
-            paddingContainer.getElement().style.border = "solid 1px " + this.borderColour_;
-            var paddingContainerDom = paddingContainer.getElement();
-            var scrollContainerDom = scrollContainer.getElement();
             var tableContainerDom = tableContainer.getElement();
-            // Resize the grid picker if width > screen width
-            if (this.width_ > windowSize.width) {
-                this.width_ = windowSize.width;
+            if (tableContainerDom) {
+                var menuItemsDom = tableContainerDom.childNodes;
+                for (var i = 0; i < menuItemsDom.length; ++i) {
+                    var elem = menuItemsDom[i];
+                    elem.className = "blocklyGridPickerRow";
+                }
             }
-            tableContainerDom.style.width = this.width_ + 'px';
-            tableContainerDom.style.backgroundColor = this.backgroundColour_;
-            scrollContainerDom.style.backgroundColor = this.backgroundColour_;
-            paddingContainerDom.style.backgroundColor = this.backgroundColour_;
-            tableContainerDom.className = 'blocklyGridPickerMenu';
-            scrollContainerDom.className = 'blocklyGridPickerScroller';
-            paddingContainerDom.className = 'blocklyGridPickerPadder';
-            // Add the tooltips and style the items
+        };
+        /**
+         * Add the tooltips and style the items
+         * @param options
+         * @param tableContainer
+         */
+        FieldGridPicker.prototype.createTooltips = function (options, tableContainer) {
+            var _this = this;
+            var needToFloatLeft = (options.length < this.columns_);
+            var tableContainerDom = tableContainer.getElement();
             var menuItemsDom = tableContainerDom.getElementsByClassName('goog-menuitem');
             var largestTextItem = -1;
-            var _loop_2 = function(i) {
+            var _loop_3 = function(i) {
                 var elem = menuItemsDom[i];
                 elem.style.borderColor = this_2.backgroundColour_;
                 elem.style.backgroundColor = this_2.itemColour_;
-                elem.parentElement.className = 'blocklyGridPickerRow';
+                if (needToFloatLeft) {
+                    elem.className += " floatLeft";
+                }
                 var tooltipText = options[i][0].alt;
                 if (tooltipText) {
                     var tooltip_1 = new goog.ui.Tooltip(elem, tooltipText);
@@ -5648,7 +5499,7 @@ var pxtblockly;
             };
             var this_2 = this;
             for (var i = 0; i < menuItemsDom.length; ++i) {
-                _loop_2(i);
+                _loop_3(i);
             }
             // Resize text items so they have a uniform width
             if (largestTextItem > -1) {
@@ -5657,6 +5508,91 @@ var pxtblockly;
                     goog.style.setWidth(elem, largestTextItem);
                 }
             }
+        };
+        /**
+         * Whether or not to show a box around the dropdown menu.
+         * @return {boolean} True if we should show a box (rect) around the dropdown menu. Otherwise false.
+         * @private
+         */
+        FieldGridPicker.prototype.shouldShowRect_ = function () {
+            return !this.hideRect_ ? !this.sourceBlock_.isShadow() : false;
+        };
+        /**
+         * Create a dropdown menu under the text.
+         * @private
+         */
+        FieldGridPicker.prototype.showEditor_ = function () {
+            var _this = this;
+            Blockly.WidgetDiv.show(this, this.sourceBlock_.RTL, null);
+            this.disposeTooltips();
+            var options = this.getOptions();
+            // Container for the menu rows
+            var tableContainer = new goog.ui.Control();
+            //const tableContainer = this.getTableContainer(options);
+            this.populateTableContainer(options, tableContainer);
+            // Container used to limit the height of the tableContainer, because the tableContainer uses
+            // display: table, which ignores height and maxHeight
+            var scrollContainer = new goog.ui.Control();
+            // Needed to correctly style borders and padding around the scrollContainer, because the padding around the
+            // scrollContainer is part of the scrollable area and will not be correctly shown at the top and bottom
+            // when scrolling
+            var paddingContainer = new goog.ui.Control();
+            // Record windowSize and scrollOffset before adding menu.
+            var windowSize = goog.dom.getViewportSize();
+            var scrollOffset = goog.style.getViewportPageOffset(document);
+            var xy = this.getAbsoluteXY_();
+            var borderBBox = this.getScaledBBox_();
+            var div = Blockly.WidgetDiv.DIV;
+            scrollContainer.addChild(tableContainer, true);
+            paddingContainer.addChild(scrollContainer, true);
+            paddingContainer.render(div);
+            var paddingContainerDom = paddingContainer.getElement();
+            var scrollContainerDom = scrollContainer.getElement();
+            var tableContainerDom = tableContainer.getElement();
+            // Search bar
+            if (this.hasSearchBar_) {
+                var searchBarDiv = document.createElement("div");
+                searchBarDiv.setAttribute("class", "ui fluid icon input");
+                var searchIcon = document.createElement("i");
+                searchIcon.setAttribute("class", "search icon");
+                var searchBar_1 = document.createElement("input");
+                searchBar_1.setAttribute("type", "search");
+                searchBar_1.setAttribute("id", "search-bar");
+                searchBar_1.setAttribute("class", "blocklyGridPickerSearchBar");
+                searchBar_1.setAttribute("placeholder", pxt.Util.lf("Search"));
+                searchBar_1.addEventListener("click", function () {
+                    searchBar_1.focus();
+                    searchBar_1.setSelectionRange(0, searchBar_1.value.length);
+                });
+                searchBar_1.addEventListener("keyup", function () {
+                    var text = searchBar_1.value;
+                    var re = new RegExp(text, "i");
+                    var filteredOptions = options.filter(function (block) {
+                        var alt = block[0].alt; // Human-readable text or image.
+                        var value = block[1]; // Language-neutral value.
+                        return alt ? re.test(alt) : re.test(value);
+                    });
+                    _this.populateTableContainer.bind(_this)(filteredOptions, tableContainer);
+                    _this.createTooltips(filteredOptions, tableContainer);
+                });
+                searchBarDiv.appendChild(searchBar_1);
+                searchBarDiv.appendChild(searchIcon);
+                paddingContainerDom.insertBefore(searchBarDiv, paddingContainerDom.childNodes[0]);
+                searchBar_1.focus();
+            }
+            paddingContainerDom.style.border = "solid 1px " + this.borderColour_;
+            // Resize the grid picker if width > screen width
+            if (this.width_ > windowSize.width) {
+                this.width_ = windowSize.width;
+            }
+            tableContainerDom.style.width = this.width_ + 'px';
+            tableContainerDom.style.backgroundColor = this.backgroundColour_;
+            scrollContainerDom.style.backgroundColor = this.backgroundColour_;
+            paddingContainerDom.style.backgroundColor = this.backgroundColour_;
+            tableContainerDom.className = 'blocklyGridPickerMenu';
+            scrollContainerDom.className = 'blocklyGridPickerScroller';
+            paddingContainerDom.className = 'blocklyGridPickerPadder';
+            this.createTooltips(options, tableContainer);
             // Record current container sizes after adding menu.
             var paddingContainerSize = goog.style.getSize(paddingContainerDom);
             var scrollContainerSize = goog.style.getSize(scrollContainerDom);
@@ -5733,7 +5669,6 @@ var pxtblockly;
             }
             Blockly.WidgetDiv.position(xy.x, xy.y, windowSize, scrollOffset, this.sourceBlock_.RTL);
             goog.style.setHeight(div, "auto");
-            tableContainerDom.focus();
         };
         FieldGridPicker.prototype.createRow = function (row, options) {
             var columns = this.columns_;
@@ -5794,9 +5729,349 @@ var pxtblockly;
                 this.tooltips_ = [];
             }
         };
+        /**
+         * Sets the text in this field.  Trigger a rerender of the source block.
+         * @param {?string} text New text.
+         */
+        FieldGridPicker.prototype.setText = function (text) {
+            if (text === null || text === this.text_) {
+                // No change if null.
+                return;
+            }
+            this.text_ = text;
+            this.updateTextNode_();
+            if (this.imageJson_ && this.textElement_) {
+                // Update class for dropdown text.
+                // This class is reset every time updateTextNode_ is called.
+                this.textElement_.setAttribute('class', this.textElement_.getAttribute('class') + ' blocklyHidden');
+                this.imageElement_.parentNode.appendChild(this.arrow_);
+            }
+            else if (this.textElement_) {
+                // Update class for dropdown text.
+                // This class is reset every time updateTextNode_ is called.
+                this.textElement_.setAttribute('class', this.textElement_.getAttribute('class') + ' blocklyDropdownText');
+                this.textElement_.parentNode.appendChild(this.arrow_);
+            }
+            if (this.sourceBlock_ && this.sourceBlock_.rendered) {
+                this.sourceBlock_.render();
+                this.sourceBlock_.bumpNeighbours_();
+            }
+        };
+        ;
+        /**
+         * Updates the width of the field. This calls getCachedWidth which won't cache
+         * the approximated width on IE/Edge when `getComputedTextLength` fails. Once
+         * it eventually does succeed, the result will be cached.
+         **/
+        FieldGridPicker.prototype.updateWidth = function () {
+            var width;
+            if (this.imageJson_) {
+                width = this.imageJson_.width + 5;
+                this.arrowY_ = this.imageJson_.height / 2;
+            }
+            else {
+                // Calculate width of field
+                width = Blockly.Field.getCachedWidth(this.textElement_);
+            }
+            // Add padding to left and right of text.
+            if (this.EDITABLE) {
+                width += Blockly.BlockSvg.EDITABLE_FIELD_PADDING;
+            }
+            // Adjust width for drop-down arrows.
+            this.arrowWidth_ = 0;
+            if (this.positionArrow) {
+                this.arrowWidth_ = this.positionArrow(width);
+                width += this.arrowWidth_;
+            }
+            // Add padding to any drawn box.
+            if (this.box_) {
+                width += 2 * Blockly.BlockSvg.BOX_FIELD_PADDING;
+            }
+            // Set width of the field.
+            this.size_.width = width;
+        };
+        ;
+        /**
+         * Update the text node of this field to display the current text.
+         * @private
+         */
+        FieldGridPicker.prototype.updateTextNode_ = function () {
+            if (!this.textElement_ && !this.imageElement_) {
+                // Not rendered yet.
+                return;
+            }
+            var text = this.text_;
+            if (text.length > this.maxDisplayLength) {
+                // Truncate displayed string and add an ellipsis ('...').
+                text = text.substring(0, this.maxDisplayLength - 2) + '\u2026';
+                // Add special class for sizing font when truncated
+                this.textElement_.setAttribute('class', 'blocklyText blocklyTextTruncated');
+            }
+            else {
+                this.textElement_.setAttribute('class', 'blocklyText');
+            }
+            // Empty the text element.
+            goog.dom.removeChildren(/** @type {!Element} */ (this.textElement_));
+            goog.dom.removeNode(this.imageElement_);
+            this.imageElement_ = null;
+            if (this.imageJson_) {
+                // Image option is selected.
+                this.imageElement_ = Blockly.utils.createSvgElement('image', { 'y': 5, 'x': 8, 'height': this.imageJson_.height + 'px',
+                    'width': this.imageJson_.width + 'px' });
+                this.imageElement_.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', this.imageJson_.src);
+                this.size_.height = Number(this.imageJson_.height) + 10;
+                this.textElement_.parentNode.appendChild(this.imageElement_);
+            }
+            else {
+                // Replace whitespace with non-breaking spaces so the text doesn't collapse.
+                text = text.replace(/\s/g, Blockly.Field.NBSP);
+                if (this.sourceBlock_.RTL && text) {
+                    // The SVG is LTR, force text to be RTL.
+                    text += '\u200F';
+                }
+                if (!text) {
+                    // Prevent the field from disappearing if empty.
+                    text = Blockly.Field.NBSP;
+                }
+                var textNode = document.createTextNode(text);
+                this.textElement_.appendChild(textNode);
+            }
+            // Cached width is obsolete.  Clear it.
+            this.size_.width = 0;
+        };
+        ;
         return FieldGridPicker;
     }(Blockly.FieldDropdown));
     pxtblockly.FieldGridPicker = FieldGridPicker;
+})(pxtblockly || (pxtblockly = {}));
+/// <reference path="../../localtypings/blockly.d.ts" />
+var pxtblockly;
+(function (pxtblockly) {
+    var FieldImageDropdown = (function (_super) {
+        __extends(FieldImageDropdown, _super);
+        function FieldImageDropdown(text, options, validator) {
+            _super.call(this, options.data);
+            this.isFieldCustom_ = true;
+            /**
+             * Callback for when a button is clicked inside the drop-down.
+             * Should be bound to the FieldIconMenu.
+             * @param {Event} e DOM event for the click/touch
+             * @private
+             */
+            this.buttonClick_ = function (e) {
+                var value = e.target.getAttribute('data-value');
+                this.setValue(value);
+                Blockly.DropDownDiv.hide();
+            };
+            /**
+             * Callback for when the drop-down is hidden.
+             */
+            this.onHide_ = function () {
+                Blockly.DropDownDiv.content_.removeAttribute('role');
+                Blockly.DropDownDiv.content_.removeAttribute('aria-haspopup');
+                Blockly.DropDownDiv.content_.removeAttribute('aria-activedescendant');
+            };
+            this.columns_ = parseInt(options.columns);
+            this.maxRows_ = parseInt(options.maxRows) || 0;
+            this.width_ = parseInt(options.width) || 300;
+            this.backgroundColour_ = pxtblockly.parseColour(options.colour);
+            this.itemColour_ = options.itemColour || "rgba(255, 255, 255, 0.6)";
+            this.borderColour_ = Blockly.PXTUtils.fadeColour(this.backgroundColour_, 0.4, false);
+        }
+        /**
+         * Create a dropdown menu under the text.
+         * @private
+         */
+        FieldImageDropdown.prototype.showEditor_ = function () {
+            // If there is an existing drop-down we own, this is a request to hide the drop-down.
+            if (Blockly.DropDownDiv.hideIfOwner(this)) {
+                return;
+            }
+            // If there is an existing drop-down someone else owns, hide it immediately and clear it.
+            Blockly.DropDownDiv.hideWithoutAnimation();
+            Blockly.DropDownDiv.clearContent();
+            // Populate the drop-down with the icons for this field.
+            var contentDiv = Blockly.DropDownDiv.getContentDiv();
+            // Accessibility properties
+            contentDiv.setAttribute('role', 'menu');
+            contentDiv.setAttribute('aria-haspopup', 'true');
+            var options = this.getOptions();
+            for (var i = 0, option = void 0; option = options[i]; i++) {
+                var content = options[i][0]; // Human-readable text or image.
+                var value = options[i][1]; // Language-neutral value.
+                // Icons with the type property placeholder take up space but don't have any functionality
+                // Use for special-case layouts
+                if (content.type == 'placeholder') {
+                    var placeholder = document.createElement('span');
+                    placeholder.setAttribute('class', 'blocklyDropDownPlaceholder');
+                    placeholder.style.width = content.width + 'px';
+                    placeholder.style.height = content.height + 'px';
+                    contentDiv.appendChild(placeholder);
+                    continue;
+                }
+                var button = document.createElement('button');
+                button.setAttribute('id', ':' + i); // For aria-activedescendant
+                button.setAttribute('role', 'menuitem');
+                button.setAttribute('class', 'blocklyDropDownButton');
+                button.title = content.alt;
+                if (this.columns_) {
+                    button.style.width = ((this.width_ / this.columns_) - 8) + 'px';
+                    button.style.height = ((this.width_ / this.columns_) - 8) + 'px';
+                }
+                else {
+                    button.style.width = content.width + 'px';
+                    button.style.height = content.height + 'px';
+                }
+                var backgroundColor = this.backgroundColour_;
+                if (value == this.getValue()) {
+                    // This icon is selected, show it in a different colour
+                    backgroundColor = this.sourceBlock_.getColourTertiary();
+                    button.setAttribute('aria-selected', 'true');
+                }
+                button.style.backgroundColor = backgroundColor;
+                button.style.borderColor = this.borderColour_;
+                Blockly.bindEvent_(button, 'click', this, this.buttonClick_);
+                Blockly.bindEvent_(button, 'mouseup', this, this.buttonClick_);
+                // These are applied manually instead of using the :hover pseudoclass
+                // because Android has a bad long press "helper" menu and green highlight
+                // that we must prevent with ontouchstart preventDefault
+                Blockly.bindEvent_(button, 'mousedown', button, function (e) {
+                    this.setAttribute('class', 'blocklyDropDownButton blocklyDropDownButtonHover');
+                    e.preventDefault();
+                });
+                Blockly.bindEvent_(button, 'mouseover', button, function () {
+                    this.setAttribute('class', 'blocklyDropDownButton blocklyDropDownButtonHover');
+                    contentDiv.setAttribute('aria-activedescendant', this.id);
+                });
+                Blockly.bindEvent_(button, 'mouseout', button, function () {
+                    this.setAttribute('class', 'blocklyDropDownButton');
+                    contentDiv.removeAttribute('aria-activedescendant');
+                });
+                var buttonImg = document.createElement('img');
+                buttonImg.src = content.src;
+                //buttonImg.alt = icon.alt;
+                // Upon click/touch, we will be able to get the clicked element as e.target
+                // Store a data attribute on all possible click targets so we can match it to the icon.
+                button.setAttribute('data-value', value);
+                buttonImg.setAttribute('data-value', value);
+                button.appendChild(buttonImg);
+                contentDiv.appendChild(button);
+            }
+            contentDiv.style.width = this.width_ + 'px';
+            Blockly.DropDownDiv.setColour(this.backgroundColour_, this.borderColour_);
+            var scale = this.sourceBlock_.workspace.scale;
+            // Offset for icon-type horizontal blocks.
+            var secondaryYOffset = (-(Blockly.BlockSvg.MIN_BLOCK_Y * scale) - (Blockly.BlockSvg.FIELD_Y_OFFSET * scale));
+            var renderedPrimary = Blockly.DropDownDiv.showPositionedByBlock(this, this.sourceBlock_, this.onHide_.bind(this), secondaryYOffset);
+        };
+        /**
+         * Sets the text in this field.  Trigger a rerender of the source block.
+         * @param {?string} text New text.
+         */
+        FieldImageDropdown.prototype.setText = function (text) {
+            if (text === null || text === this.text_) {
+                // No change if null.
+                return;
+            }
+            this.text_ = text;
+            this.updateTextNode_();
+            if (this.imageJson_ && this.textElement_) {
+                // Update class for dropdown text.
+                // This class is reset every time updateTextNode_ is called.
+                this.textElement_.setAttribute('class', this.textElement_.getAttribute('class') + ' blocklyHidden');
+                this.imageElement_.parentNode.appendChild(this.arrow_);
+            }
+            else if (this.textElement_) {
+                // Update class for dropdown text.
+                // This class is reset every time updateTextNode_ is called.
+                this.textElement_.setAttribute('class', this.textElement_.getAttribute('class') + ' blocklyDropdownText');
+                this.textElement_.parentNode.appendChild(this.arrow_);
+            }
+            if (this.sourceBlock_ && this.sourceBlock_.rendered) {
+                this.sourceBlock_.render();
+                this.sourceBlock_.bumpNeighbours_();
+            }
+        };
+        ;
+        /**
+         * Updates the width of the field. This calls getCachedWidth which won't cache
+         * the approximated width on IE/Edge when `getComputedTextLength` fails. Once
+         * it eventually does succeed, the result will be cached.
+         **/
+        FieldImageDropdown.prototype.updateWidth = function () {
+            // Calculate width of field
+            var width = this.imageJson_.width + 5;
+            // Add padding to left and right of text.
+            if (this.EDITABLE) {
+                width += Blockly.BlockSvg.EDITABLE_FIELD_PADDING;
+            }
+            this.arrowY_ = this.imageJson_.height / 2;
+            // Adjust width for drop-down arrows.
+            this.arrowWidth_ = 0;
+            if (this.positionArrow) {
+                this.arrowWidth_ = this.positionArrow(width);
+                width += this.arrowWidth_;
+            }
+            // Add padding to any drawn box.
+            if (this.box_) {
+                width += 2 * Blockly.BlockSvg.BOX_FIELD_PADDING;
+            }
+            // Set width of the field.
+            this.size_.width = width;
+        };
+        ;
+        /**
+         * Update the text node of this field to display the current text.
+         * @private
+         */
+        FieldImageDropdown.prototype.updateTextNode_ = function () {
+            if (!this.textElement_ && !this.imageElement_) {
+                // Not rendered yet.
+                return;
+            }
+            var text = this.text_;
+            if (text.length > this.maxDisplayLength) {
+                // Truncate displayed string and add an ellipsis ('...').
+                text = text.substring(0, this.maxDisplayLength - 2) + '\u2026';
+                // Add special class for sizing font when truncated
+                this.textElement_.setAttribute('class', 'blocklyText blocklyTextTruncated');
+            }
+            else {
+                this.textElement_.setAttribute('class', 'blocklyText');
+            }
+            // Empty the text element.
+            goog.dom.removeChildren(/** @type {!Element} */ (this.textElement_));
+            goog.dom.removeNode(this.imageElement_);
+            this.imageElement_ = null;
+            if (this.imageJson_) {
+                // Image option is selected.
+                this.imageElement_ = Blockly.utils.createSvgElement('image', { 'y': 5, 'x': 8, 'height': this.imageJson_.height + 'px',
+                    'width': this.imageJson_.width + 'px' });
+                this.imageElement_.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', this.imageJson_.src);
+                this.size_.height = Number(this.imageJson_.height) + 10;
+                this.textElement_.parentNode.appendChild(this.imageElement_);
+            }
+            else {
+                // Replace whitespace with non-breaking spaces so the text doesn't collapse.
+                text = text.replace(/\s/g, Blockly.Field.NBSP);
+                if (this.sourceBlock_.RTL && text) {
+                    // The SVG is LTR, force text to be RTL.
+                    text += '\u200F';
+                }
+                if (!text) {
+                    // Prevent the field from disappearing if empty.
+                    text = Blockly.Field.NBSP;
+                }
+                var textNode = document.createTextNode(text);
+                this.textElement_.appendChild(textNode);
+            }
+            // Cached width is obsolete.  Clear it.
+            this.size_.width = 0;
+        };
+        ;
+        return FieldImageDropdown;
+    }(Blockly.FieldDropdown));
+    pxtblockly.FieldImageDropdown = FieldImageDropdown;
 })(pxtblockly || (pxtblockly = {}));
 /// <reference path="../../localtypings/blockly.d.ts" />
 var pxtblockly;
@@ -6160,10 +6435,18 @@ var pxtblockly;
             this.nKeys_ = size;
             return this;
         };
+        FieldNote.prototype.onHtmlInputChange_ = function (e) {
+            _super.prototype.onHtmlInputChange_.call(this, e);
+            Blockly.DropDownDiv.hideWithoutAnimation();
+        };
         /**
          * Create a piano under the note field.
          */
         FieldNote.prototype.showEditor_ = function (opt_quietInput) {
+            // If there is an existing drop-down someone else owns, hide it immediately and clear it.
+            Blockly.DropDownDiv.hideWithoutAnimation();
+            Blockly.DropDownDiv.clearContent();
+            var contentDiv = Blockly.DropDownDiv.getContentDiv();
             //  change Note name to number frequency
             Blockly.FieldNumber.prototype.setText.call(this, this.getText());
             FieldNote.superClass_.showEditor_.call(this, true);
@@ -6171,8 +6454,8 @@ var pxtblockly;
             var pianoHeight;
             var keyWidth = 22;
             var keyHeight = 90;
-            var labelHeight;
-            var prevNextHeight;
+            var labelHeight = 20;
+            var prevNextHeight = 20;
             var whiteKeyCounter = 0;
             var selectedKeyColor = "yellowgreen";
             var soundingKeys = 0;
@@ -6185,7 +6468,7 @@ var pxtblockly;
             var piano = [];
             //  initializate
             pianoWidth = keyWidth * (this.nKeys_ - (this.nKeys_ / 12 * 5));
-            pianoHeight = keyHeight;
+            pianoHeight = keyHeight + labelHeight;
             //  Create the piano using Closure (CustomButton).
             for (var i = 0; i < this.nKeys_; i++) {
                 piano.push(new goog.ui.CustomButton());
@@ -6193,57 +6476,29 @@ var pxtblockly;
             if (editorWidth < pianoWidth) {
                 pagination = true;
                 pianoWidth = 7 * keyWidth;
+                pianoHeight = keyHeight + labelHeight + prevNextHeight;
             }
             //  Check if Mobile, pagination -> true
             var quietInput = opt_quietInput || false;
             if (!quietInput && (goog.userAgent.MOBILE || goog.userAgent.ANDROID)) {
                 pagination = true;
                 mobile = true;
-                var r = keyWidth / keyHeight;
-                keyWidth = Math.ceil(windowSize.width / 7);
-                keyHeight = Math.ceil(keyWidth / r);
+                keyWidth = keyWidth * 2;
+                keyHeight = keyHeight * 2;
                 pianoWidth = 7 * keyWidth;
-                pianoHeight = keyHeight;
-                labelHeight = keyWidth / 1.5;
-                prevNextHeight = keyWidth / 1.5;
+                labelHeight = labelHeight * 1.2;
+                prevNextHeight = prevNextHeight * 2;
+                pianoHeight = keyHeight + labelHeight + prevNextHeight;
             }
             //  create piano div
-            var div = Blockly.WidgetDiv.DIV;
             var pianoDiv = goog.dom.createDom("div", {});
             pianoDiv.className = "blocklyPianoDiv";
-            div.appendChild(pianoDiv);
+            contentDiv.appendChild(pianoDiv);
             var scrollOffset = goog.style.getViewportPageOffset(document);
-            //let pianoHeight = keyHeight + div.scrollHeight + 5;
             var xy = this.getAbsoluteXY_();
             var borderBBox = this.getScaledBBox_();
-            var topPosition = 0, leftPosition = 0;
-            //  Flip the piano vertically if off the bottom (only in web view).
-            if (!mobile) {
-                if (xy.y + pianoHeight + borderBBox.height >=
-                    windowSize.height + scrollOffset.y) {
-                    topPosition = -(pianoHeight + borderBBox.height);
-                }
-                if (this.sourceBlock_.RTL) {
-                    xy.x += borderBBox.width;
-                    xy.x -= pianoWidth;
-                    leftPosition += borderBBox.width;
-                    leftPosition -= pianoWidth;
-                    // Don't go offscreen left.
-                    if (xy.x < scrollOffset.x) {
-                        leftPosition = scrollOffset.x - xy.x;
-                    }
-                }
-                else {
-                    // Don't go offscreen right.
-                    if (xy.x > windowSize.width + scrollOffset.x - pianoWidth) {
-                        leftPosition -= xy.x - (windowSize.width + scrollOffset.x - pianoWidth);
-                    }
-                }
-            }
-            else {
-                leftPosition = -document.getElementsByClassName("blocklyWidgetDiv")[0].offsetLeft; //+ ((windowSize.width - this.pianoWidth_) / 2);
-                topPosition = windowSize.height - (keyHeight + labelHeight + prevNextHeight) - document.getElementsByClassName("blocklyWidgetDiv")[0].offsetTop - borderBBox.height;
-            }
+            var leftPosition = 0; //-(<HTMLElement>document.getElementsByClassName("blocklyDropdownDiv")[0]).offsetLeft;   //+ ((windowSize.width - this.pianoWidth_) / 2);
+            var topPosition = 0; //(keyHeight + labelHeight + prevNextHeight);
             //  save all changes in the same group of events
             Blockly.Events.setGroup(true);
             //  render piano keys
@@ -6258,11 +6513,11 @@ var pxtblockly;
                 var bgColor = (isWhite(i)) ? "white" : "black";
                 var width = getKeyWidth(i);
                 var height = getKeyHeight(i);
-                var position = getPosition(i);
+                var position_1 = getPosition(i);
                 //  modify original position in pagination
                 if (pagination && i >= 12)
-                    position -= 7 * octaveCounter * keyWidth;
-                var style = getKeyStyle(bgColor, width, height, position + leftPosition, topPosition, isWhite(i) ? 1000 : 1001, isWhite(i) ? this.colour_ : "black", mobile);
+                    position_1 -= 7 * octaveCounter * keyWidth;
+                var style = getKeyStyle(bgColor, width, height, position_1 + leftPosition, topPosition, isWhite(i) ? 1000 : 1001, isWhite(i) ? this.colour_ : "black", mobile);
                 key.setContent(style);
                 key.setId(this.noteName_[i]);
                 key.render(pianoDiv);
@@ -6289,7 +6544,6 @@ var pxtblockly;
                 goog.events.listen(key.getElement(), goog.events.EventType.MOUSEOVER, function () {
                     var script = showNoteLabel.getContent();
                     script.innerText = this.getId();
-                    this.labelHeight_ = document.getElementsByClassName("blocklyNoteLabel")[0].offsetHeight;
                 }, false, key);
                 //  increment white key counter
                 if (isWhite(i))
@@ -6305,7 +6559,6 @@ var pxtblockly;
             showNoteLabel.render(pianoDiv);
             var scriptLabel = showNoteLabel.getContent();
             scriptLabel.innerText = "-";
-            labelHeight = document.getElementsByClassName("blocklyNoteLabel")[0].offsetHeight;
             // create next and previous CustomButtons for pagination
             var prevButton = new goog.ui.CustomButton();
             var nextButton = new goog.ui.CustomButton();
@@ -6313,7 +6566,6 @@ var pxtblockly;
             var nextButtonStyle = getNextPrevStyle(topPosition, leftPosition, false, mobile);
             if (pagination) {
                 scriptLabel.innerText = "Octave #1";
-                labelHeight = document.getElementsByClassName("blocklyNoteLabel")[0].offsetHeight;
                 //  render previous button
                 var script = void 0;
                 prevButton.setContent(prevButtonStyle);
@@ -6344,7 +6596,6 @@ var pxtblockly;
                         piano[i + newFirstKey].setVisible(true);
                     currentPage_1--;
                     scriptLabel.innerText = "Octave #" + (currentPage_1 + 1);
-                    this.labelHeight_ = document.getElementsByClassName("blocklyNoteLabel")[0].offsetHeight;
                 }, false, prevButton);
                 goog.events.listen(nextButton.getElement(), goog.events.EventType.MOUSEDOWN, function () {
                     if (currentPage_1 == Npages_1 - 1) {
@@ -6361,7 +6612,6 @@ var pxtblockly;
                         piano[i + newFirstKey].setVisible(true);
                     currentPage_1++;
                     scriptLabel.innerText = "Octave #" + (currentPage_1 + 1);
-                    this.labelHeight_ = document.getElementsByClassName("blocklyNoteLabel")[0].offsetHeight;
                 }, false, nextButton);
             }
             // create the key sound
@@ -6531,17 +6781,55 @@ var pxtblockly;
                     return pos;
                 return pos - (keyWidth / 4);
             }
+            pianoDiv.style.width = pianoWidth + "px";
+            pianoDiv.style.height = (pianoHeight + 1) + "px";
+            contentDiv.style.width = (pianoWidth + 1) + "px";
+            var primaryColour = (this.sourceBlock_.isShadow()) ?
+                this.sourceBlock_.parentBlock_.getColour() : this.sourceBlock_.getColour();
+            Blockly.DropDownDiv.setColour(primaryColour, this.sourceBlock_.getColourTertiary());
+            // Calculate positioning based on the field position.
+            var scale = this.sourceBlock_.workspace.scale;
+            var bBox = { width: this.size_.width, height: this.size_.height };
+            bBox.width *= scale;
+            bBox.height *= scale;
+            var position = this.fieldGroup_.getBoundingClientRect();
+            var primaryX = position.left + bBox.width / 2;
+            var primaryY = position.top + bBox.height;
+            var secondaryX = primaryX;
+            var secondaryY = position.top;
+            // Set bounds to workspace; show the drop-down.
+            Blockly.DropDownDiv.setBoundsElement(this.sourceBlock_.workspace.getParentSvg().parentNode);
+            Blockly.DropDownDiv.show(this, primaryX, primaryY, secondaryX, secondaryY, this.onHide.bind(this));
         };
+        /**
+         * Callback for when the drop-down is hidden.
+         */
+        FieldNote.prototype.onHide = function () {
+        };
+        ;
         /**
          * Close the note picker if this input is being deleted.
          */
         FieldNote.prototype.dispose = function () {
-            Blockly.WidgetDiv.hideIfOwner(this);
+            Blockly.DropDownDiv.hideIfOwner(this);
             Blockly.FieldTextInput.superClass_.dispose.call(this);
         };
         return FieldNote;
     }(Blockly.FieldNumber));
     pxtblockly.FieldNote = FieldNote;
+})(pxtblockly || (pxtblockly = {}));
+/// <reference path="../../localtypings/blockly.d.ts" />
+var pxtblockly;
+(function (pxtblockly) {
+    var FieldNumberDropdown = (function (_super) {
+        __extends(FieldNumberDropdown, _super);
+        function FieldNumberDropdown(value, options, validator) {
+            _super.call(this, value, options.data, options.min, options.max, options.precision, validator);
+            this.isFieldCustom_ = true;
+        }
+        return FieldNumberDropdown;
+    }(Blockly.FieldNumberDropdown));
+    pxtblockly.FieldNumberDropdown = FieldNumberDropdown;
 })(pxtblockly || (pxtblockly = {}));
 /// <reference path="../../localtypings/blockly.d.ts" />
 var pxtblockly;
@@ -6552,7 +6840,7 @@ var pxtblockly;
             _super.call(this, null, opt_validator);
             this.setValue(funcname || '');
         }
-        FieldProcedure.prototype.getOptions_ = function () {
+        FieldProcedure.prototype.getOptions = function () {
             return this.dropdownCreate();
         };
         ;
@@ -6630,6 +6918,19 @@ var pxtblockly;
         return FieldProcedure;
     }(Blockly.FieldDropdown));
     pxtblockly.FieldProcedure = FieldProcedure;
+})(pxtblockly || (pxtblockly = {}));
+/// <reference path="../../localtypings/blockly.d.ts" />
+var pxtblockly;
+(function (pxtblockly) {
+    var FieldTextDropdown = (function (_super) {
+        __extends(FieldTextDropdown, _super);
+        function FieldTextDropdown(text, options, validator) {
+            _super.call(this, text, options.data, validator);
+            this.isFieldCustom_ = true;
+        }
+        return FieldTextDropdown;
+    }(Blockly.FieldTextDropdown));
+    pxtblockly.FieldTextDropdown = FieldTextDropdown;
 })(pxtblockly || (pxtblockly = {}));
 var pxtblockly;
 (function (pxtblockly) {

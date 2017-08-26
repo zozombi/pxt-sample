@@ -51,8 +51,9 @@ CACHE:
 https://az416426.vo.msecnd.net/scripts/a/ai.0.js
 
 /pxt-sample/worker.js
-# ver Sat Aug 26 2017 13:03:37 GMT-0700 (Pacific Daylight Time)
-@monacoworkerjs@
+/pxt-sample/monacoworker.js
+
+# ver Sat Aug 26 2017 13:11:31 GMT-0700 (Pacific Daylight Time)
 
 /pxt-sample/target.js
   

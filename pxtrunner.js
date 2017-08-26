@@ -311,6 +311,7 @@ var pxt;
                 if (options.snippetReplaceParent)
                     c = c.parent();
                 var compiled = r.compileJS && r.compileJS.success;
+                // TODO should this use pxt.outputName() and not pxtc.BINARY_HEX
                 var hex = options.hex && compiled && r.compileJS.outfiles[pxtc.BINARY_HEX]
                     ? r.compileJS.outfiles[pxtc.BINARY_HEX] : undefined;
                 var hexname = (pxt.appTarget.nickname || pxt.appTarget.id) + "-" + (options.hexName || '') + "-" + snippetCount++ + ".hex";
@@ -669,21 +670,23 @@ var pxt;
         }
         function renderTypeScript(options) {
             var woptions = {
-                showEdit: true,
-                run: true
+                showEdit: !!options.showEdit,
+                run: !!options.simulator
             };
             function render(e) {
-                if (typeof hljs !== "undefined")
+                if (typeof hljs !== "undefined") {
+                    $(e).text($(e).text().replace(/^\s*\r?\n/, ''));
                     hljs.highlightBlock(e);
+                }
                 fillWithWidget(options, $(e).parent(), $(e), undefined, undefined, woptions);
             }
             $('code.lang-typescript').each(function (i, e) {
                 render(e);
+                $(e).removeClass('lang-typescript');
             });
             $('code.lang-typescript-ignore').each(function (i, e) {
                 render(e);
-                $(e).removeClass('lang-typescript-ignore')
-                    .addClass('lang-typescript');
+                $(e).removeClass('lang-typescript-ignore');
             });
         }
         function renderAsync(options) {
@@ -966,7 +969,8 @@ var pxt;
                     var runOptions = {
                         boardDefinition: board,
                         parts: parts,
-                        fnArgs: fnArgs
+                        fnArgs: fnArgs,
+                        cdnUrl: pxt.webConfig.commitCdnUrl
                     };
                     if (pxt.appTarget.simulator)
                         runOptions.aspectRatio = parts.length && pxt.appTarget.simulator.partsAspectRatio
@@ -1021,6 +1025,8 @@ var pxt;
                     var dm = m;
                     if (dm && dm.localToken) {
                         pxt.Cloud.localToken = dm.localToken;
+                        pendingLocalToken.forEach(function (p) { return p(); });
+                        pendingLocalToken = [];
                     }
                     break;
             }
@@ -1071,13 +1077,27 @@ var pxt;
                     p.then(function () { return render(m[1], decodeURIComponent(m[2])); });
                 }
             }
-            window.addEventListener("message", receiveDocMessage, false);
-            window.addEventListener("hashchange", function () {
-                renderHash();
-            }, false);
-            parent.postMessage({ type: "sidedocready" }, "*");
-            // delay load doc page to allow simulator to load first
-            setTimeout(function () { return renderHash(); }, 1);
+            var promise = Promise.resolve();
+            if (pxt.appTarget.appTheme && pxt.appTarget.appTheme.extendEditor) {
+                var opts_1 = {};
+                promise = promise.then(function () { return pxt.BrowserUtils.loadScriptAsync(pxt.webConfig.commitCdnUrl + "editor.js"); })
+                    .then(function () { return pxt.editor.initExtensionsAsync(opts_1); })
+                    .then(function (res) {
+                    if (res.fieldEditors)
+                        res.fieldEditors.forEach(function (fi) {
+                            pxt.blocks.registerFieldEditor(fi.selector, fi.editor, fi.validator);
+                        });
+                });
+            }
+            promise.done(function () {
+                window.addEventListener("message", receiveDocMessage, false);
+                window.addEventListener("hashchange", function () {
+                    renderHash();
+                }, false);
+                parent.postMessage({ type: "sidedocready" }, "*");
+                // delay load doc page to allow simulator to load first
+                setTimeout(function () { return renderHash(); }, 1);
+            });
         }
         runner.startDocsServer = startDocsServer;
         function renderProjectAsync(content, projectid, template) {
@@ -1168,7 +1188,11 @@ var pxt;
         runner.renderMarkdownAsync = renderMarkdownAsync;
         function renderTutorialAsync(content, tutorialid) {
             tutorialid = tutorialid.replace(/^\//, "");
-            return pxt.Cloud.downloadMarkdownAsync(tutorialid, runner.editorLocale, pxt.Util.localizeLive)
+            var initPromise = Promise.resolve();
+            if (pxt.Cloud.isLocalHost()) {
+                initPromise = waitForLocalTokenAsync();
+            }
+            return initPromise.then(function () { return pxt.Cloud.downloadMarkdownAsync(tutorialid, runner.editorLocale, pxt.Util.localizeLive); })
                 .then(function (tutorialmd) {
                 var steps = tutorialmd.split(/^###[^#].*$/gmi);
                 var stepInfo = [];
@@ -1190,7 +1214,7 @@ var pxt;
                     .then(function () {
                     var uptoSteps = steps.join();
                     uptoSteps = uptoSteps.replace(/((?!.)\s)+/g, "\n");
-                    var regex = /```(sim|block|blocks|shuffle|filterblocks)\n([\s\S]*?)\n```/gmi;
+                    var regex = /```(sim|block|blocks|shuffle|filterblocks)\s*\n([\s\S]*?)\n```/gmi;
                     var match;
                     var code = '';
                     while ((match = regex.exec(uptoSteps)) != null) {
@@ -1200,6 +1224,7 @@ var pxt;
                         return pxt.runner.decompileToBlocksAsync(code, {
                             emPixels: 14,
                             layout: pxt.blocks.BlockLayout.Flow,
+                            useViewWidth: true,
                             package: undefined
                         }).then(function (r) {
                             var blocksxml = r.compileBlocks.outfiles['main.blocks'];
@@ -1271,6 +1296,15 @@ var pxt;
             });
         }
         runner.decompileToBlocksAsync = decompileToBlocksAsync;
+        var pendingLocalToken = [];
+        function waitForLocalTokenAsync() {
+            if (pxt.Cloud.localToken) {
+                return Promise.resolve();
+            }
+            return new Promise(function (resolve, reject) {
+                pendingLocalToken.push(resolve);
+            });
+        }
         runner.initCallbacks = [];
         function init() {
             initInnerAsync()

@@ -1541,7 +1541,11 @@ var pxsim;
                 this.fixBreakpoints();
             }
             this.sendEvent(new pxsim.protocol.InitializedEvent());
-            this.driver.run(js, { parts: parts, fnArgs: fnArgs, boardDefinition: board });
+            this.driver.run(js, {
+                parts: parts,
+                fnArgs: fnArgs,
+                boardDefinition: board
+            });
         };
         SimDebugSession.prototype.stopSimulator = function (unload) {
             if (unload === void 0) { unload = false; }
@@ -1859,6 +1863,7 @@ var pxsim;
                 .done(function () {
                 runtime.run(function (v) {
                     pxsim.dumpLivePointers();
+                    pxsim.Runtime.postMessage({ type: "toplevelcodefinished" });
                 });
             });
         }
@@ -2399,13 +2404,17 @@ var pxsim;
     pxsim.check = check;
     var refObjId = 1;
     var liveRefObjs = {};
-    var stringLiterals;
     var stringRefCounts = {};
     var refCounting = true;
+    var floatingPoint = false;
     function noRefCounting() {
         refCounting = false;
     }
     pxsim.noRefCounting = noRefCounting;
+    function enableFloatingPoint() {
+        floatingPoint = true;
+    }
+    pxsim.enableFloatingPoint = enableFloatingPoint;
     var RefObject = (function () {
         function RefObject() {
             this.id = refObjId++;
@@ -2582,7 +2591,7 @@ var pxsim;
     }(RefObject));
     pxsim.RefMap = RefMap;
     function num(v) {
-        if (v === undefined)
+        if (!floatingPoint && v === undefined)
             return 0;
         return v;
     }
@@ -2602,47 +2611,9 @@ var pxsim;
                 o.destroy();
             }
         }
-        else if (typeof v == "string") {
-            if (stringLiterals && !stringLiterals.hasOwnProperty(v)) {
-                stringRefDelta(v, -1);
-            }
-        }
-        else if (!v) {
-        }
-        else if (typeof v == "function") {
-        }
-        else {
-            throw new Error("bad decr");
-        }
     }
     pxsim.decr = decr;
-    function setupStringLiterals(strings) {
-        // reset
-        liveRefObjs = {};
-        stringRefCounts = {};
-        // and set up strings
-        strings[""] = 1;
-        strings["true"] = 1;
-        strings["false"] = 1;
-        // comment out next line to disable string ref counting
-        // stringLiterals = strings
-    }
-    pxsim.setupStringLiterals = setupStringLiterals;
-    function stringRefDelta(s, n) {
-        if (!stringRefCounts.hasOwnProperty(s))
-            stringRefCounts[s] = 0;
-        var r = (stringRefCounts[s] += n);
-        if (r == 0)
-            delete stringRefCounts[s];
-        else
-            check(r > 0);
-        return r;
-    }
     function initString(v) {
-        if (!v || !stringLiterals)
-            return v;
-        if (typeof v == "string" && !stringLiterals.hasOwnProperty(v))
-            stringRefDelta(v, 1);
         return v;
     }
     pxsim.initString = initString;
@@ -2653,10 +2624,6 @@ var pxsim;
             var o = v;
             check(o.refcnt > 0);
             o.refcnt++;
-        }
-        else if (stringLiterals && typeof v == "string" && !stringLiterals.hasOwnProperty(v)) {
-            var k = stringRefDelta(v, 1);
-            check(k > 1);
         }
         return v;
     }
@@ -2673,6 +2640,35 @@ var pxsim;
         });
     }
     pxsim.dumpLivePointers = dumpLivePointers;
+    var numops;
+    (function (numops) {
+        function toString(v) {
+            if (v === null)
+                return "null";
+            else if (v === undefined)
+                return "undefined";
+            return initString(v.toString());
+        }
+        numops.toString = toString;
+        function toBoolDecr(v) {
+            decr(v);
+            return !!v;
+        }
+        numops.toBoolDecr = toBoolDecr;
+        function toBool(v) {
+            return !!v;
+        }
+        numops.toBool = toBool;
+    })(numops = pxsim.numops || (pxsim.numops = {}));
+    var langsupp;
+    (function (langsupp) {
+        function toInt(v) { return (v | 0); }
+        langsupp.toInt = toInt; // TODO
+        function toFloat(v) { return v; }
+        langsupp.toFloat = toFloat;
+        function ignore(v) { return v; }
+        langsupp.ignore = ignore;
+    })(langsupp = pxsim.langsupp || (pxsim.langsupp = {}));
     var pxtcore;
     (function (pxtcore) {
         pxtcore.incr = pxsim.incr;
@@ -2697,6 +2693,34 @@ var pxsim;
             return 0;
         }
         pxtcore.programHash = programHash;
+        function programSize() {
+            return 0;
+        }
+        pxtcore.programSize = programSize;
+        function afterProgramPage() {
+            return 0;
+        }
+        pxtcore.afterProgramPage = afterProgramPage;
+        // these shouldn't generally be called when compiled for simulator
+        // provide implementation to silence warnings and as future-proofing
+        function toInt(n) { return n >> 0; }
+        pxtcore.toInt = toInt;
+        function toUInt(n) { return n >>> 0; }
+        pxtcore.toUInt = toUInt;
+        function toDouble(n) { return n; }
+        pxtcore.toDouble = toDouble;
+        function toFloat(n) { return n; }
+        pxtcore.toFloat = toFloat;
+        function fromInt(n) { return n; }
+        pxtcore.fromInt = fromInt;
+        function fromUInt(n) { return n; }
+        pxtcore.fromUInt = fromUInt;
+        function fromDouble(n) { return n; }
+        pxtcore.fromDouble = fromDouble;
+        function fromFloat(n) { return n; }
+        pxtcore.fromFloat = fromFloat;
+        function fromBool(n) { return !!n; }
+        pxtcore.fromBool = fromBool;
     })(pxtcore = pxsim.pxtcore || (pxsim.pxtcore = {}));
     var pxtrt;
     (function (pxtrt) {
@@ -2714,6 +2738,10 @@ var pxsim;
             return v | 0;
         }
         pxtrt.toInt32 = toInt32;
+        function toUInt32(v) {
+            return v >>> 0;
+        }
+        pxtrt.toUInt32 = toUInt32;
         function toUInt8(v) {
             return v & 0xff;
         }
@@ -2888,6 +2916,14 @@ var pxsim;
             pxtrt.decr(map);
         }
         pxtrt.mapSetRef = mapSetRef;
+        function switch_eq(a, b) {
+            if (a == b) {
+                pxtrt.decr(b);
+                return true;
+            }
+            return false;
+        }
+        pxtrt.switch_eq = switch_eq;
     })(pxtrt = pxsim.pxtrt || (pxsim.pxtrt = {}));
     var pxtcore;
     (function (pxtcore) {
@@ -2898,7 +2934,7 @@ var pxsim;
             r.vtable = vtable;
             var len = vtable.refmask.length;
             for (var i = 0; i < len; ++i)
-                r.fields.push(0);
+                r.fields.push(floatingPoint ? undefined : 0);
             return r;
         }
         pxtcore.mkClassInstance = mkClassInstance;
@@ -2938,20 +2974,16 @@ var pxsim;
         //undefiend or null values need to be handled specially to support default values
         //default values of boolean, string, number & object arrays are respectively, false, null, 0, null
         //All of the default values are implemented by mapping undefined\null to zero.
-        // 1 - collection of refs (need decr)
-        // 2 - collection of strings (in fact we always have 3, never 2 alone)
-        function RefCollection(flags) {
+        function RefCollection() {
             _super.call(this);
-            this.flags = flags;
             this.data = [];
         }
         RefCollection.prototype.destroy = function () {
             var data = this.data;
-            if (this.flags & 1)
-                for (var i = 0; i < data.length; ++i) {
-                    pxsim.decr(data[i]);
-                    data[i] = 0;
-                }
+            for (var i = 0; i < data.length; ++i) {
+                pxsim.decr(data[i]);
+                data[i] = 0;
+            }
             this.data = [];
         };
         RefCollection.prototype.isValidIndex = function (x) {
@@ -3011,15 +3043,15 @@ var pxsim;
             return undefinedIndex;
         };
         RefCollection.prototype.print = function () {
-            console.log("RefCollection id:" + this.id + " refs:" + this.refcnt + " len:" + this.data.length + " flags:" + this.flags + " d0:" + this.data[0]);
+            console.log("RefCollection id:" + this.id + " refs:" + this.refcnt + " len:" + this.data.length + " d0:" + this.data[0]);
         };
         return RefCollection;
     }(pxsim.RefObject));
     pxsim.RefCollection = RefCollection;
     var Array_;
     (function (Array_) {
-        function mk(f) {
-            return new RefCollection(f);
+        function mk() {
+            return new RefCollection();
         }
         Array_.mk = mk;
         function length(c) {
@@ -3034,24 +3066,21 @@ var pxsim;
         Array_.setLength = setLength;
         function push(c, x) {
             pxsim.pxtrt.nullCheck(c);
-            if (c.flags & 1)
-                pxsim.incr(x);
+            pxsim.incr(x);
             c.push(x);
         }
         Array_.push = push;
         function pop(c, x) {
             pxsim.pxtrt.nullCheck(c);
             var ret = c.pop();
-            if (c.flags & 1)
-                pxsim.decr(ret);
+            pxsim.decr(ret);
             return ret;
         }
         Array_.pop = pop;
         function getAt(c, x) {
             pxsim.pxtrt.nullCheck(c);
             var tmp = c.getAt(x);
-            if (c.flags & 1)
-                pxsim.incr(tmp);
+            pxsim.incr(tmp);
             return tmp;
         }
         Array_.getAt = getAt;
@@ -3059,26 +3088,23 @@ var pxsim;
             pxsim.pxtrt.nullCheck(c);
             if (!c.isValidIndex(x))
                 return;
-            if (c.flags & 1) {
-                pxsim.decr(c.getAt(x));
-            }
+            pxsim.decr(c.getAt(x));
             return c.removeAt(x);
         }
         Array_.removeAt = removeAt;
         function insertAt(c, x, y) {
             pxsim.pxtrt.nullCheck(c);
-            if (c.flags & 1)
-                pxsim.incr(y);
+            pxsim.incr(y);
             c.insertAt(x, y);
         }
         Array_.insertAt = insertAt;
         function setAt(c, x, y) {
             pxsim.pxtrt.nullCheck(c);
-            if (c.isValidIndex(x) && (c.flags & 1)) {
+            if (c.isValidIndex(x)) {
                 //if there is an existing element handle refcount
                 pxsim.decr(c.getAt(x));
-                pxsim.incr(y);
             }
+            pxsim.incr(y);
             c.setAt(x, y);
         }
         Array_.setAt = setAt;
@@ -3100,24 +3126,64 @@ var pxsim;
     })(Array_ = pxsim.Array_ || (pxsim.Array_ = {}));
     var Math_;
     (function (Math_) {
-        function sqrt(n) {
-            return Math.sqrt(n) >>> 0;
+        function imul(x, y) {
+            return intMult(x, y);
         }
+        Math_.imul = imul;
+        function idiv(x, y) {
+            return (x / y) >> 0;
+        }
+        Math_.idiv = idiv;
+        function round(n) { return Math.round(n); }
+        Math_.round = round;
+        function ceil(n) { return Math.ceil(n); }
+        Math_.ceil = ceil;
+        function floor(n) { return Math.floor(n); }
+        Math_.floor = floor;
+        function sqrt(n) { return Math.sqrt(n); }
         Math_.sqrt = sqrt;
-        function pow(x, y) {
-            return Math.pow(x, y) >>> 0;
-        }
+        function pow(x, y) { return Math.pow(x, y); }
         Math_.pow = pow;
-        function random(max) {
-            if (max < 1)
-                return 0;
-            var r = 0;
-            do {
-                r = Math.floor(Math.random() * max);
-            } while (r == max);
-            return r;
+        function log(n) { return Math.log(n); }
+        Math_.log = log;
+        function exp(n) { return Math.exp(n); }
+        Math_.exp = exp;
+        function sin(n) { return Math.sin(n); }
+        Math_.sin = sin;
+        function cos(n) { return Math.cos(n); }
+        Math_.cos = cos;
+        function tan(n) { return Math.tan(n); }
+        Math_.tan = tan;
+        function asin(n) { return Math.asin(n); }
+        Math_.asin = asin;
+        function acos(n) { return Math.acos(n); }
+        Math_.acos = acos;
+        function atan(n) { return Math.atan(n); }
+        Math_.atan = atan;
+        function atan2(y, x) { return Math.atan2(y, x); }
+        Math_.atan2 = atan2;
+        function trunc(x) {
+            return x > 0 ? Math.floor(x) : Math.ceil(x);
+        }
+        Math_.trunc = trunc;
+        function random() {
+            return Math.random();
         }
         Math_.random = random;
+        function randomRange(min, max) {
+            if (min == max)
+                return min;
+            if (min > max) {
+                var t = min;
+                min = max;
+                max = t;
+            }
+            if (Math.floor(min) == min && Math.floor(max) == max)
+                return min + Math.floor(Math.random() * (max - min + 1));
+            else
+                return min + Math.random() * (max - min);
+        }
+        Math_.randomRange = randomRange;
     })(Math_ = pxsim.Math_ || (pxsim.Math_ = {}));
     // for explanations see:
     // http://stackoverflow.com/questions/3428136/javascript-integer-math-incorrect-results (second answer)
@@ -3175,18 +3241,6 @@ var pxsim;
         thumb.lsrs = lsrs;
         function asrs(x, y) { return x >> y; }
         thumb.asrs = asrs;
-        function cmp_lt(x, y) { return x < y; }
-        thumb.cmp_lt = cmp_lt;
-        function cmp_le(x, y) { return x <= y; }
-        thumb.cmp_le = cmp_le;
-        function cmp_ne(x, y) { return !cmp_eq(x, y); }
-        thumb.cmp_ne = cmp_ne;
-        function cmp_eq(x, y) { return pxsim.pxtrt.nullFix(x) == pxsim.pxtrt.nullFix(y); }
-        thumb.cmp_eq = cmp_eq;
-        function cmp_gt(x, y) { return x > y; }
-        thumb.cmp_gt = cmp_gt;
-        function cmp_ge(x, y) { return x >= y; }
-        thumb.cmp_ge = cmp_ge;
         function ignore(v) { return v; }
         thumb.ignore = ignore;
     })(thumb = pxsim.thumb || (pxsim.thumb = {}));
@@ -3289,6 +3343,12 @@ var pxsim;
             NumberFormat[NumberFormat["Int16BE"] = 8] = "Int16BE";
             NumberFormat[NumberFormat["UInt16BE"] = 9] = "UInt16BE";
             NumberFormat[NumberFormat["Int32BE"] = 10] = "Int32BE";
+            NumberFormat[NumberFormat["UInt32LE"] = 11] = "UInt32LE";
+            NumberFormat[NumberFormat["UInt32BE"] = 12] = "UInt32BE";
+            NumberFormat[NumberFormat["Float32LE"] = 13] = "Float32LE";
+            NumberFormat[NumberFormat["Float64LE"] = 14] = "Float64LE";
+            NumberFormat[NumberFormat["Float32BE"] = 15] = "Float32BE";
+            NumberFormat[NumberFormat["Float64BE"] = 16] = "Float64BE";
         })(BufferMethods.NumberFormat || (BufferMethods.NumberFormat = {}));
         var NumberFormat = BufferMethods.NumberFormat;
         ;
@@ -3299,11 +3359,17 @@ var pxsim;
                 case NumberFormat.Int16LE: return -2;
                 case NumberFormat.UInt16LE: return 2;
                 case NumberFormat.Int32LE: return -4;
+                case NumberFormat.UInt32LE: return 4;
                 case NumberFormat.Int8BE: return -10;
                 case NumberFormat.UInt8BE: return 10;
                 case NumberFormat.Int16BE: return -20;
                 case NumberFormat.UInt16BE: return 20;
                 case NumberFormat.Int32BE: return -40;
+                case NumberFormat.UInt32BE: return 40;
+                case NumberFormat.Float32LE: return 4;
+                case NumberFormat.Float32BE: return 40;
+                case NumberFormat.Float64LE: return 8;
+                case NumberFormat.Float64BE: return 80;
                 default: throw pxsim.U.userError("bad format");
             }
         }
@@ -3319,10 +3385,22 @@ var pxsim;
                 swap = true;
                 size /= 10;
             }
-            return { size: size, signed: signed, swap: swap };
+            var isFloat = fmt >= NumberFormat.Float32LE;
+            return { size: size, signed: signed, swap: swap, isFloat: isFloat };
         }
         function getNumber(buf, fmt, offset) {
             var inf = fmtInfo(fmt);
+            if (inf.isFloat) {
+                var subarray = buf.data.buffer.slice(offset, offset + inf.size);
+                if (inf.swap) {
+                    var u8 = new Uint8Array(subarray);
+                    u8.reverse();
+                }
+                if (inf.size == 4)
+                    return new Float32Array(subarray)[0];
+                else
+                    return new Float64Array(subarray)[0];
+            }
             var r = 0;
             for (var i = 0; i < inf.size; ++i) {
                 r <<= 8;
@@ -3333,11 +3411,27 @@ var pxsim;
                 var missingBits = 32 - (inf.size * 8);
                 r = (r << missingBits) >> missingBits;
             }
+            else {
+                r = r >>> 0;
+            }
             return r;
         }
         BufferMethods.getNumber = getNumber;
         function setNumber(buf, fmt, offset, r) {
             var inf = fmtInfo(fmt);
+            if (inf.isFloat) {
+                var arr = new Uint8Array(inf.size);
+                if (inf.size == 4)
+                    new Float32Array(arr.buffer)[0] = r;
+                else
+                    new Float64Array(arr.buffer)[0] = r;
+                if (inf.swap)
+                    arr.reverse();
+                for (var i = 0; i < inf.size; ++i) {
+                    buf.data[offset + i] = arr[i];
+                }
+                return;
+            }
             for (var i = 0; i < inf.size; ++i) {
                 var off = !inf.swap ? offset + i : offset + inf.size - i - 1;
                 buf.data[off] = (r & 0xff);
@@ -3349,6 +3443,13 @@ var pxsim;
             return new RefBuffer(new Uint8Array(size));
         }
         BufferMethods.createBuffer = createBuffer;
+        function createBufferFromHex(hex) {
+            var r = createBuffer(hex.length >> 1);
+            for (var i = 0; i < hex.length; i += 2)
+                r.data[i >> 1] = parseInt(hex.slice(i, i + 2), 16);
+            return r;
+        }
+        BufferMethods.createBufferFromHex = createBufferFromHex;
         function getBytes(buf) {
             // not sure if this is any useful...
             return buf.data;
@@ -3870,17 +3971,6 @@ var pxsim;
             return Date.now();
         }
         U.now = now;
-        function perfNow() {
-            var perf = typeof performance != "undefined" ?
-                performance.now.bind(performance) ||
-                    performance.moznow.bind(performance) ||
-                    performance.msNow.bind(performance) ||
-                    performance.webkitNow.bind(performance) ||
-                    performance.oNow.bind(performance) :
-                Date.now;
-            return perf();
-        }
-        U.perfNow = perfNow;
         function nextTick(f) {
             Promise._async._schedule(f);
         }
@@ -3922,7 +4012,7 @@ var pxsim;
         function CoreBoard() {
             var _this = this;
             _super.call(this);
-            this.id = "b" + pxsim.Math_.random(2147483647);
+            this.id = "b" + Math.round(Math.random() * 2147483647);
             this.bus = new pxsim.EventBus(pxsim.runtime);
             // updates
             this.updateSubscribers = [];
@@ -3974,8 +4064,21 @@ var pxsim;
             this.runtime = runtime;
             this.max = 5;
             this.events = [];
+            this.awaiters = [];
         }
-        EventQueue.prototype.push = function (e) {
+        EventQueue.prototype.push = function (e, notifyOne) {
+            if (this.awaiters.length > 0) {
+                if (notifyOne) {
+                    var aw = this.awaiters.shift();
+                    if (aw)
+                        aw();
+                }
+                else {
+                    var aws = this.awaiters.slice();
+                    this.awaiters = [];
+                    aws.forEach(function (aw) { return aw(); });
+                }
+            }
             if (!this.handler || this.events.length > this.max)
                 return;
             this.events.push(e);
@@ -4014,6 +4117,9 @@ var pxsim;
             enumerable: true,
             configurable: true
         });
+        EventQueue.prototype.addAwaiter = function (awaiter) {
+            this.awaiters.push(awaiter);
+        };
         return EventQueue;
     }());
     pxsim.EventQueue = EventQueue;
@@ -4027,7 +4133,6 @@ var pxsim;
             this.dead = false;
             this.running = false;
             this.startTime = 0;
-            this.startTimeUs = 0;
             this.globals = {};
             this.numDisplayUpdates = 0;
             U.assert(!!pxsim.initCurrentRuntime);
@@ -4345,7 +4450,6 @@ var pxsim;
                 this.running = r;
                 if (this.running) {
                     this.startTime = U.now();
-                    this.startTimeUs = U.perfNow();
                     Runtime.postMessage({ type: 'status', runtimeid: this.id, state: 'running' });
                 }
                 else {
@@ -4428,7 +4532,7 @@ var pxsim;
             }
             // dispatch to all iframe besides self
             var frames = this.container.getElementsByTagName("iframe");
-            if (source && (msg.type === 'eventbus' || msg.type == 'radiopacket')) {
+            if (source && (msg.type === 'eventbus' || msg.type == 'radiopacket' || msg.type == 'irpacket')) {
                 if (frames.length < 2) {
                     this.container.appendChild(this.createFrame());
                     frames = this.container.getElementsByTagName("iframe");
@@ -4556,7 +4660,8 @@ var pxsim;
                 code: js,
                 partDefinitions: opts.partDefinitions,
                 mute: opts.mute,
-                highContrast: opts.highContrast
+                highContrast: opts.highContrast,
+                cdnUrl: opts.cdnUrl
             };
             this.applyAspectRatio();
             this.scheduleFrameCleanup();
@@ -4615,6 +4720,10 @@ var pxsim;
                     break; //handled elsewhere
                 case 'debugger':
                     this.handleDebuggerMessage(msg);
+                    break;
+                case 'toplevelcodefinished':
+                    if (this.options.onTopLevelCodeEnd)
+                        this.options.onTopLevelCodeEnd();
                     break;
                 default:
                     if (msg.type == 'radiopacket') {
@@ -4741,32 +4850,37 @@ var pxsim;
         function EventBus(runtime) {
             this.runtime = runtime;
             this.queues = {};
+            this.nextNotifyEvent = 1024;
         }
-        EventBus.prototype.listen = function (id, evid, handler) {
+        EventBus.prototype.setNotify = function (notifyID, notifyOneID) {
+            this.notifyID = notifyID;
+            this.notifyOneID = notifyOneID;
+        };
+        EventBus.prototype.start = function (id, evid, create) {
             var k = id + ":" + evid;
             var queue = this.queues[k];
             if (!queue)
                 queue = this.queues[k] = new pxsim.EventQueue(this.runtime);
-            queue.handler = handler;
+            return queue;
+        };
+        EventBus.prototype.listen = function (id, evid, handler) {
+            var q = this.start(id, evid, true);
+            q.handler = handler;
         };
         EventBus.prototype.queue = function (id, evid, value) {
             if (value === void 0) { value = 0; }
-            //id: event source, e.g., MICROBIT_ID_BUTTON_A
-            //evid: event value, e.g., MICROBIT_BUTTON_EVT_CLICK
-            //value: mysterious optional parameter
-            var k = id + ":" + evid;
-            var queue = this.queues[k];
-            if (queue) {
-                this.lastEventValue = evid;
-                this.lastEventTimestamp = pxsim.U.perfNow();
-                queue.push(value);
-            }
+            // special handling for notify one
+            var notifyOne = this.notifyID && this.notifyOneID && id == this.notifyOneID;
+            if (notifyOne)
+                id = this.notifyID;
+            // grab queue and handle
+            var q = this.start(id, evid, false);
+            if (q)
+                q.push(value, notifyOne);
         };
-        EventBus.prototype.getLastEventValue = function () {
-            return this.lastEventValue;
-        };
-        EventBus.prototype.getLastEventTime = function () {
-            return Math.floor(this.lastEventTimestamp - pxsim.runtime.startTimeUs) * 1000;
+        EventBus.prototype.wait = function (id, evid, cb) {
+            var q = this.start(id, evid, true);
+            q.addAwaiter(cb);
         };
         return EventBus;
     }());
@@ -5117,6 +5231,13 @@ var pxsim;
             el.setAttribute('transform', "translate(" + originX + "," + originY + ") rotate(" + (degrees + 90) + ") translate(" + -originX + "," + -originY + ")");
         }
         svg_1.rotateElement = rotateElement;
+        function hasClass(el, cls) {
+            if (el.classList)
+                return el.classList.contains(cls);
+            else
+                return el.className.baseVal.indexOf(cls) > -1;
+        }
+        svg_1.hasClass = hasClass;
         function addClass(el, cls) {
             if (el.classList)
                 el.classList.add(cls);
@@ -5181,32 +5302,67 @@ var pxsim;
             els.forEach(function (el) { return el.style.fill = c; });
         }
         svg_1.fills = fills;
-        function buttonEvents(el, move, start, stop) {
+        function isTouchEnabled() {
+            return typeof window !== "undefined" &&
+                ('ontouchstart' in window // works on most browsers
+                    || navigator.maxTouchPoints > 0); // works on IE10/11 and Surface);
+        }
+        svg_1.isTouchEnabled = isTouchEnabled;
+        svg_1.touchEvents = isTouchEnabled() ? {
+            "mousedown": ["mousedown", "touchstart"],
+            "mouseup": ["mouseup", "touchend"],
+            "mousemove": ["mousemove", "touchmove"],
+            "mouseleave": ["mouseleave", "touchcancel"]
+        } : {
+            "mousedown": ["mousedown"],
+            "mouseup": ["mouseup"],
+            "mousemove": ["mousemove"],
+            "mouseleave": ["mouseleave"]
+        };
+        function onClick(el, click) {
             var captured = false;
-            el.addEventListener('mousedown', function (ev) {
+            svg_1.touchEvents.mousedown.forEach(function (evname) { return el.addEventListener(evname, function (ev) {
                 captured = true;
-                if (start)
-                    start(ev);
                 return true;
-            });
-            el.addEventListener('mousemove', function (ev) {
+            }, false); });
+            svg_1.touchEvents.mouseup.forEach(function (evname) { return el.addEventListener(evname, function (ev) {
                 if (captured) {
-                    move(ev);
+                    captured = false;
+                    click(ev);
                     ev.preventDefault();
                     return false;
                 }
                 return true;
-            });
-            el.addEventListener('mouseup', function (ev) {
+            }, false); });
+        }
+        svg_1.onClick = onClick;
+        function buttonEvents(el, move, start, stop) {
+            var captured = false;
+            svg_1.touchEvents.mousedown.forEach(function (evname) { return el.addEventListener(evname, function (ev) {
+                captured = true;
+                if (start)
+                    start(ev);
+                return true;
+            }, false); });
+            svg_1.touchEvents.mousemove.forEach(function (evname) { return el.addEventListener(evname, function (ev) {
+                if (captured) {
+                    if (move)
+                        move(ev);
+                    ev.preventDefault();
+                    return false;
+                }
+                return true;
+            }, false); });
+            svg_1.touchEvents.mouseup.forEach(function (evname) { return el.addEventListener(evname, function (ev) {
                 captured = false;
                 if (stop)
                     stop(ev);
-            });
-            el.addEventListener('mouseleave', function (ev) {
+            }, false); });
+            svg_1.touchEvents.mouseleave.forEach(function (evname) { return el.addEventListener(evname, function (ev) {
                 captured = false;
                 if (stop)
                     stop(ev);
-            });
+            }, false); });
         }
         svg_1.buttonEvents = buttonEvents;
         function mkLinearGradient(id) {
@@ -5452,6 +5608,26 @@ var pxsim;
         return NeoPixelState;
     }());
     pxsim.NeoPixelState = NeoPixelState;
+})(pxsim || (pxsim = {}));
+var pxsim;
+(function (pxsim) {
+    var ToggleState = (function () {
+        function ToggleState(pin) {
+            this.pin = pin;
+            this.on = false;
+        }
+        ToggleState.prototype.toggle = function () {
+            this.on = !this.on;
+            if (this.on) {
+                this.pin.value = 200;
+            }
+            else {
+                this.pin.value = 0;
+            }
+        };
+        return ToggleState;
+    }());
+    pxsim.ToggleState = ToggleState;
 })(pxsim || (pxsim = {}));
 var pxsim;
 (function (pxsim) {

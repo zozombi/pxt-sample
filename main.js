@@ -26,7 +26,6 @@ var screenshot = require("./screenshot");
 var hidbridge = require("./hidbridge");
 var share = require("./share");
 var lang = require("./lang");
-var notification = require("./notification");
 var tutorial = require("./tutorial");
 var editortoolbar = require("./editortoolbar");
 var filelist = require("./filelist");
@@ -34,12 +33,14 @@ var container = require("./container");
 var scriptsearch = require("./scriptsearch");
 var projects = require("./projects");
 var sounds = require("./sounds");
+var make = require("./make");
+var baseToolbox = require("./toolbox");
+var monacoToolbox = require("./monacoSnippets");
 var monaco = require("./monaco");
 var pxtjson = require("./pxtjson");
 var blocks = require("./blocks");
 var logview = require("./logview");
 var draganddrop = require("./draganddrop");
-var hwdbg = require("./hwdbg");
 var electron = require("./electron");
 var Cloud = pxt.Cloud;
 var Util = pxt.Util;
@@ -141,6 +142,7 @@ var ProjectView = (function (_super) {
                         .then(function (hd) { return _this.loadHeaderAsync(hd, null); });
                 }
             }];
+        this.resourceImporters = [];
         // Close on escape
         this.closeOnEscape = function (e) {
             if (e.keyCode !== 27)
@@ -263,7 +265,7 @@ var ProjectView = (function (_super) {
                 this.setState({ embedSimView: false });
             return;
         }
-        if (this.isJavaScriptActive())
+        if (this.isJavaScriptActive() || (this.shouldTryDecompile && !this.state.embedSimView))
             this.textEditor.openBlocks();
         else if (this.isAnyEditeableJavaScriptOrPackageActive()) {
             this.saveFileAsync()
@@ -279,6 +281,7 @@ var ProjectView = (function (_super) {
         }
         else
             this.setFile(pkg.mainEditorPkg().files["main.blocks"]);
+        this.shouldTryDecompile = false;
     };
     ProjectView.prototype.openPreviousEditor = function () {
         if (this.prevEditorId == "monacoEditor") {
@@ -399,6 +402,9 @@ var ProjectView = (function (_super) {
     ProjectView.prototype.setFile = function (fn) {
         if (!fn)
             return;
+        if (fn.name === "main.ts") {
+            this.shouldTryDecompile = true;
+        }
         this.setState({
             currFile: fn,
             showBlocks: false,
@@ -464,6 +470,18 @@ var ProjectView = (function (_super) {
                 removeIt();
         });
     };
+    ProjectView.prototype.updateFileAsync = function (name, content, open) {
+        var _this = this;
+        var p = pkg.mainEditorPkg();
+        p.setFile(name, content);
+        return p.updateConfigAsync(function (cfg) { return cfg.files.indexOf(name) < 0 ? cfg.files.push(name) : 0; })
+            .then(function () {
+            if (open)
+                _this.setFile(p.lookupFile("this/" + name));
+            return p.savePkgAsync();
+        })
+            .then(function () { return _this.reloadHeaderAsync(); });
+    };
     ProjectView.prototype.setSideMarkdown = function (md) {
         var sd = this.refs["sidedoc"];
         if (!sd)
@@ -508,7 +526,8 @@ var ProjectView = (function (_super) {
                 switch (t.subtype) {
                     case 'loaded':
                         var tt = msg;
-                        this.editor.filterToolbox({ blocks: tt.toolboxSubset, defaultState: pxt.editor.FilterState.Hidden }, CategoryMode.Basic);
+                        if (tt.toolboxSubset && Object.keys(tt.toolboxSubset).length > 0)
+                            this.editor.filterToolbox({ blocks: tt.toolboxSubset, defaultState: pxt.editor.FilterState.Hidden }, CategoryMode.Basic);
                         var tutorialOptions = this.state.tutorialOptions;
                         tutorialOptions.tutorialReady = true;
                         tutorialOptions.tutorialStepInfo = tt.stepInfo;
@@ -566,6 +585,9 @@ var ProjectView = (function (_super) {
                 currFile: file,
                 sideDocsLoadUrl: ''
             });
+            if (file.name === "main.ts") {
+                _this.shouldTryDecompile = true;
+            }
             pkg.getEditorPkg(pkg.mainPkg).onupdate = function () {
                 _this.loadHeaderAsync(h, _this.state.filters).done();
             };
@@ -633,7 +655,7 @@ var ProjectView = (function (_super) {
         var _this = this;
         if (!file)
             return;
-        fileReadAsTextAsync(file)
+        ts.pxtc.Util.fileReadAsTextAsync(file)
             .done(function (contents) {
             _this.newProject({
                 filesOverride: { "main.blocks": contents, "main.ts": "  " },
@@ -645,7 +667,7 @@ var ProjectView = (function (_super) {
         var _this = this;
         if (!file)
             return;
-        fileReadAsTextAsync(file)
+        ts.pxtc.Util.fileReadAsTextAsync(file)
             .done(function (contents) {
             _this.newProject({
                 filesOverride: { "main.blocks": '', "main.ts": contents || "  " },
@@ -656,10 +678,14 @@ var ProjectView = (function (_super) {
     ProjectView.prototype.convertTouchDevelopToTypeScriptAsync = function (td) {
         return tdlegacy.td2tsAsync(td);
     };
-    ProjectView.prototype.importHex = function (data) {
+    ProjectView.prototype.importHex = function (data, createNewIfFailed) {
+        var _this = this;
+        if (createNewIfFailed === void 0) { createNewIfFailed = false; }
         var targetId = pxt.appTarget.id;
         if (!data || !data.meta) {
             core.warningNotification(lf("Sorry, we could not recognize this file."));
+            if (createNewIfFailed)
+                this.newProject();
             return;
         }
         var importer = this.hexFileImporters.filter(function (fi) { return fi.canImport(data); })[0];
@@ -671,18 +697,22 @@ var ProjectView = (function (_super) {
                 pxt.reportException(e, { importer: importer.id });
                 core.hideLoading();
                 core.errorNotification(lf("Oops, something went wrong when importing your project"));
+                if (createNewIfFailed)
+                    _this.newProject();
             });
         }
         else {
             core.warningNotification(lf("Sorry, we could not import this project."));
             pxt.tickEvent("warning.importfailed");
+            if (createNewIfFailed)
+                this.newProject();
         }
     };
     ProjectView.prototype.importProjectFile = function (file) {
         var _this = this;
         if (!file)
             return;
-        fileReadAsBufferAsync(file)
+        ts.pxtc.Util.fileReadAsBufferAsync(file)
             .then(function (buf) { return pxt.lzmaDecompressAsync(buf); })
             .done(function (contents) {
             var data = JSON.parse(contents);
@@ -706,8 +736,15 @@ var ProjectView = (function (_super) {
         else if (isProjectFile(file.name)) {
             this.importProjectFile(file);
         }
-        else
-            core.warningNotification(lf("Oops, don't know how to load this file!"));
+        else {
+            var importer = this.resourceImporters.filter(function (fi) { return fi.canImport(file); })[0];
+            if (importer) {
+                importer.importAsync(this, file).done();
+            }
+            else {
+                core.warningNotification(lf("Oops, don't know how to load this file!"));
+            }
+        }
     };
     ProjectView.prototype.importProjectAsync = function (project, filters) {
         var _this = this;
@@ -891,19 +928,25 @@ var ProjectView = (function (_super) {
         var _this = this;
         if (!this.state.header)
             return;
+        this.setState({ isSaving: true });
         return (this.state.projectName !== lf("Untitled")
             ? Promise.resolve(true) : this.promptRenameProjectAsync())
             .then(function () { return _this.saveProjectNameAsync(); })
             .then(function () { return _this.saveFileAsync(); })
             .then(function () {
-            if (!pxt.appTarget.compile.hasHex) {
-                _this.saveProjectToFileAsync().done();
+            if (!pxt.appTarget.compile.hasHex || pxt.appTarget.compile.useMkcd) {
+                _this.saveProjectToFileAsync()
+                    .finally(function () {
+                    _this.setState({ isSaving: false });
+                })
+                    .done();
             }
             else {
                 _this.compile(true);
             }
         });
     };
+    ProjectView.prototype.beforeCompile = function () { };
     ProjectView.prototype.compile = function (saveOnly) {
         var _this = this;
         if (saveOnly === void 0) { saveOnly = false; }
@@ -911,8 +954,9 @@ var ProjectView = (function (_super) {
         if (/webusb=1/i.test(window.location.href)) {
             pxt.usb.initAsync().catch(function (e) { });
         }
+        this.beforeCompile();
         var userContextWindow = undefined;
-        if (pxt.BrowserUtils.isBrowserDownloadInSameWindow())
+        if (!pxt.appTarget.compile.useModulator && pxt.BrowserUtils.isBrowserDownloadInSameWindow())
             userContextWindow = window.open("");
         pxt.tickEvent("compile");
         pxt.debug('compiling...');
@@ -930,7 +974,7 @@ var ProjectView = (function (_super) {
         compiler.compileAsync({ native: true, forceEmit: true, preferredEditor: this.getPreferredEditor() })
             .then(function (resp) {
             _this.editor.setDiagnostics(_this.editorFile, state);
-            var fn = pxt.appTarget.compile.useUF2 ? pxtc.BINARY_UF2 : pxtc.BINARY_HEX;
+            var fn = pxt.outputName();
             if (!resp.outfiles[fn]) {
                 pxt.tickEvent("compile.noemit");
                 core.warningNotification(lf("Compilation failed, please check your code for errors."));
@@ -938,9 +982,19 @@ var ProjectView = (function (_super) {
             }
             resp.saveOnly = saveOnly;
             resp.userContextWindow = userContextWindow;
+            resp.downloadFileBaseName = pkg.genFileName("");
+            resp.confirmAsync = core.confirmAsync;
+            if (saveOnly) {
+                return pxt.commands.saveOnlyAsync(resp);
+            }
             return pxt.commands.deployCoreAsync(resp)
                 .catch(function (e) {
-                core.warningNotification(lf(".hex file upload failed, please try again."));
+                if (e.notifyUser) {
+                    core.warningNotification(e.message);
+                }
+                else {
+                    core.warningNotification(lf("Upload failed, please try again."));
+                }
                 pxt.reportException(e);
                 if (userContextWindow)
                     try {
@@ -957,7 +1011,7 @@ var ProjectView = (function (_super) {
                 }
                 catch (e) { }
         }).finally(function () {
-            _this.setState({ compiling: false });
+            _this.setState({ compiling: false, isSaving: false });
             if (simRestart)
                 _this.runSimulator();
         })
@@ -982,13 +1036,13 @@ var ProjectView = (function (_super) {
         this.stopSimulator();
         this.startSimulator();
     };
-    ProjectView.prototype.toggleTrace = function () {
+    ProjectView.prototype.toggleTrace = function (intervalSpeed) {
         if (this.state.tracing) {
             this.editor.clearHighlightedStatements();
             simulator.setTraceInterval(0);
         }
         else {
-            simulator.setTraceInterval(simulator.SLOW_TRACE_INTERVAL);
+            simulator.setTraceInterval(intervalSpeed != undefined ? intervalSpeed : simulator.SLOW_TRACE_INTERVAL);
         }
         this.setState({ tracing: !this.state.tracing });
         this.restartSimulator();
@@ -1051,28 +1105,15 @@ var ProjectView = (function (_super) {
         this.setState({ mute: !this.state.mute });
     };
     ProjectView.prototype.openInstructions = function () {
+        var _this = this;
         pxt.tickEvent("simulator.make");
-        compiler.compileAsync({ native: true })
-            .done(function (resp) {
-            var p = pkg.mainEditorPkg();
-            var code = p.files["main.ts"];
-            var data = {
-                name: p.header.name || lf("Untitled"),
-                code: code ? code.content : "basic.showString(\"Hi!\");",
-                board: JSON.stringify(pxt.appTarget.simulator.boardDefinition)
-            };
-            var parts = ts.pxtc.computeUsedParts(resp);
-            if (parts.length) {
-                data.parts = parts.join(" ");
-                data.partdefs = JSON.stringify(pkg.mainPkg.computePartDefinitions(parts));
-            }
-            var fnArgs = resp.usedArguments;
-            if (fnArgs)
-                data.fnArgs = JSON.stringify(fnArgs);
-            data.package = Util.values(pkg.mainPkg.deps).filter(function (p) { return p.id != "this"; }).map(function (p) { return (p.id + "=" + p._verspec); }).join('\n');
-            var urlData = Object.keys(data).map(function (k) { return (k + "=" + encodeURIComponent(data[k])); }).join('&');
-            var url = pxt.webConfig.partsUrl + "?" + urlData;
-            window.open(url, '_blank');
+        var running = this.state.running;
+        if (running)
+            this.stopSimulator();
+        make.makeAsync()
+            .finally(function () {
+            if (running)
+                _this.startSimulator();
         });
     };
     ProjectView.prototype.clearLog = function () {
@@ -1086,11 +1127,11 @@ var ProjectView = (function (_super) {
         return start.then(function () {
             simulator.driver.setHwDebugger({
                 postMessage: function (msg) {
-                    hwdbg.handleMessage(msg);
+                    pxt.HWDBG.handleMessage(msg);
                 }
             });
-            hwdbg.postMessage = function (msg) { return simulator.driver.handleHwDebuggerMsg(msg); };
-            return hwdbg.startDebugAsync();
+            pxt.HWDBG.postMessage = function (msg) { return simulator.driver.handleHwDebuggerMsg(msg); };
+            return Promise.join(compiler.compileAsync({ debug: true, native: true }), hidbridge.initAsync()).then(function (vals) { return pxt.HWDBG.startDebugAsync(vals[0], vals[1]); });
         });
     };
     ProjectView.prototype.runSimulator = function (opts) {
@@ -1130,7 +1171,13 @@ var ProjectView = (function (_super) {
     ProjectView.prototype.importFileDialog = function () {
         var _this = this;
         var input;
-        var ext = pxt.appTarget.compile && pxt.appTarget.compile.hasHex ? ".hex" : ".mkcd";
+        var ext = ".mkcd";
+        if (pxt.appTarget.compile && pxt.appTarget.compile.hasHex) {
+            ext = ".hex";
+        }
+        if (pxt.appTarget.compile && pxt.appTarget.compile.useUF2) {
+            ext = ".uf2";
+        }
         core.confirmAsync({
             header: lf("Open {0} file", ext),
             onLoaded: function ($el) {
@@ -1250,7 +1297,7 @@ var ProjectView = (function (_super) {
         })
             .catch(function (e) {
             core.errorNotification(e.message);
-            return undefined;
+            throw e;
         });
     };
     ProjectView.prototype.updateHeaderName = function (name) {
@@ -1299,7 +1346,7 @@ var ProjectView = (function (_super) {
             header: lf("About {0}", pxt.appTarget.name),
             hideCancel: true,
             agreeLbl: lf("Ok"),
-            htmlBody: "\n<p>" + Util.htmlEscape(pxt.appTarget.description) + "</p>\n<p>" + lf("{0} version:", Util.htmlEscape(pxt.appTarget.name)) + " <a href=\"" + Util.htmlEscape(pxt.appTarget.appTheme.githubUrl) + "/releases/tag/v" + Util.htmlEscape(pxt.appTarget.versions.target) + "\" target=\"_blank\">" + Util.htmlEscape(pxt.appTarget.versions.target) + "</a></p>\n<p>" + lf("{0} version:", "Microsoft MakeCode") + " <a href=\"https://github.com/Microsoft/pxt/releases/tag/v" + Util.htmlEscape(pxt.appTarget.versions.pxt) + "\" target=\"_blank\">" + Util.htmlEscape(pxt.appTarget.versions.pxt) + "</a></p>\n" + (compileService ? "<p>" + lf("{0} version:", "C++ runtime") + " <a href=\"" + Util.htmlEscape("https://github.com/" + compileService.githubCorePackage + '/releases/tag/' + compileService.gittag) + "\" target=\"_blank\">" + Util.htmlEscape(compileService.gittag) + "</a></p>" : "") + "\n"
+            htmlBody: "\n<p>" + Util.htmlEscape(pxt.appTarget.description) + "</p>\n<p>" + lf("{0} version:", Util.htmlEscape(pxt.appTarget.name)) + " <a href=\"" + Util.htmlEscape(pxt.appTarget.appTheme.githubUrl) + "/releases/tag/v" + Util.htmlEscape(pxt.appTarget.versions.target) + "\" target=\"_blank\">" + Util.htmlEscape(pxt.appTarget.versions.target) + "</a></p>\n<p>" + lf("{0} version:", "Microsoft MakeCode") + " <a href=\"https://github.com/Microsoft/pxt/releases/tag/v" + Util.htmlEscape(pxt.appTarget.versions.pxt) + "\" target=\"_blank\">" + Util.htmlEscape(pxt.appTarget.versions.pxt) + "</a></p>\n" + (compileService && compileService.githubCorePackage && compileService.gittag ? "<p>" + lf("{0} version:", "C++ runtime") + " <a href=\"" + Util.htmlEscape("https://github.com/" + compileService.githubCorePackage + '/releases/tag/' + compileService.gittag) + "\" target=\"_blank\">" + Util.htmlEscape(compileService.gittag) + "</a></p>" : "") + "\n"
         }).done();
     };
     ProjectView.prototype.embed = function () {
@@ -1309,21 +1356,6 @@ var ProjectView = (function (_super) {
     };
     ProjectView.prototype.selectLang = function () {
         this.languagePicker.show();
-    };
-    ProjectView.prototype.loadNotificationsAsync = function () {
-        var _this = this;
-        return pxt.targetConfigAsync().then(function (targetConfig) {
-            if (targetConfig) {
-                var notifications = targetConfig && targetConfig.notifications
-                    ? targetConfig.notifications
-                    : {};
-                var thisNotification = notifications[window.location.hostname];
-                if (thisNotification) {
-                    pxt.tickEvent("notifications.showDialog");
-                    _this.setState({ notification: thisNotification });
-                }
-            }
-        });
     };
     ProjectView.prototype.renderBlocksAsync = function (req) {
         return compiler.getBlocksAsync()
@@ -1382,6 +1414,9 @@ var ProjectView = (function (_super) {
             _this.setState({ tutorialOptions: tutorialOptions, tracing: undefined });
             var tc = _this.refs["tutorialcontent"];
             tc.setPath(tutorialId);
+        }).catch(function (e) {
+            core.hideLoading();
+            core.handleNetworkError(e);
         });
     };
     ProjectView.prototype.exitTutorial = function (keep) {
@@ -1469,13 +1504,14 @@ var ProjectView = (function (_super) {
         var tutorialOptions = this.state.tutorialOptions;
         var inTutorial = !!tutorialOptions && !!tutorialOptions.tutorial;
         var docMenu = targetTheme.docMenu && targetTheme.docMenu.length && !sandbox && !inTutorial;
-        var gettingStarted = !sandbox && !inTutorial && !this.state.sideDocsLoadUrl && targetTheme && targetTheme.sideDoc && isBlocks;
+        var gettingStarted = !sandbox && !inTutorial && !this.state.sideDocsLoadUrl && targetTheme && targetTheme.sideDoc && isBlocks && !targetTheme.useStartPage;
         var gettingStartedTooltip = lf("Open beginner tutorial");
         var run = true; // !compileBtn || !pxt.appTarget.simulator.autoRun || !isBlocks;
         var restart = run && !simOpts.hideRestart;
         var trace = run && simOpts.enableTrace;
         var fullscreen = run && !inTutorial && !simOpts.hideFullscreen;
         var audio = run && !inTutorial && targetTheme.hasAudio;
+        var useModulator = compile.useModulator;
         var hideMenuBar = targetTheme.hideMenuBar, hideEditorToolbar = targetTheme.hideEditorToolbar;
         var isHeadless = simOpts.headless;
         var cookieKey = "cookieconsent";
@@ -1486,6 +1522,7 @@ var ProjectView = (function (_super) {
         var javascriptActive = this.isJavaScriptActive();
         var traceTooltip = this.state.tracing ? lf("Disable Slow-Mo") : lf("Slow-Mo");
         var selectLanguage = targetTheme.selectLanguage;
+        var betaUrl = targetTheme.betaUrl;
         var consentCookie = function () {
             pxt.storage.setLocal(cookieKey, "1");
             _this.forceUpdate();
@@ -1508,15 +1545,15 @@ var ProjectView = (function (_super) {
             'full-abs',
             'dimmable'
         ]);
-        return (React.createElement("div", {id: 'root', className: rootClasses}, hideMenuBar ? undefined :
+        return (React.createElement("div", {id: 'root', className: rootClasses}, useModulator ? React.createElement("audio", {id: "modulatorAudioOutput", controls: true}) : undefined, useModulator ? React.createElement("div", {id: "modulatorWrapper"}, React.createElement("div", {id: "modulatorBubble"}, React.createElement("canvas", {id: "modulatorWavStrip"}))) : undefined, hideMenuBar ? undefined :
             React.createElement("div", {id: "menubar", role: "banner"}, React.createElement("div", {className: "ui borderless fixed " + (targetTheme.invertedMenu ? "inverted" : '') + " menu", role: "menubar"}, !sandbox ? React.createElement("div", {className: "left menu"}, React.createElement("span", {id: "logo", className: "ui item logo"}, targetTheme.logo || targetTheme.portraitLogo
                 ? React.createElement("a", {className: "ui image", target: "_blank", rel: "noopener", href: targetTheme.logoUrl}, React.createElement("img", {className: "ui logo " + (targetTheme.portraitLogo ? " portrait hide" : ''), src: Util.toDataUri(targetTheme.logo || targetTheme.portraitLogo), alt: targetTheme.boardName + " Logo"}))
-                : React.createElement("span", {className: "name"}, targetTheme.name), targetTheme.portraitLogo ? (React.createElement("a", {className: "ui", target: "_blank", rel: "noopener", href: targetTheme.logoUrl}, React.createElement("img", {className: 'ui mini image portrait only', src: Util.toDataUri(targetTheme.portraitLogo), alt: targetTheme.boardName + " Logo"}))) : null), !inTutorial ? React.createElement(sui.Item, {class: "icon openproject", role: "menuitem", textClass: "landscape only", icon: "folder open large", text: lf("Projects"), onClick: function () { return _this.openProject(); }}) : null, !inTutorial && this.state.header && sharingEnabled ? React.createElement(sui.Item, {class: "icon shareproject", role: "menuitem", textClass: "widedesktop only", text: lf("Share"), icon: "share alternate large", onClick: function () { return _this.embed(); }}) : null, inTutorial ? React.createElement(sui.Item, {class: "tutorialname", role: "menuitem", textClass: "landscape only", text: tutorialOptions.tutorialName}) : null) : React.createElement("div", {className: "left menu"}, React.createElement("span", {id: "logo", className: "ui item logo"}, React.createElement("img", {className: "ui mini image", src: Util.toDataUri(rightLogo), onClick: function () { return _this.launchFullEditor(); }, alt: targetTheme.boardName + " Logo"}))), !inTutorial && !targetTheme.blocksOnly ? React.createElement(sui.Item, {class: "editor-menuitem"}, sandbox ? React.createElement(sui.Item, {class: "sim-menuitem thin portrait only", textClass: "landscape only", text: lf("Simulator"), icon: simActive && this.state.running ? "stop" : "play", active: simActive, onClick: function () { return _this.openSimView(); }, title: !simActive ? lf("Show Simulator") : runTooltip}) : undefined, React.createElement(sui.Item, {class: "blocks-menuitem", textClass: "landscape only", text: lf("Blocks"), icon: "xicon blocks", active: blockActive, onClick: function () { return _this.openBlocks(); }, title: lf("Convert code to Blocks")}), React.createElement(sui.Item, {class: "javascript-menuitem", textClass: "landscape only", text: lf("JavaScript"), icon: "xicon js", active: javascriptActive, onClick: function () { return _this.openJavaScript(); }, title: lf("Convert code to JavaScript")})) : undefined, inTutorial ? React.createElement(tutorial.TutorialMenuItem, {parent: this}) : undefined, React.createElement("div", {className: "right menu"}, docMenu ? React.createElement(container.DocsMenuItem, {parent: this}) : undefined, sandbox || inTutorial ? undefined :
+                : React.createElement("span", {className: "name"}, targetTheme.name), targetTheme.portraitLogo ? (React.createElement("a", {className: "ui", target: "_blank", rel: "noopener", href: targetTheme.logoUrl}, React.createElement("img", {className: 'ui mini image portrait only', src: Util.toDataUri(targetTheme.portraitLogo), alt: targetTheme.boardName + " Logo"}))) : null), !inTutorial ? React.createElement(sui.Item, {class: "icon openproject", role: "menuitem", textClass: "landscape only", icon: "folder open large", text: lf("Projects"), onClick: function () { return _this.openProject(); }}) : null, !inTutorial && this.state.header && sharingEnabled ? React.createElement(sui.Item, {class: "icon shareproject", role: "menuitem", textClass: "widedesktop only", text: lf("Share"), icon: "share alternate large", onClick: function () { return _this.embed(); }}) : null, inTutorial ? React.createElement(sui.Item, {class: "tutorialname", role: "menuitem", textClass: "landscape only", text: tutorialOptions.tutorialName}) : null) : React.createElement("div", {className: "left menu"}, React.createElement("span", {id: "logo", className: "ui item logo"}, React.createElement("img", {className: "ui mini image", src: Util.toDataUri(rightLogo), onClick: function () { return _this.launchFullEditor(); }, alt: targetTheme.boardName + " Logo"}))), !inTutorial && !targetTheme.blocksOnly ? React.createElement(sui.Item, {class: "editor-menuitem"}, React.createElement("div", {className: "ui grid padded"}, sandbox ? React.createElement(sui.Item, {class: "sim-menuitem thin portrait only", textClass: "landscape only", text: lf("Simulator"), icon: simActive && this.state.running ? "stop" : "play", active: simActive, onClick: function () { return _this.openSimView(); }, title: !simActive ? lf("Show Simulator") : runTooltip}) : undefined, React.createElement(sui.Item, {class: "blocks-menuitem", textClass: "landscape only", text: lf("Blocks"), icon: "xicon blocks", active: blockActive, onClick: function () { return _this.openBlocks(); }, title: lf("Convert code to Blocks")}), React.createElement(sui.Item, {class: "javascript-menuitem", textClass: "landscape only", text: lf("JavaScript"), icon: "xicon js", active: javascriptActive, onClick: function () { return _this.openJavaScript(); }, title: lf("Convert code to JavaScript")}), React.createElement("div", {className: "ui item toggle"}))) : undefined, inTutorial ? React.createElement(tutorial.TutorialMenuItem, {parent: this}) : undefined, React.createElement("div", {className: "right menu"}, docMenu ? React.createElement(container.DocsMenuItem, {parent: this}) : undefined, sandbox || inTutorial ? undefined :
                 React.createElement(sui.DropdownMenuItem, {icon: 'setting large', title: lf("More..."), class: "more-dropdown-menuitem"}, this.state.header ? React.createElement(sui.Item, {role: "menuitem", icon: "options", text: lf("Project Settings"), onClick: function () { return _this.setFile(pkg.mainEditorPkg().lookupFile("this/pxt.json")); }}) : undefined, this.state.header && packages ? React.createElement(sui.Item, {role: "menuitem", icon: "disk outline", text: lf("Add Package..."), onClick: function () { return _this.addPackage(); }}) : undefined, this.state.header ? React.createElement(sui.Item, {role: "menuitem", icon: "trash", text: lf("Delete Project"), onClick: function () { return _this.removeProject(); }}) : undefined, reportAbuse ? React.createElement(sui.Item, {role: "menuitem", icon: "warning circle", text: lf("Report Abuse..."), onClick: function () { return _this.showReportAbuse(); }}) : undefined, React.createElement("div", {className: "ui divider"}), selectLanguage ? React.createElement(sui.Item, {icon: "xicon globe", role: "menuitem", text: lf("Language"), onClick: function () { return _this.selectLang(); }}) : undefined, targetTheme.highContrast ? React.createElement(sui.Item, {role: "menuitem", text: this.state.highContrast ? lf("High Contrast Off") : lf("High Contrast On"), onClick: function () { return _this.toggleHighContrast(); }}) : undefined, React.createElement(sui.Item, {role: "menuitem", icon: 'sign out', text: lf("Reset"), onClick: function () { return _this.reset(); }}), React.createElement("div", {className: "ui divider"}), targetTheme.privacyUrl ? React.createElement("a", {className: "ui item", href: targetTheme.privacyUrl, role: "menuitem", title: lf("Privacy & Cookies"), target: "_blank"}, lf("Privacy & Cookies")) : undefined, targetTheme.termsOfUseUrl ? React.createElement("a", {className: "ui item", href: targetTheme.termsOfUseUrl, role: "menuitem", title: lf("Terms Of Use"), target: "_blank"}, lf("Terms Of Use")) : undefined, React.createElement(sui.Item, {role: "menuitem", text: lf("About..."), onClick: function () { return _this.about(); }}), electron.isElectron ? React.createElement(sui.Item, {role: "menuitem", text: lf("Check for updates..."), onClick: function () { return electron.checkForUpdate(); }}) : undefined, targetTheme.feedbackUrl ? React.createElement("div", {className: "ui divider"}) : undefined, targetTheme.feedbackUrl ? React.createElement("a", {className: "ui item", href: targetTheme.feedbackUrl, role: "menuitem", title: lf("Give Feedback"), target: "_blank", rel: "noopener"}, lf("Give Feedback")) : undefined), sandbox && !targetTheme.hideEmbedEdit ? React.createElement(sui.Item, {role: "menuitem", icon: "external", textClass: "mobile hide", text: lf("Edit"), onClick: function () { return _this.launchFullEditor(); }}) : undefined, inTutorial ? React.createElement(sui.ButtonMenuItem, {class: "exit-tutorial-btn", role: "menuitem", icon: "external", text: lf("Exit tutorial"), textClass: "landscape only", onClick: function () { return _this.exitTutorial(true); }}) : undefined, !sandbox ? React.createElement("a", {id: "organization", href: targetTheme.organizationUrl, target: "blank", rel: "noopener", className: "ui item logo", onClick: function () { return pxt.tickEvent("menu.org"); }}, targetTheme.organizationWideLogo || targetTheme.organizationLogo
                 ? React.createElement("img", {className: "ui logo " + (targetTheme.organizationWideLogo ? " portrait hide" : ''), src: Util.toDataUri(targetTheme.organizationWideLogo || targetTheme.organizationLogo), alt: targetTheme.organization + " Logo"})
-                : React.createElement("span", {className: "name"}, targetTheme.organization), targetTheme.organizationLogo ? (React.createElement("img", {className: 'ui mini image portrait only', src: Util.toDataUri(targetTheme.organizationLogo), alt: targetTheme.organization + " Logo"})) : null) : undefined))), gettingStarted ?
+                : React.createElement("span", {className: "name"}, targetTheme.organization), targetTheme.organizationLogo ? (React.createElement("img", {className: 'ui mini image portrait only', src: Util.toDataUri(targetTheme.organizationLogo), alt: targetTheme.organization + " Logo"})) : null) : undefined, betaUrl ? React.createElement("a", {href: "" + betaUrl, className: "ui red mini corner top left attached label betalabel"}, lf("Beta")) : undefined))), gettingStarted ?
             React.createElement("div", {id: "getting-started-btn"}, React.createElement(sui.Button, {class: "portrait hide bottom attached small getting-started-btn", title: gettingStartedTooltip, text: lf("Getting Started"), onClick: function () { return _this.gettingStarted(); }}))
-            : undefined, React.createElement("div", {id: "simulator"}, React.createElement("div", {id: "filelist", className: "ui items", role: "complementary"}, React.createElement("div", {id: "boardview", className: "ui vertical editorFloat"}), !isHeadless ? React.createElement("div", {className: "ui item grid centered portrait hide simtoolbar"}, React.createElement("div", {className: "ui icon buttons " + (this.state.fullscreen ? 'massive' : ''), style: { padding: "0" }}, make ? React.createElement(sui.Button, {icon: 'configure', class: "fluid sixty secondary", text: lf("Make"), title: makeTooltip, onClick: function () { return _this.openInstructions(); }}) : undefined, run ? React.createElement(sui.Button, {key: 'runbtn', class: "play-button " + (this.state.running ? "stop" : "play"), icon: this.state.running ? "stop" : "play", title: runTooltip, onClick: function () { return _this.startStopSimulator(); }}) : undefined, restart ? React.createElement(sui.Button, {key: 'restartbtn', class: "restart-button", icon: "refresh", title: restartTooltip, onClick: function () { return _this.restartSimulator(); }}) : undefined, trace ? React.createElement(sui.Button, {key: 'debug', class: "trace-button " + (this.state.tracing ? 'orange' : ''), icon: "xicon turtle", title: traceTooltip, onClick: function () { return _this.toggleTrace(); }}) : undefined), React.createElement("div", {className: "ui icon buttons " + (this.state.fullscreen ? 'massive' : ''), style: { padding: "0" }}, audio ? React.createElement(sui.Button, {key: 'mutebtn', class: "mute-button " + (this.state.mute ? 'red' : ''), icon: "" + (this.state.mute ? 'volume off' : 'volume up'), title: muteTooltip, onClick: function () { return _this.toggleMute(); }}) : undefined, fullscreen ? React.createElement(sui.Button, {key: 'fullscreenbtn', class: "fullscreen-button", icon: "" + (this.state.fullscreen ? 'compress' : 'maximize'), title: fullscreenTooltip, onClick: function () { return _this.toggleSimulatorFullscreen(); }}) : undefined)) : undefined, React.createElement("div", {className: "ui item portrait hide"}, pxt.options.debug && !this.state.running ? React.createElement(sui.Button, {key: 'debugbtn', class: 'teal', icon: "xicon bug", text: "Sim Debug", onClick: function () { return _this.runSimulator({ debug: true }); }}) : '', pxt.options.debug ? React.createElement(sui.Button, {key: 'hwdebugbtn', class: 'teal', icon: "xicon chip", text: "Dev Debug", onClick: function () { return _this.hwDebug(); }}) : ''), React.createElement("div", {className: "ui editorFloat portrait hide"}, React.createElement(logview.LogView, {ref: "logs"})), sandbox || isBlocks ? undefined : React.createElement(filelist.FileList, {parent: this}))), React.createElement("div", {id: "maineditor", className: sandbox ? "sandbox" : "", role: "main"}, inTutorial ? React.createElement(tutorial.TutorialCard, {ref: "tutorialcard", parent: this}) : undefined, this.allEditors.map(function (e) { return e.displayOuter(); })), inTutorial ? React.createElement(tutorial.TutorialHint, {ref: "tutorialhint", parent: this}) : undefined, inTutorial ? React.createElement(tutorial.TutorialContent, {ref: "tutorialcontent", parent: this}) : undefined, hideEditorToolbar ? undefined : React.createElement("div", {id: "editortools", role: "complementary"}, React.createElement(editortoolbar.EditorToolbar, {ref: "editortools", parent: this})), sideDocs ? React.createElement(container.SideDocs, {ref: "sidedoc", parent: this}) : undefined, sandbox ? undefined : React.createElement(scriptsearch.ScriptSearch, {parent: this, ref: function (v) { return _this.scriptSearch = v; }}), sandbox ? undefined : React.createElement(projects.Projects, {parent: this, ref: function (v) { return _this.projects = v; }}), sandbox || !sharingEnabled ? undefined : React.createElement(share.ShareEditor, {parent: this, ref: function (v) { return _this.shareEditor = v; }}), selectLanguage ? React.createElement(lang.LanguagePicker, {parent: this, ref: function (v) { return _this.languagePicker = v; }}) : undefined, inTutorial ? React.createElement(tutorial.TutorialComplete, {parent: this, ref: function (v) { return _this.tutorialComplete = v; }}) : undefined, React.createElement(notification.NotificationDialog, {parent: this, ref: function (v) { return _this.notificationDialog = v; }}), sandbox ? React.createElement("div", {className: "ui horizontal small divided link list sandboxfooter"}, targetTheme.organizationUrl && targetTheme.organization ? React.createElement("a", {className: "item", target: "_blank", rel: "noopener", href: targetTheme.organizationUrl}, targetTheme.organization) : undefined, React.createElement("a", {target: "_blank", className: "item", href: targetTheme.termsOfUseUrl, rel: "noopener"}, lf("Terms of Use")), React.createElement("a", {target: "_blank", className: "item", href: targetTheme.privacyUrl, rel: "noopener"}, lf("Privacy")), React.createElement("span", {className: "item"}, React.createElement("a", {className: "ui thin portrait only", title: compileTooltip, onClick: function () { return _this.compile(); }}, React.createElement("i", {className: "icon download"}), lf("Download")))) : undefined, cookieConsented ? undefined : React.createElement("div", {id: 'cookiemsg', className: "ui teal inverted black segment"}, React.createElement("button", {"arial-label": lf("Ok"), className: "ui right floated icon button clear inverted", onClick: consentCookie}, React.createElement("i", {className: "remove icon"})), lf("By using this site you agree to the use of cookies for analytics."), React.createElement("a", {target: "_blank", className: "ui link", href: pxt.appTarget.appTheme.privacyUrl, rel: "noopener"}, lf("Learn more")))));
+            : undefined, React.createElement("div", {id: "simulator"}, React.createElement("div", {id: "filelist", className: "ui items", role: "complementary"}, React.createElement("div", {id: "boardview", className: "ui vertical editorFloat"}), !isHeadless ? React.createElement("div", {className: "ui item grid centered portrait hide simtoolbar"}, React.createElement("div", {className: "ui icon buttons " + (this.state.fullscreen ? 'massive' : ''), style: { padding: "0" }}, make ? React.createElement(sui.Button, {icon: 'configure', class: "fluid sixty secondary", text: lf("Make"), title: makeTooltip, onClick: function () { return _this.openInstructions(); }}) : undefined, run ? React.createElement(sui.Button, {key: 'runbtn', class: "play-button " + (this.state.running ? "stop" : "play"), icon: this.state.running ? "stop" : "play", title: runTooltip, onClick: function () { return _this.startStopSimulator(); }}) : undefined, restart ? React.createElement(sui.Button, {key: 'restartbtn', class: "restart-button", icon: "refresh", title: restartTooltip, onClick: function () { return _this.restartSimulator(); }}) : undefined, trace ? React.createElement(sui.Button, {key: 'debug', class: "trace-button " + (this.state.tracing ? 'orange' : ''), icon: "xicon turtle", title: traceTooltip, onClick: function () { return _this.toggleTrace(); }}) : undefined), React.createElement("div", {className: "ui icon buttons " + (this.state.fullscreen ? 'massive' : ''), style: { padding: "0" }}, audio ? React.createElement(sui.Button, {key: 'mutebtn', class: "mute-button " + (this.state.mute ? 'red' : ''), icon: "" + (this.state.mute ? 'volume off' : 'volume up'), title: muteTooltip, onClick: function () { return _this.toggleMute(); }}) : undefined, fullscreen ? React.createElement(sui.Button, {key: 'fullscreenbtn', class: "fullscreen-button", icon: "" + (this.state.fullscreen ? 'compress' : 'maximize'), title: fullscreenTooltip, onClick: function () { return _this.toggleSimulatorFullscreen(); }}) : undefined)) : undefined, React.createElement("div", {className: "ui item portrait hide"}, pxt.options.debug && !this.state.running ? React.createElement(sui.Button, {key: 'debugbtn', class: 'teal', icon: "xicon bug", text: "Sim Debug", onClick: function () { return _this.runSimulator({ debug: true }); }}) : '', pxt.options.debug ? React.createElement(sui.Button, {key: 'hwdebugbtn', class: 'teal', icon: "xicon chip", text: "Dev Debug", onClick: function () { return _this.hwDebug(); }}) : ''), React.createElement("div", {className: "ui editorFloat portrait hide"}, React.createElement(logview.LogView, {ref: "logs"})), sandbox || isBlocks ? undefined : React.createElement(filelist.FileList, {parent: this}))), React.createElement("div", {id: "maineditor", className: sandbox ? "sandbox" : "", role: "main"}, inTutorial ? React.createElement(tutorial.TutorialCard, {ref: "tutorialcard", parent: this}) : undefined, this.allEditors.map(function (e) { return e.displayOuter(); })), inTutorial ? React.createElement(tutorial.TutorialHint, {ref: "tutorialhint", parent: this}) : undefined, inTutorial ? React.createElement(tutorial.TutorialContent, {ref: "tutorialcontent", parent: this}) : undefined, hideEditorToolbar ? undefined : React.createElement("div", {id: "editortools", role: "complementary"}, React.createElement(editortoolbar.EditorToolbar, {ref: "editortools", parent: this})), sideDocs ? React.createElement(container.SideDocs, {ref: "sidedoc", parent: this}) : undefined, sandbox ? undefined : React.createElement(scriptsearch.ScriptSearch, {parent: this, ref: function (v) { return _this.scriptSearch = v; }}), sandbox ? undefined : React.createElement(projects.Projects, {parent: this, ref: function (v) { return _this.projects = v; }, hasGettingStarted: gettingStarted}), sandbox || !sharingEnabled ? undefined : React.createElement(share.ShareEditor, {parent: this, ref: function (v) { return _this.shareEditor = v; }}), selectLanguage ? React.createElement(lang.LanguagePicker, {parent: this, ref: function (v) { return _this.languagePicker = v; }}) : undefined, inTutorial ? React.createElement(tutorial.TutorialComplete, {parent: this, ref: function (v) { return _this.tutorialComplete = v; }}) : undefined, sandbox ? React.createElement("div", {className: "ui horizontal small divided link list sandboxfooter"}, targetTheme.organizationUrl && targetTheme.organization ? React.createElement("a", {className: "item", target: "_blank", rel: "noopener", href: targetTheme.organizationUrl}, targetTheme.organization) : undefined, React.createElement("a", {target: "_blank", className: "item", href: targetTheme.termsOfUseUrl, rel: "noopener"}, lf("Terms of Use")), React.createElement("a", {target: "_blank", className: "item", href: targetTheme.privacyUrl, rel: "noopener"}, lf("Privacy")), React.createElement("span", {className: "item"}, React.createElement("a", {className: "ui thin portrait only", title: compileTooltip, onClick: function () { return _this.compile(); }}, React.createElement("i", {className: "icon " + (pxt.appTarget.appTheme.downloadIcon || 'download')}), pxt.appTarget.appTheme.useUploadMessage ? lf("Upload") : lf("Download")))) : undefined, cookieConsented ? undefined : React.createElement("div", {id: 'cookiemsg', className: "ui teal inverted black segment"}, React.createElement("button", {"arial-label": lf("Ok"), className: "ui right floated icon button clear inverted", onClick: consentCookie}, React.createElement("i", {className: "remove icon"})), lf("By using this site you agree to the use of cookies for analytics."), React.createElement("a", {target: "_blank", className: "ui link", href: pxt.appTarget.appTheme.privacyUrl, rel: "noopener"}, lf("Learn more")))));
     };
     return ProjectView;
 }(data.Component));
@@ -1538,30 +1575,6 @@ function isTypescriptFile(filename) {
 }
 function isProjectFile(filename) {
     return /\.(pxt|mkcd)$/i.test(filename);
-}
-function fileReadAsBufferAsync(f) {
-    if (!f)
-        return Promise.resolve(null);
-    else {
-        return new Promise(function (resolve, reject) {
-            var reader = new FileReader();
-            reader.onerror = function (ev) { return resolve(null); };
-            reader.onload = function (ev) { return resolve(new Uint8Array(reader.result)); };
-            reader.readAsArrayBuffer(f);
-        });
-    }
-}
-function fileReadAsTextAsync(f) {
-    if (!f)
-        return Promise.resolve(null);
-    else {
-        return new Promise(function (resolve, reject) {
-            var reader = new FileReader();
-            reader.onerror = function (ev) { return resolve(null); };
-            reader.onload = function (ev) { return resolve(reader.result); };
-            reader.readAsText(f);
-        });
-    }
 }
 function initLogin() {
     {
@@ -1586,7 +1599,7 @@ function initLogin() {
     }
 }
 function initSerial() {
-    if (!pxt.appTarget.serial || !Cloud.isLocalHost() || !Cloud.localToken)
+    if (!pxt.appTarget.serial || !pxt.winrt.isWinRT() && (!Cloud.isLocalHost() || !Cloud.localToken))
         return;
     if (hidbridge.shouldUse()) {
         hidbridge.initAsync()
@@ -1691,7 +1704,6 @@ var myexports = {
     sim: simulator,
     apiAsync: core.apiAsync,
     showIcons: showIcons,
-    hwdbg: hwdbg,
     assembleCurrent: assembleCurrent,
     log: log
 };
@@ -1813,16 +1825,30 @@ function handleHash(hash) {
             theEditor.importProjectFromFileAsync(fileContents)
                 .done(function () { return core.hideLoading(); });
             return true;
-        case "transfer":
-            pxt.tickEvent("hash." + hash.cmd);
-            var resp = JSON.parse(window.atob(hash.arg));
-            window.location.hash = "";
-            core.showLoading(lf("loading project..."));
-            workspace.installAsync(resp.header, resp.text)
-                .done(function (hd) { return theEditor.loadHeaderAsync(hd); });
-            return true;
     }
     return false;
+}
+// Determines whether the hash argument affects the starting project
+function isProjectRelatedHash(hash) {
+    if (!hash) {
+        return false;
+    }
+    switch (hash.cmd) {
+        case "follow":
+        case "newproject":
+        case "newjavascript":
+        // case "gettingstarted": // This should be true, #gettingstarted hash handling is not yet implemented
+        case "tutorial":
+        case "projects":
+        case "sandbox":
+        case "pub":
+        case "edit":
+        case "sandboxproject":
+        case "project":
+            return true;
+        default:
+            return false;
+    }
 }
 function loadHeaderBySharedId(id) {
     var existing = workspace.getHeaders()
@@ -1848,17 +1874,41 @@ function initExtensionsAsync() {
     return pxt.BrowserUtils.loadScriptAsync(pxt.webConfig.commitCdnUrl + "editor.js")
         .then(function () { return pxt.editor.initExtensionsAsync(opts); })
         .then(function (res) {
-        if (res.hexFileImporters)
+        if (res.hexFileImporters) {
             res.hexFileImporters.forEach(function (fi) {
                 pxt.debug("\tadded hex importer " + fi.id);
                 theEditor.hexFileImporters.push(fi);
             });
-        if (res.fieldEditors)
+        }
+        if (res.resourceImporters) {
+            res.resourceImporters.forEach(function (fi) {
+                pxt.debug("\tadded resource importer " + fi.id);
+                theEditor.resourceImporters.push(fi);
+            });
+        }
+        if (res.deployCoreAsync) {
+            pxt.debug("\tadded custom deploy core async");
+            pxt.commands.deployCoreAsync = res.deployCoreAsync;
+        }
+        if (res.beforeCompile) {
+            theEditor.beforeCompile = res.beforeCompile;
+        }
+        if (res.fieldEditors) {
             res.fieldEditors.forEach(function (fi) {
                 pxt.blocks.registerFieldEditor(fi.selector, fi.editor, fi.validator);
             });
+        }
+        if (res.toolboxOptions) {
+            if (res.toolboxOptions.blocklyXml) {
+                baseToolbox.overrideBaseToolbox(res.toolboxOptions.blocklyXml);
+            }
+            if (res.toolboxOptions.monacoToolbox) {
+                monacoToolbox.overrideToolbox(res.toolboxOptions.monacoToolbox);
+            }
+        }
     });
 }
+pxt.winrt.captureInitialActivation();
 $(document).ready(function () {
     pxt.setupWebConfig(window.pxtConfig);
     var config = pxt.webConfig;
@@ -1884,16 +1934,20 @@ $(document).ready(function () {
     var hash = parseHash();
     appcache.init(hash);
     pxt.docs.requireMarked = function () { return require("marked"); };
-    var ih = function (hex) { return theEditor.importHex(hex); };
+    var importHex = function (hex, createNewIfFailed) {
+        if (createNewIfFailed === void 0) { createNewIfFailed = false; }
+        return theEditor.importHex(hex, createNewIfFailed);
+    };
     var hm = /^(https:\/\/[^/]+)/.exec(window.location.href);
     if (hm)
         Cloud.apiRoot = hm[1] + "/api/";
     var ws = /ws=(\w+)/.exec(window.location.href);
+    var isSandbox = pxt.shell.isSandboxMode() || pxt.shell.isReadOnly();
     if (ws)
         workspace.setupWorkspace(ws[1]);
     else if (pxt.appTarget.appTheme.allowParentController)
         workspace.setupWorkspace("iframe");
-    else if (pxt.shell.isSandboxMode() || pxt.shell.isReadOnly())
+    else if (isSandbox)
         workspace.setupWorkspace("mem");
     else if (pxt.winrt.isWinRT())
         workspace.setupWorkspace("uwp");
@@ -1915,38 +1969,53 @@ $(document).ready(function () {
     })
         .then(function () { return initTheme(); })
         .then(function () { return cmds.initCommandsAsync(); })
-        .then(function () { return compiler.init(); })
-        .then(function () { return workspace.initAsync(); })
-        .then(function (state) {
+        .then(function () {
+        compiler.init();
+        return workspace.initAsync();
+    })
+        .then(function () {
         $("#loading").remove();
         render();
         return workspace.syncAsync();
     })
-        .then(function (state) { return state ? theEditor.setState(state) : undefined; })
-        .then(function () {
+        .then(function (state) {
+        if (state) {
+            theEditor.setState(state);
+        }
         initSerial();
         initScreenshots();
         initHashchange();
-    })
-        .then(function () { return pxt.winrt.initAsync(ih); })
-        .then(function () { return initExtensionsAsync(); })
-        .then(function () {
         electron.init();
-        if (hash.cmd && handleHash(hash))
-            return Promise.resolve();
-        // default handlers
+        return initExtensionsAsync();
+    })
+        .then(function () { return pxt.winrt.initAsync(importHex); })
+        .then(function () { return pxt.winrt.hasActivationProjectAsync(); })
+        .then(function (hasWinRTProject) {
         var ent = theEditor.settings.fileHistory.filter(function (e) { return !!workspace.getHeader(e.id); })[0];
         var hd = workspace.getHeaders()[0];
         if (ent)
             hd = workspace.getHeader(ent.id);
+        // Only show the start page if there are no initial projects requested
+        // (e.g. from the URL hash or from WinRT activation arguments)
+        var shouldShowStartPage = !isSandbox && pxt.appTarget.appTheme.useStartPage && !hasWinRTProject && !isProjectRelatedHash(hash);
+        if (shouldShowStartPage) {
+            theEditor.projects.showInitialStartPage(hd);
+            return Promise.resolve();
+        }
+        if (hash.cmd && handleHash(hash)) {
+            return Promise.resolve();
+        }
+        if (hasWinRTProject) {
+            return pxt.winrt.loadActivationProject();
+        }
+        // default handlers
         if (hd)
-            return theEditor.loadHeaderAsync(hd, null);
+            return theEditor.loadHeaderAsync(hd, theEditor.state.filters);
         else
             theEditor.newProject();
         return Promise.resolve();
     })
         .then(function () { return workspace.importLegacyScriptsAsync(); })
-        .then(function () { return theEditor.loadNotificationsAsync(); })
         .done(function () { });
     document.addEventListener("visibilitychange", function (ev) {
         if (theEditor)
@@ -2001,23 +2070,25 @@ $(document).ready(function () {
     }, false);
 });
 
-},{"./appcache":2,"./blocks":4,"./cmds":7,"./compiler":9,"./container":10,"./core":11,"./data":12,"./draganddrop":14,"./editortoolbar":15,"./electron":16,"./filelist":17,"./hidbridge":20,"./hwdbg":21,"./lang":23,"./logview":24,"./monaco":26,"./notification":28,"./package":29,"./projects":30,"./pxtjson":31,"./screenshot":32,"./scriptsearch":33,"./share":34,"./simulator":35,"./sounds":36,"./sui":38,"./tdlegacy":39,"./tutorial":41,"./workspace":42,"marked":112,"react":268,"react-dom":139}],2:[function(require,module,exports){
+},{"./appcache":2,"./blocks":4,"./cmds":7,"./compiler":9,"./container":10,"./core":11,"./data":12,"./draganddrop":14,"./editortoolbar":15,"./electron":16,"./filelist":17,"./hidbridge":20,"./lang":22,"./logview":23,"./make":24,"./monaco":26,"./monacoSnippets":27,"./package":28,"./projects":29,"./pxtjson":30,"./screenshot":31,"./scriptsearch":32,"./share":33,"./simulator":34,"./sounds":35,"./sui":37,"./tdlegacy":38,"./toolbox":39,"./tutorial":40,"./workspace":41,"marked":111,"react":267,"react-dom":138}],2:[function(require,module,exports){
 "use strict";
 var core = require("./core");
 function init(hash) {
     var appCache = window.applicationCache;
-    appCache.addEventListener('updateready', function () {
-        core.infoNotification(lf("Update download complete. Reloading... "));
-        setTimeout(function () {
-            // On embedded pages, preserve the loaded project
-            if (pxt.BrowserUtils.isIFrame() && hash.cmd === "pub") {
-                location.replace(location.origin + ("/#pub:" + hash.arg));
-            }
-            else {
-                location.reload();
-            }
-        }, 5000);
-    }, false);
+    if (!(pxt.appTarget.appTheme && pxt.appTarget.appTheme.noReloadOnUpdate)) {
+        appCache.addEventListener('updateready', function () {
+            core.infoNotification(lf("Update download complete. Reloading... "));
+            setTimeout(function () {
+                // On embedded pages, preserve the loaded project
+                if (pxt.BrowserUtils.isIFrame() && hash.cmd === "pub") {
+                    location.replace(location.origin + ("/#pub:" + hash.arg));
+                }
+                else {
+                    location.reload();
+                }
+            }, 5000);
+        }, false);
+    }
 }
 exports.init = init;
 
@@ -2079,7 +2150,7 @@ var pkg = require("./package");
 var core = require("./core");
 var srceditor = require("./srceditor");
 var compiler = require("./compiler");
-var toolbox_1 = require("./toolbox");
+var baseToolbox = require("./toolbox");
 var CategoryMode = pxt.blocks.CategoryMode;
 var Util = pxt.Util;
 var lf = Util.lf;
@@ -2153,6 +2224,7 @@ var Editor = (function (_super) {
                     pxt.blocks.initSearch(_this.editor, tb, tbAll || tb, function (searchFor) { return compiler.apiSearchAsync(searchFor)
                         .then(function (fns) { return fns; }); }, function (searchTb) { return _this.updateToolbox(searchTb, _this.showToolboxCategories, true); });
                 }
+                pxt.blocks.initFlyouts(_this.editor);
                 var xml = _this.delayLoadXml;
                 _this.delayLoadXml = undefined;
                 _this.loadBlockly(xml);
@@ -2228,12 +2300,16 @@ var Editor = (function (_super) {
             needsLayout = needsLayout || (b.type != ts.pxtc.ON_START_TYPE && tp.x == 0 && tp.y == 0);
         });
         if (needsLayout) {
-            // If the blocks file has no location info (e.g. it's from the decompiler), format the code
-            pxt.blocks.layout.flow(this.editor);
+            // If the blocks file has no location info (e.g. it's from the decompiler), format the code.
+            pxt.blocks.layout.flow(this.editor, { useViewWidth: true });
         }
         else {
             // Otherwise translate the blocks so that they are positioned on the top left
             this.editor.getTopBlocks(false).forEach(function (b) { return b.moveBy(-minX, -minY); });
+            this.editor.scrollX = 10;
+            this.editor.scrollY = 10;
+            // Forces scroll to take effect
+            this.editor.resizeContents();
         }
     };
     Editor.prototype.initPrompts = function () {
@@ -2413,9 +2489,10 @@ var Editor = (function (_super) {
         var blocklyOptions = this.getBlocklyOptions(showCategories);
         Util.jsonMergeFrom(blocklyOptions, pxt.appTarget.appTheme.blocklyOptions || {});
         this.editor = Blockly.inject(blocklyDiv, blocklyOptions);
-        // zoom out on mobile by default
-        if (pxt.BrowserUtils.isMobile())
-            this.editor.zoomCenter(-4);
+        // set Blockly Colors
+        var blocklyColors = Blockly.Colours;
+        Util.jsonMergeFrom(blocklyColors, pxt.appTarget.appTheme.blocklyColors || {});
+        Blockly.Colours = blocklyColors;
         this.editor.addChangeListener(function (ev) {
             Blockly.Events.disableOrphans(ev);
             if (ev.type != 'ui') {
@@ -2431,6 +2508,7 @@ var Editor = (function (_super) {
                 pxt.tickActivity("blocks.create", "blocks.create." + blockId);
                 if (ev.xml.tagName == 'SHADOW')
                     _this.cleanUpShadowBlocks();
+                _this.parent.setState({ hideEditorFloats: false });
             }
             if (ev.type == 'ui') {
                 if (ev.element == 'category') {
@@ -2632,14 +2710,18 @@ var Editor = (function (_super) {
             comments: true,
             disable: false,
             readOnly: readOnly,
-            toolboxType: pxt.appTarget.appTheme.coloredToolbox ? 'coloured' : pxt.appTarget.appTheme.invertedToolbox ? 'inverted' : 'normal',
+            toolboxOptions: {
+                colour: pxt.appTarget.appTheme.coloredToolbox,
+                inverted: pxt.appTarget.appTheme.invertedToolbox
+            },
             zoom: {
                 enabled: false,
                 controls: false,
                 wheel: true,
                 maxScale: 2.5,
                 minScale: .2,
-                scaleSpeed: 1.05
+                scaleSpeed: 1.05,
+                startScale: pxt.BrowserUtils.isMobile() ? 1.2 : 0.9
             },
             rtl: Util.isUserLanguageRtl()
         };
@@ -2648,7 +2730,7 @@ var Editor = (function (_super) {
     Editor.prototype.getDefaultToolbox = function (showCategories) {
         if (showCategories === void 0) { showCategories = this.showToolboxCategories; }
         return showCategories !== CategoryMode.None ?
-            toolbox_1.default.documentElement
+            baseToolbox.getBaseToolboxDom().documentElement
             : new DOMParser().parseFromString("<xml id=\"blocklyToolboxDefinition\" style=\"display: none\"></xml>", "text/xml").documentElement;
     };
     Editor.prototype.filterToolbox = function (filters, showCategories) {
@@ -2710,7 +2792,7 @@ var Editor = (function (_super) {
 }(srceditor.Editor));
 exports.Editor = Editor;
 
-},{"./compiler":9,"./core":11,"./package":29,"./srceditor":37,"./toolbox":40,"react":268}],5:[function(require,module,exports){
+},{"./compiler":9,"./core":11,"./package":28,"./srceditor":36,"./toolbox":39,"react":267}],5:[function(require,module,exports){
 /// <reference path="../../typings/globals/jquery/index.d.ts" />
 "use strict";
 var __extends = (this && this.__extends) || function (d, b) {
@@ -2745,7 +2827,7 @@ var BlocksPreview = (function (_super) {
 }(React.Component));
 exports.BlocksPreview = BlocksPreview;
 
-},{"react":268,"react-dom":139}],6:[function(require,module,exports){
+},{"react":267,"react-dom":138}],6:[function(require,module,exports){
 "use strict";
 var db = require("./db");
 var core = require("./core");
@@ -3066,20 +3148,10 @@ function resetAsync() {
         data.clearCache();
     });
 }
-var legacyKey = 'legacyScriptsImported';
-function legacyScriptsUrl() {
-    var legacyDomain = pxt.appTarget.appTheme.legacyDomain;
-    if (!legacyDomain || !pxt.webConfig.targetUrl || !!pxt.storage.getLocal(legacyKey))
-        return undefined;
-    var targetDomain = pxt.webConfig.targetUrl.replace(/^https:\/\//i, '');
-    if (legacyDomain == targetDomain)
-        return undefined; // nothing to do
-    var url = "https://" + legacyDomain + "/api/transfer/" + targetDomain + "?storageid=" + pxt.storage.storageId();
-    return url;
-}
 function importLegacyScriptsAsync() {
+    var key = 'legacyScriptsImported';
     var legacyDomain = pxt.appTarget.appTheme.legacyDomain;
-    if (!legacyDomain || !pxt.webConfig.targetUrl || !!pxt.storage.getLocal(legacyKey))
+    if (!legacyDomain || !pxt.webConfig.targetUrl || !!pxt.storage.getLocal(key))
         return Promise.resolve();
     var targetDomain = pxt.webConfig.targetUrl.replace(/^https:\/\//i, '');
     if (legacyDomain == targetDomain)
@@ -3096,7 +3168,6 @@ function importLegacyScriptsAsync() {
             pxt.debug('cleaning import iframe');
             window.removeEventListener('message', receiveMessage, false);
             if (clear) {
-                pxt.tickEvent("transfer.done");
                 pxt.debug("sending clear command");
                 frame.contentWindow.postMessage({
                     type: "transfer",
@@ -3111,7 +3182,7 @@ function importLegacyScriptsAsync() {
     function pushProjectAsync(dbdata) {
         if (!dbdata.header.length) {
             pxt.log('done importing scripts');
-            pxt.storage.setLocal(legacyKey, '1');
+            pxt.storage.setLocal(key, '1');
             clean(true);
             return Promise.resolve();
         }
@@ -3129,12 +3200,7 @@ function importLegacyScriptsAsync() {
         if (ev.data && ev.data.type == 'transfer' && ev.data.action == 'export' && ev.data.data) {
             var dbdata = ev.data.data;
             pxt.debug("received " + dbdata.header.length + " projects");
-            pxt.tickEvent("transfer.projects", { projects: dbdata.header.length });
             pushProjectAsync(dbdata).done();
-        }
-        else if (ev.data && ev.data.type == 'transfer' && ev.data.action == 'error') {
-            pxt.log('error while importing: ' + ev.data.message);
-            clean(false);
         }
     }
     window.addEventListener('message', receiveMessage, false);
@@ -3146,7 +3212,6 @@ function importLegacyScriptsAsync() {
         pxt.reportException(e);
         clean(false);
     };
-    pxt.tickEvent("transfer.start");
     document.documentElement.appendChild(frame);
     return Promise.resolve();
 }
@@ -3160,11 +3225,10 @@ exports.provider = {
     saveToCloudAsync: saveToCloudAsync,
     syncAsync: syncAsync,
     resetAsync: resetAsync,
-    legacyScriptsUrl: legacyScriptsUrl,
     importLegacyScriptsAsync: importLegacyScriptsAsync
 };
 
-},{"./core":11,"./data":12,"./db":13,"./package":29,"./workspace":42}],7:[function(require,module,exports){
+},{"./core":11,"./data":12,"./db":13,"./package":28,"./workspace":41}],7:[function(require,module,exports){
 "use strict";
 /// <reference path="../../built/pxtlib.d.ts"/>
 var core = require("./core");
@@ -3178,15 +3242,16 @@ function browserDownloadAsync(text, name, contentType) {
 function browserDownloadDeployCoreAsync(resp) {
     var url = "";
     var fn = "";
-    if (pxt.appTarget.compile.useUF2) {
-        var uf2 = resp.outfiles[pxtc.BINARY_UF2];
-        fn = pkg.genFileName(".uf2");
+    var ext = pxt.outputName().replace(/[^.]*/, "");
+    if (!pxt.isOutputText()) {
+        var uf2 = resp.outfiles[pxt.outputName()];
+        fn = pkg.genFileName(ext);
         pxt.debug('saving ' + fn);
         url = pxt.BrowserUtils.browserDownloadBase64(uf2, fn, "application/x-uf2", resp.userContextWindow, function (e) { return core.errorNotification(lf("saving file failed...")); });
     }
     else {
-        var hex = resp.outfiles[pxtc.BINARY_HEX];
-        fn = pkg.genFileName(".hex");
+        var hex = resp.outfiles[pxt.outputName()];
+        fn = pkg.genFileName(ext);
         pxt.debug('saving ' + fn);
         url = pxt.BrowserUtils.browserDownloadBinText(hex, fn, pxt.appTarget.compile.hexMimeType, resp.userContextWindow, function (e) { return core.errorNotification(lf("saving file failed...")); });
     }
@@ -3213,13 +3278,16 @@ function showUploadInstructionsAsync(fn, url) {
     var downloadAgain = !pxt.BrowserUtils.isIE() && !pxt.BrowserUtils.isEdge();
     var docUrl = pxt.appTarget.appTheme.usbDocs;
     var saveAs = pxt.BrowserUtils.hasSaveAs();
-    var body = saveAs ? lf("Click 'Save As' and save the {0} file to the {1} drive to transfer the code into your {2}.", pxt.appTarget.compile.useUF2 ? ".uf2" : ".hex", boardDriveName, boardName)
+    var useUF2 = pxt.appTarget.compile.useUF2;
+    var body = saveAs ? lf("Click 'Save As' and save the {0} file to the {1} drive to transfer the code into your {2}.", useUF2 ? ".uf2" : ".hex", boardDriveName, boardName)
         : lf("Move the {0} file to the {1} drive to transfer the code into your {2}.", pxt.appTarget.compile.useUF2 ? ".uf2" : ".hex", boardDriveName, boardName);
+    if (useUF2)
+        body = lf("Press the `reset` button once on the {0}.", boardName) + " " + body;
     return core.confirmAsync({
         header: lf("Download completed..."),
         body: body,
         hideCancel: true,
-        agreeLbl: lf("Done!"),
+        hideAgree: true,
         buttons: [downloadAgain ? {
                 label: fn,
                 icon: "download",
@@ -3232,7 +3300,7 @@ function showUploadInstructionsAsync(fn, url) {
                 class: "lightgrey",
                 url: docUrl
             } : undefined],
-        timeout: 7000
+        timeout: 10000
     }).then(function () { });
 }
 function webusbDeployCoreAsync(resp) {
@@ -3272,16 +3340,35 @@ function localhostDeployCoreAsync(resp) {
 }
 function initCommandsAsync() {
     pxt.commands.browserDownloadAsync = browserDownloadAsync;
+    pxt.commands.saveOnlyAsync = browserDownloadDeployCoreAsync;
     var forceHexDownload = /forceHexDownload/i.test(window.location.href);
     if (/webusb=1/i.test(window.location.href) && pxt.appTarget.compile.useUF2) {
         pxt.commands.deployCoreAsync = webusbDeployCoreAsync;
     }
+    else if (pxt.winrt.isWinRT()) {
+        if (pxt.appTarget.serial && pxt.appTarget.serial.useHF2) {
+            pxt.HF2.mkPacketIOAsync = pxt.winrt.mkPacketIOAsync;
+            pxt.commands.deployCoreAsync = hidDeployCoreAsync;
+        }
+        else {
+            if (pxt.appTarget.serial && pxt.appTarget.serial.rawHID) {
+                pxt.HF2.mkPacketIOAsync = pxt.winrt.mkPacketIOAsync;
+            }
+            pxt.commands.deployCoreAsync = pxt.winrt.driveDeployCoreAsync;
+        }
+        pxt.commands.browserDownloadAsync = pxt.winrt.browserDownloadAsync;
+        pxt.commands.saveOnlyAsync = function (resp) {
+            return pxt.winrt.saveOnlyAsync(resp)
+                .then(function (saved) {
+                if (saved) {
+                    core.infoNotification(lf("file saved!"));
+                }
+            })
+                .catch(function () { return core.errorNotification(lf("saving file failed...")); });
+        };
+    }
     else if (hidbridge.shouldUse() && !forceHexDownload) {
         pxt.commands.deployCoreAsync = hidDeployCoreAsync;
-    }
-    else if (pxt.winrt.isWinRT()) {
-        pxt.commands.deployCoreAsync = pxt.winrt.deployCoreAsync;
-        pxt.commands.browserDownloadAsync = pxt.winrt.browserDownloadAsync;
     }
     else if (Cloud.isLocalHost() && Cloud.localToken && !forceHexDownload) {
         pxt.commands.deployCoreAsync = localhostDeployCoreAsync;
@@ -3293,7 +3380,7 @@ function initCommandsAsync() {
 }
 exports.initCommandsAsync = initCommandsAsync;
 
-},{"./core":11,"./hidbridge":20,"./package":29}],8:[function(require,module,exports){
+},{"./core":11,"./hidbridge":20,"./package":28}],8:[function(require,module,exports){
 "use strict";
 var __extends = (this && this.__extends) || function (d, b) {
     for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
@@ -3328,8 +3415,8 @@ var CodeCardView = (function (_super) {
         var sideUrl = url && /^\//.test(url) ? "#doc:" + url : url;
         var className = card.className;
         var cardDiv = React.createElement("div", {className: "ui card " + color + " " + (card.onClick ? "link" : '') + " " + (className ? className : ''), title: card.title, onClick: function (e) { return card.onClick ? card.onClick(e) : undefined; }}, card.header || card.blocks || card.javascript || card.hardware || card.software || card.any ?
-            React.createElement("div", {key: "header", className: "ui content " + (card.responsive ? " tall desktop only" : "")}, React.createElement("div", {className: "right floated meta"}, card.any ? (React.createElement("i", {key: "costany", className: "ui grey circular label tiny"}, card.any > 0 ? card.any : null)) : null, repeat(card.blocks, function (k) { return React.createElement("i", {key: "costblocks" + k, className: "puzzle orange icon"}); }), repeat(card.javascript, function (k) { return React.createElement("i", {key: "costjs" + k, className: "align left blue icon"}); }), repeat(card.hardware, function (k) { return React.createElement("i", {key: "costhardware" + k, className: "certificate black icon"}); }), repeat(card.software, function (k) { return React.createElement("i", {key: "costsoftware" + k, className: "square teal icon"}); })), card.header) : null, card.label || card.blocksXml || card.typeScript || card.imageUrl ? React.createElement("div", {className: "ui image"}, card.label ? React.createElement("label", {className: "ui orange right ribbon label"}, card.label) : undefined, card.blocksXml ? React.createElement(blockspreview.BlocksPreview, {key: "promoblocks", xml: card.blocksXml}) : null, card.typeScript ? React.createElement("pre", {key: "promots"}, card.typeScript) : null, card.imageUrl ? React.createElement("div", {className: "ui cardimage", style: { backgroundImage: "url(\"" + card.imageUrl + "\")" }}) : null) : undefined, card.icon ?
-            React.createElement("div", {className: "ui"}, React.createElement("div", {className: "" + ('ui button massive fluid ' + card.iconColor)}, " ", React.createElement("i", {className: "" + ('icon ' + card.icon)}), " ")) : undefined, card.shortName || card.name || card.description ?
+            React.createElement("div", {key: "header", className: "ui content " + (card.responsive ? " tall desktop only" : "")}, React.createElement("div", {className: "right floated meta"}, card.any ? (React.createElement("i", {key: "costany", className: "ui grey circular label tiny"}, card.any > 0 ? card.any : null)) : null, repeat(card.blocks, function (k) { return React.createElement("i", {key: "costblocks" + k, className: "puzzle orange icon"}); }), repeat(card.javascript, function (k) { return React.createElement("i", {key: "costjs" + k, className: "align left blue icon"}); }), repeat(card.hardware, function (k) { return React.createElement("i", {key: "costhardware" + k, className: "certificate black icon"}); }), repeat(card.software, function (k) { return React.createElement("i", {key: "costsoftware" + k, className: "square teal icon"}); })), card.header) : null, card.label || card.blocksXml || card.typeScript || card.imageUrl || card.youTubeId ? React.createElement("div", {className: "ui image"}, card.label ? React.createElement("label", {className: "ui orange right ribbon label"}, card.label) : undefined, card.blocksXml ? React.createElement(blockspreview.BlocksPreview, {key: "promoblocks", xml: card.blocksXml}) : undefined, card.typeScript ? React.createElement("pre", {key: "promots"}, card.typeScript) : undefined, card.imageUrl ? React.createElement("div", {className: "ui cardimage", style: { backgroundImage: "url(\"" + card.imageUrl + "\")" }}) : undefined, card.youTubeId ? React.createElement("div", {className: "ui cardimage", style: { backgroundImage: "url(\"https://img.youtube.com/vi/" + card.youTubeId + "/maxresdefault.jpg\")" }}) : undefined) : undefined, card.icon || card.iconContent ?
+            React.createElement("div", {className: "ui"}, React.createElement("div", {className: "ui button massive fluid " + card.iconColor + " " + (card.iconContent ? "iconcontent" : "")}, card.icon ? React.createElement("i", {className: "" + ('icon ' + card.icon)}) : undefined, card.iconContent || undefined)) : undefined, card.shortName || card.name || card.description ?
             React.createElement("div", {className: "content"}, card.shortName || card.name ? React.createElement("div", {className: "header"}, card.shortName || card.name) : null, card.time ? React.createElement("div", {className: "meta tall"}, card.time ? React.createElement("span", {key: "date", className: "date"}, pxt.Util.timeSince(card.time)) : null) : undefined, card.description ? React.createElement("div", {className: "description tall"}, renderMd(card.description)) : null) : undefined);
         if (!card.onClick && url) {
             return (React.createElement("div", null, React.createElement("a", {href: url, target: "docs", className: "ui widedesktop hide"}, cardDiv), React.createElement("a", {href: sideUrl, className: "ui widedesktop only"}, cardDiv)));
@@ -3342,7 +3429,7 @@ var CodeCardView = (function (_super) {
 }(React.Component));
 exports.CodeCardView = CodeCardView;
 
-},{"./blockspreview":5,"react":268}],9:[function(require,module,exports){
+},{"./blockspreview":5,"react":267}],9:[function(require,module,exports){
 "use strict";
 var pkg = require("./package");
 var core = require("./core");
@@ -3404,6 +3491,8 @@ function compileAsync(options) {
             opts.justMyCode = true;
         }
         if (options.trace) {
+            opts.breakpoints = true;
+            opts.justMyCode = true;
             opts.trace = true;
         }
         opts.computeUsedSymbols = true;
@@ -3461,6 +3550,7 @@ function decompileAsync(fileName, blockInfo, oldWorkspace, blockFile) {
     return pkg.mainPkg.getCompileOptionsAsync(trg)
         .then(function (opts) {
         opts.ast = true;
+        opts.alwaysDecompileOnStart = pxt.appTarget.runtime && pxt.appTarget.runtime.onStartUnDeletable;
         return decompileCoreAsync(opts, fileName);
     })
         .then(function (resp) {
@@ -3569,7 +3659,7 @@ function newProject() {
 }
 exports.newProject = newProject;
 
-},{"./core":11,"./package":29}],10:[function(require,module,exports){
+},{"./core":11,"./package":28}],10:[function(require,module,exports){
 /// <reference path="../../typings/globals/react/index.d.ts" />
 /// <reference path="../../typings/globals/react-dom/index.d.ts" />
 /// <reference path="../../built/pxtlib.d.ts" />
@@ -3679,7 +3769,7 @@ var SideDocs = (function (_super) {
 }(data.Component));
 exports.SideDocs = SideDocs;
 
-},{"./data":12,"./sui":38,"react":268}],11:[function(require,module,exports){
+},{"./data":12,"./sui":37,"react":267}],11:[function(require,module,exports){
 /// <reference path="../../typings/globals/react/index.d.ts" />
 /// <reference path="../../typings/globals/react-dom/index.d.ts" />
 /// <reference path="../../built/pxtlib.d.ts" />
@@ -3940,8 +4030,14 @@ function promptAsync(options) {
     options.onLoaded = function () {
         var dialogInput = document.getElementById('promptDialogInput');
         if (dialogInput) {
-            dialogInput.focus();
             dialogInput.setSelectionRange(0, 9999);
+            dialogInput.onkeyup = function (e) {
+                var charCode = (typeof e.which == "number") ? e.which : e.keyCode;
+                if (charCode === 13 || charCode === 32) {
+                    e.preventDefault();
+                    document.getElementsByClassName("approve positive").item(0).click();
+                }
+            };
         }
     };
     return dialogAsync(options)
@@ -4026,7 +4122,7 @@ function apiAsync(path, data) {
 }
 exports.apiAsync = apiAsync;
 
-},{"react-dom":139}],12:[function(require,module,exports){
+},{"react-dom":138}],12:[function(require,module,exports){
 "use strict";
 var __extends = (this && this.__extends) || function (d, b) {
     for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
@@ -4051,9 +4147,10 @@ mountVirtualApi("cloud-search", {
     isOffline: function () { return !Cloud.isOnline(); },
 });
 mountVirtualApi("gallery", {
-    getAsync: function (p) { return gallery.loadGalleryAsync(stripProtocol(p)).catch(core.handleNetworkError); },
-    expirationTime: function (p) { return 3600 * 1000; },
-    isOffline: function () { return !Cloud.isOnline(); }
+    getAsync: function (p) { return gallery.loadGalleryAsync(stripProtocol(p)).catch(function (e) {
+        return Promise.resolve(e);
+    }); },
+    expirationTime: function (p) { return 3600 * 1000; }
 });
 mountVirtualApi("td-cloud", {
     getAsync: function (p) {
@@ -4109,7 +4206,7 @@ function expired(ce) {
     return ce.data == null || (Date.now() - ce.lastRefresh) > ce.api.expirationTime(ce.path);
 }
 function shouldCache(ce) {
-    if (!ce.data)
+    if (!ce.data || ce.data instanceof Error)
         return false;
     return /^cloud:(me\/settings|ptr-pkg-)/.test(ce.path);
 }
@@ -4188,7 +4285,7 @@ function getCached(component, path) {
     var r = lookup(path);
     if (r.api.isSync)
         return r.api.getSync(r.path);
-    if (expired(r))
+    if (expired(r) || r.data instanceof Error)
         queue(r);
     return r.data;
 }
@@ -4289,7 +4386,7 @@ function wrapWorkspace(ws) {
 exports.wrapWorkspace = wrapWorkspace;
 loadCache();
 
-},{"./core":11,"./gallery":19,"react":268}],13:[function(require,module,exports){
+},{"./core":11,"./gallery":19,"react":267}],13:[function(require,module,exports){
 "use strict";
 var Promise = require("bluebird");
 window.Promise = Promise;
@@ -4372,7 +4469,7 @@ var Table = (function () {
 }());
 exports.Table = Table;
 
-},{"bluebird":45,"pouchdb":124,"pouchdb/extras/memory":122}],14:[function(require,module,exports){
+},{"bluebird":44,"pouchdb":123,"pouchdb/extras/memory":121}],14:[function(require,module,exports){
 "use strict";
 function setupDragAndDrop(r, filter, dragged) {
     var dragAndDrop = document && document.createElement && 'draggable' in document.createElement('span');
@@ -4494,7 +4591,7 @@ var EditorToolbar = (function (_super) {
     };
     EditorToolbar.prototype.render = function () {
         var _this = this;
-        var _a = this.props.parent.state, tutorialOptions = _a.tutorialOptions, hideEditorFloats = _a.hideEditorFloats, collapseEditorTools = _a.collapseEditorTools, projectName = _a.projectName, showParts = _a.showParts, compiling = _a.compiling, running = _a.running;
+        var _a = this.props.parent.state, tutorialOptions = _a.tutorialOptions, hideEditorFloats = _a.hideEditorFloats, collapseEditorTools = _a.collapseEditorTools, projectName = _a.projectName, showParts = _a.showParts, compiling = _a.compiling, isSaving = _a.isSaving, running = _a.running;
         var sandbox = pxt.shell.isSandboxMode();
         var readOnly = pxt.shell.isReadOnly();
         var tutorial = tutorialOptions ? tutorialOptions.tutorial : false;
@@ -4525,29 +4622,41 @@ var EditorToolbar = (function (_super) {
         var trace = run && simOpts.enableTrace;
         var tracing = this.props.parent.state.tracing;
         var traceTooltip = tracing ? lf("Disable Slow-Mo") : lf("Slow-Mo");
+        var downloadIcon = pxt.appTarget.appTheme.downloadIcon || "download";
+        var downloadText = pxt.appTarget.appTheme.useUploadMessage ? lf("Upload") : lf("Download");
+        var downloadButtonClasses = "";
+        var saveButtonClasses = "";
+        if (isSaving) {
+            downloadButtonClasses = "disabled";
+            saveButtonClasses = "loading disabled";
+        }
+        else if (compileLoading) {
+            downloadButtonClasses = "loading disabled";
+            saveButtonClasses = "disabled";
+        }
         return React.createElement("div", {className: "ui equal width grid right aligned padded"}, React.createElement("div", {className: "column mobile only"}, collapsed ?
-            React.createElement("div", {className: "ui equal width grid"}, React.createElement("div", {className: "left aligned column"}, React.createElement("div", {className: "ui icon small buttons"}, React.createElement(sui.Button, {icon: "" + (collapsed ? 'toggle up' : 'toggle down'), class: "collapse-button " + (collapsed ? 'collapsed' : '') + " " + (hideEditorFloats ? 'disabled' : ''), title: collapseTooltip, onClick: function () { return _this.toggleCollapse('mobile'); }}), headless && run ? React.createElement(sui.Button, {class: "play-button " + (running ? "stop" : "play"), key: 'runmenubtn', icon: running ? "stop" : "play", title: runTooltip, onClick: function () { return _this.startStopSimulator('mobile'); }}) : undefined, headless && restart ? React.createElement(sui.Button, {key: 'restartbtn', class: "restart-button", icon: "refresh", title: restartTooltip, onClick: function () { return _this.restartSimulator('mobile'); }}) : undefined, headless && trace ? React.createElement(sui.Button, {key: 'tracebtn', class: "trace-button " + (tracing ? 'orange' : ''), icon: "xicon turtle", title: traceTooltip, onClick: function () { return _this.toggleTrace('mobile'); }}) : undefined, compileBtn ? React.createElement(sui.Button, {class: "primary download-button download-button-full " + (compileLoading ? 'loading' : ''), icon: "download", title: compileTooltip, onClick: function () { return _this.compile('mobile'); }}) : undefined)), React.createElement("div", {className: "right aligned column"}, !readOnly ?
-                React.createElement("div", {className: "ui icon small buttons"}, React.createElement(sui.Button, {icon: 'save', class: "editortools-btn save-editortools-btn", title: lf("Save"), onClick: function () { return _this.saveFile('mobile'); }}), showUndoRedo ? React.createElement(sui.Button, {icon: 'xicon undo', class: "editortools-btn undo-editortools-btn} " + (!hasUndo ? 'disabled' : ''), title: lf("Undo"), onClick: function () { return _this.undo('mobile'); }}) : undefined) : undefined), React.createElement("div", {className: "right aligned column"}, showZoomControls ?
+            React.createElement("div", {className: "ui equal width grid"}, React.createElement("div", {className: "left aligned column"}, React.createElement("div", {className: "ui icon small buttons"}, React.createElement(sui.Button, {icon: "" + (collapsed ? 'toggle up' : 'toggle down'), class: "collapse-button " + (collapsed ? 'collapsed' : '') + " " + (hideEditorFloats ? 'disabled' : ''), title: collapseTooltip, onClick: function () { return _this.toggleCollapse('mobile'); }}), headless && run ? React.createElement(sui.Button, {class: "play-button " + (running ? "stop" : "play"), key: 'runmenubtn', icon: running ? "stop" : "play", title: runTooltip, onClick: function () { return _this.startStopSimulator('mobile'); }}) : undefined, headless && restart ? React.createElement(sui.Button, {key: 'restartbtn', class: "restart-button", icon: "refresh", title: restartTooltip, onClick: function () { return _this.restartSimulator('mobile'); }}) : undefined, headless && trace ? React.createElement(sui.Button, {key: 'tracebtn', class: "trace-button " + (tracing ? 'orange' : ''), icon: "xicon turtle", title: traceTooltip, onClick: function () { return _this.toggleTrace('mobile'); }}) : undefined, compileBtn ? React.createElement(sui.Button, {class: "primary download-button download-button-full " + downloadButtonClasses, icon: downloadIcon, title: compileTooltip, onClick: function () { return _this.compile('mobile'); }}) : undefined)), React.createElement("div", {className: "right aligned column"}, !readOnly ?
+                React.createElement("div", {className: "ui icon small buttons"}, React.createElement(sui.Button, {icon: 'save', class: "editortools-btn save-editortools-btn " + saveButtonClasses, title: lf("Save"), onClick: function () { return _this.saveFile('mobile'); }}), showUndoRedo ? React.createElement(sui.Button, {icon: 'xicon undo', class: "editortools-btn undo-editortools-btn} " + (!hasUndo ? 'disabled' : ''), title: lf("Undo"), onClick: function () { return _this.undo('mobile'); }}) : undefined) : undefined), React.createElement("div", {className: "right aligned column"}, showZoomControls ?
                 React.createElement("div", {className: "ui icon small buttons"}, React.createElement(sui.Button, {icon: 'plus circle', class: "editortools-btn zoomin-editortools-btn", title: lf("Zoom In"), onClick: function () { return _this.zoomIn('mobile'); }}), React.createElement(sui.Button, {icon: 'minus circle', class: "editortools-btn zoomout-editortools-btn", title: lf("Zoom Out"), onClick: function () { return _this.zoomOut('mobile'); }})) : undefined)) :
             React.createElement("div", {className: "ui equal width grid"}, React.createElement("div", {className: "left aligned two wide column"}, React.createElement("div", {className: "ui vertical icon small buttons"}, run ? React.createElement(sui.Button, {class: "play-button " + (running ? "stop" : "play"), key: 'runmenubtn', icon: running ? "stop" : "play", title: runTooltip, onClick: function () { return _this.startStopSimulator('mobile'); }}) : undefined, restart ? React.createElement(sui.Button, {key: 'restartbtn', class: "restart-button", icon: "refresh", title: restartTooltip, onClick: function () { return _this.restartSimulator('mobile'); }}) : undefined), showCollapsed ?
                 React.createElement("div", {className: "row", style: { paddingTop: "1rem" }}, React.createElement("div", {className: "ui vertical icon small buttons"}, React.createElement(sui.Button, {icon: "" + (collapsed ? 'toggle up' : 'toggle down'), class: "collapse-button " + (collapsed ? 'collapsed' : ''), title: collapseTooltip, onClick: function () { return _this.toggleCollapse('mobile'); }}))) : undefined), React.createElement("div", {className: "three wide column"}), React.createElement("div", {className: "ui grid column"}, readOnly || !showUndoRedo ? undefined :
-                React.createElement("div", {className: "row"}, React.createElement("div", {className: "column"}, React.createElement("div", {className: "ui icon large buttons"}, React.createElement(sui.Button, {icon: 'xicon undo', class: "editortools-btn undo-editortools-btn} " + (!hasUndo ? 'disabled' : ''), title: lf("Undo"), onClick: function () { return _this.undo('mobile'); }})))), React.createElement("div", {className: "row", style: readOnly || !showUndoRedo ? undefined : { paddingTop: 0 }}, React.createElement("div", {className: "column"}, React.createElement("div", {className: "ui icon large buttons"}, trace ? React.createElement(sui.Button, {key: 'tracebtn', class: "trace-button " + (tracing ? 'orange' : ''), icon: "xicon turtle", title: traceTooltip, onClick: function () { return _this.toggleTrace('mobile'); }}) : undefined, compileBtn ? React.createElement(sui.Button, {class: "primary download-button download-button-full " + (compileLoading ? 'loading' : ''), icon: "download", title: compileTooltip, onClick: function () { return _this.compile('mobile'); }}) : undefined)))))), React.createElement("div", {className: "column tablet only"}, collapsed ?
+                React.createElement("div", {className: "row"}, React.createElement("div", {className: "column"}, React.createElement("div", {className: "ui icon large buttons"}, React.createElement(sui.Button, {icon: 'xicon undo', class: "editortools-btn undo-editortools-btn} " + (!hasUndo ? 'disabled' : ''), title: lf("Undo"), onClick: function () { return _this.undo('mobile'); }})))), React.createElement("div", {className: "row", style: readOnly || !showUndoRedo ? undefined : { paddingTop: 0 }}, React.createElement("div", {className: "column"}, React.createElement("div", {className: "ui icon large buttons"}, trace ? React.createElement(sui.Button, {key: 'tracebtn', class: "trace-button " + (tracing ? 'orange' : ''), icon: "xicon turtle", title: traceTooltip, onClick: function () { return _this.toggleTrace('mobile'); }}) : undefined, compileBtn ? React.createElement(sui.Button, {class: "primary download-button download-button-full " + downloadButtonClasses, icon: downloadIcon, title: compileTooltip, onClick: function () { return _this.compile('mobile'); }}) : undefined)))))), React.createElement("div", {className: "column tablet only"}, collapsed ?
             React.createElement("div", {className: "ui grid seven column"}, headless ?
-                React.createElement("div", {className: "left aligned six wide column"}, React.createElement("div", {className: "ui icon buttons"}, React.createElement(sui.Button, {icon: "" + (collapsed ? 'toggle up' : 'toggle down'), class: "collapse-button " + (collapsed ? 'collapsed' : '') + " " + (hideEditorFloats ? 'disabled' : ''), title: collapseTooltip, onClick: function () { return _this.toggleCollapse('tablet'); }}), run ? React.createElement(sui.Button, {role: "menuitem", class: "play-button " + (running ? "stop" : "play"), key: 'runmenubtn', icon: running ? "stop" : "play", title: runTooltip, onClick: function () { return _this.startStopSimulator('tablet'); }}) : undefined, restart ? React.createElement(sui.Button, {key: 'restartbtn', class: "restart-button", icon: "refresh", title: restartTooltip, onClick: function () { return _this.restartSimulator('tablet'); }}) : undefined, trace ? React.createElement(sui.Button, {key: 'tracebtn', class: "trace-button " + (tracing ? 'orange' : ''), icon: "xicon turtle", title: traceTooltip, onClick: function () { return _this.toggleTrace('tablet'); }}) : undefined, compileBtn ? React.createElement(sui.Button, {class: "primary download-button download-button-full " + (compileLoading ? 'loading' : ''), icon: "download", title: compileTooltip, onClick: function () { return _this.compile('tablet'); }}) : undefined)) :
-                React.createElement("div", {className: "left aligned six wide column"}, React.createElement("div", {className: "ui icon buttons"}, React.createElement(sui.Button, {icon: "" + (collapsed ? 'toggle up' : 'toggle down'), class: "collapse-button " + (collapsed ? 'collapsed' : '') + " " + (hideEditorFloats ? 'disabled' : ''), title: collapseTooltip, onClick: function () { return _this.toggleCollapse('tablet'); }}), compileBtn ? React.createElement(sui.Button, {class: "primary download-button download-button-full " + (compileLoading ? 'loading' : ''), icon: "download", text: lf("Download"), title: compileTooltip, onClick: function () { return _this.compile('tablet'); }}) : undefined)), React.createElement("div", {className: "column four wide"}, readOnly ? undefined :
-                React.createElement(sui.Button, {icon: 'save', class: "small editortools-btn save-editortools-btn", title: lf("Save"), onClick: function () { return _this.saveFile('tablet'); }})), React.createElement("div", {className: "column six wide right aligned"}, showUndoRedo ?
+                React.createElement("div", {className: "left aligned six wide column"}, React.createElement("div", {className: "ui icon buttons"}, React.createElement(sui.Button, {icon: "" + (collapsed ? 'toggle up' : 'toggle down'), class: "collapse-button " + (collapsed ? 'collapsed' : '') + " " + (hideEditorFloats ? 'disabled' : ''), title: collapseTooltip, onClick: function () { return _this.toggleCollapse('tablet'); }}), run ? React.createElement(sui.Button, {role: "menuitem", class: "play-button " + (running ? "stop" : "play"), key: 'runmenubtn', icon: running ? "stop" : "play", title: runTooltip, onClick: function () { return _this.startStopSimulator('tablet'); }}) : undefined, restart ? React.createElement(sui.Button, {key: 'restartbtn', class: "restart-button", icon: "refresh", title: restartTooltip, onClick: function () { return _this.restartSimulator('tablet'); }}) : undefined, trace ? React.createElement(sui.Button, {key: 'tracebtn', class: "trace-button " + (tracing ? 'orange' : ''), icon: "xicon turtle", title: traceTooltip, onClick: function () { return _this.toggleTrace('tablet'); }}) : undefined, compileBtn ? React.createElement(sui.Button, {class: "primary download-button download-button-full " + downloadButtonClasses, icon: downloadIcon, title: compileTooltip, onClick: function () { return _this.compile('tablet'); }}) : undefined)) :
+                React.createElement("div", {className: "left aligned six wide column"}, React.createElement("div", {className: "ui icon buttons"}, React.createElement(sui.Button, {icon: "" + (collapsed ? 'toggle up' : 'toggle down'), class: "collapse-button " + (collapsed ? 'collapsed' : '') + " " + (hideEditorFloats ? 'disabled' : ''), title: collapseTooltip, onClick: function () { return _this.toggleCollapse('tablet'); }}), compileBtn ? React.createElement(sui.Button, {class: "primary download-button download-button-full " + downloadButtonClasses, icon: downloadIcon, text: downloadText, title: compileTooltip, onClick: function () { return _this.compile('tablet'); }}) : undefined)), React.createElement("div", {className: "column four wide"}, readOnly ? undefined :
+                React.createElement(sui.Button, {icon: 'save', class: "small editortools-btn save-editortools-btn " + saveButtonClasses, title: lf("Save"), onClick: function () { return _this.saveFile('tablet'); }})), React.createElement("div", {className: "column six wide right aligned"}, showUndoRedo ?
                 React.createElement("div", {className: "ui icon small buttons"}, React.createElement(sui.Button, {icon: 'xicon undo', class: "editortools-btn undo-editortools-btn} " + (!hasUndo ? 'disabled' : ''), title: lf("Undo"), onClick: function () { return _this.undo('tablet'); }}), React.createElement(sui.Button, {icon: 'xicon redo', class: "editortools-btn redo-editortools-btn} " + (!hasRedo ? 'disabled' : ''), title: lf("Redo"), onClick: function () { return _this.redo('tablet'); }})) : undefined, showZoomControls ?
                 React.createElement("div", {className: "ui icon small buttons"}, React.createElement(sui.Button, {icon: 'plus circle', class: "editortools-btn zoomin-editortools-btn", title: lf("Zoom In"), onClick: function () { return _this.zoomIn('tablet'); }}), React.createElement(sui.Button, {icon: 'minus circle', class: "editortools-btn zoomout-editortools-btn", title: lf("Zoom Out"), onClick: function () { return _this.zoomOut('tablet'); }})) : undefined))
             : React.createElement("div", {className: "ui grid"}, React.createElement("div", {className: "left aligned two wide column"}, React.createElement("div", {className: "ui vertical icon small buttons"}, run ? React.createElement(sui.Button, {role: "menuitem", class: "play-button " + (running ? "stop" : "play"), key: 'runmenubtn', icon: running ? "stop" : "play", title: runTooltip, onClick: function () { return _this.startStopSimulator('tablet'); }}) : undefined, restart ? React.createElement(sui.Button, {key: 'restartbtn', class: "restart-button", icon: "refresh", title: restartTooltip, onClick: function () { return _this.restartSimulator('tablet'); }}) : undefined), showCollapsed ?
-                React.createElement("div", {className: "row", style: { paddingTop: "1rem" }}, React.createElement("div", {className: "ui vertical icon small buttons"}, React.createElement(sui.Button, {icon: "" + (collapsed ? 'toggle up' : 'toggle down'), class: "collapse-button " + (collapsed ? 'collapsed' : ''), title: collapseTooltip, onClick: function () { return _this.toggleCollapse('tablet'); }}))) : undefined), React.createElement("div", {className: "three wide column"}), React.createElement("div", {className: "five wide column"}, React.createElement("div", {className: "ui grid right aligned"}, compileBtn ? React.createElement("div", {className: "row"}, React.createElement("div", {className: "column"}, React.createElement(sui.Button, {role: "menuitem", class: "primary large fluid download-button download-button-full " + (compileLoading ? 'loading' : ''), icon: "download", text: lf("Download"), title: compileTooltip, onClick: function () { return _this.compile('tablet'); }}))) : undefined, showProjectRename ?
-                React.createElement("div", {className: "row", style: compileBtn ? { paddingTop: 0 } : {}}, React.createElement("div", {className: "column"}, React.createElement("div", {className: "ui item large right labeled fluid input projectname-input projectname-tablet", title: lf("Pick a name for your project")}, React.createElement("input", {id: "fileNameInput", type: "text", placeholder: lf("Pick a name..."), value: projectName || '', onChange: function (e) { return _this.saveProjectName(e.target.value, 'tablet'); }}), React.createElement(sui.Button, {icon: 'save', class: "large right attached editortools-btn save-editortools-btn", title: lf("Save"), onClick: function () { return _this.saveFile('tablet'); }})))) : undefined)), React.createElement("div", {className: "six wide column right aligned"}, React.createElement("div", {className: "ui grid right aligned"}, showUndoRedo || showZoomControls ?
+                React.createElement("div", {className: "row", style: { paddingTop: "1rem" }}, React.createElement("div", {className: "ui vertical icon small buttons"}, React.createElement(sui.Button, {icon: "" + (collapsed ? 'toggle up' : 'toggle down'), class: "collapse-button " + (collapsed ? 'collapsed' : ''), title: collapseTooltip, onClick: function () { return _this.toggleCollapse('tablet'); }}))) : undefined), React.createElement("div", {className: "three wide column"}), React.createElement("div", {className: "five wide column"}, React.createElement("div", {className: "ui grid right aligned"}, compileBtn ? React.createElement("div", {className: "row"}, React.createElement("div", {className: "column"}, React.createElement(sui.Button, {role: "menuitem", class: "primary large fluid download-button download-button-full " + downloadButtonClasses, icon: downloadIcon, text: downloadText, title: compileTooltip, onClick: function () { return _this.compile('tablet'); }}))) : undefined, showProjectRename ?
+                React.createElement("div", {className: "row", style: compileBtn ? { paddingTop: 0 } : {}}, React.createElement("div", {className: "column"}, React.createElement("div", {className: "ui item large right labeled fluid input projectname-input projectname-tablet", title: lf("Pick a name for your project")}, React.createElement("input", {id: "fileNameInput", type: "text", placeholder: lf("Pick a name..."), value: projectName || '', onChange: function (e) { return _this.saveProjectName(e.target.value, 'tablet'); }}), React.createElement(sui.Button, {icon: 'save', class: "large right attached editortools-btn save-editortools-btn " + saveButtonClasses, title: lf("Save"), onClick: function () { return _this.saveFile('tablet'); }})))) : undefined)), React.createElement("div", {className: "six wide column right aligned"}, React.createElement("div", {className: "ui grid right aligned"}, showUndoRedo || showZoomControls ?
                 React.createElement("div", {className: "row"}, React.createElement("div", {className: "column"}, showUndoRedo ?
                     React.createElement("div", {className: "ui icon large buttons"}, React.createElement(sui.Button, {icon: 'xicon undo', class: "editortools-btn undo-editortools-btn} " + (!hasUndo ? 'disabled' : ''), title: lf("Undo"), onClick: function () { return _this.undo(); }}), React.createElement(sui.Button, {icon: 'xicon redo', class: "editortools-btn redo-editortools-btn} " + (!hasRedo ? 'disabled' : ''), title: lf("Redo"), onClick: function () { return _this.redo(); }})) : undefined, showZoomControls ?
                     React.createElement("div", {className: "ui icon large buttons"}, React.createElement(sui.Button, {icon: 'plus circle', class: "editortools-btn zoomin-editortools-btn", title: lf("Zoom In"), onClick: function () { return _this.zoomIn(); }}), React.createElement(sui.Button, {icon: 'minus circle', class: "editortools-btn zoomout-editortools-btn", title: lf("Zoom Out"), onClick: function () { return _this.zoomOut(); }})) : undefined)) : undefined, trace ?
                 React.createElement("div", {className: "row", style: showUndoRedo || showZoomControls ? { paddingTop: 0 } : {}}, React.createElement("div", {className: "column"}, React.createElement(sui.Button, {key: 'tracebtn', class: "large trace-button " + (tracing ? 'orange' : ''), icon: "xicon turtle", title: traceTooltip, onClick: function () { return _this.toggleTrace('tablet'); }}))) : undefined)))), React.createElement("div", {className: "column computer only"}, React.createElement("div", {className: "ui grid equal width"}, React.createElement("div", {id: "downloadArea", className: "ui column items"}, headless ?
-            React.createElement("div", {className: "ui item"}, React.createElement("div", {className: "ui icon large buttons"}, showCollapsed ? React.createElement(sui.Button, {icon: "" + (collapseEditorTools ? 'toggle right' : 'toggle left'), class: "large collapse-button " + (collapsed ? 'collapsed' : ''), title: collapseTooltip, onClick: function () { return _this.toggleCollapse('computer'); }}) : undefined, run ? React.createElement(sui.Button, {role: "menuitem", class: "large play-button " + (running ? "stop" : "play"), key: 'runmenubtn', icon: running ? "stop" : "play", title: runTooltip, onClick: function () { return _this.startStopSimulator('computer'); }}) : undefined, restart ? React.createElement(sui.Button, {key: 'restartbtn', class: "large restart-button", icon: "refresh", title: restartTooltip, onClick: function () { return _this.restartSimulator('computer'); }}) : undefined, trace ? React.createElement(sui.Button, {key: 'tracebtn', class: "large trace-button " + (tracing ? 'orange' : ''), icon: "xicon turtle", title: traceTooltip, onClick: function () { return _this.toggleTrace('computer'); }}) : undefined, compileBtn ? React.createElement(sui.Button, {icon: 'icon download', class: "primary large download-button " + (compileLoading ? 'loading' : ''), title: compileTooltip, onClick: function () { return _this.compile('computer'); }}) : undefined)) :
-            React.createElement("div", {className: "ui item"}, showCollapsed ? React.createElement(sui.Button, {icon: "" + (collapseEditorTools ? 'toggle right' : 'toggle left'), class: "large collapse-button " + (collapsed ? 'collapsed' : ''), title: collapseTooltip, onClick: function () { return _this.toggleCollapse('computer'); }}) : undefined, compileBtn ? React.createElement(sui.Button, {icon: 'icon download', class: "primary huge fluid download-button " + (compileLoading ? 'loading' : ''), text: lf("Download"), title: compileTooltip, onClick: function () { return _this.compile('computer'); }}) : undefined)), showProjectRename ?
-            React.createElement("div", {className: "column left aligned"}, React.createElement("div", {className: "ui right labeled input projectname-input projectname-computer", title: lf("Pick a name for your project")}, React.createElement("input", {id: "fileNameInput", type: "text", placeholder: lf("Pick a name..."), value: projectName || '', onChange: function (e) { return _this.saveProjectName(e.target.value, 'computer'); }}), React.createElement(sui.Button, {icon: 'save', class: "small right attached editortools-btn save-editortools-btn", title: lf("Save"), onClick: function () { return _this.saveFile('computer'); }}))) : undefined, React.createElement("div", {className: "column right aligned"}, showUndoRedo ?
+            React.createElement("div", {className: "ui item"}, React.createElement("div", {className: "ui icon large buttons"}, showCollapsed ? React.createElement(sui.Button, {icon: "" + (collapseEditorTools ? 'toggle right' : 'toggle left'), class: "large collapse-button " + (collapsed ? 'collapsed' : ''), title: collapseTooltip, onClick: function () { return _this.toggleCollapse('computer'); }}) : undefined, run ? React.createElement(sui.Button, {role: "menuitem", class: "large play-button " + (running ? "stop" : "play"), key: 'runmenubtn', icon: running ? "stop" : "play", title: runTooltip, onClick: function () { return _this.startStopSimulator('computer'); }}) : undefined, restart ? React.createElement(sui.Button, {key: 'restartbtn', class: "large restart-button", icon: "refresh", title: restartTooltip, onClick: function () { return _this.restartSimulator('computer'); }}) : undefined, trace ? React.createElement(sui.Button, {key: 'tracebtn', class: "large trace-button " + (tracing ? 'orange' : ''), icon: "xicon turtle", title: traceTooltip, onClick: function () { return _this.toggleTrace('computer'); }}) : undefined, compileBtn ? React.createElement(sui.Button, {icon: downloadIcon, class: "primary large download-button " + downloadButtonClasses, title: compileTooltip, onClick: function () { return _this.compile('computer'); }}) : undefined)) :
+            React.createElement("div", {className: "ui item"}, showCollapsed ? React.createElement(sui.Button, {icon: "" + (collapseEditorTools ? 'toggle right' : 'toggle left'), class: "large collapse-button " + (collapsed ? 'collapsed' : ''), title: collapseTooltip, onClick: function () { return _this.toggleCollapse('computer'); }}) : undefined, compileBtn ? React.createElement(sui.Button, {icon: downloadIcon, class: "primary huge fluid download-button " + downloadButtonClasses, text: downloadText, title: compileTooltip, onClick: function () { return _this.compile('computer'); }}) : undefined)), showProjectRename ?
+            React.createElement("div", {className: "column left aligned"}, React.createElement("div", {className: "ui right labeled input projectname-input projectname-computer", title: lf("Pick a name for your project")}, React.createElement("input", {id: "fileNameInput", type: "text", placeholder: lf("Pick a name..."), value: projectName || '', onChange: function (e) { return _this.saveProjectName(e.target.value, 'computer'); }}), React.createElement(sui.Button, {icon: 'save', class: "small right attached editortools-btn save-editortools-btn " + saveButtonClasses, title: lf("Save"), onClick: function () { return _this.saveFile('computer'); }}))) : undefined, React.createElement("div", {className: "column right aligned"}, showUndoRedo ?
             React.createElement("div", {className: "ui icon small buttons"}, React.createElement(sui.Button, {icon: 'xicon undo', class: "editortools-btn undo-editortools-btn} " + (!hasUndo ? 'disabled' : ''), title: lf("Undo"), onClick: function () { return _this.undo('computer'); }}), React.createElement(sui.Button, {icon: 'xicon redo', class: "editortools-btn redo-editortools-btn} " + (!hasRedo ? 'disabled' : ''), title: lf("Redo"), onClick: function () { return _this.redo('computer'); }})) : undefined, showZoomControls ?
             React.createElement("div", {className: "ui icon small buttons"}, React.createElement(sui.Button, {icon: 'plus circle', class: "editortools-btn zoomin-editortools-btn", title: lf("Zoom In"), onClick: function () { return _this.zoomIn('computer'); }}), React.createElement(sui.Button, {icon: 'minus circle', class: "editortools-btn zoomout-editortools-btn", title: lf("Zoom Out"), onClick: function () { return _this.zoomOut('computer'); }})) : undefined))));
     };
@@ -4555,7 +4664,7 @@ var EditorToolbar = (function (_super) {
 }(data.Component));
 exports.EditorToolbar = EditorToolbar;
 
-},{"./data":12,"./sui":38,"react":268}],16:[function(require,module,exports){
+},{"./data":12,"./sui":37,"react":267}],16:[function(require,module,exports){
 "use strict";
 var core = require("./core");
 var Cloud = pxt.Cloud;
@@ -4836,12 +4945,7 @@ var FileList = (function (_super) {
         }).then(function (v) {
             if (!v)
                 return;
-            var p = pkg.mainEditorPkg();
-            p.setFile(customFile, "\n/**\n * " + lf("Use this file to define custom functions and blocks.") + "\n * " + lf("Read more at {0}", pxt.appTarget.appTheme.homeUrl + 'blocks/custom') + "\n */\n\nenum MyEnum {\n    //% block=\"one\"\n    One,\n    //% block=\"two\"\n    Two\n}\n\n/**\n * " + lf("Custom blocks") + "\n */\n//% weight=100 color=#0fbc11 icon=\"\uF0C3\"\nnamespace custom {\n    /**\n     * TODO: " + lf("describe your function here") + "\n     * @param n " + lf("describe parameter here") + ", eg: 5\n     * @param s " + lf("describe parameter here") + ", eg: \"Hello\"\n     * @param e " + lf("describe parameter here") + "\n     */    \n    //% block\n    export function foo(n: number, s: string, e: MyEnum): void {\n        // Add code here\n    }\n\n    /**\n     * TODO: " + lf("describe your function here") + "\n     * @param value " + lf("describe value here") + ", eg: 5\n     */    \n    //% block\n    export function fib(value: number): number {\n        return value <= 1 ? value : fib(value -1) + fib(value - 2);\n    }\n}\n");
-            return p.updateConfigAsync(function (cfg) { return cfg.files.push(customFile); })
-                .then(function () { return _this.props.parent.setFile(p.lookupFile("this/" + customFile)); })
-                .then(function () { return p.savePkgAsync(); })
-                .then(function () { return _this.props.parent.reloadHeaderAsync(); });
+            return _this.props.parent.updateFileAsync(customFile, "\n/**\n * " + lf("Use this file to define custom functions and blocks.") + "\n * " + lf("Read more at {0}", pxt.appTarget.appTheme.homeUrl + 'blocks/custom') + "\n */\n\nenum MyEnum {\n    //% block=\"one\"\n    One,\n    //% block=\"two\"\n    Two\n}\n\n/**\n * " + lf("Custom blocks") + "\n */\n//% weight=100 color=#0fbc11 icon=\"\uF0C3\"\nnamespace custom {\n    /**\n     * TODO: " + lf("describe your function here") + "\n     * @param n " + lf("describe parameter here") + ", eg: 5\n     * @param s " + lf("describe parameter here") + ", eg: \"Hello\"\n     * @param e " + lf("describe parameter here") + "\n     */    \n    //% block\n    export function foo(n: number, s: string, e: MyEnum): void {\n        // Add code here\n    }\n\n    /**\n     * TODO: " + lf("describe your function here") + "\n     * @param value " + lf("describe value here") + ", eg: 5\n     */    \n    //% block\n    export function fib(value: number): number {\n        return value <= 1 ? value : fib(value -1) + fib(value - 2);\n    }\n}\n", true);
         });
     };
     FileList.prototype.renderCore = function () {
@@ -4855,7 +4959,7 @@ var FileList = (function (_super) {
 }(data.Component));
 exports.FileList = FileList;
 
-},{"./core":11,"./data":12,"./package":29,"./sui":38,"react":268}],18:[function(require,module,exports){
+},{"./core":11,"./data":12,"./package":28,"./sui":37,"react":267}],18:[function(require,module,exports){
 "use strict";
 var db = require("./db");
 var core = require("./core");
@@ -5169,32 +5273,38 @@ function init() {
     }
 }
 function shouldUse() {
-    return pxt.appTarget.serial && pxt.appTarget.serial.useHF2 && Cloud.isLocalHost() && !!Cloud.localToken;
+    var serial = pxt.appTarget.serial;
+    return serial && serial.useHF2 && (Cloud.isLocalHost() && !!Cloud.localToken || pxt.winrt.isWinRT());
 }
 exports.shouldUse = shouldUse;
 function mkBridgeAsync() {
     init();
-    return iface.opAsync("list", {})
-        .then(function (devs) {
-        var d0 = devs.devices.filter(function (d) { return (d.release & 0xff00) == 0x4200; })[0];
-        if (d0)
-            return new BridgeIO(d0);
-        else
-            throw new Error("No device connected");
-    })
-        .then(function (b) { return b.initAsync().then(function () { return b; }); });
+    var raw = false;
+    if (pxt.appTarget.serial && pxt.appTarget.serial.rawHID)
+        raw = true;
+    var b = new BridgeIO(raw);
+    return b.initAsync()
+        .then(function () { return b; });
 }
-exports.mkBridgeAsync = mkBridgeAsync;
+pxt.HF2.mkPacketIOAsync = mkBridgeAsync;
 var BridgeIO = (function () {
-    function BridgeIO(dev) {
-        this.dev = dev;
+    function BridgeIO(rawMode) {
+        var _this = this;
+        if (rawMode === void 0) { rawMode = false; }
+        this.rawMode = rawMode;
         this.onData = function (v) { };
+        this.onEvent = function (v) { };
         this.onError = function (e) { };
         this.onSerial = function (v, isErr) { };
+        if (rawMode)
+            this.onEvent = function (v) { return _this.onData(v); };
     }
     BridgeIO.prototype.onOOB = function (v) {
         if (v.op == "serial") {
             this.onSerial(U.fromHex(v.result.data), v.result.isError);
+        }
+        else if (v.op = "event") {
+            this.onEvent(U.fromHex(v.result.data));
         }
     };
     BridgeIO.prototype.talksAsync = function (cmds) {
@@ -5212,7 +5322,18 @@ var BridgeIO = (function () {
     BridgeIO.prototype.reconnectAsync = function () {
         return this.initAsync();
     };
+    BridgeIO.prototype.disconnectAsync = function () {
+        return iface.opAsync("disconnect", {
+            path: this.dev.path
+        });
+    };
     BridgeIO.prototype.sendPacketAsync = function (pkt) {
+        if (this.rawMode)
+            return iface.opAsync("send", {
+                path: this.dev.path,
+                data: U.toHex(pkt),
+                raw: true
+            });
         throw new Error("should use talksAsync()!");
     };
     BridgeIO.prototype.sendSerialAsync = function (buf, useStdErr) {
@@ -5223,15 +5344,31 @@ var BridgeIO = (function () {
         });
     };
     BridgeIO.prototype.initAsync = function () {
-        bridgeByPath[this.dev.path] = this;
-        return iface.opAsync("init", {
-            path: this.dev.path
-        });
+        var _this = this;
+        return iface.opAsync("list", {})
+            .then(function (devs0) {
+            var devs = devs0.devices;
+            var d0 = devs.filter(function (d) { return (d.release & 0xff00) == 0x4200; })[0];
+            if (pxt.appTarget.serial && pxt.appTarget.serial.rawHID)
+                d0 = devs[0];
+            if (d0) {
+                if (_this.dev)
+                    delete bridgeByPath[_this.dev.path];
+                _this.dev = d0;
+                bridgeByPath[_this.dev.path] = _this;
+            }
+            else
+                throw new Error("No device connected");
+        })
+            .then(function () { return iface.opAsync("init", {
+            path: _this.dev.path,
+            raw: _this.rawMode,
+        }); });
     };
     return BridgeIO;
 }());
 function hf2Async() {
-    return mkBridgeAsync()
+    return pxt.HF2.mkPacketIOAsync()
         .then(function (h) {
         var w = new pxt.HF2.Wrapper(h);
         return w.reconnectAsync(true)
@@ -5240,328 +5377,31 @@ function hf2Async() {
 }
 var initPromise;
 function initAsync() {
-    if (!initPromise)
+    var isFirstInit = false;
+    if (!initPromise) {
+        isFirstInit = true;
         initPromise = hf2Async()
             .catch(function (err) {
             initPromise = null;
             return Promise.reject(err);
         });
-    return initPromise;
+    }
+    var wrapper;
+    return initPromise
+        .then(function (w) {
+        wrapper = w;
+        if (pxt.winrt.isWinRT() && !isFirstInit) {
+            // For WinRT, disconnecting the device after flashing once puts the wrapper in a bad state.
+            // To workaround this, reconnect every time.
+            return wrapper.reconnectAsync();
+        }
+        return Promise.resolve();
+    })
+        .then(function () { return wrapper; });
 }
 exports.initAsync = initAsync;
 
 },{}],21:[function(require,module,exports){
-"use strict";
-var compiler = require("./compiler");
-var Cloud = pxt.Cloud;
-var U = pxt.Util;
-var iface;
-var isHalted = false;
-var lastCompileResult;
-var haltCheckRunning = false;
-var onHalted = Promise.resolve();
-var haltHandler;
-var cachedStateInfo;
-var nextBreakpoints = [];
-var currBreakpoint;
-var lastDebugStatus;
-var callInfos;
-function init() {
-    if (!iface) {
-        if (!Cloud.isLocalHost() || !Cloud.localToken)
-            return;
-        pxt.debug('initializing debug pipe');
-        iface = pxt.worker.makeWebSocket("ws://localhost:" + pxt.options.wsPort + "/" + Cloud.localToken + "/debug");
-    }
-}
-function readMemAsync(addr, numwords) {
-    return workerOpAsync("mem", { addr: addr, words: numwords })
-        .then(function (resp) { return resp.data; });
-}
-exports.readMemAsync = readMemAsync;
-function writeMemAsync(addr, words) {
-    return workerOpAsync("wrmem", { addr: addr, words: words })
-        .then(function () { });
-}
-exports.writeMemAsync = writeMemAsync;
-var asm = "";
-function callAndPush(prc) {
-    var idx = asm.length;
-    asm += "\n    ldr r4, .proc" + idx + "\n    blx r4\n    push {r0}\n    b .next" + idx + "\n    .balign 4\n.proc" + idx + ":\n    .word " + prc + "|1\n.next" + idx + ":\n";
-}
-var stateProcs = [
-    "pxt::getNumGlobals/numGlobals",
-    "pxtrt::getGlobalsPtr/globalsPtr",
-];
-function callForStateAsync(st) {
-    if (cachedStateInfo)
-        return Promise.resolve(cachedStateInfo);
-    asm = "";
-    for (var _i = 0, stateProcs_1 = stateProcs; _i < stateProcs_1.length; _i++) {
-        var p = stateProcs_1[_i];
-        callAndPush(p.replace(/\/.*/, ""));
-    }
-    asm += "\n    bkpt 42\n    @nostackcheck\n";
-    return compiler.assembleAsync(asm)
-        .then(function (res) { return workerOpAsync("exec", { code: res.words, args: [] }); })
-        .then(function () { return snapshotAsync(); })
-        .then(function (st) {
-        var fields = stateProcs.map(function (s) { return s.replace(/.*\//, ""); });
-        fields.reverse();
-        var r = {};
-        fields.forEach(function (f, i) {
-            r[f] = st.stack[i];
-        });
-        cachedStateInfo = r;
-    })
-        .then(function () { return restoreAsync(st); })
-        .then(function () { return cachedStateInfo; });
-}
-function clearAsync() {
-    isHalted = false;
-    lastCompileResult = null;
-    cachedStateInfo = null;
-    lastDebugStatus = null;
-    return Promise.resolve();
-}
-function coreHalted() {
-    return getHwStateAsync()
-        .then(function (st) {
-        nextBreakpoints = [];
-        var globals = {};
-        st.globals.slice(1).forEach(function (v, i) {
-            var loc = lastCompileResult.procDebugInfo[0].locals[i];
-            if (loc)
-                globals[loc.name] = v;
-            else
-                globals["?" + i] = v;
-        });
-        var pc = st.machineState.registers[15];
-        var final = function () { return Promise.resolve(); };
-        var stepInBkp = lastCompileResult.procDebugInfo.filter(function (p) { return p.bkptLoc == pc; })[0];
-        if (stepInBkp) {
-            pc = stepInBkp.codeStartLoc;
-            st.machineState.registers[15] = pc;
-            final = function () { return restoreAsync(st.machineState); };
-        }
-        var bb = lastCompileResult.breakpoints;
-        var brkMatch = bb[0];
-        var bestDelta = Infinity;
-        for (var _i = 0, bb_1 = bb; _i < bb_1.length; _i++) {
-            var b = bb_1[_i];
-            var delta = pc - b.binAddr;
-            if (delta >= 0 && delta < bestDelta) {
-                bestDelta = delta;
-                brkMatch = b;
-            }
-        }
-        currBreakpoint = brkMatch;
-        var msg = {
-            type: 'debugger',
-            subtype: 'breakpoint',
-            breakpointId: brkMatch.id,
-            globals: globals,
-            stackframes: []
-        };
-        exports.postMessage(msg);
-        return final();
-    })
-        .then(haltHandler);
-}
-function haltCheckAsync() {
-    if (isHalted)
-        return Promise.delay(100).then(haltCheckAsync);
-    return workerOpAsync("status")
-        .then(function (res) {
-        if (res.isHalted) {
-            isHalted = true;
-            coreHalted();
-        }
-        return Promise.delay(300);
-    })
-        .then(haltCheckAsync);
-}
-function clearHalted() {
-    isHalted = false;
-    onHalted = new Promise(function (resolve, reject) {
-        haltHandler = resolve;
-    });
-    if (!haltCheckRunning) {
-        haltCheckRunning = true;
-        haltCheckAsync();
-    }
-}
-function writeDebugStatusAsync(v) {
-    if (v === lastDebugStatus)
-        return Promise.resolve();
-    lastDebugStatus = v;
-    return writeMemAsync(cachedStateInfo.globalsPtr, [v]);
-}
-function setBreakpointsAsync(addrs) {
-    return workerOpAsync("breakpoints", { addrs: addrs });
-}
-function startDebugAsync() {
-    return clearAsync()
-        .then(function () { return compiler.compileAsync({ native: true }); })
-        .then(function (res) {
-        lastCompileResult = res;
-        callInfos = {};
-        var procLookup = [];
-        for (var _i = 0, _a = res.procDebugInfo; _i < _a.length; _i++) {
-            var pdi = _a[_i];
-            procLookup[pdi.idx] = pdi;
-        }
-        for (var _b = 0, _c = res.procDebugInfo; _b < _c.length; _b++) {
-            var pdi = _c[_b];
-            for (var _d = 0, _e = pdi.calls; _d < _e.length; _d++) {
-                var ci = _e[_d];
-                callInfos[ci.addr + ""] = {
-                    from: pdi,
-                    to: procLookup[ci.procIndex],
-                    stack: ci.stack
-                };
-            }
-        }
-        var bb = lastCompileResult.breakpoints;
-        var entry = bb[1];
-        for (var _f = 0, bb_2 = bb; _f < bb_2.length; _f++) {
-            var b = bb_2[_f];
-            if (b.binAddr && b.binAddr < entry.binAddr)
-                entry = b;
-        }
-        return setBreakpointsAsync([entry.binAddr]);
-    })
-        .then(function () { return workerOpAsync("reset"); })
-        .then(clearHalted)
-        .then(waitForHaltAsync)
-        .then(function (res) { return writeDebugStatusAsync(1).then(function () { return res; }); });
-}
-exports.startDebugAsync = startDebugAsync;
-function handleMessage(msg) {
-    console.log("HWDBGMSG", msg);
-    if (msg.type != "debugger")
-        return;
-    var stepInto = false;
-    switch (msg.subtype) {
-        case 'stepinto':
-            stepInto = true;
-        case 'stepover':
-            nextBreakpoints = currBreakpoint.successors.map(function (id) { return lastCompileResult.breakpoints[id].binAddr; });
-            resumeAsync(stepInto);
-            break;
-    }
-}
-exports.handleMessage = handleMessage;
-function snapshotAsync() {
-    return workerOpAsync("snapshot")
-        .then(function (r) { return r.state; });
-}
-exports.snapshotAsync = snapshotAsync;
-function restoreAsync(st) {
-    return workerOpAsync("restore", { state: st })
-        .then(function () { });
-}
-exports.restoreAsync = restoreAsync;
-function resumeAsync(into) {
-    if (into === void 0) { into = false; }
-    return Promise.resolve()
-        .then(function () { return writeDebugStatusAsync(into ? 3 : 1); })
-        .then(function () { return setBreakpointsAsync(nextBreakpoints); })
-        .then(function () { return workerOpAsync("resume"); })
-        .then(clearHalted);
-}
-exports.resumeAsync = resumeAsync;
-function waitForHaltAsync() {
-    U.assert(haltCheckRunning);
-    return onHalted;
-}
-exports.waitForHaltAsync = waitForHaltAsync;
-function getHwStateAsync() {
-    var res = {
-        machineState: null,
-        globals: []
-    };
-    return snapshotAsync()
-        .then(function (v) {
-        res.machineState = v;
-        return callForStateAsync(v);
-    })
-        .then(function (info) { return readMemAsync(info.globalsPtr, info.numGlobals); })
-        .then(function (g) {
-        res.globals = g;
-        return res;
-    });
-}
-exports.getHwStateAsync = getHwStateAsync;
-var devPath;
-function workerOpAsync(op, arg) {
-    if (arg === void 0) { arg = {}; }
-    init();
-    if (!devPath)
-        devPath = iface.opAsync("list", {})
-            .then(function (devs) {
-            var d0 = devs.devices[0];
-            if (d0)
-                return d0.path;
-            else
-                throw new Error("No device connected");
-        });
-    return devPath
-        .then(function (path) {
-        arg["path"] = path;
-        return iface.opAsync(op, arg);
-    });
-}
-exports.workerOpAsync = workerOpAsync;
-function flashDeviceAsync(startAddr, words) {
-    var cfg = {
-        flashWords: words,
-        flashCode: [],
-        bufferAddr: 0x20000400,
-        numBuffers: 2,
-        flashAddr: startAddr
-    };
-    return compiler.assembleAsync(nrfFlashAsm)
-        .then(function (res) { cfg.flashCode = res.words; })
-        .then(function (res) { return workerOpAsync("wrpages", cfg); });
-}
-exports.flashDeviceAsync = flashDeviceAsync;
-/*
-#define PAGE_SIZE 0x400
-#define SIZE_IN_WORDS (PAGE_SIZE/4)
-
-void setConfig(uint32_t v) {
-    NRF_NVMC->CONFIG = v;
-    while (NRF_NVMC->READY == NVMC_READY_READY_Busy);
-}
-
-void overwriteFlashPage(uint32_t* to, uint32_t* from)
-{
-    // Turn on flash erase enable and wait until the NVMC is ready:
-    setConfig(NVMC_CONFIG_WEN_Een << NVMC_CONFIG_WEN_Pos);
-
-    // Erase page:
-    NRF_NVMC->ERASEPAGE = (uint32_t)to;
-    while (NRF_NVMC->READY == NVMC_READY_READY_Busy);
-
-    // Turn off flash erase enable and wait until the NVMC is ready:
-    setConfig(NVMC_CONFIG_WEN_Ren << NVMC_CONFIG_WEN_Pos);
-
-    // Turn on flash write enable and wait until the NVMC is ready:
-    setConfig(NVMC_CONFIG_WEN_Wen << NVMC_CONFIG_WEN_Pos);
-
-    for(int i = 0; i <= (SIZE_IN_WORDS - 1); i++) {
-        *(to + i) = *(from + i);
-        while (NRF_NVMC->READY == NVMC_READY_READY_Busy);
-    }
-
-    // Turn off flash write enable and wait until the NVMC is ready:
-    setConfig(NVMC_CONFIG_WEN_Ren << NVMC_CONFIG_WEN_Pos);
-}
-*/
-var nrfFlashAsm = "\noverwriteFlashPage:\n        cpsid i\n        push    {r4, r5, r6, lr}\n        movs    r5, r0\n        movs    r0, #2\n        movs    r6, r1\n        bl      .setConfig\n        movs    r3, #161        ; 0xa1\n        movs    r2, #128        ; 0x80\n        ldr     r4, .NRF_NVMC\n        lsls    r3, r3, #3\n        str     r5, [r4, r3]\n        lsls    r2, r2, #3\n.overLoop:\n        ldr     r3, [r4, r2]\n        cmp     r3, #0\n        beq     .overLoop\n        movs    r0, #0\n        bl      .setConfig\n        movs    r0, #1\n        bl      .setConfig\n        movs    r2, #128\n        lsls    r2, r2, #3\n        movs    r3, #0\n        movs    r1, r2\n.overOuterLoop:\n        ldr     r0, [r6, r3]\n        str     r0, [r5, r3]\n.overLoop2:\n        ldr     r0, [r4, r2]\n        cmp     r0, #0\n        beq     .overLoop2\n        adds    r3, #4\n        cmp     r3, r1\n        bne     .overOuterLoop\n        movs    r0, #0\n        bl      .setConfig\n        pop     {r4, r5, r6, pc}\n\n.setConfig:\n        movs    r1, #128\n        ldr     r3, .NRF_NVMC\n        ldr     r2, .v504\n        lsls    r1, r1, #3\n        str     r0, [r3, r2]\n.cfgLoop:\n        ldr     r2, [r3, r1]\n        cmp     r2, #0\n        beq     .cfgLoop\n        bx      lr\n\n\n                .balign 4\n.NRF_NVMC:      .word   0x4001e000\n.v504:          .word   0x504\n";
-
-},{"./compiler":9}],22:[function(require,module,exports){
 "use strict";
 var data = require("./data");
 var mem = require("./memoryworkspace");
@@ -5624,7 +5464,7 @@ exports.provider = {
     resetAsync: resetAsync
 };
 
-},{"./data":12,"./memoryworkspace":25}],23:[function(require,module,exports){
+},{"./data":12,"./memoryworkspace":25}],22:[function(require,module,exports){
 "use strict";
 var __extends = (this && this.__extends) || function (d, b) {
     for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
@@ -5741,7 +5581,7 @@ var LanguagePicker = (function (_super) {
 }(data.Component));
 exports.LanguagePicker = LanguagePicker;
 
-},{"./codecard":8,"./data":12,"./sui":38,"react":268}],24:[function(require,module,exports){
+},{"./codecard":8,"./data":12,"./sui":37,"react":267}],23:[function(require,module,exports){
 /// <reference path="../../built/pxtsim.d.ts" />
 "use strict";
 var __extends = (this && this.__extends) || function (d, b) {
@@ -5897,7 +5737,49 @@ var LogView = (function (_super) {
 }(React.Component));
 exports.LogView = LogView;
 
-},{"./core":11,"react":268,"react-dom":139}],25:[function(require,module,exports){
+},{"./core":11,"react":267,"react-dom":138}],24:[function(require,module,exports){
+"use strict";
+var pkg = require("./package");
+var core = require("./core");
+var compiler = require("./compiler");
+function makeAsync() {
+    return compiler.compileAsync({ native: true })
+        .then(function (resp) {
+        var p = pkg.mainEditorPkg();
+        var code = p.files["main.ts"];
+        var data = {
+            name: p.header.name || lf("Untitled"),
+            code: code ? code.content : "basic.showString(\"Hi!\");",
+            board: JSON.stringify(pxt.appTarget.simulator.boardDefinition)
+        };
+        var parts = ts.pxtc.computeUsedParts(resp);
+        if (parts.length) {
+            data.parts = parts.join(" ");
+            data.partdefs = JSON.stringify(pkg.mainPkg.computePartDefinitions(parts));
+        }
+        var fnArgs = resp.usedArguments;
+        if (fnArgs)
+            data.fnArgs = JSON.stringify(fnArgs);
+        data.package = Util.values(pkg.mainPkg.deps).filter(function (p) { return p.id != "this"; }).map(function (p) { return (p.id + "=" + p._verspec); }).join('\n');
+        var urlData = Object.keys(data).map(function (k) { return (k + "=" + encodeURIComponent(data[k])); }).join('&');
+        var url = pxt.webConfig.partsUrl + "?" + urlData;
+        return core.dialogAsync({
+            hideCancel: true,
+            header: lf("Make"),
+            size: "large",
+            htmlBody: "\n        <div class=\"ui container\">\n            <div style=\"position:relative;height:0;padding-bottom:40%;overflow:hidden;\">\n                <iframe style=\"position:absolute;top:0;left:0;width:100%;height:100%;\" src=\"" + url + "\" sandbox=\"allow-popups allow-forms allow-scripts allow-same-origin\"\n                    frameborder=\"0\"></iframe>\n            </div>\n        </div>",
+            buttons: [{
+                    label: lf("Open"),
+                    url: url,
+                    icon: "external"
+                }]
+        });
+    }).then(function (r) {
+    });
+}
+exports.makeAsync = makeAsync;
+
+},{"./compiler":9,"./core":11,"./package":28}],25:[function(require,module,exports){
 "use strict";
 var U = pxt.Util;
 exports.projects = {};
@@ -6436,6 +6318,7 @@ var Editor = (function (_super) {
             this.selectedCategoryRow.style.color = "" + this.selectedCategoryColor;
             this.selectedCategoryRow.className = 'blocklyTreeRow';
         }
+        this.parent.setState({ hideEditorFloats: !clear });
         if (clear) {
             this.selectedCategoryRow = null;
         }
@@ -6475,9 +6358,10 @@ var Editor = (function (_super) {
             // Advanced seperator
             group.appendChild(Editor.createTreeSeperator());
             // Advanced toggle
-            group.appendChild(this.createCategoryElement("", "#3c3c3c", this.showAdvanced ? 'advancedexpanded' : 'advancedcollapsed', false, null, function () {
+            group.appendChild(this.createCategoryElement("", pxt.blocks.getNamespaceColor('advanced'), this.showAdvanced ? 'advancedexpanded' : 'advancedcollapsed', false, null, function () {
                 _this.showAdvanced = !_this.showAdvanced;
                 _this.updateToolbox();
+                _this.parent.setState({ hideEditorFloats: false });
                 _this.resize();
             }, lf("{id:category}Advanced")));
         }
@@ -6515,18 +6399,29 @@ var Editor = (function (_super) {
                 if (!snippets.isBuiltin(ns)) {
                     var blocks_1 = monacoEditor.nsMap[ns].filter(function (block) { return !(block.attributes.blockHidden || block.attributes.deprecated); });
                     var categoryName = md.block ? md.block : undefined;
-                    el = monacoEditor.createCategoryElement(ns, md.color, md.icon, true, blocks_1, undefined, categoryName);
+                    el = monacoEditor.createCategoryElement(ns, md.color, md.icon, true, blocks_1, undefined, categoryName, md.groups, md.labelLineWidth);
                 }
                 else {
-                    el = monacoEditor.createCategoryElement("", md.color, md.icon, false, snippets.getBuiltinCategory(ns).blocks, null, Util.rlf("{id:category}" + ns));
+                    var cat = snippets.getBuiltinCategory(ns);
+                    var blocks_2 = cat.blocks;
+                    var name_1 = cat.name;
+                    if (!blocks_2 || !blocks_2.length) {
+                        return;
+                    }
+                    blocks_2.forEach(function (b) { b.noNamespace = true; });
+                    if (monacoEditor.nsMap[ns.toLowerCase()])
+                        blocks_2 = blocks_2.concat(monacoEditor.nsMap[ns.toLowerCase()].filter(function (block) { return !(block.attributes.blockHidden || block.attributes.deprecated); }));
+                    el = monacoEditor.createCategoryElement(ns, md.color, md.icon, false, blocks_2, null, name_1);
                 }
-                group.appendChild(el);
+                if (el)
+                    group.appendChild(el);
             });
         }
     };
     Editor.prototype.getNamespaceAttrs = function (ns) {
         var builtin = snippets.getBuiltinCategory(ns);
         if (builtin) {
+            builtin.attributes.color = pxt.blocks.getNamespaceColor(builtin.nameid);
             return builtin.attributes;
         }
         var info = this.blockInfo.apis.byQName[ns];
@@ -6539,20 +6434,20 @@ var Editor = (function (_super) {
         var _this = this;
         var namespaces = Object.keys(this.nsMap).filter(function (ns) { return !snippets.isBuiltin(ns) && !!_this.getNamespaceAttrs(ns); });
         var config = pxt.appTarget.runtime || {};
-        if (config.loopsBlocks)
-            namespaces.push(snippets.loops.name);
-        if (config.logicBlocks)
-            namespaces.push(snippets.logic.name);
-        if (config.variablesBlocks)
-            namespaces.push(snippets.variables.name);
-        if (config.mathBlocks)
-            namespaces.push(snippets.maths.name);
-        if (config.functionBlocks)
-            namespaces.push(snippets.functions.name);
-        if (config.textBlocks)
-            namespaces.push(snippets.text.name);
-        if (config.listsBlocks)
-            namespaces.push(snippets.arrays.name);
+        if (config.loopsBlocks && !snippets.loops.removed)
+            namespaces.push(snippets.loops.nameid);
+        if (config.logicBlocks && !snippets.logic.removed)
+            namespaces.push(snippets.logic.nameid);
+        if (config.variablesBlocks && !snippets.variables.removed)
+            namespaces.push(snippets.variables.nameid);
+        if (config.mathBlocks && !snippets.maths.removed)
+            namespaces.push(snippets.maths.nameid);
+        if (config.functionBlocks && !snippets.functions.removed)
+            namespaces.push(snippets.functions.nameid);
+        if (config.textBlocks && !snippets.text.removed)
+            namespaces.push(snippets.text.nameid);
+        if (config.listsBlocks && !snippets.arrays.removed)
+            namespaces.push(snippets.arrays.nameid);
         return namespaces;
     };
     Editor.createTreeSeperator = function () {
@@ -6567,14 +6462,14 @@ var Editor = (function (_super) {
         treeitem.setAttribute('role', 'treeitem');
         return treeitem;
     };
-    Editor.prototype.createCategoryElement = function (ns, metaColor, icon, injectIconClass, fns, onClick, category) {
+    Editor.prototype.createCategoryElement = function (ns, metaColor, icon, injectIconClass, fns, onClick, category, groups, labelLineWidth) {
         var _this = this;
         if (injectIconClass === void 0) { injectIconClass = true; }
         // Filter the toolbox
         var filters = this.parent.state.filters;
         var categoryState = filters ? (filters.namespaces && filters.namespaces[ns] != undefined ? filters.namespaces[ns] : filters.defaultState) : undefined;
         var hasChild = false;
-        if (filters) {
+        if (filters && categoryState !== undefined && fns) {
             Object.keys(fns).forEach(function (fn) {
                 var fnState = filters.fns && filters.fns[fn] != undefined ? filters.fns[fn] : (categoryState != undefined ? categoryState : filters.defaultState);
                 if (fnState == pxt.editor.FilterState.Disabled || fnState == pxt.editor.FilterState.Visible)
@@ -6601,6 +6496,7 @@ var Editor = (function (_super) {
                 monacoEditor.selectedCategoryRow = null;
                 monacoFlyout.style.display = 'none';
                 treerow.className = 'blocklyTreeRow';
+                _this.parent.setState({ hideEditorFloats: false });
                 return;
             }
             else {
@@ -6632,121 +6528,67 @@ var Editor = (function (_super) {
             }
             else {
                 // Create a flyout and add the category methods in there
-                fns.sort(function (f1, f2) {
-                    // sort by fn weight
-                    var w2 = (f2.attributes.weight || 50) + (f2.attributes.advanced ? 0 : 1000);
-                    var w1 = (f1.attributes.weight || 50) + (f1.attributes.advanced ? 0 : 1000);
-                    return w2 - w1;
-                })
-                    .forEach(function (fn) {
-                    var monacoBlockDisabled = false;
-                    var fnState = filters ? (filters.fns && filters.fns[fn.name] != undefined ? filters.fns[fn.name] : (categoryState != undefined ? categoryState : filters.defaultState)) : undefined;
-                    monacoBlockDisabled = fnState == pxt.editor.FilterState.Disabled;
-                    if (fnState == pxt.editor.FilterState.Hidden)
-                        return;
-                    var monacoBlockArea = document.createElement('div');
-                    var monacoBlock = document.createElement('div');
-                    monacoBlock.className = 'monacoDraggableBlock';
-                    monacoBlock.style.fontSize = monacoEditor.parent.settings.editorFontSize + "px";
-                    monacoBlock.style.backgroundColor = monacoBlockDisabled ?
-                        "" + Blockly.PXTUtils.fadeColour(color || '#ddd', 0.8, false) :
-                        "" + color;
-                    monacoBlock.style.borderColor = "" + color;
-                    var snippet = fn.snippet;
-                    var comment = fn.attributes.jsDoc;
-                    var snippetPrefix = ns;
-                    var element = fn;
-                    if (element.attributes.block) {
-                        if (element.attributes.defaultInstance) {
-                            snippetPrefix = element.attributes.defaultInstance;
-                        }
-                        else {
-                            var nsInfo_1 = _this.blockInfo.apis.byQName[element.namespace];
-                            if (nsInfo_1.kind === pxtc.SymbolKind.Class) {
-                                return;
-                            }
-                            else if (nsInfo_1.attributes.fixedInstances) {
-                                var instances = Util.values(_this.blockInfo.apis.byQName).filter(function (value) {
-                                    return value.kind === pxtc.SymbolKind.Variable &&
-                                        value.attributes.fixedInstance &&
-                                        value.retType === nsInfo_1.name;
-                                })
-                                    .sort(function (v1, v2) { return v1.name.localeCompare(v2.name); });
-                                if (instances.length) {
-                                    snippetPrefix = instances[0].namespace + "." + instances[0].name;
-                                }
-                            }
-                        }
+                // Add the heading label
+                if (!pxt.appTarget.appTheme.hideFlyoutHeadings && pxt.BrowserUtils.isMobile()) {
+                    var monacoHeadingLabel = document.createElement('div');
+                    monacoHeadingLabel.className = 'monacoFlyoutLabel monacoFlyoutHeading';
+                    var monacoHeadingIcon = document.createElement('span');
+                    var iconClass_1 = ("blocklyTreeIcon" + (icon ? (ns || icon).toLowerCase() : 'Default')).replace(/\s/g, '');
+                    monacoHeadingIcon.className = "monacoFlyoutHeadingIcon blocklyTreeIcon " + iconClass_1;
+                    monacoHeadingIcon.setAttribute('role', 'presentation');
+                    monacoHeadingIcon.style.display = 'inline-block';
+                    monacoHeadingIcon.style.color = "" + color;
+                    var monacoHeadingText = document.createElement('div');
+                    monacoHeadingText.className = "monacoFlyoutHeadingText";
+                    monacoHeadingText.style.display = 'inline-block';
+                    monacoHeadingText.style.fontSize = (monacoEditor.parent.settings.editorFontSize + 5) + "px";
+                    monacoHeadingText.textContent = category ? category : "" + Util.capitalize(ns);
+                    monacoHeadingLabel.appendChild(monacoHeadingIcon);
+                    monacoHeadingLabel.appendChild(monacoHeadingText);
+                    monacoFlyout.appendChild(monacoHeadingLabel);
+                }
+                // Organize and rearrange methods into groups
+                var blockGroups = {};
+                var sortedGroups_1 = [];
+                if (groups)
+                    sortedGroups_1 = groups;
+                // Organize the blocks into the different groups
+                for (var bi = 0; bi < fns.length; ++bi) {
+                    var blk = fns[bi];
+                    var group = blk.attributes.group || 'other';
+                    if (!blockGroups[group])
+                        blockGroups[group] = [];
+                    blockGroups[group].push(blk);
+                }
+                // Add any missing groups to the sorted groups list
+                Object.keys(blockGroups).sort().forEach(function (group) {
+                    if (sortedGroups_1.indexOf(group) == -1) {
+                        sortedGroups_1.push(group);
                     }
-                    var sigToken = document.createElement('span');
-                    if (!fn.snippetOnly) {
-                        sigToken.className = 'sig';
-                    }
-                    // completion is a bit busted but looks better
-                    sigToken.innerText = snippet
-                        .replace(/^[^(]*\(/, '(')
-                        .replace(/^\s*\{\{\}\}\n/gm, '')
-                        .replace(/\{\n\}/g, '{}')
-                        .replace(/(?:\{\{)|(?:\}\})/g, '');
-                    monacoBlock.title = comment;
-                    if (!monacoBlockDisabled) {
-                        monacoBlock.draggable = true;
-                        monacoBlock.onclick = function (ev2) {
-                            pxt.tickEvent("monaco.toolbox.itemclick");
-                            monacoEditor.resetFlyout(true);
-                            var model = monacoEditor.editor.getModel();
-                            var currPos = monacoEditor.editor.getPosition();
-                            var cursor = model.getOffsetAt(currPos);
-                            var insertText = snippetPrefix ? snippetPrefix + "." + snippet : snippet;
-                            insertText = (currPos.column > 1) ? '\n' + insertText :
-                                model.getWordUntilPosition(currPos) != undefined && model.getWordUntilPosition(currPos).word != '' ?
-                                    insertText + '\n' : insertText;
-                            if (insertText.indexOf('{{}}') > -1) {
-                                cursor += (insertText.indexOf('{{}}'));
-                                insertText = insertText.replace('{{}}', '');
-                            }
-                            else
-                                cursor += (insertText.length);
-                            insertText = insertText.replace(/(?:\{\{)|(?:\}\})/g, '');
-                            monacoEditor.editor.pushUndoStop();
-                            monacoEditor.editor.executeEdits("", [
-                                {
-                                    identifier: { major: 0, minor: 0 },
-                                    range: new monaco.Range(currPos.lineNumber, currPos.column, currPos.lineNumber, currPos.column),
-                                    text: insertText,
-                                    forceMoveMarkers: false
-                                }
-                            ]);
-                            monacoEditor.beforeCompile();
-                            monacoEditor.editor.pushUndoStop();
-                            var endPos = model.getPositionAt(cursor);
-                            monacoEditor.editor.setPosition(endPos);
-                            monacoEditor.editor.focus();
-                            //monacoEditor.editor.setSelection(new monaco.Range(currPos.lineNumber, currPos.column, endPos.lineNumber, endPos.column));
-                        };
-                        monacoBlock.ondragstart = function (ev2) {
-                            pxt.tickEvent("monaco.toolbox.itemdrag");
-                            var clone = monacoBlock.cloneNode(true);
-                            setTimeout(function () {
-                                monacoFlyout.style.transform = "translateX(-9999px)";
-                            });
-                            var insertText = snippetPrefix ? snippetPrefix + "." + snippet : snippet;
-                            ev2.dataTransfer.setData('text', insertText); // IE11 only supports text
-                        };
-                        monacoBlock.ondragend = function (ev2) {
-                            monacoFlyout.style.transform = "none";
-                            monacoEditor.resetFlyout(true);
-                        };
-                    }
-                    if (!fn.snippetOnly) {
-                        var methodToken = document.createElement('span');
-                        methodToken.innerText = fn.name;
-                        monacoBlock.appendChild(methodToken);
-                    }
-                    monacoBlock.appendChild(sigToken);
-                    monacoBlockArea.appendChild(monacoBlock);
-                    monacoFlyout.appendChild(monacoBlockArea);
                 });
+                // Add labels and insert the blocks into the flyout
+                for (var bg = 0; bg < sortedGroups_1.length; ++bg) {
+                    var group = sortedGroups_1[bg];
+                    // Add the group label
+                    if (group != 'other') {
+                        var groupLabel = document.createElement('div');
+                        groupLabel.className = 'monacoFlyoutLabel blocklyFlyoutGroup';
+                        var groupLabelText = document.createElement('div');
+                        groupLabelText.className = 'monacoFlyoutLabelText';
+                        groupLabelText.style.fontSize = monacoEditor.parent.settings.editorFontSize + "px";
+                        groupLabelText.textContent = pxt.Util.rlf("{id:group}" + group);
+                        groupLabel.appendChild(groupLabelText);
+                        monacoFlyout.appendChild(groupLabel);
+                        var groupLabelLine = document.createElement('hr');
+                        groupLabelLine.className = 'monacoFlyoutLabelLine';
+                        groupLabelLine.align = 'left';
+                        groupLabelLine.style.width = (labelLineWidth || groupLabelText.offsetWidth) + "px";
+                        groupLabel.appendChild(groupLabelLine);
+                    }
+                    // Add the blocks in that group
+                    if (blockGroups[group])
+                        _this.createMonacoBlocks(monacoEditor, monacoFlyout, ns, blockGroups[group], color, filters, categoryState);
+                }
             }
         };
         treerow.className = 'blocklyTreeRow';
@@ -6794,6 +6636,125 @@ var Editor = (function (_super) {
         treerow.style.paddingLeft = '0px';
         label.innerText = category ? category : "" + Util.capitalize(ns);
         return treeitem;
+    };
+    Editor.prototype.createMonacoBlocks = function (monacoEditor, monacoFlyout, ns, fns, color, filters, categoryState) {
+        var _this = this;
+        // Render the method blocks
+        fns.sort(function (f1, f2) {
+            // sort by fn weight
+            var w2 = (f2.attributes.weight || 50) + (f2.attributes.advanced ? 0 : 1000);
+            var w1 = (f1.attributes.weight || 50) + (f1.attributes.advanced ? 0 : 1000);
+            return w2 - w1;
+        })
+            .forEach(function (fn) {
+            var monacoBlockDisabled = false;
+            var fnState = filters ? (filters.fns && filters.fns[fn.name] != undefined ? filters.fns[fn.name] : (categoryState != undefined ? categoryState : filters.defaultState)) : undefined;
+            monacoBlockDisabled = fnState == pxt.editor.FilterState.Disabled;
+            if (fnState == pxt.editor.FilterState.Hidden)
+                return;
+            var monacoBlockArea = document.createElement('div');
+            var monacoBlock = document.createElement('div');
+            monacoBlock.className = 'monacoDraggableBlock';
+            monacoBlock.style.fontSize = monacoEditor.parent.settings.editorFontSize + "px";
+            monacoBlock.style.backgroundColor = monacoBlockDisabled ?
+                "" + Blockly.PXTUtils.fadeColour(color || '#ddd', 0.8, false) :
+                "" + color;
+            monacoBlock.style.borderColor = "" + color;
+            var snippet = fn.snippet;
+            var comment = fn.attributes.jsDoc;
+            var snippetPrefix = fn.noNamespace ? "" : ns;
+            var element = fn;
+            if (element.attributes.block) {
+                if (element.attributes.defaultInstance) {
+                    snippetPrefix = element.attributes.defaultInstance;
+                }
+                else {
+                    var nsInfo_1 = _this.blockInfo.apis.byQName[element.namespace];
+                    if (nsInfo_1.kind === pxtc.SymbolKind.Class) {
+                        return;
+                    }
+                    else if (nsInfo_1.attributes.fixedInstances) {
+                        var instances = Util.values(_this.blockInfo.apis.byQName).filter(function (value) {
+                            return value.kind === pxtc.SymbolKind.Variable &&
+                                value.attributes.fixedInstance &&
+                                value.retType === nsInfo_1.name;
+                        })
+                            .sort(function (v1, v2) { return v1.name.localeCompare(v2.name); });
+                        if (instances.length) {
+                            snippetPrefix = instances[0].namespace + "." + instances[0].name;
+                        }
+                    }
+                }
+            }
+            var sigToken = document.createElement('span');
+            if (!fn.snippetOnly) {
+                sigToken.className = 'sig';
+            }
+            // completion is a bit busted but looks better
+            sigToken.innerText = snippet
+                .replace(/^[^(]*\(/, '(')
+                .replace(/^\s*\{\{\}\}\n/gm, '')
+                .replace(/\{\n\}/g, '{}')
+                .replace(/(?:\{\{)|(?:\}\})/g, '');
+            monacoBlock.title = comment;
+            if (!monacoBlockDisabled) {
+                monacoBlock.draggable = true;
+                monacoBlock.onclick = function (ev2) {
+                    pxt.tickEvent("monaco.toolbox.itemclick");
+                    monacoEditor.resetFlyout(true);
+                    var model = monacoEditor.editor.getModel();
+                    var currPos = monacoEditor.editor.getPosition();
+                    var cursor = model.getOffsetAt(currPos);
+                    var insertText = snippetPrefix ? snippetPrefix + "." + snippet : snippet;
+                    insertText = (currPos.column > 1) ? '\n' + insertText :
+                        model.getWordUntilPosition(currPos) != undefined && model.getWordUntilPosition(currPos).word != '' ?
+                            insertText + '\n' : insertText;
+                    if (insertText.indexOf('{{}}') > -1) {
+                        cursor += (insertText.indexOf('{{}}'));
+                        insertText = insertText.replace('{{}}', '');
+                    }
+                    else
+                        cursor += (insertText.length);
+                    insertText = insertText.replace(/(?:\{\{)|(?:\}\})/g, '');
+                    monacoEditor.editor.pushUndoStop();
+                    monacoEditor.editor.executeEdits("", [
+                        {
+                            identifier: { major: 0, minor: 0 },
+                            range: new monaco.Range(currPos.lineNumber, currPos.column, currPos.lineNumber, currPos.column),
+                            text: insertText,
+                            forceMoveMarkers: false
+                        }
+                    ]);
+                    monacoEditor.beforeCompile();
+                    monacoEditor.editor.pushUndoStop();
+                    var endPos = model.getPositionAt(cursor);
+                    monacoEditor.editor.setPosition(endPos);
+                    monacoEditor.editor.focus();
+                    //monacoEditor.editor.setSelection(new monaco.Range(currPos.lineNumber, currPos.column, endPos.lineNumber, endPos.column));
+                };
+                monacoBlock.ondragstart = function (ev2) {
+                    pxt.tickEvent("monaco.toolbox.itemdrag");
+                    var clone = monacoBlock.cloneNode(true);
+                    setTimeout(function () {
+                        monacoFlyout.style.transform = "translateX(-9999px)";
+                    });
+                    var insertText = snippetPrefix ? snippetPrefix + "." + snippet : snippet;
+                    ev2.dataTransfer.setData('text', insertText); // IE11 only supports text
+                };
+                monacoBlock.ondragend = function (ev2) {
+                    monacoFlyout.style.transform = "none";
+                    monacoEditor.resetFlyout(true);
+                };
+            }
+            if (!fn.snippetOnly) {
+                var methodToken = document.createElement('span');
+                methodToken.innerText = fn.name;
+                monacoBlock.appendChild(methodToken);
+            }
+            monacoBlock.appendChild(sigToken);
+            monacoBlockArea.appendChild(monacoBlock);
+            monacoFlyout.appendChild(monacoBlockArea);
+        });
     };
     Editor.prototype.getId = function () {
         return "monacoEditor";
@@ -6971,9 +6932,9 @@ var Editor = (function (_super) {
                     monacoErrors.push({
                         severity: monaco.Severity.Error,
                         message: message,
-                        startLineNumber: d.line,
+                        startLineNumber: d.line + 1,
                         startColumn: d.column,
-                        endLineNumber: d.endLine || endPos.lineNumber,
+                        endLineNumber: (d.endLine || endPos.lineNumber) + 1,
                         endColumn: d.endColumn || endPos.column
                     });
                 }
@@ -6989,11 +6950,12 @@ var Editor = (function (_super) {
         if (!brk || !this.currFile || this.currFile.name != brk.fileName || !this.editor)
             return;
         var position = this.editor.getModel().getPositionAt(brk.start);
-        if (!position)
+        var end = this.editor.getModel().getPositionAt(brk.start + brk.length);
+        if (!position || !end)
             return;
         this.highlightDecorations = this.editor.deltaDecorations(this.highlightDecorations, [
             {
-                range: new monaco.Range(position.lineNumber, position.column, position.lineNumber, position.column + brk.length),
+                range: new monaco.Range(position.lineNumber, position.column, end.lineNumber, end.column),
                 options: { inlineClassName: 'highlight-statement' }
             },
         ]);
@@ -7017,10 +6979,11 @@ var Editor = (function (_super) {
 }(srceditor.Editor));
 exports.Editor = Editor;
 
-},{"./compiler":9,"./core":11,"./monacoSnippets":27,"./package":29,"./srceditor":37,"react":268}],27:[function(require,module,exports){
+},{"./compiler":9,"./core":11,"./monacoSnippets":27,"./package":28,"./srceditor":36,"react":267}],27:[function(require,module,exports){
 "use strict";
 exports.loops = {
     name: lf("{id:category}Loops"),
+    nameid: 'loops',
     blocks: [
         {
             name: "while",
@@ -7038,7 +7001,6 @@ exports.loops = {
         },
     ],
     attributes: {
-        color: pxt.blocks.blockColors["loops"].toString(),
         callingConvention: ts.pxtc.ir.CallingConvention.Plain,
         icon: "loops",
         weight: 50.09,
@@ -7047,6 +7009,7 @@ exports.loops = {
 };
 exports.logic = {
     name: lf("{id:category}Logic"),
+    nameid: 'logic',
     blocks: [
         {
             name: "if",
@@ -7071,7 +7034,6 @@ exports.logic = {
         },
     ],
     attributes: {
-        color: pxt.blocks.blockColors["logic"].toString(),
         callingConvention: ts.pxtc.ir.CallingConvention.Plain,
         weight: 50.08,
         icon: "logic",
@@ -7080,6 +7042,7 @@ exports.logic = {
 };
 exports.variables = {
     name: lf("{id:category}Variables"),
+    nameid: 'variables',
     blocks: [
         {
             name: "let",
@@ -7107,7 +7070,6 @@ exports.variables = {
         },
     ],
     attributes: {
-        color: pxt.blocks.blockColors["variables"].toString(),
         callingConvention: ts.pxtc.ir.CallingConvention.Plain,
         weight: 50.07,
         icon: "variables",
@@ -7116,6 +7078,7 @@ exports.variables = {
 };
 exports.maths = {
     name: lf("{id:category}Math"),
+    nameid: 'math',
     blocks: [
         {
             name: "plus",
@@ -7146,7 +7109,7 @@ exports.maths = {
             snippet: "1 / 1",
             snippetOnly: true,
             attributes: {
-                jsDoc: lf("Returns the remainder of one number divided by another")
+                jsDoc: lf("Returns the quotient of one number divided by another")
             }
         },
         {
@@ -7179,10 +7142,10 @@ exports.maths = {
             }
         },
         {
-            name: "random",
-            snippet: "Math.random(4)",
+            name: "randomRange",
+            snippet: "Math.randomRange(0, 10)",
             attributes: {
-                jsDoc: lf("Returns a random number between 0 and an upper bound")
+                jsDoc: lf("Returns a random number between min and max")
             }
         },
         {
@@ -7194,7 +7157,6 @@ exports.maths = {
         },
     ],
     attributes: {
-        color: pxt.blocks.blockColors["math"].toString(),
         callingConvention: ts.pxtc.ir.CallingConvention.Plain,
         weight: 50.06,
         icon: "math",
@@ -7203,6 +7165,7 @@ exports.maths = {
 };
 exports.text = {
     name: lf("{id:category}Text"),
+    nameid: 'text',
     blocks: [
         {
             name: "length",
@@ -7251,7 +7214,6 @@ exports.text = {
     ],
     attributes: {
         advanced: true,
-        color: pxt.blocks.blockColors["text"].toString(),
         icon: "text",
         callingConvention: ts.pxtc.ir.CallingConvention.Plain,
         paramDefl: {}
@@ -7259,6 +7221,7 @@ exports.text = {
 };
 exports.arrays = {
     name: lf("{id:category}Arrays"),
+    nameid: "arrays",
     blocks: [
         {
             name: "create",
@@ -7369,7 +7332,6 @@ exports.arrays = {
     ],
     attributes: {
         advanced: true,
-        weight: 51,
         color: pxt.blocks.blockColors["arrays"].toString(),
         icon: "arrays",
         callingConvention: ts.pxtc.ir.CallingConvention.Plain,
@@ -7378,6 +7340,7 @@ exports.arrays = {
 };
 exports.functions = {
     name: lf("{id:category}Functions"),
+    nameid: 'functions',
     blocks: [
         {
             name: "function doSomething",
@@ -7396,7 +7359,6 @@ exports.functions = {
     ],
     attributes: {
         advanced: true,
-        weight: 52,
         callingConvention: ts.pxtc.ir.CallingConvention.Plain,
         color: pxt.blocks.blockColors["functions"].toString(),
         icon: "functions",
@@ -7405,77 +7367,110 @@ exports.functions = {
 };
 function getBuiltinCategory(ns) {
     switch (ns) {
-        case exports.loops.name: return exports.loops;
-        case exports.logic.name: return exports.logic;
-        case exports.variables.name: return exports.variables;
-        case exports.maths.name: return exports.maths;
-        case exports.text.name: return exports.text;
-        case exports.arrays.name: return exports.arrays;
-        case exports.functions.name: return exports.functions;
+        case exports.loops.nameid: return exports.loops;
+        case exports.logic.nameid: return exports.logic;
+        case exports.variables.nameid: return exports.variables;
+        case exports.maths.nameid: return exports.maths;
+        case exports.text.nameid: return exports.text;
+        case exports.arrays.nameid: return exports.arrays;
+        case exports.functions.nameid: return exports.functions;
     }
     return undefined;
 }
 exports.getBuiltinCategory = getBuiltinCategory;
 function isBuiltin(ns) {
     switch (ns) {
-        case exports.loops.name:
-        case exports.logic.name:
-        case exports.variables.name:
-        case exports.maths.name:
-        case exports.text.name:
-        case exports.arrays.name:
-        case exports.functions.name:
+        case exports.loops.nameid:
+        case exports.logic.nameid:
+        case exports.variables.nameid:
+        case exports.maths.nameid:
+        case exports.text.nameid:
+        case exports.arrays.nameid:
+        case exports.functions.nameid:
             return true;
     }
     return false;
 }
 exports.isBuiltin = isBuiltin;
+function overrideCategory(ns, def) {
+    var cat = getBuiltinCategory(ns);
+    if (def && cat) {
+        if (def.name) {
+            cat.name = def.name;
+        }
+        if (def.weight !== undefined) {
+            cat.attributes.weight = def.weight;
+        }
+        if (def.advanced !== undefined) {
+            cat.attributes.advanced = def.advanced;
+        }
+        if (def.removed !== undefined) {
+            cat.removed = def.removed;
+        }
+        if (def.blocks) {
+            var currentWeight_1 = 100;
+            if (def.appendBlocks) {
+                currentWeight_1 = 50;
+                def.blocks.forEach(function (b, i) {
+                    if (b.weight) {
+                        currentWeight_1 = b.weight;
+                    }
+                    else {
+                        currentWeight_1--;
+                    }
+                    var blk = {
+                        name: b.name,
+                        snippet: b.snippet,
+                        snippetOnly: b.snippetOnly,
+                        attributes: {
+                            weight: currentWeight_1,
+                            advanced: b.advanced,
+                            jsDoc: b.jsDoc,
+                            group: b.group,
+                        },
+                        noNamespace: true
+                    };
+                    cat.blocks.push(blk);
+                });
+            }
+            else {
+                cat.blocks = def.blocks.map(function (b, i) {
+                    if (b.weight) {
+                        currentWeight_1 = b.weight;
+                    }
+                    else {
+                        currentWeight_1--;
+                    }
+                    return {
+                        name: b.name,
+                        snippet: b.snippet,
+                        snippetOnly: b.snippetOnly,
+                        attributes: {
+                            weight: currentWeight_1,
+                            advanced: b.advanced,
+                            jsDoc: b.jsDoc,
+                            group: b.group,
+                        },
+                        noNamespace: true
+                    };
+                });
+            }
+        }
+    }
+}
+exports.overrideCategory = overrideCategory;
+function overrideToolbox(def) {
+    overrideCategory(exports.loops.nameid, def.loops);
+    overrideCategory(exports.logic.nameid, def.logic);
+    overrideCategory(exports.variables.nameid, def.variables);
+    overrideCategory(exports.maths.nameid, def.maths);
+    overrideCategory(exports.text.nameid, def.text);
+    overrideCategory(exports.arrays.nameid, def.arrays);
+    overrideCategory(exports.functions.nameid, def.functions);
+}
+exports.overrideToolbox = overrideToolbox;
 
 },{}],28:[function(require,module,exports){
-"use strict";
-var __extends = (this && this.__extends) || function (d, b) {
-    for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
-    function __() { this.constructor = d; }
-    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
-};
-var React = require("react");
-var sui = require("./sui");
-var data = require("./data");
-var lf = pxt.Util.lf;
-var NotificationDialog = (function (_super) {
-    __extends(NotificationDialog, _super);
-    function NotificationDialog(props) {
-        _super.call(this, props);
-        this.state = {};
-    }
-    NotificationDialog.prototype.hide = function () {
-        this.props.parent.setState({ notification: undefined });
-    };
-    NotificationDialog.prototype.readMore = function (notification) {
-        if (!notification.readmore)
-            return;
-        this.hide();
-        window.open(notification.readmore);
-    };
-    NotificationDialog.prototype.goToURL = function (notification) {
-        if (!notification.url)
-            return;
-        this.hide();
-        window.open(notification.url);
-    };
-    NotificationDialog.prototype.renderCore = function () {
-        var _this = this;
-        if (!this.props.parent.state.notification)
-            return React.createElement("div", null);
-        var notification = this.props.parent.state.notification;
-        var header = notification.heading || lf("Notification");
-        return (React.createElement(sui.Modal, {open: !!notification, className: "notificationDialog " + notification.type, header: header, size: "small", onClose: function () { return _this.hide(); }, dimmer: true, closeIcon: true}, React.createElement("div", null, notification.message), React.createElement("div", {className: "ui segment inverted right aligned"}, notification.url ? React.createElement(sui.Button, {text: lf("Go to URL"), class: "green", onClick: function () { return _this.goToURL(notification); }}) : undefined, React.createElement(sui.Button, {text: lf("Ok"), onClick: function () { return _this.hide(); }}))));
-    };
-    return NotificationDialog;
-}(data.Component));
-exports.NotificationDialog = NotificationDialog;
-
-},{"./data":12,"./sui":38,"react":268}],29:[function(require,module,exports){
 "use strict";
 var workspace = require("./workspace");
 var data = require("./data");
@@ -7885,7 +7880,7 @@ data.mountVirtualApi("pkg-status", {
     },
 });
 
-},{"./core":11,"./data":12,"./db":13,"./workspace":42}],30:[function(require,module,exports){
+},{"./core":11,"./data":12,"./db":13,"./workspace":41}],29:[function(require,module,exports){
 /// <reference path="../../typings/globals/react/index.d.ts" />
 /// <reference path="../../typings/globals/react-dom/index.d.ts" />
 /// <reference path="../../built/pxtlib.d.ts" />
@@ -7905,6 +7900,7 @@ var core = require("./core");
 var compiler = require("./compiler");
 var codecard = require("./codecard");
 var gallery = require("./gallery");
+var WELCOME = "__welcome";
 var MYSTUFF = "__mystuff";
 var Projects = (function (_super) {
     __extends(Projects, _super);
@@ -7913,13 +7909,34 @@ var Projects = (function (_super) {
         this.prevGhData = [];
         this.prevUrlData = [];
         this.prevGalleries = {};
+        this.galleryFetchErrors = {};
         this.state = {
             visible: false,
             tab: MYSTUFF
         };
     }
-    Projects.prototype.hide = function () {
-        this.setState({ visible: false });
+    Projects.prototype.hide = function (closeOnly) {
+        if (closeOnly === void 0) { closeOnly = false; }
+        if (this.state.isInitialStartPage && closeOnly) {
+            // If this was the initial start page and the dialog was close without a selection being made, load the
+            // previous project if available or create a new one
+            pxt.tickEvent("projects.welcome.hide");
+            if (this.state.resumeProject) {
+                this.props.parent.loadHeaderAsync(this.state.resumeProject);
+            }
+            else {
+                this.props.parent.newProject();
+            }
+        }
+        this.setState({ visible: false, isInitialStartPage: false });
+    };
+    Projects.prototype.showInitialStartPage = function (resumeProject) {
+        this.setState({
+            visible: true,
+            tab: WELCOME,
+            isInitialStartPage: true,
+            resumeProject: resumeProject
+        });
     };
     Projects.prototype.showOpenProject = function (tab) {
         var gals = pxt.appTarget.appTheme.galleries || {};
@@ -7934,8 +7951,14 @@ var Projects = (function (_super) {
         if (this.state.tab != tab)
             return [];
         var res = this.getData("gallery:" + encodeURIComponent(path));
-        if (res)
-            this.prevGalleries[path] = Util.concat(res.map(function (g) { return g.cards; }));
+        if (res) {
+            if (res instanceof Error) {
+                this.galleryFetchErrors[tab] = true;
+            }
+            else {
+                this.prevGalleries[path] = Util.concat(res.map(function (g) { return g.cards; }));
+            }
+        }
         return this.prevGalleries[path] || [];
     };
     Projects.prototype.fetchUrlData = function () {
@@ -7965,7 +7988,8 @@ var Projects = (function (_super) {
     Projects.prototype.shouldComponentUpdate = function (nextProps, nextState, nextContext) {
         return this.state.visible != nextState.visible
             || this.state.tab != nextState.tab
-            || this.state.searchFor != nextState.searchFor;
+            || this.state.searchFor != nextState.searchFor
+            || this.state.welcomeDescription != nextState.welcomeDescription;
     };
     Projects.prototype.numDaysOld = function (d1) {
         var diff = Math.abs((Date.now() / 1000) - d1);
@@ -7976,7 +8000,8 @@ var Projects = (function (_super) {
         var _a = this.state, visible = _a.visible, tab = _a.tab;
         var theme = pxt.appTarget.appTheme;
         var galleries = theme.galleries || {};
-        var tabs = [MYSTUFF].concat(Object.keys(galleries));
+        var galleryNames = Object.keys(galleries);
+        var tabs = (pxt.appTarget.appTheme.useStartPage ? [WELCOME, MYSTUFF] : [MYSTUFF]).concat(Object.keys(galleries));
         // lf("Make")
         // lf("Code")
         // lf("Projects")
@@ -7984,10 +8009,10 @@ var Projects = (function (_super) {
         // lf("Tutorials")
         var headers = this.fetchLocalData();
         var urldata = this.fetchUrlData();
+        this.galleryFetchErrors = {};
         var gals = Util.mapMap(galleries, function (k) { return _this.fetchGallery(k, galleries[k]); });
-        var legacyUrl = workspace.legacyScriptsUrl();
         var chgHeader = function (hdr) {
-            pxt.tickEvent("projects.header");
+            pxt.tickEvent(tab == WELCOME ? "projects.welcome.resume" : "projects.header");
             _this.hide();
             _this.props.parent.loadHeaderAsync(hdr);
         };
@@ -8008,8 +8033,12 @@ var Projects = (function (_super) {
                     var m = /^\/#tutorial:([a-z0A-Z0-9\-\/]+)$/.exec(scr.url);
                     if (m)
                         _this.props.parent.startTutorial(m[1]);
-                    else
-                        _this.props.parent.newEmptyProject(scr.name.toLowerCase(), scr.url);
+                    else {
+                        if (scr.youTubeId && !scr.url)
+                            window.open('https://youtu.be/' + scr.youTubeId, 'yt');
+                        else
+                            _this.props.parent.newEmptyProject(scr.name.toLowerCase(), scr.url);
+                    }
             }
         };
         var chgCode = function (scr, loadBlocks) {
@@ -8057,13 +8086,8 @@ var Projects = (function (_super) {
             _this.hide();
             _this.props.parent.importUrlDialog();
         };
-        var importLegacy = function () {
-            pxt.tickEvent("projects.importlegacy");
-            _this.hide();
-            window.location.href = legacyUrl;
-        };
         var newProject = function () {
-            pxt.tickEvent("projects.new");
+            pxt.tickEvent(tab == WELCOME ? "projects.welcome.new" : "projects.new");
             _this.hide();
             _this.props.parent.newProject();
         };
@@ -8071,6 +8095,28 @@ var Projects = (function (_super) {
             pxt.tickEvent("projects.rename");
             _this.hide();
             _this.props.parent.setFile(pkg.mainEditorPkg().files[pxt.CONFIG_NAME]);
+        };
+        var resume = function () {
+            if (_this.state.isInitialStartPage) {
+                chgHeader(_this.state.resumeProject);
+            }
+            else {
+                // The msot recent project is already loaded in the editor, so this is a no-op
+                _this.hide();
+            }
+        };
+        var gettingStarted = function () {
+            pxt.tickEvent("projects.welcome.gettingstarted");
+            _this.hide();
+            _this.props.parent.gettingStarted();
+        };
+        var loadProject = function () {
+            pxt.tickEvent("projects.welcome.loadproject");
+            _this.setState({ tab: MYSTUFF });
+        };
+        var projectGalleries = function () {
+            pxt.tickEvent("projects.welcome.galleries");
+            _this.setState({ tab: galleryNames[0] });
         };
         var isEmpty = function () {
             if (_this.state.searchFor) {
@@ -8096,23 +8142,32 @@ var Projects = (function (_super) {
             { name: lf("This Month"), headers: headersThisMonth },
             { name: lf("Older"), headers: headersOlder },
         ];
-        var isLoading = tab != MYSTUFF && !gals[tab].length;
+        var hadFetchError = this.galleryFetchErrors[tab];
+        var isLoading = tab != WELCOME && tab != MYSTUFF && !hadFetchError && !gals[tab].length;
         var tabClasses = sui.cx([
             isLoading ? 'loading' : '',
             'ui segment bottom attached tab active tabsegment'
         ]);
-        return (React.createElement(sui.Modal, {open: visible, className: "projectsdialog", size: "fullscreen", closeIcon: false, onClose: function () { return _this.setState({ visible: false }); }, dimmer: true, closeOnDimmerClick: true, closeOnDocumentClick: true}, React.createElement(sui.Segment, {inverted: targetTheme.invertedMenu, attached: "top"}, React.createElement(sui.Menu, {inverted: targetTheme.invertedMenu, secondary: true}, tabs.map(function (t) {
-            return React.createElement(sui.MenuItem, {key: "tab" + t, active: tab == t, name: t == MYSTUFF ? lf("My Stuff") : Util.rlf(t), onClick: function () { return _this.setState({ tab: t }); }});
-        }), React.createElement("div", {className: "right menu"}, React.createElement(sui.Button, {icon: 'close', class: "huge clear " + (targetTheme.invertedMenu ? 'inverted' : ''), onClick: function () { return _this.setState({ visible: false }); }})))), tab == MYSTUFF ? React.createElement("div", {className: tabClasses}, React.createElement("div", {className: "group"}, React.createElement("div", {className: "ui cards"}, React.createElement(codecard.CodeCardView, {key: 'newproject', icon: "file outline", iconColor: "primary", name: lf("New Project..."), description: lf("Creates a new empty project"), onClick: function () { return newProject(); }}), pxt.appTarget.compile ?
+        return (React.createElement(sui.Modal, {open: visible, className: "projectsdialog", size: "fullscreen", closeIcon: false, onClose: function () { return _this.hide(/* closeOnly */ true); }, dimmer: true, closeOnDimmerClick: true}, React.createElement(sui.Segment, {inverted: targetTheme.invertedMenu, attached: "top"}, React.createElement(sui.Menu, {inverted: targetTheme.invertedMenu, secondary: true}, tabs.map(function (t) {
+            var name;
+            if (t == MYSTUFF)
+                name = lf("My Stuff");
+            else if (t == WELCOME)
+                name = lf("Welcome!");
+            else
+                name = Util.rlf(t);
+            return (React.createElement(sui.MenuItem, {key: "tab" + t, active: tab == t, name: name, onClick: function () { return _this.setState({ tab: t }); }}));
+        }), React.createElement("div", {className: "right menu"}, React.createElement(sui.Button, {icon: 'close', class: "huge clear " + (targetTheme.invertedMenu ? 'inverted' : ''), onClick: function () { return _this.hide(/* closeOnly */ true); }})))), tab == WELCOME ? React.createElement("div", {className: tabClasses}, React.createElement("div", {className: "ui stackable two column grid welcomegrid"}, React.createElement("div", {className: "six wide column labelsgroup"}, React.createElement("h2", {className: "editorname"}, pxt.appTarget.name), React.createElement("div", {className: "large ui loader editoravatar"})), React.createElement("div", {className: "group ten wide column"}, React.createElement("div", {className: "ui cards centered"}, this.state.resumeProject ? React.createElement(codecard.CodeCardView, {key: 'resume', iconColor: "teal", iconContent: lf("Resume"), description: lf("Load the last project you worked on"), onClick: function () { return resume(); }}) : undefined, pxt.appTarget.appTheme.sideDoc ? React.createElement(codecard.CodeCardView, {key: 'gettingstarted', iconColor: "green", iconContent: lf("Getting started"), description: lf("Create a fun, beginner project in a guided tutorial"), onClick: function () { return gettingStarted(); }}) : undefined, React.createElement(codecard.CodeCardView, {key: 'newproject', iconColor: "brown", iconContent: lf("New project"), description: lf("Start a new, empty project"), onClick: function () { return newProject(); }}), React.createElement(codecard.CodeCardView, {key: 'loadproject', iconColor: "grey", iconContent: lf("Load project"), description: lf("Load a previous project"), onClick: function () { return loadProject(); }}), galleryNames.length > 0 ? React.createElement(codecard.CodeCardView, {key: 'projectgalleries', iconColor: "orange", iconContent: lf("Project galleries"), description: lf("Browse guided tutorials, project samples and awesome activities"), onClick: function () { return projectGalleries(); }}) : undefined)))) : undefined, tab == MYSTUFF ? React.createElement("div", {className: tabClasses}, React.createElement("div", {className: "group"}, React.createElement("div", {className: "ui cards"}, React.createElement(codecard.CodeCardView, {key: 'newproject', icon: "file outline", iconColor: "primary", name: lf("New Project..."), description: lf("Creates a new empty project"), onClick: function () { return newProject(); }}), pxt.appTarget.compile ?
             React.createElement(codecard.CodeCardView, {key: 'import', icon: "upload", iconColor: "secondary", name: lf("Import File..."), description: lf("Open files from your computer"), onClick: function () { return importHex(); }}) : undefined, pxt.appTarget.cloud && pxt.appTarget.cloud.sharing && pxt.appTarget.cloud.publishing && pxt.appTarget.cloud.importing ?
-            React.createElement(codecard.CodeCardView, {key: 'importurl', icon: "cloud download", iconColor: "secondary", name: lf("Import URL..."), description: lf("Open a shared project URL"), onClick: function () { return importUrl(); }}) : undefined, legacyUrl ?
-            React.createElement(codecard.CodeCardView, {key: 'importlegacy', icon: "archive", iconColor: "secondary", name: lf("Import old programs"), description: lf("from {0}", theme.legacyDomain), onClick: function () { return importLegacy(); }}) : undefined)), headersGrouped.filter(function (g) { return g.headers.length != 0; }).map(function (headerGroup) {
+            React.createElement(codecard.CodeCardView, {key: 'importurl', icon: "cloud download", iconColor: "secondary", name: lf("Import URL..."), description: lf("Open a shared project URL"), onClick: function () { return importUrl(); }}) : undefined)), headersGrouped.filter(function (g) { return g.headers.length != 0; }).map(function (headerGroup) {
             return React.createElement("div", {key: 'localgroup' + headerGroup.name, className: "group"}, React.createElement("h3", {className: "ui dividing header disabled"}, headerGroup.name), React.createElement("div", {className: "ui cards"}, headerGroup.headers.map(function (scr) {
                 return React.createElement(codecard.CodeCardView, {key: 'local' + scr.id, name: scr.name, time: scr.recentUse, imageUrl: scr.icon, url: scr.pubId && scr.pubCurrent ? "/" + scr.pubId : "", onClick: function () { return chgHeader(scr); }});
             })));
         }), React.createElement("div", {className: "group"}, React.createElement("div", {className: "ui cards"}, urldata.map(function (scr) {
             return React.createElement(codecard.CodeCardView, {name: scr.name, time: scr.time, header: '/' + scr.id, description: scr.description, key: 'cloud' + scr.id, onClick: function () { return installScript(scr); }, url: '/' + scr.id, color: "blue"});
-        })))) : undefined, tab != MYSTUFF ? React.createElement("div", {className: tabClasses}, React.createElement("div", {className: "ui cards centered"}, gals[tab].map(function (scr) { return React.createElement(codecard.CodeCardView, {key: tab + scr.name, name: scr.name, description: scr.description, url: scr.url, imageUrl: scr.imageUrl, onClick: function () { return chgGallery(scr); }}); }))) : undefined, isEmpty() ?
+        })))) : undefined, tab != MYSTUFF && tab != WELCOME ? React.createElement("div", {className: tabClasses}, hadFetchError ?
+            React.createElement("p", {className: "ui red inverted segment"}, lf("Oops! There was an error. Please ensure you are connected to the Internet and try again."))
+            : React.createElement("div", {className: "ui cards centered"}, gals[tab].map(function (scr) { return React.createElement(codecard.CodeCardView, {key: tab + scr.name, name: scr.name, description: scr.description, url: scr.url, imageUrl: scr.imageUrl, youTubeId: scr.youTubeId, onClick: function () { return chgGallery(scr); }}); }))) : undefined, isEmpty() ?
             React.createElement("div", {className: "ui items"}, React.createElement("div", {className: "ui item"}, lf("We couldn't find any projects matching '{0}'", this.state.searchFor)))
             : undefined));
     };
@@ -8120,7 +8175,7 @@ var Projects = (function (_super) {
 }(data.Component));
 exports.Projects = Projects;
 
-},{"./codecard":8,"./compiler":9,"./core":11,"./data":12,"./gallery":19,"./package":29,"./sui":38,"./workspace":42,"react":268,"react-dom":139}],31:[function(require,module,exports){
+},{"./codecard":8,"./compiler":9,"./core":11,"./data":12,"./gallery":19,"./package":28,"./sui":37,"./workspace":41,"react":267,"react-dom":138}],30:[function(require,module,exports){
 "use strict";
 var __extends = (this && this.__extends) || function (d, b) {
     for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
@@ -8253,7 +8308,7 @@ var Editor = (function (_super) {
 }(srceditor.Editor));
 exports.Editor = Editor;
 
-},{"./package":29,"./srceditor":37,"./sui":38,"react":268}],32:[function(require,module,exports){
+},{"./package":28,"./srceditor":36,"./sui":37,"react":267}],31:[function(require,module,exports){
 "use strict";
 var workspace = require("./workspace");
 var data = require("./data");
@@ -8298,7 +8353,7 @@ function saveAsync(header, screenshot) {
 }
 exports.saveAsync = saveAsync;
 
-},{"./data":12,"./workspace":42}],33:[function(require,module,exports){
+},{"./data":12,"./workspace":41}],32:[function(require,module,exports){
 /// <reference path="../../typings/globals/react/index.d.ts" />
 /// <reference path="../../typings/globals/react-dom/index.d.ts" />
 /// <reference path="../../built/pxtlib.d.ts" />
@@ -8404,7 +8459,17 @@ var ScriptSearch = (function (_super) {
         };
         var upd = function (v) {
             var str = ReactDOM.findDOMNode(_this.refs["searchInput"]).value;
-            _this.setState({ searchFor: str });
+            // Hidden way to navigate to /beta, useful for UWP app testing
+            if (str === "@/beta") {
+                var homeUrl = pxt.appTarget.appTheme.homeUrl;
+                if (!/\/$/.test(homeUrl)) {
+                    homeUrl += "/";
+                }
+                window.location.href = homeUrl + "beta";
+            }
+            else {
+                _this.setState({ searchFor: str });
+            }
         };
         var kupd = function (ev) {
             if (ev.keyCode == 13)
@@ -8441,7 +8506,7 @@ var ScriptSearch = (function (_super) {
                 }
                 else if (conflicts.length) {
                     var body_1 = conflicts.length === 1 ?
-                        // Single conflict: "Package A is..."
+                        // Single conflict: "Package a is..."
                         lf("Package {0} is incompatible with {1}. Remove {0} and add {1}?", conflicts[0].pkg0.id, config.name) :
                         // 2 conflicts: "Packages A and B are..."; 3+ conflicts: "Packages A, B, C and D are..."
                         lf("Packages {0} and {1} are incompatible with {2}. Remove them and add {2}?", conflicts.slice(0, -1).map(function (c) { return c.pkg0.id; }).join(", "), conflicts.slice(-1)[0].pkg0.id, config.name);
@@ -8499,7 +8564,7 @@ var ScriptSearch = (function (_super) {
 }(data.Component));
 exports.ScriptSearch = ScriptSearch;
 
-},{"./codecard":8,"./core":11,"./data":12,"./package":29,"./sui":38,"react":268,"react-dom":139}],34:[function(require,module,exports){
+},{"./codecard":8,"./core":11,"./data":12,"./package":28,"./sui":37,"react":267,"react-dom":138}],33:[function(require,module,exports){
 "use strict";
 var __extends = (this && this.__extends) || function (d, b) {
     for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
@@ -8533,7 +8598,7 @@ var ShareEditor = (function (_super) {
         this.setState({ visible: false });
     };
     ShareEditor.prototype.show = function (header) {
-        this.setState({ visible: true, mode: ShareMode.Screenshot, pubCurrent: header.pubCurrent });
+        this.setState({ visible: true, mode: ShareMode.Screenshot, pubCurrent: header.pubCurrent, sharingError: false });
     };
     ShareEditor.prototype.shouldComponentUpdate = function (nextProps, nextState, nextContext) {
         return this.state.visible != nextState.visible
@@ -8541,7 +8606,8 @@ var ShareEditor = (function (_super) {
             || this.state.mode != nextState.mode
             || this.state.pubCurrent != nextState.pubCurrent
             || this.state.screenshotId != nextState.screenshotId
-            || this.state.currentPubId != nextState.currentPubId;
+            || this.state.currentPubId != nextState.currentPubId
+            || this.state.sharingError != nextState.sharingError;
     };
     ShareEditor.prototype.renderCore = function () {
         var _this = this;
@@ -8551,6 +8617,7 @@ var ShareEditor = (function (_super) {
         var embedding = !!cloud.embedding;
         var header = this.props.parent.state.header;
         var advancedMenu = !!this.state.advancedMenu;
+        var showSocialIcons = !!pxt.appTarget.appTheme.socialOptions;
         var ready = false;
         var mode = this.state.mode;
         var url = '';
@@ -8628,8 +8695,14 @@ var ShareEditor = (function (_super) {
         }
         var publish = function () {
             pxt.tickEvent("menu.embed.publish");
-            _this.props.parent.anonymousPublishAsync().done(function () {
+            _this.setState({ sharingError: false });
+            _this.props.parent.anonymousPublishAsync()
+                .catch(function (e) {
+                _this.setState({ sharingError: true });
+            })
+                .done(function () {
                 _this.setState({ pubCurrent: true });
+                _this.forceUpdate();
             });
             _this.forceUpdate();
         };
@@ -8639,11 +8712,41 @@ var ShareEditor = (function (_super) {
             { mode: ShareMode.Cli, label: lf("Command line") }
         ];
         var action = !ready ? lf("Publish project") : undefined;
-        var actionLoading = this.props.parent.state.publishing;
+        var actionLoading = this.props.parent.state.publishing && !this.state.sharingError;
+        var fbUrl = '';
+        var twitterUrl = '';
+        if (showSocialIcons) {
+            var twitterText = lf("Check out what I made!");
+            var socialOptions = pxt.appTarget.appTheme.socialOptions;
+            if (socialOptions.twitterHandle && socialOptions.orgTwitterHandle) {
+                twitterText = lf("Check out what I made with @{0} and @{1}!", socialOptions.twitterHandle, socialOptions.orgTwitterHandle);
+            }
+            else if (socialOptions.twitterHandle) {
+                twitterText = lf("Check out what I made with @{0}!", socialOptions.twitterHandle);
+            }
+            else if (socialOptions.orgTwitterHandle) {
+                twitterText = lf("Check out what I made with @{0}!", socialOptions.orgTwitterHandle);
+            }
+            fbUrl = "https://www.facebook.com/sharer/sharer.php?u=" + encodeURIComponent(url);
+            twitterUrl = ("https://twitter.com/intent/tweet?url=" + encodeURIComponent(url)) +
+                ("&text=" + encodeURIComponent(twitterText)) +
+                (socialOptions.hashtags ? "&hashtags=" + encodeURIComponent(socialOptions.hashtags) : '');
+            (socialOptions.related ? "&related=" + encodeURIComponent(socialOptions.related) : '');
+        }
+        var showFbPopup = function () {
+            pxt.tickEvent('share.facebook');
+            sui.popupWindow(fbUrl, lf("Share on Facebook"), 600, 600);
+        };
+        var showTwtPopup = function () {
+            pxt.tickEvent('share.twitter');
+            sui.popupWindow(twitterUrl, lf("Share on Twitter"), 600, 600);
+        };
         return (React.createElement(sui.Modal, {open: this.state.visible, className: "sharedialog", header: lf("Share Project"), size: "small", onClose: function () { return _this.setState({ visible: false }); }, dimmer: true, action: action, actionClick: publish, actionLoading: actionLoading, closeIcon: true, closeOnDimmerClick: true, closeOnDocumentClick: true}, React.createElement("div", {className: "ui form"}, action ?
-            React.createElement("p", null, lf("You need to publish your project to share it or embed it in other web pages.") + " " +
-                lf("You acknowledge having consent to publish this project."))
-            : undefined, url && ready ? React.createElement("div", null, React.createElement("p", null, lf("Your project is ready! Use the address below to share your projects.")), React.createElement(sui.Input, {class: "mini", readOnly: true, lines: 1, value: url, copy: true, selectOnClick: true}))
+            React.createElement("div", null, React.createElement("p", null, lf("You need to publish your project to share it or embed it in other web pages.") + " " +
+                lf("You acknowledge having consent to publish this project.")), this.state.sharingError ?
+                React.createElement("p", {className: "ui red inverted segment"}, lf("Oops! There was an error. Please ensure you are connected to the Internet and try again."))
+                : undefined)
+            : undefined, url && ready ? React.createElement("div", null, React.createElement("p", null, lf("Your project is ready! Use the address below to share your projects.")), React.createElement(sui.Input, {class: "mini", readOnly: true, lines: 1, value: url, copy: true, selectOnClick: true}), showSocialIcons ? React.createElement("div", {className: "social-icons"}, React.createElement("a", {className: "ui button large icon facebook", onClick: function (e) { showFbPopup(); e.preventDefault(); return false; }}, React.createElement("i", {className: "icon facebook"})), React.createElement("a", {className: "ui button large icon twitter", onClick: function (e) { showTwtPopup(); e.preventDefault(); return false; }}, React.createElement("i", {className: "icon twitter"}))) : undefined)
             : undefined, ready ? React.createElement("div", null, React.createElement("div", {className: "ui divider"}), React.createElement(sui.Button, {class: "labeled", icon: "chevron " + (advancedMenu ? "down" : "right"), text: lf("Embed"), onClick: function () { return _this.setState({ advancedMenu: !advancedMenu }); }}), advancedMenu ?
             React.createElement(sui.Menu, {pointing: true, secondary: true}, formats.map(function (f) {
                 return React.createElement(sui.MenuItem, {key: "tab" + f.label, active: mode == f.mode, name: f.label, onClick: function () { return _this.setState({ mode: f.mode }); }});
@@ -8654,7 +8757,7 @@ var ShareEditor = (function (_super) {
 }(data.Component));
 exports.ShareEditor = ShareEditor;
 
-},{"./data":12,"./package":29,"./sui":38,"react":268}],35:[function(require,module,exports){
+},{"./data":12,"./package":28,"./sui":37,"react":267}],34:[function(require,module,exports){
 /// <reference path="../../built/pxtsim.d.ts" />
 /// <reference path="../../localtypings/pxtparts.d.ts" />
 "use strict";
@@ -8706,14 +8809,17 @@ function init(root, cfg) {
         onDebuggerBreakpoint: function (brk) {
             updateDebuggerButtons(brk);
             var brkInfo = lastCompileResult.breakpoints[brk.breakpointId];
-            config.highlightStatement(brkInfo);
+            if (config)
+                config.highlightStatement(brkInfo);
             if (brk.exceptionMessage) {
                 core.errorNotification(lf("Program Error: {0}", brk.exceptionMessage));
             }
+            postSimEditorEvent("stopped", brk.exceptionMessage);
         },
         onTraceMessage: function (msg) {
             var brkInfo = lastCompileResult.breakpoints[msg.breakpointId];
-            config.highlightStatement(brkInfo);
+            if (config)
+                config.highlightStatement(brkInfo);
         },
         onDebuggerWarning: function (wrn) {
             for (var _i = 0, _a = wrn.breakpointIds; _i < _a.length; _i++) {
@@ -8721,17 +8827,23 @@ function init(root, cfg) {
                 var brkInfo = lastCompileResult.breakpoints[id];
                 if (brkInfo) {
                     if (!U.startsWith("pxt_modules/", brkInfo.fileName)) {
-                        config.highlightStatement(brkInfo);
+                        if (config)
+                            config.highlightStatement(brkInfo);
                         break;
                     }
                 }
             }
         },
         onDebuggerResume: function () {
-            config.highlightStatement(null);
+            postSimEditorEvent("resumed");
+            if (config)
+                config.highlightStatement(null);
             updateDebuggerButtons();
         },
         onStateChanged: function (state) {
+            if (state === pxsim.SimulatorState.Stopped) {
+                postSimEditorEvent("stopped");
+            }
             updateDebuggerButtons();
         },
         onSimulatorCommand: function (msg) {
@@ -8767,6 +8879,9 @@ function init(root, cfg) {
                     }
                     break;
             }
+        },
+        onTopLevelCodeEnd: function () {
+            postSimEditorEvent("toplevelfinished");
         }
     };
     exports.driver = new pxsim.SimulatorDriver($('#simulators')[0], options);
@@ -8774,8 +8889,18 @@ function init(root, cfg) {
     updateDebuggerButtons();
 }
 exports.init = init;
+function postSimEditorEvent(subtype, exception) {
+    if (pxt.appTarget.appTheme.allowParentController && pxt.BrowserUtils.isIFrame()) {
+        pxt.editor.postHostMessageAsync({
+            type: "pxthost",
+            action: "simevent",
+            subtype: subtype,
+            exception: exception
+        });
+    }
+}
 function setState(editor, tutMode) {
-    if (config.editor != editor) {
+    if (config && config.editor != editor) {
         config.editor = editor;
         config.highlightStatement(null);
         updateDebuggerButtons();
@@ -8806,8 +8931,10 @@ function run(pkg, debug, res, mute, highContrast) {
         fnArgs: fnArgs,
         highContrast: highContrast,
         aspectRatio: parts.length ? pxt.appTarget.simulator.partsAspectRatio : pxt.appTarget.simulator.aspectRatio,
-        partDefinitions: pkg.computePartDefinitions(parts)
+        partDefinitions: pkg.computePartDefinitions(parts),
+        cdnUrl: pxt.webConfig.commitCdnUrl
     };
+    postSimEditorEvent("started");
     exports.driver.run(js, opts);
 }
 exports.run = run;
@@ -8914,7 +9041,7 @@ function updateDebuggerButtons(brk) {
     $('#debugger').append(dbgView);
 }
 
-},{"./core":11}],36:[function(require,module,exports){
+},{"./core":11}],35:[function(require,module,exports){
 "use strict";
 var audio = require("./audio");
 var sounds = {};
@@ -8959,7 +9086,7 @@ function initTutorial() {
 }
 exports.initTutorial = initTutorial;
 
-},{"./audio":3}],37:[function(require,module,exports){
+},{"./audio":3}],36:[function(require,module,exports){
 "use strict";
 var React = require("react");
 var Editor = (function () {
@@ -9042,7 +9169,7 @@ var Editor = (function () {
 }());
 exports.Editor = Editor;
 
-},{"react":268}],38:[function(require,module,exports){
+},{"react":267}],37:[function(require,module,exports){
 "use strict";
 var __extends = (this && this.__extends) || function (d, b) {
     for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
@@ -9066,18 +9193,11 @@ function genericContent(props) {
         props.text ? (React.createElement("span", {key: 'textkey', className: 'ui text' + (props.textClass ? ' ' + props.textClass : '')}, props.text)) : null,
     ];
 }
-function addClass(el, cls) {
-    if (el.classList)
-        el.classList.add(cls);
-    else if (el.className.indexOf(cls) < 0)
-        el.className += ' ' + cls;
+function popupWindow(url, title, width, height) {
+    return window.open(url, title, "resizable=no, copyhistory=no, " +
+        ("width=" + width + ", height=" + height + ", top=" + ((screen.height / 2) - (height / 2)) + ", left=" + ((screen.width / 2) - (width / 2))));
 }
-function removeClass(el, cls) {
-    if (el.classList)
-        el.classList.remove(cls);
-    else if (el.className.indexOf(cls) >= 0)
-        el.className.replace(new RegExp("(?:^|\\s)" + cls + "(?:\\s|$)"), ' ');
-}
+exports.popupWindow = popupWindow;
 var UiElement = (function (_super) {
     __extends(UiElement, _super);
     function UiElement() {
@@ -9394,10 +9514,10 @@ var Modal = (function (_super) {
                 if (_this.state.scrolling !== scrolling) {
                     newState.scrolling = scrolling;
                     if (scrolling) {
-                        addClass(mountNode, 'scrolling');
+                        mountNode.classList.add('scrolling');
                     }
                     else {
-                        removeClass(mountNode, 'scrolling');
+                        mountNode.classList.remove('scrolling');
                     }
                 }
                 if (Object.keys(newState).length > 0)
@@ -9409,10 +9529,9 @@ var Modal = (function (_super) {
             var dimmer = _this.props.dimmer;
             var mountNode = _this.getMountNode();
             if (dimmer) {
-                addClass(mountNode, 'dimmable');
-                addClass(mountNode, 'dimmed');
+                mountNode.classList.add('dimmable', 'dimmed');
                 if (dimmer === 'blurring' && !pxt.options.light) {
-                    addClass(mountNode, 'blurring');
+                    mountNode.classList.add('blurring');
                 }
             }
             _this.setPosition();
@@ -9420,10 +9539,7 @@ var Modal = (function (_super) {
         this.handleRef = function (c) { return (_this.ref = c); };
         this.handlePortalUnmount = function () {
             var mountNode = _this.getMountNode();
-            removeClass(mountNode, 'blurring');
-            removeClass(mountNode, 'dimmable');
-            removeClass(mountNode, 'dimmed');
-            removeClass(mountNode, 'scrollable');
+            mountNode.classList.remove('blurring', 'dimmable', 'dimmed', 'scrollable');
             if (_this.animationId)
                 cancelAnimationFrame(_this.animationId);
         };
@@ -9464,7 +9580,7 @@ var Modal = (function (_super) {
         var modalJSX = (React.createElement("div", {className: classes, style: { marginTop: marginTop }, ref: this.handleRef, role: "dialog", "aria-labelledby": this.id + 'title', "aria-describedby": this.id + 'desc'}, this.props.closeIcon ? React.createElement(Button, {icon: closeIconName, class: "huge clear right floated", onClick: function () { return _this.handleClose(null); }}) : undefined, this.props.helpUrl ?
             React.createElement("a", {className: "ui button huge icon clear right floated", href: this.props.helpUrl, target: "_docs"}, React.createElement("i", {className: "help icon"}))
             : undefined, this.props.header ? React.createElement("div", {id: this.id + 'title', className: "header " + (this.props.headerClass || "")}, this.props.header) : undefined, React.createElement("div", {id: this.id + 'desc', className: "content"}, children), this.props.action && this.props.actionClick ?
-            React.createElement("div", {className: "actions"}, React.createElement(Button, {text: this.props.action, class: "approve primary " + (this.props.actionLoading ? "loading" : ""), onClick: function () {
+            React.createElement("div", {className: "actions"}, React.createElement(Button, {text: this.props.action, class: "approve primary " + (this.props.actionLoading ? "loading disabled" : ""), onClick: function () {
                 _this.props.actionClick();
             }})) : undefined));
         var dimmerClasses = !dimmer
@@ -9576,7 +9692,7 @@ var Portal = (function (_super) {
 }(data.Component));
 exports.Portal = Portal;
 
-},{"./data":12,"react":268,"react-dom":139}],39:[function(require,module,exports){
+},{"./data":12,"react":267,"react-dom":138}],38:[function(require,module,exports){
 "use strict";
 var pkg = require("./package");
 var compiler = require("./compiler");
@@ -9604,12 +9720,23 @@ function td2tsAsync(td) {
 }
 exports.td2tsAsync = td2tsAsync;
 
-},{"./compiler":9,"./package":29}],40:[function(require,module,exports){
+},{"./compiler":9,"./package":28}],39:[function(require,module,exports){
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.default = new DOMParser().parseFromString("<xml id=\"blocklyToolboxDefinition\" style=\"display: none\">\n        <category name=\"Loops\" nameid=\"loops\" colour=\"#107c10\" category=\"50\" iconclass=\"blocklyTreeIconloops\">\n            <block type=\"controls_repeat_ext\">\n                <value name=\"TIMES\">\n                    <shadow type=\"math_number\">\n                        <field name=\"NUM\">4</field>\n                    </shadow>\n                </value>\n            </block>\n            <block type=\"device_while\">\n                <value name=\"COND\">\n                    <shadow type=\"logic_boolean\"></shadow>\n                </value>\n            </block>\n            <block type=\"controls_simple_for\">\n                <value name=\"TO\">\n                    <shadow type=\"math_number\">\n                        <field name=\"NUM\">4</field>\n                    </shadow>\n                </value>\n            </block>\n            <block type=\"controls_for_of\">\n                <value name=\"LIST\">\n                    <shadow type=\"variables_get\">\n                        <field name=\"VAR\">list</field>\n                    </shadow>\n                </value>\n            </block>\n        </category>\n        <category name=\"Logic\" nameid=\"logic\" colour=\"#006970\" category=\"49\" iconclass=\"blocklyTreeIconlogic\">\n            <block type=\"controls_if\" gap=\"8\">\n                <value name=\"IF0\">\n                    <shadow type=\"logic_boolean\">\n                        <field name=\"BOOL\">TRUE</field>\n                    </shadow>\n                </value>\n            </block>\n            <block type=\"controls_if\" gap=\"8\">\n                <mutation else=\"1\"></mutation>\n                <value name=\"IF0\">\n                    <shadow type=\"logic_boolean\">\n                        <field name=\"BOOL\">TRUE</field>\n                    </shadow>\n                </value>\n            </block>\n            <block type=\"logic_compare\" gap=\"8\">\n                <value name=\"A\">\n                    <shadow type=\"math_number\">\n                        <field name=\"NUM\">0</field>\n                    </shadow>\n                </value>\n                <value name=\"B\">\n                    <shadow type=\"math_number\">\n                        <field name=\"NUM\">0</field>\n                    </shadow>\n                </value>\n            </block>\n            <block type=\"logic_compare\">\n                <field name=\"OP\">LT</field>\n                <value name=\"A\">\n                    <shadow type=\"math_number\">\n                        <field name=\"NUM\">0</field>\n                    </shadow>\n                </value>\n                <value name=\"B\">\n                    <shadow type=\"math_number\">\n                        <field name=\"NUM\">0</field>\n                    </shadow>\n                </value>\n            </block>\n            <block type=\"logic_operation\" gap=\"8\"></block>\n            <block type=\"logic_operation\" gap=\"8\">\n                <field name=\"OP\">OR</field>\n            </block>\n            <block type=\"logic_negate\"></block>\n            <block type=\"logic_boolean\" gap=\"8\"></block>\n            <block type=\"logic_boolean\">\n                <field name=\"BOOL\">FALSE</field>\n            </block>\n        </category>\n        <category name=\"Variables\" nameid=\"variables\" colour=\"#A80000\" custom=\"VARIABLE\" category=\"48\" iconclass=\"blocklyTreeIconvariables\">\n        </category>\n        <category name=\"Math\" nameid=\"math\" colour=\"#712672\" category=\"47\" iconclass=\"blocklyTreeIconmath\" expandedclass=\"blocklyTreeIconmath\">\n            <block type=\"math_arithmetic\" gap=\"8\">\n                <value name=\"A\">\n                    <shadow type=\"math_number\">\n                        <field name=\"NUM\">0</field>\n                    </shadow>\n                </value>\n                <value name=\"B\">\n                    <shadow type=\"math_number\">\n                        <field name=\"NUM\">0</field>\n                    </shadow>\n                </value>\n            </block>\n            <block type=\"math_arithmetic\" gap=\"8\">\n                <value name=\"A\">\n                    <shadow type=\"math_number\">\n                        <field name=\"NUM\">0</field>\n                    </shadow>\n                </value>\n                <value name=\"B\">\n                    <shadow type=\"math_number\">\n                        <field name=\"NUM\">0</field>\n                    </shadow>\n                </value>\n                <field name=\"OP\">MINUS</field>\n            </block>\n            <block type=\"math_arithmetic\" gap=\"8\">\n                <value name=\"A\">\n                    <shadow type=\"math_number\">\n                        <field name=\"NUM\">0</field>\n                    </shadow>\n                </value>\n                <value name=\"B\">\n                    <shadow type=\"math_number\">\n                        <field name=\"NUM\">0</field>\n                    </shadow>\n                </value>\n                <field name=\"OP\">MULTIPLY</field>\n            </block>\n            <block type=\"math_arithmetic\" gap=\"8\">\n                <value name=\"A\">\n                    <shadow type=\"math_number\">\n                        <field name=\"NUM\">0</field>\n                    </shadow>\n                </value>\n                <value name=\"B\">\n                    <shadow type=\"math_number\">\n                        <field name=\"NUM\">0</field>\n                    </shadow>\n                </value>\n                <field name=\"OP\">DIVIDE</field>\n            </block>\n            <block type=\"math_number\" gap=\"8\">\n                <field name=\"NUM\">0</field>\n            </block>\n            <block type=\"device_random\" gap=\"8\">\n                <value name=\"limit\">\n                    <shadow type=\"math_number\">\n                        <field name=\"NUM\">4</field>\n                    </shadow>\n                </value>\n            </block>\n            <category colour=\"#712672\" name=\"More\" nameid=\"more\" iconclass=\"blocklyTreeIconmore\" expandedclass=\"blocklyTreeIconmore\">\n                <block type=\"math_modulo\">\n                    <value name=\"DIVIDEND\">\n                        <shadow type=\"math_number\">\n                            <field name=\"NUM\">0</field>\n                        </shadow>\n                    </value>\n                    <value name=\"DIVISOR\">\n                        <shadow type=\"math_number\">\n                            <field name=\"NUM\">1</field>\n                        </shadow>\n                    </value>\n                </block>\n                <block type=\"math_op2\" gap=\"8\">\n                    <value name=\"x\">\n                        <shadow type=\"math_number\">\n                            <field name=\"NUM\">0</field>\n                        </shadow>\n                    </value>\n                    <value name=\"y\">\n                        <shadow type=\"math_number\">\n                            <field name=\"NUM\">0</field>\n                        </shadow>\n                    </value>\n                </block>\n                <block type=\"math_op2\" gap=\"8\">\n                    <value name=\"x\">\n                        <shadow type=\"math_number\">\n                            <field name=\"NUM\">0</field>\n                        </shadow>\n                    </value>\n                    <value name=\"y\">\n                        <shadow type=\"math_number\">\n                            <field name=\"NUM\">0</field>\n                        </shadow>\n                    </value>\n                    <field name=\"op\">max</field>\n                </block>\n                <block type=\"math_op3\">\n                    <value name=\"x\">\n                        <shadow type=\"math_number\">\n                            <field name=\"NUM\">0</field>\n                        </shadow>\n                    </value>\n                </block>\n            </category>\n        </category>\n        <category name=\"Functions\" nameid=\"functions\" colour=\"#005a9e\" custom=\"PROCEDURE\" category=\"46\" iconclass=\"blocklyTreeIconfunctions\" advanced=\"true\">\n        </category>\n        <category colour=\"#A94400\" name=\"Arrays\" nameid=\"arrays\" category=\"45\" iconclass=\"blocklyTreeIconarrays\" expandedclass=\"blocklyTreeIconarrays\" advanced=\"true\">\n            <block type=\"lists_create_with\">\n                <mutation items=\"1\"></mutation>\n                <value name=\"ADD0\">\n                    <shadow type=\"math_number\">\n                        <field name=\"NUM\">0</field>\n                    </shadow>\n                </value>\n            </block>\n            <block type=\"lists_create_with\">\n                <mutation items=\"2\"></mutation>\n                <value name=\"ADD0\">\n                    <shadow type=\"text\">\n                        <field name=\"TEXT\"></field>\n                    </shadow>\n                </value>\n                <value name=\"ADD1\">\n                    <shadow type=\"text\">\n                        <field name=\"TEXT\"></field>\n                    </shadow>\n                </value>\n            </block>\n            <block type=\"lists_length\"></block>\n            <block type=\"lists_index_get\">\n                <value name=\"LIST\">\n                    <block type=\"variables_get\">\n                        <field name=\"VAR\">list</field>\n                    </block>\n                </value>\n                <value name=\"INDEX\">\n                    <shadow type=\"math_number\">\n                        <field name=\"NUM\">0</field>\n                    </shadow>\n                </value>\n            </block>\n            <block type=\"lists_index_set\">\n                <value name=\"LIST\">\n                    <block type=\"variables_get\">\n                        <field name=\"VAR\">list</field>\n                    </block>\n                </value>\n                <value name=\"INDEX\">\n                    <shadow type=\"math_number\">\n                        <field name=\"NUM\">0</field>\n                    </shadow>\n                </value>\n            </block>\n        </category>\n        <category colour=\"#996600\" name=\"Text\" nameid=\"text\" category=\"46\" iconclass=\"blocklyTreeIcontext\" expandedclass=\"blocklyTreeIcontext\" advanced=\"true\">\n            <block type=\"text\"></block>\n            <block type=\"text_length\">\n                <value name=\"VALUE\">\n                    <shadow type=\"text\">\n                        <field name=\"TEXT\">abc</field>\n                    </shadow>\n                </value>\n            </block>\n            <block type=\"text_join\">\n                <mutation items=\"2\"></mutation>\n                <value name=\"ADD0\">\n                    <shadow type=\"text\">\n                        <field name=\"TEXT\"></field>\n                    </shadow>\n                </value>\n                <value name=\"ADD1\">\n                    <shadow type=\"text\">\n                        <field name=\"TEXT\"></field>\n                    </shadow>\n                </value>\n            </block>\n        </category>\n    </xml>", "text/xml");
+var defaultToolboxString = "<xml id=\"blocklyToolboxDefinition\" style=\"display: none\">\n    <category name=\"Loops\" nameid=\"loops\" colour=\"#107c10\" category=\"50\" web-icon=\"\uF01E\" iconclass=\"blocklyTreeIconloops\" expandedclass=\"blocklyTreeIconloops\">\n        <block type=\"controls_repeat_ext\">\n            <value name=\"TIMES\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">4</field>\n                </shadow>\n            </value>\n        </block>\n        <block type=\"device_while\">\n            <value name=\"COND\">\n                <shadow type=\"logic_boolean\"></shadow>\n            </value>\n        </block>\n        <block type=\"controls_simple_for\">\n            <value name=\"TO\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">4</field>\n                </shadow>\n            </value>\n        </block>\n        <block type=\"controls_for_of\">\n            <value name=\"LIST\">\n                <shadow type=\"variables_get\">\n                    <field name=\"VAR\">list</field>\n                </shadow>\n            </value>\n        </block>\n    </category>\n    <category name=\"Logic\" nameid=\"logic\" colour=\"#006970\" category=\"49\" web-icon=\"\uF074\" iconclass=\"blocklyTreeIconlogic\" expandedclass=\"blocklyTreeIconlogic\">\n        <block type=\"controls_if\" gap=\"8\">\n            <value name=\"IF0\">\n                <shadow type=\"logic_boolean\">\n                    <field name=\"BOOL\">TRUE</field>\n                </shadow>\n            </value>\n        </block>\n        <block type=\"controls_if\" gap=\"8\">\n            <mutation else=\"1\"></mutation>\n            <value name=\"IF0\">\n                <shadow type=\"logic_boolean\">\n                    <field name=\"BOOL\">TRUE</field>\n                </shadow>\n            </value>\n        </block>\n        <block type=\"logic_compare\" gap=\"8\">\n            <value name=\"A\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n            <value name=\"B\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n        </block>\n        <block type=\"logic_compare\">\n            <field name=\"OP\">LT</field>\n            <value name=\"A\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n            <value name=\"B\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n        </block>\n        <block type=\"logic_operation\" gap=\"8\"></block>\n        <block type=\"logic_operation\" gap=\"8\">\n            <field name=\"OP\">OR</field>\n        </block>\n        <block type=\"logic_negate\"></block>\n        <block type=\"logic_boolean\" gap=\"8\"></block>\n        <block type=\"logic_boolean\">\n            <field name=\"BOOL\">FALSE</field>\n        </block>\n    </category>\n    <category name=\"Variables\" nameid=\"variables\" colour=\"#A80000\" custom=\"VARIABLE\" category=\"48\" iconclass=\"blocklyTreeIconvariables\" expandedclass=\"blocklyTreeIconvariables\">\n    </category>\n    <category name=\"Math\" nameid=\"math\" colour=\"#712672\" category=\"47\" web-icon=\"\uF1EC\" iconclass=\"blocklyTreeIconmath\" expandedclass=\"blocklyTreeIconmath\">\n        <block type=\"math_arithmetic\" gap=\"8\">\n            <value name=\"A\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n            <value name=\"B\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n        </block>\n        <block type=\"math_arithmetic\" gap=\"8\">\n            <value name=\"A\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n            <value name=\"B\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n            <field name=\"OP\">MINUS</field>\n        </block>\n        <block type=\"math_arithmetic\" gap=\"8\">\n            <value name=\"A\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n            <value name=\"B\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n            <field name=\"OP\">MULTIPLY</field>\n        </block>\n        <block type=\"math_arithmetic\" gap=\"8\">\n            <value name=\"A\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n            <value name=\"B\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n            <field name=\"OP\">DIVIDE</field>\n        </block>\n        <block type=\"math_number\" gap=\"8\">\n            <field name=\"NUM\">0</field>\n        </block>\n        <category colour=\"#712672\" name=\"More\" nameid=\"more\" iconclass=\"blocklyTreeIconmore\" expandedclass=\"blocklyTreeIconmore\">\n            <block type=\"math_modulo\">\n                <value name=\"DIVIDEND\">\n                    <shadow type=\"math_number\">\n                        <field name=\"NUM\">0</field>\n                    </shadow>\n                </value>\n                <value name=\"DIVISOR\">\n                    <shadow type=\"math_number\">\n                        <field name=\"NUM\">1</field>\n                    </shadow>\n                </value>\n            </block>\n            <block type=\"math_op2\" gap=\"8\">\n                <value name=\"x\">\n                    <shadow type=\"math_number\">\n                        <field name=\"NUM\">0</field>\n                    </shadow>\n                </value>\n                <value name=\"y\">\n                    <shadow type=\"math_number\">\n                        <field name=\"NUM\">0</field>\n                    </shadow>\n                </value>\n            </block>\n            <block type=\"math_op2\" gap=\"8\">\n                <value name=\"x\">\n                    <shadow type=\"math_number\">\n                        <field name=\"NUM\">0</field>\n                    </shadow>\n                </value>\n                <value name=\"y\">\n                    <shadow type=\"math_number\">\n                        <field name=\"NUM\">0</field>\n                    </shadow>\n                </value>\n                <field name=\"op\">max</field>\n            </block>\n            <block type=\"math_op3\">\n                <value name=\"x\">\n                    <shadow type=\"math_number\">\n                        <field name=\"NUM\">0</field>\n                    </shadow>\n                </value>\n            </block>\n        </category>\n    </category>\n    <category name=\"Functions\" nameid=\"functions\" colour=\"#005a9e\" custom=\"PROCEDURE\" category=\"46\" iconclass=\"blocklyTreeIconfunctions\" expandedclass=\"blocklyTreeIconfunctions\" advanced=\"true\">\n    </category>\n    <category colour=\"#66672C\" name=\"Arrays\" nameid=\"arrays\" category=\"45\" web-icon=\"\uF0CB\" iconclass=\"blocklyTreeIconarrays\" expandedclass=\"blocklyTreeIconarrays\" advanced=\"true\">\n        <block type=\"lists_create_with\">\n            <mutation items=\"1\"></mutation>\n            <value name=\"ADD0\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n        </block>\n        <block type=\"lists_create_with\">\n            <mutation items=\"2\"></mutation>\n            <value name=\"ADD0\">\n                <shadow type=\"text\">\n                    <field name=\"TEXT\"></field>\n                </shadow>\n            </value>\n            <value name=\"ADD1\">\n                <shadow type=\"text\">\n                    <field name=\"TEXT\"></field>\n                </shadow>\n            </value>\n        </block>\n        <block type=\"lists_length\"></block>\n        <block type=\"lists_index_get\">\n            <value name=\"LIST\">\n                <block type=\"variables_get\">\n                    <field name=\"VAR\">list</field>\n                </block>\n            </value>\n            <value name=\"INDEX\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n        </block>\n        <block type=\"lists_index_set\">\n            <value name=\"LIST\">\n                <block type=\"variables_get\">\n                    <field name=\"VAR\">list</field>\n                </block>\n            </value>\n            <value name=\"INDEX\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n        </block>\n    </category>\n    <category colour=\"#996600\" name=\"Text\" nameid=\"text\" category=\"46\" web-icon=\"\uF035\" iconclass=\"blocklyTreeIcontext\" expandedclass=\"blocklyTreeIcontext\" advanced=\"true\">\n        <block type=\"text\"></block>\n        <block type=\"text_length\">\n            <value name=\"VALUE\">\n                <shadow type=\"text\">\n                    <field name=\"TEXT\">abc</field>\n                </shadow>\n            </value>\n        </block>\n        <block type=\"text_join\">\n            <mutation items=\"2\"></mutation>\n            <value name=\"ADD0\">\n                <shadow type=\"text\">\n                    <field name=\"TEXT\"></field>\n                </shadow>\n            </value>\n            <value name=\"ADD1\">\n                <shadow type=\"text\">\n                    <field name=\"TEXT\"></field>\n                </shadow>\n            </value>\n        </block>\n    </category>\n</xml>";
+var cachedToolboxDom;
+function getBaseToolboxDom() {
+    if (!cachedToolboxDom) {
+        overrideBaseToolbox(defaultToolboxString);
+    }
+    return cachedToolboxDom;
+}
+exports.getBaseToolboxDom = getBaseToolboxDom;
+function overrideBaseToolbox(xml) {
+    cachedToolboxDom = new DOMParser().parseFromString(xml, 'text/xml');
+}
+exports.overrideBaseToolbox = overrideBaseToolbox;
 
-},{}],41:[function(require,module,exports){
+},{}],40:[function(require,module,exports){
 /// <reference path="../../typings/globals/react/index.d.ts" />
 /// <reference path="../../typings/globals/react-dom/index.d.ts" />
 /// <reference path="../../built/pxtlib.d.ts" />
@@ -9794,7 +9921,7 @@ var TutorialComplete = (function (_super) {
     TutorialComplete.prototype.exitTutorial = function () {
         pxt.tickEvent("tutorial.completed.exit");
         this.hide();
-        this.props.parent.exitTutorial();
+        this.props.parent.exitTutorial(true);
     };
     TutorialComplete.prototype.renderCore = function () {
         var _this = this;
@@ -9805,7 +9932,7 @@ var TutorialComplete = (function (_super) {
 }(data.Component));
 exports.TutorialComplete = TutorialComplete;
 
-},{"./data":12,"./sounds":36,"./sui":38,"react":268}],42:[function(require,module,exports){
+},{"./data":12,"./sounds":35,"./sui":37,"react":267}],41:[function(require,module,exports){
 /// <reference path="../../built/pxtlib.d.ts" />
 /// <reference path="../../built/pxteditor.d.ts" />
 /// <reference path="../../built/pxtwinrt.d.ts" />
@@ -9865,11 +9992,6 @@ function getHeader(id) {
     return null;
 }
 exports.getHeader = getHeader;
-function legacyScriptsUrl() {
-    checkSession();
-    return impl.legacyScriptsUrl ? impl.legacyScriptsUrl() : undefined;
-}
-exports.legacyScriptsUrl = legacyScriptsUrl;
 function importLegacyScriptsAsync() {
     checkSession();
     return impl.importLegacyScriptsAsync ? impl.importLegacyScriptsAsync() : Promise.resolve();
@@ -10049,7 +10171,7 @@ data.mountVirtualApi("text", {
     },
 });
 
-},{"./cloudworkspace":6,"./core":11,"./data":12,"./db":13,"./fileworkspace":18,"./iframeworkspace":22,"./memoryworkspace":25}],43:[function(require,module,exports){
+},{"./cloudworkspace":6,"./core":11,"./data":12,"./db":13,"./fileworkspace":18,"./iframeworkspace":21,"./memoryworkspace":25}],42:[function(require,module,exports){
 'use strict';
 
 module.exports = argsArray;
@@ -10069,7 +10191,7 @@ function argsArray(fun) {
     }
   };
 }
-},{}],44:[function(require,module,exports){
+},{}],43:[function(require,module,exports){
 'use strict'
 
 exports.byteLength = byteLength
@@ -10185,7 +10307,7 @@ function fromByteArray (uint8) {
   return parts.join('')
 }
 
-},{}],45:[function(require,module,exports){
+},{}],44:[function(require,module,exports){
 (function (process,global){
 /* @preserve
  * The MIT License (MIT)
@@ -15807,9 +15929,9 @@ module.exports = ret;
 },{"./es5":13}]},{},[4])(4)
 });                    ;if (typeof window !== 'undefined' && window !== null) {                               window.P = window.Promise;                                                     } else if (typeof self !== 'undefined' && self !== null) {                             self.P = self.Promise;                                                         }
 }).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"_process":137}],46:[function(require,module,exports){
+},{"_process":136}],45:[function(require,module,exports){
 
-},{}],47:[function(require,module,exports){
+},{}],46:[function(require,module,exports){
 (function (global){
 /*!
  * The buffer module from node.js, for the browser.
@@ -17602,7 +17724,7 @@ function isnan (val) {
 }
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"base64-js":44,"ieee754":89,"isarray":93}],48:[function(require,module,exports){
+},{"base64-js":43,"ieee754":88,"isarray":92}],47:[function(require,module,exports){
 (function (Buffer){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -17713,7 +17835,7 @@ function objectToString(o) {
 }
 
 }).call(this,{"isBuffer":require("../../is-buffer/index.js")})
-},{"../../is-buffer/index.js":92}],49:[function(require,module,exports){
+},{"../../is-buffer/index.js":91}],48:[function(require,module,exports){
 var util = require('util')
   , AbstractIterator = require('abstract-leveldown').AbstractIterator
 
@@ -17749,7 +17871,7 @@ DeferredIterator.prototype._operation = function (method, args) {
 
 module.exports = DeferredIterator;
 
-},{"abstract-leveldown":54,"util":305}],50:[function(require,module,exports){
+},{"abstract-leveldown":53,"util":304}],49:[function(require,module,exports){
 (function (Buffer,process){
 var util              = require('util')
   , AbstractLevelDOWN = require('abstract-leveldown').AbstractLevelDOWN
@@ -17809,7 +17931,7 @@ module.exports                  = DeferredLevelDOWN
 module.exports.DeferredIterator = DeferredIterator
 
 }).call(this,{"isBuffer":require("../is-buffer/index.js")},require('_process'))
-},{"../is-buffer/index.js":92,"./deferred-iterator":49,"_process":137,"abstract-leveldown":54,"util":305}],51:[function(require,module,exports){
+},{"../is-buffer/index.js":91,"./deferred-iterator":48,"_process":136,"abstract-leveldown":53,"util":304}],50:[function(require,module,exports){
 (function (process){
 /* Copyright (c) 2013 Rod Vagg, MIT License */
 
@@ -17892,7 +18014,7 @@ AbstractChainedBatch.prototype.write = function (options, callback) {
 
 module.exports = AbstractChainedBatch
 }).call(this,require('_process'))
-},{"_process":137}],52:[function(require,module,exports){
+},{"_process":136}],51:[function(require,module,exports){
 (function (process){
 /* Copyright (c) 2013 Rod Vagg, MIT License */
 
@@ -17945,7 +18067,7 @@ AbstractIterator.prototype.end = function (callback) {
 module.exports = AbstractIterator
 
 }).call(this,require('_process'))
-},{"_process":137}],53:[function(require,module,exports){
+},{"_process":136}],52:[function(require,module,exports){
 (function (Buffer,process){
 /* Copyright (c) 2013 Rod Vagg, MIT License */
 
@@ -18221,13 +18343,13 @@ AbstractLevelDOWN.prototype._checkKey = function (obj, type) {
 module.exports = AbstractLevelDOWN
 
 }).call(this,{"isBuffer":require("../../../is-buffer/index.js")},require('_process'))
-},{"../../../is-buffer/index.js":92,"./abstract-chained-batch":51,"./abstract-iterator":52,"_process":137,"xtend":307}],54:[function(require,module,exports){
+},{"../../../is-buffer/index.js":91,"./abstract-chained-batch":50,"./abstract-iterator":51,"_process":136,"xtend":306}],53:[function(require,module,exports){
 exports.AbstractLevelDOWN    = require('./abstract-leveldown')
 exports.AbstractIterator     = require('./abstract-iterator')
 exports.AbstractChainedBatch = require('./abstract-chained-batch')
 exports.isLevelDOWN          = require('./is-leveldown')
 
-},{"./abstract-chained-batch":51,"./abstract-iterator":52,"./abstract-leveldown":53,"./is-leveldown":55}],55:[function(require,module,exports){
+},{"./abstract-chained-batch":50,"./abstract-iterator":51,"./abstract-leveldown":52,"./is-leveldown":54}],54:[function(require,module,exports){
 var AbstractLevelDOWN = require('./abstract-leveldown')
 
 function isLevelDOWN (db) {
@@ -18243,7 +18365,7 @@ function isLevelDOWN (db) {
 
 module.exports = isLevelDOWN
 
-},{"./abstract-leveldown":53}],56:[function(require,module,exports){
+},{"./abstract-leveldown":52}],55:[function(require,module,exports){
 /**
  * Copyright (c) 2013 Petka Antonov
  * 
@@ -18532,7 +18654,7 @@ function getCapacity(capacity) {
 
 module.exports = Deque;
 
-},{}],57:[function(require,module,exports){
+},{}],56:[function(require,module,exports){
 var prr = require('prr')
 
 function init (type, message, cause) {
@@ -18589,7 +18711,7 @@ module.exports = function (errno) {
   }
 }
 
-},{"prr":138}],58:[function(require,module,exports){
+},{"prr":137}],57:[function(require,module,exports){
 var all = module.exports.all = [
   {
     errno: -2,
@@ -18904,7 +19026,7 @@ all.forEach(function (error) {
 module.exports.custom = require('./custom')(module.exports)
 module.exports.create = module.exports.custom.createError
 
-},{"./custom":57}],59:[function(require,module,exports){
+},{"./custom":56}],58:[function(require,module,exports){
 (function (root, factory) {
   /* istanbul ignore next */
   if (typeof define === 'function' && define.amd) {
@@ -19122,7 +19244,7 @@ module.exports.create = module.exports.custom.createError
   return PromisePool
 })
 
-},{}],60:[function(require,module,exports){
+},{}],59:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -19426,7 +19548,7 @@ function isUndefined(arg) {
   return arg === void 0;
 }
 
-},{}],61:[function(require,module,exports){
+},{}],60:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -19513,7 +19635,7 @@ var EventListener = {
 
 module.exports = EventListener;
 }).call(this,require('_process'))
-},{"./emptyFunction":68,"_process":137}],62:[function(require,module,exports){
+},{"./emptyFunction":67,"_process":136}],61:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -19550,7 +19672,7 @@ var ExecutionEnvironment = {
 };
 
 module.exports = ExecutionEnvironment;
-},{}],63:[function(require,module,exports){
+},{}],62:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -19583,7 +19705,7 @@ function camelize(string) {
 }
 
 module.exports = camelize;
-},{}],64:[function(require,module,exports){
+},{}],63:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -19624,7 +19746,7 @@ function camelizeStyleName(string) {
 }
 
 module.exports = camelizeStyleName;
-},{"./camelize":63}],65:[function(require,module,exports){
+},{"./camelize":62}],64:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -19680,7 +19802,7 @@ function containsNode(_x, _x2) {
 }
 
 module.exports = containsNode;
-},{"./isTextNode":78}],66:[function(require,module,exports){
+},{"./isTextNode":77}],65:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -19766,7 +19888,7 @@ function createArrayFromMixed(obj) {
 }
 
 module.exports = createArrayFromMixed;
-},{"./toArray":86}],67:[function(require,module,exports){
+},{"./toArray":85}],66:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -19853,7 +19975,7 @@ function createNodesFromMarkup(markup, handleScript) {
 
 module.exports = createNodesFromMarkup;
 }).call(this,require('_process'))
-},{"./ExecutionEnvironment":62,"./createArrayFromMixed":66,"./getMarkupWrap":72,"./invariant":76,"_process":137}],68:[function(require,module,exports){
+},{"./ExecutionEnvironment":61,"./createArrayFromMixed":65,"./getMarkupWrap":71,"./invariant":75,"_process":136}],67:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -19892,7 +20014,7 @@ emptyFunction.thatReturnsArgument = function (arg) {
 };
 
 module.exports = emptyFunction;
-},{}],69:[function(require,module,exports){
+},{}],68:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -19915,7 +20037,7 @@ if (process.env.NODE_ENV !== 'production') {
 
 module.exports = emptyObject;
 }).call(this,require('_process'))
-},{"_process":137}],70:[function(require,module,exports){
+},{"_process":136}],69:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -19942,7 +20064,7 @@ function focusNode(node) {
 }
 
 module.exports = focusNode;
-},{}],71:[function(require,module,exports){
+},{}],70:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -19978,7 +20100,7 @@ function getActiveElement() /*?DOMElement*/{
 }
 
 module.exports = getActiveElement;
-},{}],72:[function(require,module,exports){
+},{}],71:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -20076,7 +20198,7 @@ function getMarkupWrap(nodeName) {
 
 module.exports = getMarkupWrap;
 }).call(this,require('_process'))
-},{"./ExecutionEnvironment":62,"./invariant":76,"_process":137}],73:[function(require,module,exports){
+},{"./ExecutionEnvironment":61,"./invariant":75,"_process":136}],72:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -20115,7 +20237,7 @@ function getUnboundedScrollPosition(scrollable) {
 }
 
 module.exports = getUnboundedScrollPosition;
-},{}],74:[function(require,module,exports){
+},{}],73:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -20149,7 +20271,7 @@ function hyphenate(string) {
 }
 
 module.exports = hyphenate;
-},{}],75:[function(require,module,exports){
+},{}],74:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -20189,7 +20311,7 @@ function hyphenateStyleName(string) {
 }
 
 module.exports = hyphenateStyleName;
-},{"./hyphenate":74}],76:[function(require,module,exports){
+},{"./hyphenate":73}],75:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -20242,7 +20364,7 @@ function invariant(condition, format, a, b, c, d, e, f) {
 
 module.exports = invariant;
 }).call(this,require('_process'))
-},{"_process":137}],77:[function(require,module,exports){
+},{"_process":136}],76:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -20266,7 +20388,7 @@ function isNode(object) {
 }
 
 module.exports = isNode;
-},{}],78:[function(require,module,exports){
+},{}],77:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -20292,7 +20414,7 @@ function isTextNode(object) {
 }
 
 module.exports = isTextNode;
-},{"./isNode":77}],79:[function(require,module,exports){
+},{"./isNode":76}],78:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -20343,7 +20465,7 @@ var keyMirror = function (obj) {
 
 module.exports = keyMirror;
 }).call(this,require('_process'))
-},{"./invariant":76,"_process":137}],80:[function(require,module,exports){
+},{"./invariant":75,"_process":136}],79:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -20379,7 +20501,7 @@ var keyOf = function (oneKeyObj) {
 };
 
 module.exports = keyOf;
-},{}],81:[function(require,module,exports){
+},{}],80:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -20431,7 +20553,7 @@ function mapObject(object, callback, context) {
 }
 
 module.exports = mapObject;
-},{}],82:[function(require,module,exports){
+},{}],81:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -20463,7 +20585,7 @@ function memoizeStringOnly(callback) {
 }
 
 module.exports = memoizeStringOnly;
-},{}],83:[function(require,module,exports){
+},{}],82:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -20487,7 +20609,7 @@ if (ExecutionEnvironment.canUseDOM) {
 }
 
 module.exports = performance || {};
-},{"./ExecutionEnvironment":62}],84:[function(require,module,exports){
+},{"./ExecutionEnvironment":61}],83:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -20522,7 +20644,7 @@ if (performance.now) {
 }
 
 module.exports = performanceNow;
-},{"./performance":83}],85:[function(require,module,exports){
+},{"./performance":82}],84:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -20573,7 +20695,7 @@ function shallowEqual(objA, objB) {
 }
 
 module.exports = shallowEqual;
-},{}],86:[function(require,module,exports){
+},{}],85:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -20633,7 +20755,7 @@ function toArray(obj) {
 
 module.exports = toArray;
 }).call(this,require('_process'))
-},{"./invariant":76,"_process":137}],87:[function(require,module,exports){
+},{"./invariant":75,"_process":136}],86:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2014-2015, Facebook, Inc.
@@ -20693,7 +20815,7 @@ if (process.env.NODE_ENV !== 'production') {
 
 module.exports = warning;
 }).call(this,require('_process'))
-},{"./emptyFunction":68,"_process":137}],88:[function(require,module,exports){
+},{"./emptyFunction":67,"_process":136}],87:[function(require,module,exports){
 "use strict"
 
 module.exports = createRBTree
@@ -21690,7 +21812,7 @@ function defaultCompare(a, b) {
 function createRBTree(compare) {
   return new RedBlackTree(compare || defaultCompare, null)
 }
-},{}],89:[function(require,module,exports){
+},{}],88:[function(require,module,exports){
 exports.read = function (buffer, offset, isLE, mLen, nBytes) {
   var e, m
   var eLen = nBytes * 8 - mLen - 1
@@ -21776,7 +21898,7 @@ exports.write = function (buffer, value, offset, isLE, mLen, nBytes) {
   buffer[offset + i - d] |= s * 128
 }
 
-},{}],90:[function(require,module,exports){
+},{}],89:[function(require,module,exports){
 (function (global){
 'use strict';
 var Mutation = global.MutationObserver || global.WebKitMutationObserver;
@@ -21849,7 +21971,7 @@ function immediate(task) {
 }
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],91:[function(require,module,exports){
+},{}],90:[function(require,module,exports){
 if (typeof Object.create === 'function') {
   // implementation from standard node.js 'util' module
   module.exports = function inherits(ctor, superCtor) {
@@ -21874,7 +21996,7 @@ if (typeof Object.create === 'function') {
   }
 }
 
-},{}],92:[function(require,module,exports){
+},{}],91:[function(require,module,exports){
 /*!
  * Determine if an object is a Buffer
  *
@@ -21897,14 +22019,14 @@ function isSlowBuffer (obj) {
   return typeof obj.readFloatLE === 'function' && typeof obj.slice === 'function' && isBuffer(obj.slice(0, 0))
 }
 
-},{}],93:[function(require,module,exports){
+},{}],92:[function(require,module,exports){
 var toString = {}.toString;
 
 module.exports = Array.isArray || function (arr) {
   return toString.call(arr) == '[object Array]';
 };
 
-},{}],94:[function(require,module,exports){
+},{}],93:[function(require,module,exports){
 (function() { 
 
   var slice   = Array.prototype.slice,
@@ -21933,7 +22055,7 @@ module.exports = Array.isArray || function (arr) {
   this.extend = extend;
 
 }).call(this);
-},{}],95:[function(require,module,exports){
+},{}],94:[function(require,module,exports){
 var encodings = require('./lib/encodings');
 
 module.exports = Codec;
@@ -22041,7 +22163,7 @@ Codec.prototype.valueAsBuffer = function(opts){
 };
 
 
-},{"./lib/encodings":96}],96:[function(require,module,exports){
+},{"./lib/encodings":95}],95:[function(require,module,exports){
 (function (Buffer){
 
 exports.utf8 = exports['utf-8'] = {
@@ -22121,7 +22243,7 @@ function isBinary(data){
 
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":47}],97:[function(require,module,exports){
+},{"buffer":46}],96:[function(require,module,exports){
 /* Copyright (c) 2012-2015 LevelUP contributors
  * See list at <https://github.com/rvagg/node-levelup#contributing>
  * MIT License
@@ -22145,7 +22267,7 @@ module.exports = {
   , EncodingError       : createError('EncodingError', LevelUPError)
 }
 
-},{"errno":58}],98:[function(require,module,exports){
+},{"errno":57}],97:[function(require,module,exports){
 var inherits = require('inherits');
 var Readable = require('readable-stream').Readable;
 var extend = require('xtend');
@@ -22203,12 +22325,12 @@ ReadStream.prototype._cleanup = function(){
 };
 
 
-},{"inherits":91,"level-errors":97,"readable-stream":105,"xtend":307}],99:[function(require,module,exports){
+},{"inherits":90,"level-errors":96,"readable-stream":104,"xtend":306}],98:[function(require,module,exports){
 module.exports = Array.isArray || function (arr) {
   return Object.prototype.toString.call(arr) == '[object Array]';
 };
 
-},{}],100:[function(require,module,exports){
+},{}],99:[function(require,module,exports){
 (function (process){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -22301,7 +22423,7 @@ function forEach (xs, f) {
 }
 
 }).call(this,require('_process'))
-},{"./_stream_readable":102,"./_stream_writable":104,"_process":137,"core-util-is":48,"inherits":91}],101:[function(require,module,exports){
+},{"./_stream_readable":101,"./_stream_writable":103,"_process":136,"core-util-is":47,"inherits":90}],100:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -22349,7 +22471,7 @@ PassThrough.prototype._transform = function(chunk, encoding, cb) {
   cb(null, chunk);
 };
 
-},{"./_stream_transform":103,"core-util-is":48,"inherits":91}],102:[function(require,module,exports){
+},{"./_stream_transform":102,"core-util-is":47,"inherits":90}],101:[function(require,module,exports){
 (function (process){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -23304,7 +23426,7 @@ function indexOf (xs, x) {
 }
 
 }).call(this,require('_process'))
-},{"./_stream_duplex":100,"_process":137,"buffer":47,"core-util-is":48,"events":60,"inherits":91,"isarray":99,"stream":286,"string_decoder/":287,"util":46}],103:[function(require,module,exports){
+},{"./_stream_duplex":99,"_process":136,"buffer":46,"core-util-is":47,"events":59,"inherits":90,"isarray":98,"stream":285,"string_decoder/":286,"util":45}],102:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -23515,7 +23637,7 @@ function done(stream, er) {
   return stream.push(null);
 }
 
-},{"./_stream_duplex":100,"core-util-is":48,"inherits":91}],104:[function(require,module,exports){
+},{"./_stream_duplex":99,"core-util-is":47,"inherits":90}],103:[function(require,module,exports){
 (function (process){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -23996,7 +24118,7 @@ function endWritable(stream, state, cb) {
 }
 
 }).call(this,require('_process'))
-},{"./_stream_duplex":100,"_process":137,"buffer":47,"core-util-is":48,"inherits":91,"stream":286}],105:[function(require,module,exports){
+},{"./_stream_duplex":99,"_process":136,"buffer":46,"core-util-is":47,"inherits":90,"stream":285}],104:[function(require,module,exports){
 (function (process){
 exports = module.exports = require('./lib/_stream_readable.js');
 exports.Stream = require('stream');
@@ -24010,7 +24132,7 @@ if (!process.browser && process.env.READABLE_STREAM === 'disable') {
 }
 
 }).call(this,require('_process'))
-},{"./lib/_stream_duplex.js":100,"./lib/_stream_passthrough.js":101,"./lib/_stream_readable.js":102,"./lib/_stream_transform.js":103,"./lib/_stream_writable.js":104,"_process":137,"stream":286}],106:[function(require,module,exports){
+},{"./lib/_stream_duplex.js":99,"./lib/_stream_passthrough.js":100,"./lib/_stream_readable.js":101,"./lib/_stream_transform.js":102,"./lib/_stream_writable.js":103,"_process":136,"stream":285}],105:[function(require,module,exports){
 /* Copyright (c) 2012-2016 LevelUP contributors
  * See list at <https://github.com/level/levelup#contributing>
  * MIT License
@@ -24095,7 +24217,7 @@ Batch.prototype.write = function (callback) {
 
 module.exports = Batch
 
-},{"./util":108,"level-errors":97}],107:[function(require,module,exports){
+},{"./util":107,"level-errors":96}],106:[function(require,module,exports){
 (function (process){
 /* Copyright (c) 2012-2016 LevelUP contributors
  * See list at <https://github.com/level/levelup#contributing>
@@ -24498,7 +24620,7 @@ module.exports.repair  = deprecate(
 
 
 }).call(this,require('_process'))
-},{"./batch":106,"./util":108,"_process":137,"deferred-leveldown":50,"events":60,"level-codec":95,"level-errors":97,"level-iterator-stream":98,"prr":109,"util":305,"xtend":307}],108:[function(require,module,exports){
+},{"./batch":105,"./util":107,"_process":136,"deferred-leveldown":49,"events":59,"level-codec":94,"level-errors":96,"level-iterator-stream":97,"prr":108,"util":304,"xtend":306}],107:[function(require,module,exports){
 /* Copyright (c) 2012-2016 LevelUP contributors
  * See list at <https://github.com/level/levelup#contributing>
  * MIT License
@@ -24577,7 +24699,7 @@ module.exports = {
   , isDefined       : isDefined
 }
 
-},{"../package.json":110,"level-errors":97,"leveldown":46,"leveldown/package":46,"semver":46,"util":305,"xtend":307}],109:[function(require,module,exports){
+},{"../package.json":109,"level-errors":96,"leveldown":45,"leveldown/package":45,"semver":45,"util":304,"xtend":306}],108:[function(require,module,exports){
 /*!
   * prr
   * (c) 2013 Rod Vagg <rod@vagg.org>
@@ -24641,7 +24763,7 @@ module.exports = {
 
   return prr
 })
-},{}],110:[function(require,module,exports){
+},{}],109:[function(require,module,exports){
 module.exports={
   "_args": [
     [
@@ -24838,7 +24960,7 @@ module.exports={
   "version": "1.3.2"
 }
 
-},{}],111:[function(require,module,exports){
+},{}],110:[function(require,module,exports){
 (function (Buffer){
 
 exports.compare = function (a, b) {
@@ -24937,7 +25059,7 @@ exports.filter = function (range, compare) {
 }
 
 }).call(this,{"isBuffer":require("../is-buffer/index.js")})
-},{"../is-buffer/index.js":92}],112:[function(require,module,exports){
+},{"../is-buffer/index.js":91}],111:[function(require,module,exports){
 (function (global){
 /**
  * marked - a markdown parser
@@ -26227,7 +26349,7 @@ if (typeof module !== 'undefined' && typeof exports === 'object') {
 }());
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],113:[function(require,module,exports){
+},{}],112:[function(require,module,exports){
 (function (process,global,Buffer){
 var inherits          = require('inherits')
   , AbstractLevelDOWN = require('abstract-leveldown').AbstractLevelDOWN
@@ -26471,7 +26593,7 @@ MemDOWN.destroy = function (name, callback) {
 module.exports = MemDOWN
 
 }).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {},require("buffer").Buffer)
-},{"_process":137,"abstract-leveldown":117,"buffer":47,"functional-red-black-tree":88,"inherits":91,"ltgt":111}],114:[function(require,module,exports){
+},{"_process":136,"abstract-leveldown":116,"buffer":46,"functional-red-black-tree":87,"inherits":90,"ltgt":110}],113:[function(require,module,exports){
 (function (process){
 /* Copyright (c) 2013 Rod Vagg, MIT License */
 
@@ -26563,9 +26685,9 @@ AbstractChainedBatch.prototype.write = function (options, callback) {
 module.exports = AbstractChainedBatch
 
 }).call(this,require('_process'))
-},{"_process":137}],115:[function(require,module,exports){
-arguments[4][52][0].apply(exports,arguments)
-},{"_process":137,"dup":52}],116:[function(require,module,exports){
+},{"_process":136}],114:[function(require,module,exports){
+arguments[4][51][0].apply(exports,arguments)
+},{"_process":136,"dup":51}],115:[function(require,module,exports){
 (function (Buffer,process){
 /* Copyright (c) 2013 Rod Vagg, MIT License */
 
@@ -26841,11 +26963,11 @@ AbstractLevelDOWN.prototype._checkKey = function (obj, type) {
 module.exports = AbstractLevelDOWN
 
 }).call(this,{"isBuffer":require("../../../is-buffer/index.js")},require('_process'))
-},{"../../../is-buffer/index.js":92,"./abstract-chained-batch":114,"./abstract-iterator":115,"_process":137,"xtend":307}],117:[function(require,module,exports){
+},{"../../../is-buffer/index.js":91,"./abstract-chained-batch":113,"./abstract-iterator":114,"_process":136,"xtend":306}],116:[function(require,module,exports){
+arguments[4][53][0].apply(exports,arguments)
+},{"./abstract-chained-batch":113,"./abstract-iterator":114,"./abstract-leveldown":115,"./is-leveldown":117,"dup":53}],117:[function(require,module,exports){
 arguments[4][54][0].apply(exports,arguments)
-},{"./abstract-chained-batch":114,"./abstract-iterator":115,"./abstract-leveldown":116,"./is-leveldown":118,"dup":54}],118:[function(require,module,exports){
-arguments[4][55][0].apply(exports,arguments)
-},{"./abstract-leveldown":116,"dup":55}],119:[function(require,module,exports){
+},{"./abstract-leveldown":115,"dup":54}],118:[function(require,module,exports){
 'use strict';
 
 var MIN_MAGNITUDE = -324; // verified by -Number.MIN_VALUE
@@ -27200,7 +27322,7 @@ function numToIndexableString(num) {
   return result;
 }
 
-},{"./utils":120}],120:[function(require,module,exports){
+},{"./utils":119}],119:[function(require,module,exports){
 'use strict';
 
 function pad(str, padWith, upToLength) {
@@ -27271,7 +27393,7 @@ exports.intToDecimalForm = function (int) {
 
   return result;
 };
-},{}],121:[function(require,module,exports){
+},{}],120:[function(require,module,exports){
 'use strict';
 exports.Map = LazyMap; // TODO: use ES6 map
 exports.Set = LazySet; // TODO: use ES6 set
@@ -27342,9 +27464,9 @@ LazySet.prototype.delete = function (key) {
   return this.store.delete(key);
 };
 
-},{}],122:[function(require,module,exports){
+},{}],121:[function(require,module,exports){
 module.exports = require('../lib/extras/memory');
-},{"../lib/extras/memory":123}],123:[function(require,module,exports){
+},{"../lib/extras/memory":122}],122:[function(require,module,exports){
 (function (process,global,Buffer){
 'use strict';
 
@@ -30419,7 +30541,7 @@ if (!PDB) {
   MemoryPouchPlugin(PDB);
 }
 }).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {},require("buffer").Buffer)
-},{"_process":137,"argsarray":43,"buffer":47,"debug":125,"double-ended-queue":56,"events":60,"inherits":127,"js-extend":94,"levelup":107,"lie":128,"memdown":113,"pouchdb":124,"pouchdb-collections":121,"spark-md5":285,"sublevel-pouchdb":290,"through2":135,"vuvuzela":306}],124:[function(require,module,exports){
+},{"_process":136,"argsarray":42,"buffer":46,"debug":124,"double-ended-queue":55,"events":59,"inherits":126,"js-extend":93,"levelup":106,"lie":127,"memdown":112,"pouchdb":123,"pouchdb-collections":120,"spark-md5":284,"sublevel-pouchdb":289,"through2":134,"vuvuzela":305}],123:[function(require,module,exports){
 (function (process,global){
 'use strict';
 
@@ -41110,7 +41232,7 @@ PouchDB.plugin(IDBPouch)
 
 module.exports = PouchDB;
 }).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"_process":137,"argsarray":43,"debug":125,"es6-promise-pool":59,"events":60,"inherits":127,"js-extend":94,"lie":128,"pouchdb-collate":119,"pouchdb-collections":121,"scope-eval":284,"spark-md5":285,"vuvuzela":306}],125:[function(require,module,exports){
+},{"_process":136,"argsarray":42,"debug":124,"es6-promise-pool":58,"events":59,"inherits":126,"js-extend":93,"lie":127,"pouchdb-collate":118,"pouchdb-collections":120,"scope-eval":283,"spark-md5":284,"vuvuzela":305}],124:[function(require,module,exports){
 
 /**
  * This is the web browser implementation of `debug()`.
@@ -41280,7 +41402,7 @@ function localstorage(){
   } catch (e) {}
 }
 
-},{"./debug":126}],126:[function(require,module,exports){
+},{"./debug":125}],125:[function(require,module,exports){
 
 /**
  * This is the common logic for both the Node.js and web browser
@@ -41479,9 +41601,9 @@ function coerce(val) {
   return val;
 }
 
-},{"ms":129}],127:[function(require,module,exports){
-arguments[4][91][0].apply(exports,arguments)
-},{"dup":91}],128:[function(require,module,exports){
+},{"ms":128}],126:[function(require,module,exports){
+arguments[4][90][0].apply(exports,arguments)
+},{"dup":90}],127:[function(require,module,exports){
 'use strict';
 var immediate = require('immediate');
 
@@ -41736,7 +41858,7 @@ function race(iterable) {
   }
 }
 
-},{"immediate":90}],129:[function(require,module,exports){
+},{"immediate":89}],128:[function(require,module,exports){
 /**
  * Helpers.
  */
@@ -41863,7 +41985,7 @@ function plural(ms, n, name) {
   return Math.ceil(ms / n) + ' ' + name + 's';
 }
 
-},{}],130:[function(require,module,exports){
+},{}],129:[function(require,module,exports){
 // a duplex stream is just a stream that is both readable and writable.
 // Since JS doesn't have multiple prototypal inheritance, this class
 // prototypally inherits from Readable, and then parasitically from
@@ -41939,7 +42061,7 @@ function forEach(xs, f) {
     f(xs[i], i);
   }
 }
-},{"./_stream_readable":131,"./_stream_writable":133,"core-util-is":48,"inherits":127,"process-nextick-args":136}],131:[function(require,module,exports){
+},{"./_stream_readable":130,"./_stream_writable":132,"core-util-is":47,"inherits":126,"process-nextick-args":135}],130:[function(require,module,exports){
 (function (process){
 'use strict';
 
@@ -42822,7 +42944,7 @@ function indexOf(xs, x) {
   return -1;
 }
 }).call(this,require('_process'))
-},{"./_stream_duplex":130,"_process":137,"buffer":47,"core-util-is":48,"events":60,"inherits":127,"isarray":93,"process-nextick-args":136,"string_decoder/":287,"util":46}],132:[function(require,module,exports){
+},{"./_stream_duplex":129,"_process":136,"buffer":46,"core-util-is":47,"events":59,"inherits":126,"isarray":92,"process-nextick-args":135,"string_decoder/":286,"util":45}],131:[function(require,module,exports){
 // a transform stream is a readable/writable stream where you do
 // something with the data.  Sometimes it's called a "filter",
 // but that's not a great name for it, since that implies a thing where
@@ -43003,7 +43125,7 @@ function done(stream, er) {
 
   return stream.push(null);
 }
-},{"./_stream_duplex":130,"core-util-is":48,"inherits":127}],133:[function(require,module,exports){
+},{"./_stream_duplex":129,"core-util-is":47,"inherits":126}],132:[function(require,module,exports){
 (function (process){
 // A bit simpler than readable streams.
 // Implement an async ._write(chunk, encoding, cb), and it'll handle all
@@ -43522,10 +43644,10 @@ function CorkedRequest(state) {
   };
 }
 }).call(this,require('_process'))
-},{"./_stream_duplex":130,"_process":137,"buffer":47,"core-util-is":48,"events":60,"inherits":127,"process-nextick-args":136,"util-deprecate":302}],134:[function(require,module,exports){
+},{"./_stream_duplex":129,"_process":136,"buffer":46,"core-util-is":47,"events":59,"inherits":126,"process-nextick-args":135,"util-deprecate":301}],133:[function(require,module,exports){
 module.exports = require("./lib/_stream_transform.js")
 
-},{"./lib/_stream_transform.js":132}],135:[function(require,module,exports){
+},{"./lib/_stream_transform.js":131}],134:[function(require,module,exports){
 (function (process){
 var Transform = require('readable-stream/transform')
   , inherits  = require('util').inherits
@@ -43625,7 +43747,7 @@ module.exports.obj = through2(function (options, transform, flush) {
 })
 
 }).call(this,require('_process'))
-},{"_process":137,"readable-stream/transform":134,"util":305,"xtend":307}],136:[function(require,module,exports){
+},{"_process":136,"readable-stream/transform":133,"util":304,"xtend":306}],135:[function(require,module,exports){
 (function (process){
 'use strict';
 
@@ -43672,7 +43794,7 @@ function nextTick(fn, arg1, arg2, arg3) {
 }
 
 }).call(this,require('_process'))
-},{"_process":137}],137:[function(require,module,exports){
+},{"_process":136}],136:[function(require,module,exports){
 // shim for using process in browser
 var process = module.exports = {};
 
@@ -43858,14 +43980,14 @@ process.chdir = function (dir) {
 };
 process.umask = function() { return 0; };
 
-},{}],138:[function(require,module,exports){
-arguments[4][109][0].apply(exports,arguments)
-},{"dup":109}],139:[function(require,module,exports){
+},{}],137:[function(require,module,exports){
+arguments[4][108][0].apply(exports,arguments)
+},{"dup":108}],138:[function(require,module,exports){
 'use strict';
 
 module.exports = require('react/lib/ReactDOM');
 
-},{"react/lib/ReactDOM":174}],140:[function(require,module,exports){
+},{"react/lib/ReactDOM":173}],139:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -43902,7 +44024,7 @@ var AutoFocusUtils = {
 };
 
 module.exports = AutoFocusUtils;
-},{"./ReactMount":204,"./findDOMNode":247,"fbjs/lib/focusNode":70}],141:[function(require,module,exports){
+},{"./ReactMount":203,"./findDOMNode":246,"fbjs/lib/focusNode":69}],140:[function(require,module,exports){
 /**
  * Copyright 2013-2015 Facebook, Inc.
  * All rights reserved.
@@ -44308,7 +44430,7 @@ var BeforeInputEventPlugin = {
 };
 
 module.exports = BeforeInputEventPlugin;
-},{"./EventConstants":153,"./EventPropagators":157,"./FallbackCompositionState":158,"./SyntheticCompositionEvent":229,"./SyntheticInputEvent":233,"fbjs/lib/ExecutionEnvironment":62,"fbjs/lib/keyOf":80}],142:[function(require,module,exports){
+},{"./EventConstants":152,"./EventPropagators":156,"./FallbackCompositionState":157,"./SyntheticCompositionEvent":228,"./SyntheticInputEvent":232,"fbjs/lib/ExecutionEnvironment":61,"fbjs/lib/keyOf":79}],141:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -44448,7 +44570,7 @@ var CSSProperty = {
 };
 
 module.exports = CSSProperty;
-},{}],143:[function(require,module,exports){
+},{}],142:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -44626,7 +44748,7 @@ ReactPerf.measureMethods(CSSPropertyOperations, 'CSSPropertyOperations', {
 
 module.exports = CSSPropertyOperations;
 }).call(this,require('_process'))
-},{"./CSSProperty":142,"./ReactPerf":210,"./dangerousStyleValue":244,"_process":137,"fbjs/lib/ExecutionEnvironment":62,"fbjs/lib/camelizeStyleName":64,"fbjs/lib/hyphenateStyleName":75,"fbjs/lib/memoizeStringOnly":82,"fbjs/lib/warning":87}],144:[function(require,module,exports){
+},{"./CSSProperty":141,"./ReactPerf":209,"./dangerousStyleValue":243,"_process":136,"fbjs/lib/ExecutionEnvironment":61,"fbjs/lib/camelizeStyleName":63,"fbjs/lib/hyphenateStyleName":74,"fbjs/lib/memoizeStringOnly":81,"fbjs/lib/warning":86}],143:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -44722,7 +44844,7 @@ PooledClass.addPoolingTo(CallbackQueue);
 
 module.exports = CallbackQueue;
 }).call(this,require('_process'))
-},{"./Object.assign":161,"./PooledClass":162,"_process":137,"fbjs/lib/invariant":76}],145:[function(require,module,exports){
+},{"./Object.assign":160,"./PooledClass":161,"_process":136,"fbjs/lib/invariant":75}],144:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -45044,7 +45166,7 @@ var ChangeEventPlugin = {
 };
 
 module.exports = ChangeEventPlugin;
-},{"./EventConstants":153,"./EventPluginHub":154,"./EventPropagators":157,"./ReactUpdates":222,"./SyntheticEvent":231,"./getEventTarget":253,"./isEventSupported":258,"./isTextInputElement":259,"fbjs/lib/ExecutionEnvironment":62,"fbjs/lib/keyOf":80}],146:[function(require,module,exports){
+},{"./EventConstants":152,"./EventPluginHub":153,"./EventPropagators":156,"./ReactUpdates":221,"./SyntheticEvent":230,"./getEventTarget":252,"./isEventSupported":257,"./isTextInputElement":258,"fbjs/lib/ExecutionEnvironment":61,"fbjs/lib/keyOf":79}],145:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -45068,7 +45190,7 @@ var ClientReactRootIndex = {
 };
 
 module.exports = ClientReactRootIndex;
-},{}],147:[function(require,module,exports){
+},{}],146:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -45200,7 +45322,7 @@ ReactPerf.measureMethods(DOMChildrenOperations, 'DOMChildrenOperations', {
 
 module.exports = DOMChildrenOperations;
 }).call(this,require('_process'))
-},{"./Danger":150,"./ReactMultiChildUpdateTypes":206,"./ReactPerf":210,"./setInnerHTML":263,"./setTextContent":264,"_process":137,"fbjs/lib/invariant":76}],148:[function(require,module,exports){
+},{"./Danger":149,"./ReactMultiChildUpdateTypes":205,"./ReactPerf":209,"./setInnerHTML":262,"./setTextContent":263,"_process":136,"fbjs/lib/invariant":75}],147:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -45437,7 +45559,7 @@ var DOMProperty = {
 
 module.exports = DOMProperty;
 }).call(this,require('_process'))
-},{"_process":137,"fbjs/lib/invariant":76}],149:[function(require,module,exports){
+},{"_process":136,"fbjs/lib/invariant":75}],148:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -45665,7 +45787,7 @@ ReactPerf.measureMethods(DOMPropertyOperations, 'DOMPropertyOperations', {
 
 module.exports = DOMPropertyOperations;
 }).call(this,require('_process'))
-},{"./DOMProperty":148,"./ReactPerf":210,"./quoteAttributeValueForBrowser":261,"_process":137,"fbjs/lib/warning":87}],150:[function(require,module,exports){
+},{"./DOMProperty":147,"./ReactPerf":209,"./quoteAttributeValueForBrowser":260,"_process":136,"fbjs/lib/warning":86}],149:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -45813,7 +45935,7 @@ var Danger = {
 
 module.exports = Danger;
 }).call(this,require('_process'))
-},{"_process":137,"fbjs/lib/ExecutionEnvironment":62,"fbjs/lib/createNodesFromMarkup":67,"fbjs/lib/emptyFunction":68,"fbjs/lib/getMarkupWrap":72,"fbjs/lib/invariant":76}],151:[function(require,module,exports){
+},{"_process":136,"fbjs/lib/ExecutionEnvironment":61,"fbjs/lib/createNodesFromMarkup":66,"fbjs/lib/emptyFunction":67,"fbjs/lib/getMarkupWrap":71,"fbjs/lib/invariant":75}],150:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -45841,7 +45963,7 @@ var keyOf = require('fbjs/lib/keyOf');
 var DefaultEventPluginOrder = [keyOf({ ResponderEventPlugin: null }), keyOf({ SimpleEventPlugin: null }), keyOf({ TapEventPlugin: null }), keyOf({ EnterLeaveEventPlugin: null }), keyOf({ ChangeEventPlugin: null }), keyOf({ SelectEventPlugin: null }), keyOf({ BeforeInputEventPlugin: null })];
 
 module.exports = DefaultEventPluginOrder;
-},{"fbjs/lib/keyOf":80}],152:[function(require,module,exports){
+},{"fbjs/lib/keyOf":79}],151:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -45966,7 +46088,7 @@ var EnterLeaveEventPlugin = {
 };
 
 module.exports = EnterLeaveEventPlugin;
-},{"./EventConstants":153,"./EventPropagators":157,"./ReactMount":204,"./SyntheticMouseEvent":235,"fbjs/lib/keyOf":80}],153:[function(require,module,exports){
+},{"./EventConstants":152,"./EventPropagators":156,"./ReactMount":203,"./SyntheticMouseEvent":234,"fbjs/lib/keyOf":79}],152:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -46059,7 +46181,7 @@ var EventConstants = {
 };
 
 module.exports = EventConstants;
-},{"fbjs/lib/keyMirror":79}],154:[function(require,module,exports){
+},{"fbjs/lib/keyMirror":78}],153:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -46341,7 +46463,7 @@ var EventPluginHub = {
 
 module.exports = EventPluginHub;
 }).call(this,require('_process'))
-},{"./EventPluginRegistry":155,"./EventPluginUtils":156,"./ReactErrorUtils":195,"./accumulateInto":241,"./forEachAccumulated":249,"_process":137,"fbjs/lib/invariant":76,"fbjs/lib/warning":87}],155:[function(require,module,exports){
+},{"./EventPluginRegistry":154,"./EventPluginUtils":155,"./ReactErrorUtils":194,"./accumulateInto":240,"./forEachAccumulated":248,"_process":136,"fbjs/lib/invariant":75,"fbjs/lib/warning":86}],154:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -46564,7 +46686,7 @@ var EventPluginRegistry = {
 
 module.exports = EventPluginRegistry;
 }).call(this,require('_process'))
-},{"_process":137,"fbjs/lib/invariant":76}],156:[function(require,module,exports){
+},{"_process":136,"fbjs/lib/invariant":75}],155:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -46769,7 +46891,7 @@ var EventPluginUtils = {
 
 module.exports = EventPluginUtils;
 }).call(this,require('_process'))
-},{"./EventConstants":153,"./ReactErrorUtils":195,"_process":137,"fbjs/lib/invariant":76,"fbjs/lib/warning":87}],157:[function(require,module,exports){
+},{"./EventConstants":152,"./ReactErrorUtils":194,"_process":136,"fbjs/lib/invariant":75,"fbjs/lib/warning":86}],156:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -46907,7 +47029,7 @@ var EventPropagators = {
 
 module.exports = EventPropagators;
 }).call(this,require('_process'))
-},{"./EventConstants":153,"./EventPluginHub":154,"./accumulateInto":241,"./forEachAccumulated":249,"_process":137,"fbjs/lib/warning":87}],158:[function(require,module,exports){
+},{"./EventConstants":152,"./EventPluginHub":153,"./accumulateInto":240,"./forEachAccumulated":248,"_process":136,"fbjs/lib/warning":86}],157:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -47003,7 +47125,7 @@ assign(FallbackCompositionState.prototype, {
 PooledClass.addPoolingTo(FallbackCompositionState);
 
 module.exports = FallbackCompositionState;
-},{"./Object.assign":161,"./PooledClass":162,"./getTextContentAccessor":256}],159:[function(require,module,exports){
+},{"./Object.assign":160,"./PooledClass":161,"./getTextContentAccessor":255}],158:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -47234,7 +47356,7 @@ var HTMLDOMPropertyConfig = {
 };
 
 module.exports = HTMLDOMPropertyConfig;
-},{"./DOMProperty":148,"fbjs/lib/ExecutionEnvironment":62}],160:[function(require,module,exports){
+},{"./DOMProperty":147,"fbjs/lib/ExecutionEnvironment":61}],159:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -47371,7 +47493,7 @@ var LinkedValueUtils = {
 
 module.exports = LinkedValueUtils;
 }).call(this,require('_process'))
-},{"./ReactPropTypeLocations":212,"./ReactPropTypes":213,"_process":137,"fbjs/lib/invariant":76,"fbjs/lib/warning":87}],161:[function(require,module,exports){
+},{"./ReactPropTypeLocations":211,"./ReactPropTypes":212,"_process":136,"fbjs/lib/invariant":75,"fbjs/lib/warning":86}],160:[function(require,module,exports){
 /**
  * Copyright 2014-2015, Facebook, Inc.
  * All rights reserved.
@@ -47419,7 +47541,7 @@ function assign(target, sources) {
 }
 
 module.exports = assign;
-},{}],162:[function(require,module,exports){
+},{}],161:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -47541,7 +47663,7 @@ var PooledClass = {
 
 module.exports = PooledClass;
 }).call(this,require('_process'))
-},{"_process":137,"fbjs/lib/invariant":76}],163:[function(require,module,exports){
+},{"_process":136,"fbjs/lib/invariant":75}],162:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -47582,7 +47704,7 @@ React.__SECRET_DOM_DO_NOT_USE_OR_YOU_WILL_BE_FIRED = ReactDOM;
 React.__SECRET_DOM_SERVER_DO_NOT_USE_OR_YOU_WILL_BE_FIRED = ReactDOMServer;
 
 module.exports = React;
-},{"./Object.assign":161,"./ReactDOM":174,"./ReactDOMServer":184,"./ReactIsomorphic":202,"./deprecated":245}],164:[function(require,module,exports){
+},{"./Object.assign":160,"./ReactDOM":173,"./ReactDOMServer":183,"./ReactIsomorphic":201,"./deprecated":244}],163:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -47621,7 +47743,7 @@ var ReactBrowserComponentMixin = {
 
 module.exports = ReactBrowserComponentMixin;
 }).call(this,require('_process'))
-},{"./ReactInstanceMap":201,"./findDOMNode":247,"_process":137,"fbjs/lib/warning":87}],165:[function(require,module,exports){
+},{"./ReactInstanceMap":200,"./findDOMNode":246,"_process":136,"fbjs/lib/warning":86}],164:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -47946,7 +48068,7 @@ ReactPerf.measureMethods(ReactBrowserEventEmitter, 'ReactBrowserEventEmitter', {
 });
 
 module.exports = ReactBrowserEventEmitter;
-},{"./EventConstants":153,"./EventPluginHub":154,"./EventPluginRegistry":155,"./Object.assign":161,"./ReactEventEmitterMixin":196,"./ReactPerf":210,"./ViewportMetrics":240,"./isEventSupported":258}],166:[function(require,module,exports){
+},{"./EventConstants":152,"./EventPluginHub":153,"./EventPluginRegistry":154,"./Object.assign":160,"./ReactEventEmitterMixin":195,"./ReactPerf":209,"./ViewportMetrics":239,"./isEventSupported":257}],165:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2014-2015, Facebook, Inc.
@@ -48071,7 +48193,7 @@ var ReactChildReconciler = {
 
 module.exports = ReactChildReconciler;
 }).call(this,require('_process'))
-},{"./ReactReconciler":215,"./instantiateReactComponent":257,"./shouldUpdateReactComponent":265,"./traverseAllChildren":266,"_process":137,"fbjs/lib/warning":87}],167:[function(require,module,exports){
+},{"./ReactReconciler":214,"./instantiateReactComponent":256,"./shouldUpdateReactComponent":264,"./traverseAllChildren":265,"_process":136,"fbjs/lib/warning":86}],166:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -48254,7 +48376,7 @@ var ReactChildren = {
 };
 
 module.exports = ReactChildren;
-},{"./PooledClass":162,"./ReactElement":191,"./traverseAllChildren":266,"fbjs/lib/emptyFunction":68}],168:[function(require,module,exports){
+},{"./PooledClass":161,"./ReactElement":190,"./traverseAllChildren":265,"fbjs/lib/emptyFunction":67}],167:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -49028,7 +49150,7 @@ var ReactClass = {
 
 module.exports = ReactClass;
 }).call(this,require('_process'))
-},{"./Object.assign":161,"./ReactComponent":169,"./ReactElement":191,"./ReactNoopUpdateQueue":208,"./ReactPropTypeLocationNames":211,"./ReactPropTypeLocations":212,"_process":137,"fbjs/lib/emptyObject":69,"fbjs/lib/invariant":76,"fbjs/lib/keyMirror":79,"fbjs/lib/keyOf":80,"fbjs/lib/warning":87}],169:[function(require,module,exports){
+},{"./Object.assign":160,"./ReactComponent":168,"./ReactElement":190,"./ReactNoopUpdateQueue":207,"./ReactPropTypeLocationNames":210,"./ReactPropTypeLocations":211,"_process":136,"fbjs/lib/emptyObject":68,"fbjs/lib/invariant":75,"fbjs/lib/keyMirror":78,"fbjs/lib/keyOf":79,"fbjs/lib/warning":86}],168:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -49153,7 +49275,7 @@ if (process.env.NODE_ENV !== 'production') {
 
 module.exports = ReactComponent;
 }).call(this,require('_process'))
-},{"./ReactNoopUpdateQueue":208,"./canDefineProperty":243,"_process":137,"fbjs/lib/emptyObject":69,"fbjs/lib/invariant":76,"fbjs/lib/warning":87}],170:[function(require,module,exports){
+},{"./ReactNoopUpdateQueue":207,"./canDefineProperty":242,"_process":136,"fbjs/lib/emptyObject":68,"fbjs/lib/invariant":75,"fbjs/lib/warning":86}],169:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -49195,7 +49317,7 @@ var ReactComponentBrowserEnvironment = {
 };
 
 module.exports = ReactComponentBrowserEnvironment;
-},{"./ReactDOMIDOperations":179,"./ReactMount":204}],171:[function(require,module,exports){
+},{"./ReactDOMIDOperations":178,"./ReactMount":203}],170:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2014-2015, Facebook, Inc.
@@ -49249,7 +49371,7 @@ var ReactComponentEnvironment = {
 
 module.exports = ReactComponentEnvironment;
 }).call(this,require('_process'))
-},{"_process":137,"fbjs/lib/invariant":76}],172:[function(require,module,exports){
+},{"_process":136,"fbjs/lib/invariant":75}],171:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -49946,7 +50068,7 @@ var ReactCompositeComponent = {
 
 module.exports = ReactCompositeComponent;
 }).call(this,require('_process'))
-},{"./Object.assign":161,"./ReactComponentEnvironment":171,"./ReactCurrentOwner":173,"./ReactElement":191,"./ReactInstanceMap":201,"./ReactPerf":210,"./ReactPropTypeLocationNames":211,"./ReactPropTypeLocations":212,"./ReactReconciler":215,"./ReactUpdateQueue":221,"./shouldUpdateReactComponent":265,"_process":137,"fbjs/lib/emptyObject":69,"fbjs/lib/invariant":76,"fbjs/lib/warning":87}],173:[function(require,module,exports){
+},{"./Object.assign":160,"./ReactComponentEnvironment":170,"./ReactCurrentOwner":172,"./ReactElement":190,"./ReactInstanceMap":200,"./ReactPerf":209,"./ReactPropTypeLocationNames":210,"./ReactPropTypeLocations":211,"./ReactReconciler":214,"./ReactUpdateQueue":220,"./shouldUpdateReactComponent":264,"_process":136,"fbjs/lib/emptyObject":68,"fbjs/lib/invariant":75,"fbjs/lib/warning":86}],172:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -49977,7 +50099,7 @@ var ReactCurrentOwner = {
 };
 
 module.exports = ReactCurrentOwner;
-},{}],174:[function(require,module,exports){
+},{}],173:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -50072,7 +50194,7 @@ if (process.env.NODE_ENV !== 'production') {
 
 module.exports = React;
 }).call(this,require('_process'))
-},{"./ReactCurrentOwner":173,"./ReactDOMTextComponent":185,"./ReactDefaultInjection":188,"./ReactInstanceHandles":200,"./ReactMount":204,"./ReactPerf":210,"./ReactReconciler":215,"./ReactUpdates":222,"./ReactVersion":223,"./findDOMNode":247,"./renderSubtreeIntoContainer":262,"_process":137,"fbjs/lib/ExecutionEnvironment":62,"fbjs/lib/warning":87}],175:[function(require,module,exports){
+},{"./ReactCurrentOwner":172,"./ReactDOMTextComponent":184,"./ReactDefaultInjection":187,"./ReactInstanceHandles":199,"./ReactMount":203,"./ReactPerf":209,"./ReactReconciler":214,"./ReactUpdates":221,"./ReactVersion":222,"./findDOMNode":246,"./renderSubtreeIntoContainer":261,"_process":136,"fbjs/lib/ExecutionEnvironment":61,"fbjs/lib/warning":86}],174:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -50123,7 +50245,7 @@ var ReactDOMButton = {
 };
 
 module.exports = ReactDOMButton;
-},{}],176:[function(require,module,exports){
+},{}],175:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -51088,7 +51210,7 @@ assign(ReactDOMComponent.prototype, ReactDOMComponent.Mixin, ReactMultiChild.Mix
 
 module.exports = ReactDOMComponent;
 }).call(this,require('_process'))
-},{"./AutoFocusUtils":140,"./CSSPropertyOperations":143,"./DOMProperty":148,"./DOMPropertyOperations":149,"./EventConstants":153,"./Object.assign":161,"./ReactBrowserEventEmitter":165,"./ReactComponentBrowserEnvironment":170,"./ReactDOMButton":175,"./ReactDOMInput":180,"./ReactDOMOption":181,"./ReactDOMSelect":182,"./ReactDOMTextarea":186,"./ReactMount":204,"./ReactMultiChild":205,"./ReactPerf":210,"./ReactUpdateQueue":221,"./canDefineProperty":243,"./escapeTextContentForBrowser":246,"./isEventSupported":258,"./setInnerHTML":263,"./setTextContent":264,"./validateDOMNesting":267,"_process":137,"fbjs/lib/invariant":76,"fbjs/lib/keyOf":80,"fbjs/lib/shallowEqual":85,"fbjs/lib/warning":87}],177:[function(require,module,exports){
+},{"./AutoFocusUtils":139,"./CSSPropertyOperations":142,"./DOMProperty":147,"./DOMPropertyOperations":148,"./EventConstants":152,"./Object.assign":160,"./ReactBrowserEventEmitter":164,"./ReactComponentBrowserEnvironment":169,"./ReactDOMButton":174,"./ReactDOMInput":179,"./ReactDOMOption":180,"./ReactDOMSelect":181,"./ReactDOMTextarea":185,"./ReactMount":203,"./ReactMultiChild":204,"./ReactPerf":209,"./ReactUpdateQueue":220,"./canDefineProperty":242,"./escapeTextContentForBrowser":245,"./isEventSupported":257,"./setInnerHTML":262,"./setTextContent":263,"./validateDOMNesting":266,"_process":136,"fbjs/lib/invariant":75,"fbjs/lib/keyOf":79,"fbjs/lib/shallowEqual":84,"fbjs/lib/warning":86}],176:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -51268,7 +51390,7 @@ var ReactDOMFactories = mapObject({
 
 module.exports = ReactDOMFactories;
 }).call(this,require('_process'))
-},{"./ReactElement":191,"./ReactElementValidator":192,"_process":137,"fbjs/lib/mapObject":81}],178:[function(require,module,exports){
+},{"./ReactElement":190,"./ReactElementValidator":191,"_process":136,"fbjs/lib/mapObject":80}],177:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -51287,7 +51409,7 @@ var ReactDOMFeatureFlags = {
 };
 
 module.exports = ReactDOMFeatureFlags;
-},{}],179:[function(require,module,exports){
+},{}],178:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -51384,7 +51506,7 @@ ReactPerf.measureMethods(ReactDOMIDOperations, 'ReactDOMIDOperations', {
 
 module.exports = ReactDOMIDOperations;
 }).call(this,require('_process'))
-},{"./DOMChildrenOperations":147,"./DOMPropertyOperations":149,"./ReactMount":204,"./ReactPerf":210,"_process":137,"fbjs/lib/invariant":76}],180:[function(require,module,exports){
+},{"./DOMChildrenOperations":146,"./DOMPropertyOperations":148,"./ReactMount":203,"./ReactPerf":209,"_process":136,"fbjs/lib/invariant":75}],179:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -51540,7 +51662,7 @@ function _handleChange(event) {
 
 module.exports = ReactDOMInput;
 }).call(this,require('_process'))
-},{"./LinkedValueUtils":160,"./Object.assign":161,"./ReactDOMIDOperations":179,"./ReactMount":204,"./ReactUpdates":222,"_process":137,"fbjs/lib/invariant":76}],181:[function(require,module,exports){
+},{"./LinkedValueUtils":159,"./Object.assign":160,"./ReactDOMIDOperations":178,"./ReactMount":203,"./ReactUpdates":221,"_process":136,"fbjs/lib/invariant":75}],180:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -51632,7 +51754,7 @@ var ReactDOMOption = {
 
 module.exports = ReactDOMOption;
 }).call(this,require('_process'))
-},{"./Object.assign":161,"./ReactChildren":167,"./ReactDOMSelect":182,"_process":137,"fbjs/lib/warning":87}],182:[function(require,module,exports){
+},{"./Object.assign":160,"./ReactChildren":166,"./ReactDOMSelect":181,"_process":136,"fbjs/lib/warning":86}],181:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -51823,7 +51945,7 @@ function _handleChange(event) {
 
 module.exports = ReactDOMSelect;
 }).call(this,require('_process'))
-},{"./LinkedValueUtils":160,"./Object.assign":161,"./ReactMount":204,"./ReactUpdates":222,"_process":137,"fbjs/lib/warning":87}],183:[function(require,module,exports){
+},{"./LinkedValueUtils":159,"./Object.assign":160,"./ReactMount":203,"./ReactUpdates":221,"_process":136,"fbjs/lib/warning":86}],182:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -52036,7 +52158,7 @@ var ReactDOMSelection = {
 };
 
 module.exports = ReactDOMSelection;
-},{"./getNodeForCharacterOffset":255,"./getTextContentAccessor":256,"fbjs/lib/ExecutionEnvironment":62}],184:[function(require,module,exports){
+},{"./getNodeForCharacterOffset":254,"./getTextContentAccessor":255,"fbjs/lib/ExecutionEnvironment":61}],183:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -52063,7 +52185,7 @@ var ReactDOMServer = {
 };
 
 module.exports = ReactDOMServer;
-},{"./ReactDefaultInjection":188,"./ReactServerRendering":219,"./ReactVersion":223}],185:[function(require,module,exports){
+},{"./ReactDefaultInjection":187,"./ReactServerRendering":218,"./ReactVersion":222}],184:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -52193,7 +52315,7 @@ assign(ReactDOMTextComponent.prototype, {
 
 module.exports = ReactDOMTextComponent;
 }).call(this,require('_process'))
-},{"./DOMChildrenOperations":147,"./DOMPropertyOperations":149,"./Object.assign":161,"./ReactComponentBrowserEnvironment":170,"./ReactMount":204,"./escapeTextContentForBrowser":246,"./setTextContent":264,"./validateDOMNesting":267,"_process":137}],186:[function(require,module,exports){
+},{"./DOMChildrenOperations":146,"./DOMPropertyOperations":148,"./Object.assign":160,"./ReactComponentBrowserEnvironment":169,"./ReactMount":203,"./escapeTextContentForBrowser":245,"./setTextContent":263,"./validateDOMNesting":266,"_process":136}],185:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -52309,7 +52431,7 @@ function _handleChange(event) {
 
 module.exports = ReactDOMTextarea;
 }).call(this,require('_process'))
-},{"./LinkedValueUtils":160,"./Object.assign":161,"./ReactDOMIDOperations":179,"./ReactUpdates":222,"_process":137,"fbjs/lib/invariant":76,"fbjs/lib/warning":87}],187:[function(require,module,exports){
+},{"./LinkedValueUtils":159,"./Object.assign":160,"./ReactDOMIDOperations":178,"./ReactUpdates":221,"_process":136,"fbjs/lib/invariant":75,"fbjs/lib/warning":86}],186:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -52377,7 +52499,7 @@ var ReactDefaultBatchingStrategy = {
 };
 
 module.exports = ReactDefaultBatchingStrategy;
-},{"./Object.assign":161,"./ReactUpdates":222,"./Transaction":239,"fbjs/lib/emptyFunction":68}],188:[function(require,module,exports){
+},{"./Object.assign":160,"./ReactUpdates":221,"./Transaction":238,"fbjs/lib/emptyFunction":67}],187:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -52477,7 +52599,7 @@ module.exports = {
   inject: inject
 };
 }).call(this,require('_process'))
-},{"./BeforeInputEventPlugin":141,"./ChangeEventPlugin":145,"./ClientReactRootIndex":146,"./DefaultEventPluginOrder":151,"./EnterLeaveEventPlugin":152,"./HTMLDOMPropertyConfig":159,"./ReactBrowserComponentMixin":164,"./ReactComponentBrowserEnvironment":170,"./ReactDOMComponent":176,"./ReactDOMTextComponent":185,"./ReactDefaultBatchingStrategy":187,"./ReactDefaultPerf":189,"./ReactEventListener":197,"./ReactInjection":198,"./ReactInstanceHandles":200,"./ReactMount":204,"./ReactReconcileTransaction":214,"./SVGDOMPropertyConfig":224,"./SelectEventPlugin":225,"./ServerReactRootIndex":226,"./SimpleEventPlugin":227,"_process":137,"fbjs/lib/ExecutionEnvironment":62}],189:[function(require,module,exports){
+},{"./BeforeInputEventPlugin":140,"./ChangeEventPlugin":144,"./ClientReactRootIndex":145,"./DefaultEventPluginOrder":150,"./EnterLeaveEventPlugin":151,"./HTMLDOMPropertyConfig":158,"./ReactBrowserComponentMixin":163,"./ReactComponentBrowserEnvironment":169,"./ReactDOMComponent":175,"./ReactDOMTextComponent":184,"./ReactDefaultBatchingStrategy":186,"./ReactDefaultPerf":188,"./ReactEventListener":196,"./ReactInjection":197,"./ReactInstanceHandles":199,"./ReactMount":203,"./ReactReconcileTransaction":213,"./SVGDOMPropertyConfig":223,"./SelectEventPlugin":224,"./ServerReactRootIndex":225,"./SimpleEventPlugin":226,"_process":136,"fbjs/lib/ExecutionEnvironment":61}],188:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -52715,7 +52837,7 @@ var ReactDefaultPerf = {
 };
 
 module.exports = ReactDefaultPerf;
-},{"./DOMProperty":148,"./ReactDefaultPerfAnalysis":190,"./ReactMount":204,"./ReactPerf":210,"fbjs/lib/performanceNow":84}],190:[function(require,module,exports){
+},{"./DOMProperty":147,"./ReactDefaultPerfAnalysis":189,"./ReactMount":203,"./ReactPerf":209,"fbjs/lib/performanceNow":83}],189:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -52917,7 +53039,7 @@ var ReactDefaultPerfAnalysis = {
 };
 
 module.exports = ReactDefaultPerfAnalysis;
-},{"./Object.assign":161}],191:[function(require,module,exports){
+},{"./Object.assign":160}],190:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2014-2015, Facebook, Inc.
@@ -53167,7 +53289,7 @@ ReactElement.isValidElement = function (object) {
 
 module.exports = ReactElement;
 }).call(this,require('_process'))
-},{"./Object.assign":161,"./ReactCurrentOwner":173,"./canDefineProperty":243,"_process":137}],192:[function(require,module,exports){
+},{"./Object.assign":160,"./ReactCurrentOwner":172,"./canDefineProperty":242,"_process":136}],191:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2014-2015, Facebook, Inc.
@@ -53451,7 +53573,7 @@ var ReactElementValidator = {
 
 module.exports = ReactElementValidator;
 }).call(this,require('_process'))
-},{"./ReactCurrentOwner":173,"./ReactElement":191,"./ReactPropTypeLocationNames":211,"./ReactPropTypeLocations":212,"./canDefineProperty":243,"./getIteratorFn":254,"_process":137,"fbjs/lib/invariant":76,"fbjs/lib/warning":87}],193:[function(require,module,exports){
+},{"./ReactCurrentOwner":172,"./ReactElement":190,"./ReactPropTypeLocationNames":210,"./ReactPropTypeLocations":211,"./canDefineProperty":242,"./getIteratorFn":253,"_process":136,"fbjs/lib/invariant":75,"fbjs/lib/warning":86}],192:[function(require,module,exports){
 /**
  * Copyright 2014-2015, Facebook, Inc.
  * All rights reserved.
@@ -53507,7 +53629,7 @@ assign(ReactEmptyComponent.prototype, {
 ReactEmptyComponent.injection = ReactEmptyComponentInjection;
 
 module.exports = ReactEmptyComponent;
-},{"./Object.assign":161,"./ReactElement":191,"./ReactEmptyComponentRegistry":194,"./ReactReconciler":215}],194:[function(require,module,exports){
+},{"./Object.assign":160,"./ReactElement":190,"./ReactEmptyComponentRegistry":193,"./ReactReconciler":214}],193:[function(require,module,exports){
 /**
  * Copyright 2014-2015, Facebook, Inc.
  * All rights reserved.
@@ -53556,7 +53678,7 @@ var ReactEmptyComponentRegistry = {
 };
 
 module.exports = ReactEmptyComponentRegistry;
-},{}],195:[function(require,module,exports){
+},{}],194:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -53636,7 +53758,7 @@ if (process.env.NODE_ENV !== 'production') {
 
 module.exports = ReactErrorUtils;
 }).call(this,require('_process'))
-},{"_process":137}],196:[function(require,module,exports){
+},{"_process":136}],195:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -53675,7 +53797,7 @@ var ReactEventEmitterMixin = {
 };
 
 module.exports = ReactEventEmitterMixin;
-},{"./EventPluginHub":154}],197:[function(require,module,exports){
+},{"./EventPluginHub":153}],196:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -53887,7 +54009,7 @@ var ReactEventListener = {
 };
 
 module.exports = ReactEventListener;
-},{"./Object.assign":161,"./PooledClass":162,"./ReactInstanceHandles":200,"./ReactMount":204,"./ReactUpdates":222,"./getEventTarget":253,"fbjs/lib/EventListener":61,"fbjs/lib/ExecutionEnvironment":62,"fbjs/lib/getUnboundedScrollPosition":73}],198:[function(require,module,exports){
+},{"./Object.assign":160,"./PooledClass":161,"./ReactInstanceHandles":199,"./ReactMount":203,"./ReactUpdates":221,"./getEventTarget":252,"fbjs/lib/EventListener":60,"fbjs/lib/ExecutionEnvironment":61,"fbjs/lib/getUnboundedScrollPosition":72}],197:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -53926,7 +54048,7 @@ var ReactInjection = {
 };
 
 module.exports = ReactInjection;
-},{"./DOMProperty":148,"./EventPluginHub":154,"./ReactBrowserEventEmitter":165,"./ReactClass":168,"./ReactComponentEnvironment":171,"./ReactEmptyComponent":193,"./ReactNativeComponent":207,"./ReactPerf":210,"./ReactRootIndex":217,"./ReactUpdates":222}],199:[function(require,module,exports){
+},{"./DOMProperty":147,"./EventPluginHub":153,"./ReactBrowserEventEmitter":164,"./ReactClass":167,"./ReactComponentEnvironment":170,"./ReactEmptyComponent":192,"./ReactNativeComponent":206,"./ReactPerf":209,"./ReactRootIndex":216,"./ReactUpdates":221}],198:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -54051,7 +54173,7 @@ var ReactInputSelection = {
 };
 
 module.exports = ReactInputSelection;
-},{"./ReactDOMSelection":183,"fbjs/lib/containsNode":65,"fbjs/lib/focusNode":70,"fbjs/lib/getActiveElement":71}],200:[function(require,module,exports){
+},{"./ReactDOMSelection":182,"fbjs/lib/containsNode":64,"fbjs/lib/focusNode":69,"fbjs/lib/getActiveElement":70}],199:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -54356,7 +54478,7 @@ var ReactInstanceHandles = {
 
 module.exports = ReactInstanceHandles;
 }).call(this,require('_process'))
-},{"./ReactRootIndex":217,"_process":137,"fbjs/lib/invariant":76}],201:[function(require,module,exports){
+},{"./ReactRootIndex":216,"_process":136,"fbjs/lib/invariant":75}],200:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -54404,7 +54526,7 @@ var ReactInstanceMap = {
 };
 
 module.exports = ReactInstanceMap;
-},{}],202:[function(require,module,exports){
+},{}],201:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -54481,7 +54603,7 @@ var React = {
 
 module.exports = React;
 }).call(this,require('_process'))
-},{"./Object.assign":161,"./ReactChildren":167,"./ReactClass":168,"./ReactComponent":169,"./ReactDOMFactories":177,"./ReactElement":191,"./ReactElementValidator":192,"./ReactPropTypes":213,"./ReactVersion":223,"./onlyChild":260,"_process":137}],203:[function(require,module,exports){
+},{"./Object.assign":160,"./ReactChildren":166,"./ReactClass":167,"./ReactComponent":168,"./ReactDOMFactories":176,"./ReactElement":190,"./ReactElementValidator":191,"./ReactPropTypes":212,"./ReactVersion":222,"./onlyChild":259,"_process":136}],202:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -54527,7 +54649,7 @@ var ReactMarkupChecksum = {
 };
 
 module.exports = ReactMarkupChecksum;
-},{"./adler32":242}],204:[function(require,module,exports){
+},{"./adler32":241}],203:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -55380,7 +55502,7 @@ ReactPerf.measureMethods(ReactMount, 'ReactMount', {
 
 module.exports = ReactMount;
 }).call(this,require('_process'))
-},{"./DOMProperty":148,"./Object.assign":161,"./ReactBrowserEventEmitter":165,"./ReactCurrentOwner":173,"./ReactDOMFeatureFlags":178,"./ReactElement":191,"./ReactEmptyComponentRegistry":194,"./ReactInstanceHandles":200,"./ReactInstanceMap":201,"./ReactMarkupChecksum":203,"./ReactPerf":210,"./ReactReconciler":215,"./ReactUpdateQueue":221,"./ReactUpdates":222,"./instantiateReactComponent":257,"./setInnerHTML":263,"./shouldUpdateReactComponent":265,"./validateDOMNesting":267,"_process":137,"fbjs/lib/containsNode":65,"fbjs/lib/emptyObject":69,"fbjs/lib/invariant":76,"fbjs/lib/warning":87}],205:[function(require,module,exports){
+},{"./DOMProperty":147,"./Object.assign":160,"./ReactBrowserEventEmitter":164,"./ReactCurrentOwner":172,"./ReactDOMFeatureFlags":177,"./ReactElement":190,"./ReactEmptyComponentRegistry":193,"./ReactInstanceHandles":199,"./ReactInstanceMap":200,"./ReactMarkupChecksum":202,"./ReactPerf":209,"./ReactReconciler":214,"./ReactUpdateQueue":220,"./ReactUpdates":221,"./instantiateReactComponent":256,"./setInnerHTML":262,"./shouldUpdateReactComponent":264,"./validateDOMNesting":266,"_process":136,"fbjs/lib/containsNode":64,"fbjs/lib/emptyObject":68,"fbjs/lib/invariant":75,"fbjs/lib/warning":86}],204:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -55879,7 +56001,7 @@ var ReactMultiChild = {
 
 module.exports = ReactMultiChild;
 }).call(this,require('_process'))
-},{"./ReactChildReconciler":166,"./ReactComponentEnvironment":171,"./ReactCurrentOwner":173,"./ReactMultiChildUpdateTypes":206,"./ReactReconciler":215,"./flattenChildren":248,"_process":137}],206:[function(require,module,exports){
+},{"./ReactChildReconciler":165,"./ReactComponentEnvironment":170,"./ReactCurrentOwner":172,"./ReactMultiChildUpdateTypes":205,"./ReactReconciler":214,"./flattenChildren":247,"_process":136}],205:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -55912,7 +56034,7 @@ var ReactMultiChildUpdateTypes = keyMirror({
 });
 
 module.exports = ReactMultiChildUpdateTypes;
-},{"fbjs/lib/keyMirror":79}],207:[function(require,module,exports){
+},{"fbjs/lib/keyMirror":78}],206:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2014-2015, Facebook, Inc.
@@ -56009,7 +56131,7 @@ var ReactNativeComponent = {
 
 module.exports = ReactNativeComponent;
 }).call(this,require('_process'))
-},{"./Object.assign":161,"_process":137,"fbjs/lib/invariant":76}],208:[function(require,module,exports){
+},{"./Object.assign":160,"_process":136,"fbjs/lib/invariant":75}],207:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2015, Facebook, Inc.
@@ -56130,7 +56252,7 @@ var ReactNoopUpdateQueue = {
 
 module.exports = ReactNoopUpdateQueue;
 }).call(this,require('_process'))
-},{"_process":137,"fbjs/lib/warning":87}],209:[function(require,module,exports){
+},{"_process":136,"fbjs/lib/warning":86}],208:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -56224,7 +56346,7 @@ var ReactOwner = {
 
 module.exports = ReactOwner;
 }).call(this,require('_process'))
-},{"_process":137,"fbjs/lib/invariant":76}],210:[function(require,module,exports){
+},{"_process":136,"fbjs/lib/invariant":75}],209:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -56323,7 +56445,7 @@ function _noMeasure(objName, fnName, func) {
 
 module.exports = ReactPerf;
 }).call(this,require('_process'))
-},{"_process":137}],211:[function(require,module,exports){
+},{"_process":136}],210:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -56350,7 +56472,7 @@ if (process.env.NODE_ENV !== 'production') {
 
 module.exports = ReactPropTypeLocationNames;
 }).call(this,require('_process'))
-},{"_process":137}],212:[function(require,module,exports){
+},{"_process":136}],211:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -56373,7 +56495,7 @@ var ReactPropTypeLocations = keyMirror({
 });
 
 module.exports = ReactPropTypeLocations;
-},{"fbjs/lib/keyMirror":79}],213:[function(require,module,exports){
+},{"fbjs/lib/keyMirror":78}],212:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -56730,7 +56852,7 @@ function getClassName(propValue) {
 }
 
 module.exports = ReactPropTypes;
-},{"./ReactElement":191,"./ReactPropTypeLocationNames":211,"./getIteratorFn":254,"fbjs/lib/emptyFunction":68}],214:[function(require,module,exports){
+},{"./ReactElement":190,"./ReactPropTypeLocationNames":210,"./getIteratorFn":253,"fbjs/lib/emptyFunction":67}],213:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -56882,7 +57004,7 @@ assign(ReactReconcileTransaction.prototype, Transaction.Mixin, Mixin);
 PooledClass.addPoolingTo(ReactReconcileTransaction);
 
 module.exports = ReactReconcileTransaction;
-},{"./CallbackQueue":144,"./Object.assign":161,"./PooledClass":162,"./ReactBrowserEventEmitter":165,"./ReactDOMFeatureFlags":178,"./ReactInputSelection":199,"./Transaction":239}],215:[function(require,module,exports){
+},{"./CallbackQueue":143,"./Object.assign":160,"./PooledClass":161,"./ReactBrowserEventEmitter":164,"./ReactDOMFeatureFlags":177,"./ReactInputSelection":198,"./Transaction":238}],214:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -56990,7 +57112,7 @@ var ReactReconciler = {
 };
 
 module.exports = ReactReconciler;
-},{"./ReactRef":216}],216:[function(require,module,exports){
+},{"./ReactRef":215}],215:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -57069,7 +57191,7 @@ ReactRef.detachRefs = function (instance, element) {
 };
 
 module.exports = ReactRef;
-},{"./ReactOwner":209}],217:[function(require,module,exports){
+},{"./ReactOwner":208}],216:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -57099,7 +57221,7 @@ var ReactRootIndex = {
 };
 
 module.exports = ReactRootIndex;
-},{}],218:[function(require,module,exports){
+},{}],217:[function(require,module,exports){
 /**
  * Copyright 2014-2015, Facebook, Inc.
  * All rights reserved.
@@ -57123,7 +57245,7 @@ var ReactServerBatchingStrategy = {
 };
 
 module.exports = ReactServerBatchingStrategy;
-},{}],219:[function(require,module,exports){
+},{}],218:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -57209,7 +57331,7 @@ module.exports = {
   renderToStaticMarkup: renderToStaticMarkup
 };
 }).call(this,require('_process'))
-},{"./ReactDefaultBatchingStrategy":187,"./ReactElement":191,"./ReactInstanceHandles":200,"./ReactMarkupChecksum":203,"./ReactServerBatchingStrategy":218,"./ReactServerRenderingTransaction":220,"./ReactUpdates":222,"./instantiateReactComponent":257,"_process":137,"fbjs/lib/emptyObject":69,"fbjs/lib/invariant":76}],220:[function(require,module,exports){
+},{"./ReactDefaultBatchingStrategy":186,"./ReactElement":190,"./ReactInstanceHandles":199,"./ReactMarkupChecksum":202,"./ReactServerBatchingStrategy":217,"./ReactServerRenderingTransaction":219,"./ReactUpdates":221,"./instantiateReactComponent":256,"_process":136,"fbjs/lib/emptyObject":68,"fbjs/lib/invariant":75}],219:[function(require,module,exports){
 /**
  * Copyright 2014-2015, Facebook, Inc.
  * All rights reserved.
@@ -57297,7 +57419,7 @@ assign(ReactServerRenderingTransaction.prototype, Transaction.Mixin, Mixin);
 PooledClass.addPoolingTo(ReactServerRenderingTransaction);
 
 module.exports = ReactServerRenderingTransaction;
-},{"./CallbackQueue":144,"./Object.assign":161,"./PooledClass":162,"./Transaction":239,"fbjs/lib/emptyFunction":68}],221:[function(require,module,exports){
+},{"./CallbackQueue":143,"./Object.assign":160,"./PooledClass":161,"./Transaction":238,"fbjs/lib/emptyFunction":67}],220:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2015, Facebook, Inc.
@@ -57557,7 +57679,7 @@ var ReactUpdateQueue = {
 
 module.exports = ReactUpdateQueue;
 }).call(this,require('_process'))
-},{"./Object.assign":161,"./ReactCurrentOwner":173,"./ReactElement":191,"./ReactInstanceMap":201,"./ReactUpdates":222,"_process":137,"fbjs/lib/invariant":76,"fbjs/lib/warning":87}],222:[function(require,module,exports){
+},{"./Object.assign":160,"./ReactCurrentOwner":172,"./ReactElement":190,"./ReactInstanceMap":200,"./ReactUpdates":221,"_process":136,"fbjs/lib/invariant":75,"fbjs/lib/warning":86}],221:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -57783,7 +57905,7 @@ var ReactUpdates = {
 
 module.exports = ReactUpdates;
 }).call(this,require('_process'))
-},{"./CallbackQueue":144,"./Object.assign":161,"./PooledClass":162,"./ReactPerf":210,"./ReactReconciler":215,"./Transaction":239,"_process":137,"fbjs/lib/invariant":76}],223:[function(require,module,exports){
+},{"./CallbackQueue":143,"./Object.assign":160,"./PooledClass":161,"./ReactPerf":209,"./ReactReconciler":214,"./Transaction":238,"_process":136,"fbjs/lib/invariant":75}],222:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -57798,7 +57920,7 @@ module.exports = ReactUpdates;
 'use strict';
 
 module.exports = '0.14.9';
-},{}],224:[function(require,module,exports){
+},{}],223:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -57926,7 +58048,7 @@ var SVGDOMPropertyConfig = {
 };
 
 module.exports = SVGDOMPropertyConfig;
-},{"./DOMProperty":148}],225:[function(require,module,exports){
+},{"./DOMProperty":147}],224:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -58128,7 +58250,7 @@ var SelectEventPlugin = {
 };
 
 module.exports = SelectEventPlugin;
-},{"./EventConstants":153,"./EventPropagators":157,"./ReactInputSelection":199,"./SyntheticEvent":231,"./isTextInputElement":259,"fbjs/lib/ExecutionEnvironment":62,"fbjs/lib/getActiveElement":71,"fbjs/lib/keyOf":80,"fbjs/lib/shallowEqual":85}],226:[function(require,module,exports){
+},{"./EventConstants":152,"./EventPropagators":156,"./ReactInputSelection":198,"./SyntheticEvent":230,"./isTextInputElement":258,"fbjs/lib/ExecutionEnvironment":61,"fbjs/lib/getActiveElement":70,"fbjs/lib/keyOf":79,"fbjs/lib/shallowEqual":84}],225:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -58158,7 +58280,7 @@ var ServerReactRootIndex = {
 };
 
 module.exports = ServerReactRootIndex;
-},{}],227:[function(require,module,exports){
+},{}],226:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -58748,7 +58870,7 @@ var SimpleEventPlugin = {
 
 module.exports = SimpleEventPlugin;
 }).call(this,require('_process'))
-},{"./EventConstants":153,"./EventPropagators":157,"./ReactMount":204,"./SyntheticClipboardEvent":228,"./SyntheticDragEvent":230,"./SyntheticEvent":231,"./SyntheticFocusEvent":232,"./SyntheticKeyboardEvent":234,"./SyntheticMouseEvent":235,"./SyntheticTouchEvent":236,"./SyntheticUIEvent":237,"./SyntheticWheelEvent":238,"./getEventCharCode":250,"_process":137,"fbjs/lib/EventListener":61,"fbjs/lib/emptyFunction":68,"fbjs/lib/invariant":76,"fbjs/lib/keyOf":80}],228:[function(require,module,exports){
+},{"./EventConstants":152,"./EventPropagators":156,"./ReactMount":203,"./SyntheticClipboardEvent":227,"./SyntheticDragEvent":229,"./SyntheticEvent":230,"./SyntheticFocusEvent":231,"./SyntheticKeyboardEvent":233,"./SyntheticMouseEvent":234,"./SyntheticTouchEvent":235,"./SyntheticUIEvent":236,"./SyntheticWheelEvent":237,"./getEventCharCode":249,"_process":136,"fbjs/lib/EventListener":60,"fbjs/lib/emptyFunction":67,"fbjs/lib/invariant":75,"fbjs/lib/keyOf":79}],227:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -58788,7 +58910,7 @@ function SyntheticClipboardEvent(dispatchConfig, dispatchMarker, nativeEvent, na
 SyntheticEvent.augmentClass(SyntheticClipboardEvent, ClipboardEventInterface);
 
 module.exports = SyntheticClipboardEvent;
-},{"./SyntheticEvent":231}],229:[function(require,module,exports){
+},{"./SyntheticEvent":230}],228:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -58826,7 +58948,7 @@ function SyntheticCompositionEvent(dispatchConfig, dispatchMarker, nativeEvent, 
 SyntheticEvent.augmentClass(SyntheticCompositionEvent, CompositionEventInterface);
 
 module.exports = SyntheticCompositionEvent;
-},{"./SyntheticEvent":231}],230:[function(require,module,exports){
+},{"./SyntheticEvent":230}],229:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -58864,7 +58986,7 @@ function SyntheticDragEvent(dispatchConfig, dispatchMarker, nativeEvent, nativeE
 SyntheticMouseEvent.augmentClass(SyntheticDragEvent, DragEventInterface);
 
 module.exports = SyntheticDragEvent;
-},{"./SyntheticMouseEvent":235}],231:[function(require,module,exports){
+},{"./SyntheticMouseEvent":234}],230:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -59047,7 +59169,7 @@ PooledClass.addPoolingTo(SyntheticEvent, PooledClass.fourArgumentPooler);
 
 module.exports = SyntheticEvent;
 }).call(this,require('_process'))
-},{"./Object.assign":161,"./PooledClass":162,"_process":137,"fbjs/lib/emptyFunction":68,"fbjs/lib/warning":87}],232:[function(require,module,exports){
+},{"./Object.assign":160,"./PooledClass":161,"_process":136,"fbjs/lib/emptyFunction":67,"fbjs/lib/warning":86}],231:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -59085,7 +59207,7 @@ function SyntheticFocusEvent(dispatchConfig, dispatchMarker, nativeEvent, native
 SyntheticUIEvent.augmentClass(SyntheticFocusEvent, FocusEventInterface);
 
 module.exports = SyntheticFocusEvent;
-},{"./SyntheticUIEvent":237}],233:[function(require,module,exports){
+},{"./SyntheticUIEvent":236}],232:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -59124,7 +59246,7 @@ function SyntheticInputEvent(dispatchConfig, dispatchMarker, nativeEvent, native
 SyntheticEvent.augmentClass(SyntheticInputEvent, InputEventInterface);
 
 module.exports = SyntheticInputEvent;
-},{"./SyntheticEvent":231}],234:[function(require,module,exports){
+},{"./SyntheticEvent":230}],233:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -59210,7 +59332,7 @@ function SyntheticKeyboardEvent(dispatchConfig, dispatchMarker, nativeEvent, nat
 SyntheticUIEvent.augmentClass(SyntheticKeyboardEvent, KeyboardEventInterface);
 
 module.exports = SyntheticKeyboardEvent;
-},{"./SyntheticUIEvent":237,"./getEventCharCode":250,"./getEventKey":251,"./getEventModifierState":252}],235:[function(require,module,exports){
+},{"./SyntheticUIEvent":236,"./getEventCharCode":249,"./getEventKey":250,"./getEventModifierState":251}],234:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -59284,7 +59406,7 @@ function SyntheticMouseEvent(dispatchConfig, dispatchMarker, nativeEvent, native
 SyntheticUIEvent.augmentClass(SyntheticMouseEvent, MouseEventInterface);
 
 module.exports = SyntheticMouseEvent;
-},{"./SyntheticUIEvent":237,"./ViewportMetrics":240,"./getEventModifierState":252}],236:[function(require,module,exports){
+},{"./SyntheticUIEvent":236,"./ViewportMetrics":239,"./getEventModifierState":251}],235:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -59331,7 +59453,7 @@ function SyntheticTouchEvent(dispatchConfig, dispatchMarker, nativeEvent, native
 SyntheticUIEvent.augmentClass(SyntheticTouchEvent, TouchEventInterface);
 
 module.exports = SyntheticTouchEvent;
-},{"./SyntheticUIEvent":237,"./getEventModifierState":252}],237:[function(require,module,exports){
+},{"./SyntheticUIEvent":236,"./getEventModifierState":251}],236:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -59392,7 +59514,7 @@ function SyntheticUIEvent(dispatchConfig, dispatchMarker, nativeEvent, nativeEve
 SyntheticEvent.augmentClass(SyntheticUIEvent, UIEventInterface);
 
 module.exports = SyntheticUIEvent;
-},{"./SyntheticEvent":231,"./getEventTarget":253}],238:[function(require,module,exports){
+},{"./SyntheticEvent":230,"./getEventTarget":252}],237:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -59448,7 +59570,7 @@ function SyntheticWheelEvent(dispatchConfig, dispatchMarker, nativeEvent, native
 SyntheticMouseEvent.augmentClass(SyntheticWheelEvent, WheelEventInterface);
 
 module.exports = SyntheticWheelEvent;
-},{"./SyntheticMouseEvent":235}],239:[function(require,module,exports){
+},{"./SyntheticMouseEvent":234}],238:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -59682,7 +59804,7 @@ var Transaction = {
 
 module.exports = Transaction;
 }).call(this,require('_process'))
-},{"_process":137,"fbjs/lib/invariant":76}],240:[function(require,module,exports){
+},{"_process":136,"fbjs/lib/invariant":75}],239:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -59710,7 +59832,7 @@ var ViewportMetrics = {
 };
 
 module.exports = ViewportMetrics;
-},{}],241:[function(require,module,exports){
+},{}],240:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2014-2015, Facebook, Inc.
@@ -59772,7 +59894,7 @@ function accumulateInto(current, next) {
 
 module.exports = accumulateInto;
 }).call(this,require('_process'))
-},{"_process":137,"fbjs/lib/invariant":76}],242:[function(require,module,exports){
+},{"_process":136,"fbjs/lib/invariant":75}],241:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -59815,7 +59937,7 @@ function adler32(data) {
 }
 
 module.exports = adler32;
-},{}],243:[function(require,module,exports){
+},{}],242:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -59842,7 +59964,7 @@ if (process.env.NODE_ENV !== 'production') {
 
 module.exports = canDefineProperty;
 }).call(this,require('_process'))
-},{"_process":137}],244:[function(require,module,exports){
+},{"_process":136}],243:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -59898,7 +60020,7 @@ function dangerousStyleValue(name, value) {
 }
 
 module.exports = dangerousStyleValue;
-},{"./CSSProperty":142}],245:[function(require,module,exports){
+},{"./CSSProperty":141}],244:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -59949,7 +60071,7 @@ function deprecated(fnName, newModule, newPackage, ctx, fn) {
 
 module.exports = deprecated;
 }).call(this,require('_process'))
-},{"./Object.assign":161,"_process":137,"fbjs/lib/warning":87}],246:[function(require,module,exports){
+},{"./Object.assign":160,"_process":136,"fbjs/lib/warning":86}],245:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -59988,7 +60110,7 @@ function escapeTextContentForBrowser(text) {
 }
 
 module.exports = escapeTextContentForBrowser;
-},{}],247:[function(require,module,exports){
+},{}],246:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -60040,7 +60162,7 @@ function findDOMNode(componentOrElement) {
 
 module.exports = findDOMNode;
 }).call(this,require('_process'))
-},{"./ReactCurrentOwner":173,"./ReactInstanceMap":201,"./ReactMount":204,"_process":137,"fbjs/lib/invariant":76,"fbjs/lib/warning":87}],248:[function(require,module,exports){
+},{"./ReactCurrentOwner":172,"./ReactInstanceMap":200,"./ReactMount":203,"_process":136,"fbjs/lib/invariant":75,"fbjs/lib/warning":86}],247:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -60091,7 +60213,7 @@ function flattenChildren(children) {
 
 module.exports = flattenChildren;
 }).call(this,require('_process'))
-},{"./traverseAllChildren":266,"_process":137,"fbjs/lib/warning":87}],249:[function(require,module,exports){
+},{"./traverseAllChildren":265,"_process":136,"fbjs/lib/warning":86}],248:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -60121,7 +60243,7 @@ var forEachAccumulated = function (arr, cb, scope) {
 };
 
 module.exports = forEachAccumulated;
-},{}],250:[function(require,module,exports){
+},{}],249:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -60172,7 +60294,7 @@ function getEventCharCode(nativeEvent) {
 }
 
 module.exports = getEventCharCode;
-},{}],251:[function(require,module,exports){
+},{}],250:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -60276,7 +60398,7 @@ function getEventKey(nativeEvent) {
 }
 
 module.exports = getEventKey;
-},{"./getEventCharCode":250}],252:[function(require,module,exports){
+},{"./getEventCharCode":249}],251:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -60321,7 +60443,7 @@ function getEventModifierState(nativeEvent) {
 }
 
 module.exports = getEventModifierState;
-},{}],253:[function(require,module,exports){
+},{}],252:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -60351,7 +60473,7 @@ function getEventTarget(nativeEvent) {
 }
 
 module.exports = getEventTarget;
-},{}],254:[function(require,module,exports){
+},{}],253:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -60392,7 +60514,7 @@ function getIteratorFn(maybeIterable) {
 }
 
 module.exports = getIteratorFn;
-},{}],255:[function(require,module,exports){
+},{}],254:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -60466,7 +60588,7 @@ function getNodeForCharacterOffset(root, offset) {
 }
 
 module.exports = getNodeForCharacterOffset;
-},{}],256:[function(require,module,exports){
+},{}],255:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -60500,7 +60622,7 @@ function getTextContentAccessor() {
 }
 
 module.exports = getTextContentAccessor;
-},{"fbjs/lib/ExecutionEnvironment":62}],257:[function(require,module,exports){
+},{"fbjs/lib/ExecutionEnvironment":61}],256:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -60615,7 +60737,7 @@ function instantiateReactComponent(node) {
 
 module.exports = instantiateReactComponent;
 }).call(this,require('_process'))
-},{"./Object.assign":161,"./ReactCompositeComponent":172,"./ReactEmptyComponent":193,"./ReactNativeComponent":207,"_process":137,"fbjs/lib/invariant":76,"fbjs/lib/warning":87}],258:[function(require,module,exports){
+},{"./Object.assign":160,"./ReactCompositeComponent":171,"./ReactEmptyComponent":192,"./ReactNativeComponent":206,"_process":136,"fbjs/lib/invariant":75,"fbjs/lib/warning":86}],257:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -60676,7 +60798,7 @@ function isEventSupported(eventNameSuffix, capture) {
 }
 
 module.exports = isEventSupported;
-},{"fbjs/lib/ExecutionEnvironment":62}],259:[function(require,module,exports){
+},{"fbjs/lib/ExecutionEnvironment":61}],258:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -60717,7 +60839,7 @@ function isTextInputElement(elem) {
 }
 
 module.exports = isTextInputElement;
-},{}],260:[function(require,module,exports){
+},{}],259:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -60753,7 +60875,7 @@ function onlyChild(children) {
 
 module.exports = onlyChild;
 }).call(this,require('_process'))
-},{"./ReactElement":191,"_process":137,"fbjs/lib/invariant":76}],261:[function(require,module,exports){
+},{"./ReactElement":190,"_process":136,"fbjs/lib/invariant":75}],260:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -60780,7 +60902,7 @@ function quoteAttributeValueForBrowser(value) {
 }
 
 module.exports = quoteAttributeValueForBrowser;
-},{"./escapeTextContentForBrowser":246}],262:[function(require,module,exports){
+},{"./escapeTextContentForBrowser":245}],261:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -60797,7 +60919,7 @@ module.exports = quoteAttributeValueForBrowser;
 var ReactMount = require('./ReactMount');
 
 module.exports = ReactMount.renderSubtreeIntoContainer;
-},{"./ReactMount":204}],263:[function(require,module,exports){
+},{"./ReactMount":203}],262:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -60888,7 +61010,7 @@ if (ExecutionEnvironment.canUseDOM) {
 }
 
 module.exports = setInnerHTML;
-},{"fbjs/lib/ExecutionEnvironment":62}],264:[function(require,module,exports){
+},{"fbjs/lib/ExecutionEnvironment":61}],263:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -60929,7 +61051,7 @@ if (ExecutionEnvironment.canUseDOM) {
 }
 
 module.exports = setTextContent;
-},{"./escapeTextContentForBrowser":246,"./setInnerHTML":263,"fbjs/lib/ExecutionEnvironment":62}],265:[function(require,module,exports){
+},{"./escapeTextContentForBrowser":245,"./setInnerHTML":262,"fbjs/lib/ExecutionEnvironment":61}],264:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -60973,7 +61095,7 @@ function shouldUpdateReactComponent(prevElement, nextElement) {
 }
 
 module.exports = shouldUpdateReactComponent;
-},{}],266:[function(require,module,exports){
+},{}],265:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -61165,7 +61287,7 @@ function traverseAllChildren(children, callback, traverseContext) {
 
 module.exports = traverseAllChildren;
 }).call(this,require('_process'))
-},{"./ReactCurrentOwner":173,"./ReactElement":191,"./ReactInstanceHandles":200,"./getIteratorFn":254,"_process":137,"fbjs/lib/invariant":76,"fbjs/lib/warning":87}],267:[function(require,module,exports){
+},{"./ReactCurrentOwner":172,"./ReactElement":190,"./ReactInstanceHandles":199,"./getIteratorFn":253,"_process":136,"fbjs/lib/invariant":75,"fbjs/lib/warning":86}],266:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2015, Facebook, Inc.
@@ -61531,15 +61653,15 @@ if (process.env.NODE_ENV !== 'production') {
 
 module.exports = validateDOMNesting;
 }).call(this,require('_process'))
-},{"./Object.assign":161,"_process":137,"fbjs/lib/emptyFunction":68,"fbjs/lib/warning":87}],268:[function(require,module,exports){
+},{"./Object.assign":160,"_process":136,"fbjs/lib/emptyFunction":67,"fbjs/lib/warning":86}],267:[function(require,module,exports){
 'use strict';
 
 module.exports = require('./lib/React');
 
-},{"./lib/React":163}],269:[function(require,module,exports){
+},{"./lib/React":162}],268:[function(require,module,exports){
 module.exports = require('./lib/_stream_duplex.js');
 
-},{"./lib/_stream_duplex.js":270}],270:[function(require,module,exports){
+},{"./lib/_stream_duplex.js":269}],269:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -61664,7 +61786,7 @@ function forEach(xs, f) {
     f(xs[i], i);
   }
 }
-},{"./_stream_readable":272,"./_stream_writable":274,"core-util-is":48,"inherits":91,"process-nextick-args":136}],271:[function(require,module,exports){
+},{"./_stream_readable":271,"./_stream_writable":273,"core-util-is":47,"inherits":90,"process-nextick-args":135}],270:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -61712,7 +61834,7 @@ function PassThrough(options) {
 PassThrough.prototype._transform = function (chunk, encoding, cb) {
   cb(null, chunk);
 };
-},{"./_stream_transform":273,"core-util-is":48,"inherits":91}],272:[function(require,module,exports){
+},{"./_stream_transform":272,"core-util-is":47,"inherits":90}],271:[function(require,module,exports){
 (function (process,global){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -62722,7 +62844,7 @@ function indexOf(xs, x) {
   return -1;
 }
 }).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./_stream_duplex":270,"./internal/streams/BufferList":275,"./internal/streams/destroy":276,"./internal/streams/stream":277,"_process":137,"core-util-is":48,"events":60,"inherits":91,"isarray":93,"process-nextick-args":136,"safe-buffer":283,"string_decoder/":278,"util":46}],273:[function(require,module,exports){
+},{"./_stream_duplex":269,"./internal/streams/BufferList":274,"./internal/streams/destroy":275,"./internal/streams/stream":276,"_process":136,"core-util-is":47,"events":59,"inherits":90,"isarray":92,"process-nextick-args":135,"safe-buffer":282,"string_decoder/":277,"util":45}],272:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -62937,7 +63059,7 @@ function done(stream, er, data) {
 
   return stream.push(null);
 }
-},{"./_stream_duplex":270,"core-util-is":48,"inherits":91}],274:[function(require,module,exports){
+},{"./_stream_duplex":269,"core-util-is":47,"inherits":90}],273:[function(require,module,exports){
 (function (process,global){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -63604,7 +63726,7 @@ Writable.prototype._destroy = function (err, cb) {
   cb(err);
 };
 }).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./_stream_duplex":270,"./internal/streams/destroy":276,"./internal/streams/stream":277,"_process":137,"core-util-is":48,"inherits":91,"process-nextick-args":136,"safe-buffer":283,"util-deprecate":302}],275:[function(require,module,exports){
+},{"./_stream_duplex":269,"./internal/streams/destroy":275,"./internal/streams/stream":276,"_process":136,"core-util-is":47,"inherits":90,"process-nextick-args":135,"safe-buffer":282,"util-deprecate":301}],274:[function(require,module,exports){
 'use strict';
 
 /*<replacement>*/
@@ -63679,7 +63801,7 @@ module.exports = function () {
 
   return BufferList;
 }();
-},{"safe-buffer":283}],276:[function(require,module,exports){
+},{"safe-buffer":282}],275:[function(require,module,exports){
 'use strict';
 
 /*<replacement>*/
@@ -63752,10 +63874,10 @@ module.exports = {
   destroy: destroy,
   undestroy: undestroy
 };
-},{"process-nextick-args":136}],277:[function(require,module,exports){
+},{"process-nextick-args":135}],276:[function(require,module,exports){
 module.exports = require('events').EventEmitter;
 
-},{"events":60}],278:[function(require,module,exports){
+},{"events":59}],277:[function(require,module,exports){
 'use strict';
 
 var Buffer = require('safe-buffer').Buffer;
@@ -64028,10 +64150,10 @@ function simpleWrite(buf) {
 function simpleEnd(buf) {
   return buf && buf.length ? this.write(buf) : '';
 }
-},{"safe-buffer":283}],279:[function(require,module,exports){
+},{"safe-buffer":282}],278:[function(require,module,exports){
 module.exports = require('./readable').PassThrough
 
-},{"./readable":280}],280:[function(require,module,exports){
+},{"./readable":279}],279:[function(require,module,exports){
 exports = module.exports = require('./lib/_stream_readable.js');
 exports.Stream = exports;
 exports.Readable = exports;
@@ -64040,13 +64162,13 @@ exports.Duplex = require('./lib/_stream_duplex.js');
 exports.Transform = require('./lib/_stream_transform.js');
 exports.PassThrough = require('./lib/_stream_passthrough.js');
 
-},{"./lib/_stream_duplex.js":270,"./lib/_stream_passthrough.js":271,"./lib/_stream_readable.js":272,"./lib/_stream_transform.js":273,"./lib/_stream_writable.js":274}],281:[function(require,module,exports){
+},{"./lib/_stream_duplex.js":269,"./lib/_stream_passthrough.js":270,"./lib/_stream_readable.js":271,"./lib/_stream_transform.js":272,"./lib/_stream_writable.js":273}],280:[function(require,module,exports){
 module.exports = require('./readable').Transform
 
-},{"./readable":280}],282:[function(require,module,exports){
+},{"./readable":279}],281:[function(require,module,exports){
 module.exports = require('./lib/_stream_writable.js');
 
-},{"./lib/_stream_writable.js":274}],283:[function(require,module,exports){
+},{"./lib/_stream_writable.js":273}],282:[function(require,module,exports){
 /* eslint-disable node/no-deprecated-api */
 var buffer = require('buffer')
 var Buffer = buffer.Buffer
@@ -64110,7 +64232,7 @@ SafeBuffer.allocUnsafeSlow = function (size) {
   return buffer.SlowBuffer(size)
 }
 
-},{"buffer":47}],284:[function(require,module,exports){
+},{"buffer":46}],283:[function(require,module,exports){
 // Generated by CoffeeScript 1.9.2
 (function() {
   var hasProp = {}.hasOwnProperty,
@@ -64134,7 +64256,7 @@ SafeBuffer.allocUnsafeSlow = function (size) {
 
 }).call(this);
 
-},{}],285:[function(require,module,exports){
+},{}],284:[function(require,module,exports){
 (function (factory) {
     if (typeof exports === 'object') {
         // Node/CommonJS
@@ -64839,7 +64961,7 @@ SafeBuffer.allocUnsafeSlow = function (size) {
     return SparkMD5;
 }));
 
-},{}],286:[function(require,module,exports){
+},{}],285:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -64968,7 +65090,7 @@ Stream.prototype.pipe = function(dest, options) {
   return dest;
 };
 
-},{"events":60,"inherits":91,"readable-stream/duplex.js":269,"readable-stream/passthrough.js":279,"readable-stream/readable.js":280,"readable-stream/transform.js":281,"readable-stream/writable.js":282}],287:[function(require,module,exports){
+},{"events":59,"inherits":90,"readable-stream/duplex.js":268,"readable-stream/passthrough.js":278,"readable-stream/readable.js":279,"readable-stream/transform.js":280,"readable-stream/writable.js":281}],286:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -65191,7 +65313,7 @@ function base64DetectIncompleteChar(buffer) {
   this.charLength = this.charReceived ? 3 : 0;
 }
 
-},{"buffer":47}],288:[function(require,module,exports){
+},{"buffer":46}],287:[function(require,module,exports){
 module.exports = {
   encode: function (decodedKey) {
     return '\xff' + decodedKey[0] + '\xff' + decodedKey[1]
@@ -65206,7 +65328,7 @@ module.exports = {
 }
 
 
-},{}],289:[function(require,module,exports){
+},{}],288:[function(require,module,exports){
 /* Copyright (c) 2012-2014 LevelUP contributors
  * See list at <https://github.com/rvagg/node-levelup#contributing>
  * MIT License
@@ -65230,7 +65352,7 @@ module.exports = {
   , EncodingError       : createError('EncodingError', LevelUPError)
 }
 
-},{"errno":58}],290:[function(require,module,exports){
+},{"errno":57}],289:[function(require,module,exports){
 var nut   = require('./nut')
 var shell = require('./shell') //the shell surrounds the nut
 var Codec = require('level-codec')
@@ -65245,7 +65367,7 @@ module.exports = function (db) {
 }
 
 
-},{"./codec/legacy":288,"./nut":291,"./read-stream":292,"./shell":293,"level-codec":95}],291:[function(require,module,exports){
+},{"./codec/legacy":287,"./nut":290,"./read-stream":291,"./shell":292,"level-codec":94}],290:[function(require,module,exports){
 var ltgt = require('ltgt')
 
 function isFunction (f) {
@@ -65427,7 +65549,7 @@ module.exports = function (db, precodec, codec, compare) {
 
 }
 
-},{"ltgt":295}],292:[function(require,module,exports){
+},{"ltgt":294}],291:[function(require,module,exports){
 /* Copyright (c) 2012-2014 LevelUP contributors
  * See list at <https://github.com/rvagg/node-levelup#contributing>
  * MIT License <https://github.com/rvagg/node-levelup/blob/master/LICENSE.md>
@@ -65522,7 +65644,7 @@ ReadStream.prototype.toString = function () {
 module.exports = ReadStream
 
 
-},{"./errors":289,"inherits":91,"readable-stream":301}],293:[function(require,module,exports){
+},{"./errors":288,"inherits":90,"readable-stream":300}],292:[function(require,module,exports){
 (function (process){
 var EventEmitter = require('events').EventEmitter
 
@@ -65667,9 +65789,9 @@ var sublevel = module.exports = function (nut, prefix, createStream, options) {
 }
 
 }).call(this,require('_process'))
-},{"./errors":289,"_process":137,"events":60}],294:[function(require,module,exports){
-arguments[4][99][0].apply(exports,arguments)
-},{"dup":99}],295:[function(require,module,exports){
+},{"./errors":288,"_process":136,"events":59}],293:[function(require,module,exports){
+arguments[4][98][0].apply(exports,arguments)
+},{"dup":98}],294:[function(require,module,exports){
 (function (Buffer){
 
 exports.compare = function (a, b) {
@@ -65819,11 +65941,11 @@ exports.filter = function (range, compare) {
 }
 
 }).call(this,{"isBuffer":require("../../../is-buffer/index.js")})
-},{"../../../is-buffer/index.js":92}],296:[function(require,module,exports){
+},{"../../../is-buffer/index.js":91}],295:[function(require,module,exports){
+arguments[4][99][0].apply(exports,arguments)
+},{"./_stream_readable":297,"./_stream_writable":299,"_process":136,"core-util-is":47,"dup":99,"inherits":90}],296:[function(require,module,exports){
 arguments[4][100][0].apply(exports,arguments)
-},{"./_stream_readable":298,"./_stream_writable":300,"_process":137,"core-util-is":48,"dup":100,"inherits":91}],297:[function(require,module,exports){
-arguments[4][101][0].apply(exports,arguments)
-},{"./_stream_transform":299,"core-util-is":48,"dup":101,"inherits":91}],298:[function(require,module,exports){
+},{"./_stream_transform":298,"core-util-is":47,"dup":100,"inherits":90}],297:[function(require,module,exports){
 (function (process){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -66809,7 +66931,7 @@ function indexOf (xs, x) {
 }
 
 }).call(this,require('_process'))
-},{"_process":137,"buffer":47,"core-util-is":48,"events":60,"inherits":91,"isarray":294,"stream":286,"string_decoder/":287}],299:[function(require,module,exports){
+},{"_process":136,"buffer":46,"core-util-is":47,"events":59,"inherits":90,"isarray":293,"stream":285,"string_decoder/":286}],298:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -67021,7 +67143,7 @@ function done(stream, er) {
   return stream.push(null);
 }
 
-},{"./_stream_duplex":296,"core-util-is":48,"inherits":91}],300:[function(require,module,exports){
+},{"./_stream_duplex":295,"core-util-is":47,"inherits":90}],299:[function(require,module,exports){
 (function (process){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -67411,7 +67533,7 @@ function endWritable(stream, state, cb) {
 }
 
 }).call(this,require('_process'))
-},{"./_stream_duplex":296,"_process":137,"buffer":47,"core-util-is":48,"inherits":91,"stream":286}],301:[function(require,module,exports){
+},{"./_stream_duplex":295,"_process":136,"buffer":46,"core-util-is":47,"inherits":90,"stream":285}],300:[function(require,module,exports){
 var Stream = require('stream'); // hack to fix a circular dependency issue when used with browserify
 exports = module.exports = require('./lib/_stream_readable.js');
 exports.Stream = Stream;
@@ -67421,7 +67543,7 @@ exports.Duplex = require('./lib/_stream_duplex.js');
 exports.Transform = require('./lib/_stream_transform.js');
 exports.PassThrough = require('./lib/_stream_passthrough.js');
 
-},{"./lib/_stream_duplex.js":296,"./lib/_stream_passthrough.js":297,"./lib/_stream_readable.js":298,"./lib/_stream_transform.js":299,"./lib/_stream_writable.js":300,"stream":286}],302:[function(require,module,exports){
+},{"./lib/_stream_duplex.js":295,"./lib/_stream_passthrough.js":296,"./lib/_stream_readable.js":297,"./lib/_stream_transform.js":298,"./lib/_stream_writable.js":299,"stream":285}],301:[function(require,module,exports){
 (function (global){
 
 /**
@@ -67492,16 +67614,16 @@ function config (name) {
 }
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],303:[function(require,module,exports){
-arguments[4][91][0].apply(exports,arguments)
-},{"dup":91}],304:[function(require,module,exports){
+},{}],302:[function(require,module,exports){
+arguments[4][90][0].apply(exports,arguments)
+},{"dup":90}],303:[function(require,module,exports){
 module.exports = function isBuffer(arg) {
   return arg && typeof arg === 'object'
     && typeof arg.copy === 'function'
     && typeof arg.fill === 'function'
     && typeof arg.readUInt8 === 'function';
 }
-},{}],305:[function(require,module,exports){
+},{}],304:[function(require,module,exports){
 (function (process,global){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -68091,7 +68213,7 @@ function hasOwnProperty(obj, prop) {
 }
 
 }).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./support/isBuffer":304,"_process":137,"inherits":303}],306:[function(require,module,exports){
+},{"./support/isBuffer":303,"_process":136,"inherits":302}],305:[function(require,module,exports){
 'use strict';
 
 /**
@@ -68266,7 +68388,7 @@ exports.parse = function (str) {
   }
 };
 
-},{}],307:[function(require,module,exports){
+},{}],306:[function(require,module,exports){
 module.exports = extend
 
 var hasOwnProperty = Object.prototype.hasOwnProperty;

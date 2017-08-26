@@ -87,6 +87,32 @@ var ts;
                 }
             }
             Util.assert = assert;
+            function fileReadAsBufferAsync(f) {
+                if (!f)
+                    return Promise.resolve(null);
+                else {
+                    return new Promise(function (resolve, reject) {
+                        var reader = new FileReader();
+                        reader.onerror = function (ev) { return resolve(null); };
+                        reader.onload = function (ev) { return resolve(new Uint8Array(reader.result)); };
+                        reader.readAsArrayBuffer(f);
+                    });
+                }
+            }
+            Util.fileReadAsBufferAsync = fileReadAsBufferAsync;
+            function fileReadAsTextAsync(f) {
+                if (!f)
+                    return Promise.resolve(null);
+                else {
+                    return new Promise(function (resolve, reject) {
+                        var reader = new FileReader();
+                        reader.onerror = function (ev) { return resolve(null); };
+                        reader.onload = function (ev) { return resolve(reader.result); };
+                        reader.readAsText(f);
+                    });
+                }
+            }
+            Util.fileReadAsTextAsync = fileReadAsTextAsync;
             function repeatMap(n, fn) {
                 n = n || 0;
                 var r = [];
@@ -184,6 +210,22 @@ var ts;
                     trg[trgOff + i] = src[srcOff + i];
             }
             Util.memcpy = memcpy;
+            function uint8ArrayConcat(chunks) {
+                var numbytes = 0;
+                for (var _i = 0, chunks_1 = chunks; _i < chunks_1.length; _i++) {
+                    var c = chunks_1[_i];
+                    numbytes += c.length;
+                }
+                var r = new Uint8Array(numbytes);
+                var ptr = 0;
+                for (var _a = 0, chunks_2 = chunks; _a < chunks_2.length; _a++) {
+                    var c = chunks_2[_a];
+                    memcpy(r, ptr, c);
+                    ptr += c.length;
+                }
+                return r;
+            }
+            Util.uint8ArrayConcat = uint8ArrayConcat;
             function jsonMergeFrom(trg, src) {
                 if (!src)
                     return;
@@ -1321,665 +1363,6 @@ var pxt;
         return pxt.U.lookup(pxt.appTarget.bundledpkgs || {}, id);
     }
     pxt.getEmbeddedScript = getEmbeddedScript;
-    var Package = (function () {
-        function Package(id, _verspec, parent, addedBy) {
-            this.id = id;
-            this._verspec = _verspec;
-            this.parent = parent;
-            this.level = -1;
-            this.isLoaded = false;
-            if (parent) {
-                this.level = this.parent.level + 1;
-            }
-            this.addedBy = [addedBy];
-        }
-        Package.getConfigAsync = function (id, fullVers) {
-            return Promise.resolve().then(function () {
-                if (pxt.github.isGithubId(fullVers)) {
-                    var repoInfo_1 = pxt.github.parseRepoId(fullVers);
-                    return pxt.packagesConfigAsync()
-                        .then(function (config) { return pxt.github.repoAsync(repoInfo_1.fullName, config); }) // Make sure repo exists and is whitelisted
-                        .then(function (gitRepo) { return gitRepo ? pxt.github.pkgConfigAsync(repoInfo_1.fullName, repoInfo_1.tag) : null; });
-                }
-                else {
-                    // If it's not from GH, assume it's a bundled package
-                    // TODO: Add logic for shared packages if we enable that
-                    return JSON.parse(pxt.appTarget.bundledpkgs[Package.upgradePackageReference(id, fullVers)][pxt.CONFIG_NAME]);
-                }
-            });
-        };
-        Package.upgradePackageReference = function (pkg, val) {
-            if (val != "*")
-                return pkg;
-            var upgrades = pxt.appTarget.compile ? pxt.appTarget.compile.upgrades : undefined;
-            var newPackage = pkg;
-            if (upgrades) {
-                upgrades.filter(function (rule) { return rule.type == "package"; })
-                    .forEach(function (rule) {
-                    for (var match in rule.map) {
-                        if (newPackage == match) {
-                            newPackage = rule.map[match];
-                        }
-                    }
-                });
-            }
-            return newPackage;
-        };
-        Package.prototype.version = function () {
-            return this.resolvedVersion || this._verspec;
-        };
-        Package.prototype.verProtocol = function () {
-            var spl = this.version().split(':');
-            if (spl.length > 1)
-                return spl[0];
-            else
-                return "";
-        };
-        Package.prototype.verArgument = function () {
-            var p = this.verProtocol();
-            if (p)
-                return this.version().slice(p.length + 1);
-            return this.version();
-        };
-        Package.prototype.commonDownloadAsync = function () {
-            var _this = this;
-            var proto = this.verProtocol();
-            if (proto == "pub") {
-                return pxt.Cloud.downloadScriptFilesAsync(this.verArgument());
-            }
-            else if (proto == "github") {
-                return pxt.packagesConfigAsync()
-                    .then(function (config) { return pxt.github.downloadPackageAsync(_this.verArgument(), config); })
-                    .then(function (resp) { return resp.files; });
-            }
-            else if (proto == "embed") {
-                var resp = pxt.getEmbeddedScript(this.verArgument());
-                return Promise.resolve(resp);
-            }
-            else
-                return Promise.resolve(null);
-        };
-        Package.prototype.host = function () { return this.parent._host; };
-        Package.prototype.readFile = function (fn) {
-            return this.host().readFile(this, fn);
-        };
-        Package.prototype.resolveDep = function (id) {
-            if (this.parent.deps.hasOwnProperty(id))
-                return this.parent.deps[id];
-            return null;
-        };
-        Package.prototype.saveConfig = function () {
-            var cfg = JSON.stringify(this.config, null, 4) || "\n";
-            this.host().writeFile(this, pxt.CONFIG_NAME, cfg);
-        };
-        Package.prototype.resolveVersionAsync = function () {
-            var v = this._verspec;
-            if (getEmbeddedScript(this.id)) {
-                this.resolvedVersion = v = "embed:" + this.id;
-            }
-            else if (!v || v == "*") {
-                pxt.U.userError(lf("version not specified for {0}", v));
-            }
-            return Promise.resolve(v);
-        };
-        Package.prototype.downloadAsync = function () {
-            var _this = this;
-            var kindCfg = "";
-            return this.resolveVersionAsync()
-                .then(function (verNo) {
-                if (!/^embed:/.test(verNo) &&
-                    _this.config && _this.config.installedVersion == verNo)
-                    return;
-                pxt.debug('downloading ' + verNo);
-                return _this.host().downloadPackageAsync(_this)
-                    .then(function () {
-                    var confStr = _this.readFile(pxt.CONFIG_NAME);
-                    if (!confStr)
-                        pxt.U.userError("package " + _this.id + " is missing " + pxt.CONFIG_NAME);
-                    _this.parseConfig(confStr);
-                    if (_this.level != 0)
-                        _this.config.installedVersion = _this.version();
-                    _this.saveConfig();
-                })
-                    .then(function () {
-                    pxt.debug("installed " + _this.id + " /" + verNo);
-                });
-            });
-        };
-        Package.prototype.validateConfig = function () {
-            if (!this.config.dependencies)
-                pxt.U.userError("Missing dependencies in config of: " + this.id);
-            if (!Array.isArray(this.config.files))
-                pxt.U.userError("Missing files in config of: " + this.id);
-            if (typeof this.config.name != "string" || !this.config.name ||
-                (this.config.public && !/^[a-z][a-z0-9\-_]+$/i.test(this.config.name)))
-                pxt.U.userError("Invalid package name: " + this.config.name);
-            if (this.config.targetVersions
-                && this.config.targetVersions.target
-                && pxt.semver.strcmp(this.config.targetVersions.target, pxt.appTarget.versions.target) > 0)
-                pxt.U.userError(lf("Package {0} requires target version {1} (you are running {2})", this.config.name, this.config.targetVersions.target, pxt.appTarget.versions.target));
-        };
-        Package.prototype.isPackageInUse = function (pkgId, ts) {
-            if (ts === void 0) { ts = this.readFile("main.ts"); }
-            // Build the RegExp that will determine whether the dependency is in use. Try to use upgrade rules,
-            // otherwise fallback to the package's name
-            var regex = null;
-            var upgrades = pxt.appTarget.compile ? pxt.appTarget.compile.upgrades : undefined;
-            if (upgrades) {
-                upgrades.filter(function (rule) { return rule.type == "missingPackage"; }).forEach(function (rule) {
-                    Object.keys(rule.map).forEach(function (match) {
-                        if (rule.map[match] === pkgId) {
-                            regex = new RegExp(match, "g");
-                        }
-                    });
-                });
-            }
-            if (!regex) {
-                regex = new RegExp(pkgId + "\\.", "g");
-            }
-            return regex.test(ts);
-        };
-        Package.prototype.getMissingPackages = function (config, ts) {
-            var upgrades = pxt.appTarget.compile ? pxt.appTarget.compile.upgrades : undefined;
-            var missing = {};
-            if (ts && upgrades)
-                upgrades.filter(function (rule) { return rule.type == "missingPackage"; })
-                    .forEach(function (rule) {
-                    var _loop_1 = function(match) {
-                        var regex = new RegExp(match, 'g');
-                        var pkg = rule.map[match];
-                        ts.replace(regex, function (m) {
-                            if (!config.dependencies[pkg]) {
-                                missing[pkg] = "*";
-                            }
-                            return "";
-                        });
-                    };
-                    for (var match in rule.map) {
-                        _loop_1(match);
-                    }
-                });
-            return missing;
-        };
-        /**
-         * For the given package config or ID, looks through all the currently installed packages to find conflicts in
-         * Yotta settings and version spec
-         */
-        Package.prototype.findConflictsAsync = function (pkgOrId, version) {
-            var _this = this;
-            var conflicts = [];
-            var pkgCfg;
-            return Promise.resolve()
-                .then(function () {
-                // Get the package config if it's not already provided
-                if (typeof pkgOrId === "string") {
-                    return Package.getConfigAsync(pkgOrId, version);
-                }
-                else {
-                    return Promise.resolve(pkgOrId);
-                }
-            })
-                .then(function (cfg) {
-                pkgCfg = cfg;
-                // Iterate through all installed packages and check for conflicting settings
-                if (pkgCfg && pkgCfg.yotta) {
-                    var yottaCfg_1 = pxt.U.jsonFlatten(pkgCfg.yotta.config);
-                    _this.parent.sortedDeps().forEach(function (depPkg) {
-                        var depConfig = depPkg.config || JSON.parse(depPkg.readFile(pxt.CONFIG_NAME));
-                        var hasYottaSettings = !!depConfig && !!depConfig.yotta && !!depPkg.config.yotta.config;
-                        var foundYottaConflict = false;
-                        if (hasYottaSettings) {
-                            var depYottaCfg = pxt.U.jsonFlatten(depConfig.yotta.config);
-                            for (var _i = 0, _a = Object.keys(yottaCfg_1); _i < _a.length; _i++) {
-                                var settingName = _a[_i];
-                                var depSetting = depYottaCfg[settingName];
-                                var isJustDefaults = pkgCfg.yotta.configIsJustDefaults || depConfig.yotta.configIsJustDefaults;
-                                if (depYottaCfg.hasOwnProperty(settingName) && depSetting !== yottaCfg_1[settingName] && !isJustDefaults && (!depPkg.parent.config.yotta || !depPkg.parent.config.yotta.ignoreConflicts)) {
-                                    var conflict = new pxt.cpp.PkgConflictError(lf("conflict on yotta setting {0} between packages {1} and {2}", settingName, pkgCfg.name, depPkg.id));
-                                    conflict.pkg0 = depPkg;
-                                    conflict.settingName = settingName;
-                                    conflicts.push(conflict);
-                                    foundYottaConflict = true;
-                                }
-                            }
-                        }
-                        if (!foundYottaConflict && pkgCfg.name === depPkg.id && depPkg._verspec != version && !/^file:/.test(depPkg._verspec) && !/^file:/.test(version)) {
-                            var conflict = new pxt.cpp.PkgConflictError(lf("version mismatch for package {0} (installed: {1}, installing: {2})", depPkg, depPkg._verspec, version));
-                            conflict.pkg0 = depPkg;
-                            conflict.isVersionConflict = true;
-                            conflicts.push(conflict);
-                        }
-                    });
-                }
-                // Also check for conflicts for all the specified package's dependencies (recursively)
-                return Object.keys(pkgCfg.dependencies).reduce(function (soFar, pkgDep) {
-                    return soFar
-                        .then(function () { return _this.findConflictsAsync(pkgDep, pkgCfg.dependencies[pkgDep]); })
-                        .then(function (childConflicts) { return conflicts.push.apply(conflicts, childConflicts); });
-                }, Promise.resolve());
-            })
-                .then(function () {
-                // For each conflicting package, we need to include their ancestor tree in the list of conflicts
-                // For example, if package A depends on package B, and package B is in conflict with package C,
-                // then package A is also technically in conflict with C
-                var allAncestors = function (p) {
-                    var ancestors = [];
-                    p.addedBy.forEach(function (a) {
-                        if (a.id !== _this.id) {
-                            ancestors.push.apply(allAncestors(a));
-                            ancestors.push(a);
-                        }
-                    });
-                    return ancestors;
-                };
-                var additionalConflicts = [];
-                conflicts.forEach(function (c) {
-                    additionalConflicts.push.apply(additionalConflicts, allAncestors(c.pkg0).map(function (anc) {
-                        var confl = new pxt.cpp.PkgConflictError(c.isVersionConflict ?
-                            lf("a dependency of {0} has a version mismatch with package {1} (installed: {1}, installing: {2})", anc.id, pkgCfg.name, c.pkg0._verspec, version) :
-                            lf("conflict on yotta setting {0} between packages {1} and {2}", c.settingName, pkgCfg.name, c.pkg0.id));
-                        confl.pkg0 = anc;
-                        return confl;
-                    }));
-                });
-                conflicts.push.apply(conflicts, additionalConflicts);
-                // Remove duplicate conflicts (happens if more than one package had the same ancestor)
-                conflicts = conflicts.filter(function (c, index) {
-                    for (var i = 0; i < index; ++i) {
-                        if (c.pkg0.id === conflicts[i].pkg0.id) {
-                            return false;
-                        }
-                    }
-                    return true;
-                });
-                return conflicts;
-            });
-        };
-        Package.prototype.upgradeAPI = function (fileContents) {
-            var upgrades = pxt.appTarget.compile ? pxt.appTarget.compile.upgrades : undefined;
-            var updatedContents = fileContents;
-            if (upgrades) {
-                upgrades.filter(function (rule) { return rule.type == "api"; })
-                    .forEach(function (rule) {
-                    for (var match in rule.map) {
-                        var regex = new RegExp(match, 'g');
-                        updatedContents = updatedContents.replace(regex, rule.map[match]);
-                    }
-                });
-            }
-            return updatedContents;
-        };
-        Package.prototype.parseConfig = function (cfgSrc) {
-            var cfg = JSON.parse(cfgSrc);
-            this.config = cfg;
-            var currentConfig = JSON.stringify(this.config);
-            for (var dep in this.config.dependencies) {
-                var value = Package.upgradePackageReference(dep, this.config.dependencies[dep]);
-                if (value != dep) {
-                    delete this.config.dependencies[dep];
-                    if (value) {
-                        this.config.dependencies[value] = "*";
-                    }
-                }
-            }
-            if (JSON.stringify(this.config) != currentConfig) {
-                this.saveConfig();
-            }
-            this.validateConfig();
-        };
-        Package.prototype.loadAsync = function (isInstall) {
-            var _this = this;
-            if (isInstall === void 0) { isInstall = false; }
-            if (this.isLoaded)
-                return Promise.resolve();
-            var initPromise = Promise.resolve();
-            this.isLoaded = true;
-            var str = this.readFile(pxt.CONFIG_NAME);
-            if (str == null) {
-                if (!isInstall)
-                    pxt.U.userError("Package not installed: " + this.id + ", did you forget to run `pxt install`?");
-            }
-            else {
-                initPromise = initPromise.then(function () { return _this.parseConfig(str); });
-            }
-            if (isInstall)
-                initPromise = initPromise.then(function () { return _this.downloadAsync(); });
-            var loadDepsRecursive = function (dependencies) {
-                return pxt.U.mapStringMapAsync(dependencies, function (id, ver) {
-                    var mod = _this.resolveDep(id);
-                    ver = ver || "*";
-                    if (mod) {
-                        if (mod._verspec != ver && !/^file:/.test(mod._verspec) && !/^file:/.test(ver))
-                            pxt.U.userError("Version spec mismatch on " + id);
-                        mod.level = Math.min(mod.level, _this.level + 1);
-                        mod.addedBy.push(_this);
-                        return Promise.resolve();
-                    }
-                    else {
-                        mod = new Package(id, ver, _this.parent, _this);
-                        _this.parent.deps[id] = mod;
-                        return mod.loadAsync(isInstall);
-                    }
-                });
-            };
-            return initPromise
-                .then(function () { return loadDepsRecursive(_this.config.dependencies); })
-                .then(function () {
-                if (_this.level === 0) {
-                    // Check for missing packages. We need to add them 1 by 1 in case they conflict with eachother.
-                    var mainTs = _this.readFile("main.ts");
-                    if (!mainTs)
-                        return Promise.resolve(null);
-                    var missingPackages_1 = _this.getMissingPackages(_this.config, mainTs);
-                    var didAddPackages_1 = false;
-                    var addPackagesPromise = Promise.resolve();
-                    Object.keys(missingPackages_1).reduce(function (addPackagesPromise, missing) {
-                        return addPackagesPromise
-                            .then(function () { return _this.findConflictsAsync(missing, missingPackages_1[missing]); })
-                            .then(function (conflicts) {
-                            if (conflicts.length) {
-                                var conflictNames = conflicts.map(function (c) { return c.pkg0.id; }).join(", ");
-                                var settingNames = conflicts.map(function (c) { return c.settingName; }).filter(function (s) { return !!s; }).join(", ");
-                                pxt.log("skipping missing package " + missing + " because it conflicts with the following packages: " + conflictNames + " (conflicting settings: " + settingNames + ")");
-                                return Promise.resolve(null);
-                            }
-                            else {
-                                pxt.log("adding missing package " + missing);
-                                didAddPackages_1 = true;
-                                _this.config.dependencies[missing] = "*";
-                                var addDependency = {};
-                                addDependency[missing] = missingPackages_1[missing];
-                                return loadDepsRecursive(addDependency);
-                            }
-                        });
-                    }, Promise.resolve(null))
-                        .then(function () {
-                        if (didAddPackages_1) {
-                            _this.saveConfig();
-                            _this.validateConfig();
-                        }
-                        return Promise.resolve(null);
-                    });
-                }
-                return Promise.resolve(null);
-            })
-                .then(function () { return null; });
-        };
-        Package.prototype.getFiles = function () {
-            if (this.level == 0)
-                return this.config.files.concat(this.config.testFiles || []);
-            else
-                return this.config.files.slice(0);
-        };
-        Package.prototype.addSnapshot = function (files, exts) {
-            if (exts === void 0) { exts = [""]; }
-            var _loop_2 = function(fn) {
-                if (exts.some(function (e) { return pxt.U.endsWith(fn, e); })) {
-                    files[this_1.id + "/" + fn] = this_1.readFile(fn);
-                }
-            };
-            var this_1 = this;
-            for (var _i = 0, _a = this.getFiles(); _i < _a.length; _i++) {
-                var fn = _a[_i];
-                _loop_2(fn);
-            }
-            files[this.id + "/" + pxt.CONFIG_NAME] = this.readFile(pxt.CONFIG_NAME);
-        };
-        /**
-         * Returns localized strings qName -> translation
-         */
-        Package.prototype.packageLocalizationStringsAsync = function (lang) {
-            var _this = this;
-            var targetId = pxt.appTarget.id;
-            var filenames = [this.id + "-jsdoc", this.id];
-            var r = {};
-            var theme = pxt.appTarget.appTheme || {};
-            // live loc of bundled packages
-            if (pxt.Util.localizeLive && this.id != "this" && pxt.appTarget.bundledpkgs[this.id]) {
-                pxt.log("loading live translations for " + this.id);
-                var code_1 = pxt.Util.userLanguage();
-                return Promise.all(filenames.map(function (fn) { return pxt.Util.downloadLiveTranslationsAsync(code_1, targetId + "/" + fn + "-strings.json", theme.crowdinBranch)
-                    .then(function (tr) { return pxt.Util.jsonMergeFrom(r, tr); })
-                    .catch(function (e) { return pxt.log("error while downloading " + targetId + "/" + fn + "-strings.json"); }); })).then(function () { return r; });
-            }
-            else {
-                var files_1 = this.config.files;
-                filenames.map(function (name) {
-                    var fn = "_locales/" + lang.toLowerCase() + "/" + name + "-strings.json";
-                    if (files_1.indexOf(fn) > -1)
-                        return JSON.parse(_this.readFile(fn));
-                    if (lang.length > 2) {
-                        fn = "_locales/" + lang.substring(0, 2).toLowerCase() + "/" + name + "-strings.json";
-                        if (files_1.indexOf(fn) > -1)
-                            return JSON.parse(_this.readFile(fn));
-                    }
-                    return undefined;
-                }).filter(function (d) { return !!d; }).forEach(function (d) { return pxt.Util.jsonMergeFrom(r, d); });
-                return Promise.resolve(r);
-            }
-        };
-        return Package;
-    }());
-    pxt.Package = Package;
-    var MainPackage = (function (_super) {
-        __extends(MainPackage, _super);
-        function MainPackage(_host) {
-            _super.call(this, "this", "file:.", null, null);
-            this._host = _host;
-            this.deps = {};
-            this.parent = this;
-            this.addedBy = [this];
-            this.level = 0;
-            this.deps[this.id] = this;
-        }
-        MainPackage.prototype.installAllAsync = function () {
-            return this.loadAsync(true);
-        };
-        MainPackage.prototype.sortedDeps = function () {
-            var _this = this;
-            var visited = {};
-            var ids = [];
-            var rec = function (p) {
-                if (!p || pxt.U.lookup(visited, p.id))
-                    return;
-                visited[p.id] = true;
-                if (p.config && p.config.dependencies) {
-                    var deps = Object.keys(p.config.dependencies);
-                    deps.sort(function (a, b) { return pxt.U.strcmp(a, b); });
-                    deps.forEach(function (id) { return rec(_this.resolveDep(id)); });
-                    ids.push(p.id);
-                }
-            };
-            rec(this);
-            return ids.map(function (id) { return _this.resolveDep(id); });
-        };
-        MainPackage.prototype.localizationStringsAsync = function (lang) {
-            var loc = {};
-            return Promise.all(pxt.Util.values(this.deps).map(function (dep) {
-                return dep.packageLocalizationStringsAsync(lang)
-                    .then(function (depLoc) {
-                    if (depLoc)
-                        for (var k in depLoc)
-                            if (!loc[k])
-                                loc[k] = depLoc[k];
-                });
-            }))
-                .then(function () { return loc; });
-        };
-        MainPackage.prototype.getTargetOptions = function () {
-            var res = pxt.U.clone(pxt.appTarget.compile);
-            pxt.U.assert(!!res);
-            return res;
-        };
-        MainPackage.prototype.getCompileOptionsAsync = function (target) {
-            var _this = this;
-            if (target === void 0) { target = this.getTargetOptions(); }
-            var opts = {
-                sourceFiles: [],
-                fileSystem: {},
-                target: target,
-                hexinfo: { hex: [] }
-            };
-            var generateFile = function (fn, cont) {
-                if (_this.config.files.indexOf(fn) < 0)
-                    pxt.U.userError(lf("please add '{0}' to \"files\" in {1}", fn, pxt.CONFIG_NAME));
-                cont = "// Auto-generated. Do not edit.\n" + cont + "\n// Auto-generated. Do not edit. Really.\n";
-                if (_this.host().readFile(_this, fn) !== cont) {
-                    pxt.log("updating " + fn + " (size=" + cont.length + ")...");
-                    _this.host().writeFile(_this, fn, cont);
-                }
-            };
-            var upgradeFile = function (fn, cont) {
-                var updatedCont = _this.upgradeAPI(cont);
-                if (updatedCont != cont) {
-                    // save file (force write)
-                    pxt.log("updating APIs in " + fn + " (size=" + cont.length + ")...");
-                    _this.host().writeFile(_this, fn, updatedCont, true);
-                }
-                return updatedCont;
-            };
-            return this.loadAsync()
-                .then(function () {
-                pxt.debug("building: " + _this.sortedDeps().map(function (p) { return p.config.name; }).join(", "));
-                var ext = pxt.cpp.getExtensionInfo(_this);
-                if (ext.shimsDTS)
-                    generateFile("shims.d.ts", ext.shimsDTS);
-                if (ext.enumsDTS)
-                    generateFile("enums.d.ts", ext.enumsDTS);
-                return (target.isNative
-                    ? _this.host().getHexInfoAsync(ext)
-                    : Promise.resolve(null))
-                    .then(function (inf) {
-                    ext = pxt.U.flatClone(ext);
-                    delete ext.compileData;
-                    delete ext.generatedFiles;
-                    delete ext.extensionFiles;
-                    opts.extinfo = ext;
-                    opts.hexinfo = inf;
-                });
-            })
-                .then(function () { return _this.config.binaryonly || pxt.appTarget.compile.shortPointers || !opts.target.isNative ? null : _this.filesToBePublishedAsync(true); })
-                .then(function (files) {
-                if (files) {
-                    files = pxt.U.mapMap(files, upgradeFile);
-                    var headerString_1 = JSON.stringify({
-                        name: _this.config.name,
-                        comment: _this.config.description,
-                        status: "unpublished",
-                        scriptId: _this.config.installedVersion,
-                        cloudId: pxt.CLOUD_ID + pxt.appTarget.id,
-                        editor: target.preferredEditor ? target.preferredEditor : (pxt.U.lookup(files, "main.blocks") ? pxt.BLOCKS_PROJECT_NAME : pxt.JAVASCRIPT_PROJECT_NAME),
-                        targetVersions: pxt.appTarget.versions
-                    });
-                    var programText_1 = JSON.stringify(files);
-                    return pxt.lzmaCompressAsync(headerString_1 + programText_1)
-                        .then(function (buf) {
-                        opts.embedMeta = JSON.stringify({
-                            compression: "LZMA",
-                            headerSize: headerString_1.length,
-                            textSize: programText_1.length,
-                            name: _this.config.name,
-                            eURL: pxt.appTarget.appTheme.embedUrl,
-                            eVER: pxt.appTarget.versions ? pxt.appTarget.versions.target : "",
-                            pxtTarget: pxt.appTarget.id,
-                        });
-                        opts.embedBlob = btoa(pxt.U.uint8ArrayToString(buf));
-                    });
-                }
-                else {
-                    return Promise.resolve();
-                }
-            })
-                .then(function () {
-                for (var _i = 0, _a = _this.sortedDeps(); _i < _a.length; _i++) {
-                    var pkg = _a[_i];
-                    for (var _b = 0, _c = pkg.getFiles(); _b < _c.length; _b++) {
-                        var f = _c[_b];
-                        if (/\.(ts|asm)$/.test(f)) {
-                            var sn = f;
-                            if (pkg.level > 0)
-                                sn = "pxt_modules/" + pkg.id + "/" + f;
-                            opts.sourceFiles.push(sn);
-                            opts.fileSystem[sn] = pkg.readFile(f);
-                        }
-                    }
-                }
-                return opts;
-            });
-        };
-        MainPackage.prototype.filesToBePublishedAsync = function (allowPrivate) {
-            var _this = this;
-            if (allowPrivate === void 0) { allowPrivate = false; }
-            var files = {};
-            return this.loadAsync()
-                .then(function () {
-                if (!allowPrivate && !_this.config.public)
-                    pxt.U.userError('Only packages with "public":true can be published');
-                var cfg = pxt.U.clone(_this.config);
-                delete cfg.installedVersion;
-                pxt.U.iterMap(cfg.dependencies, function (k, v) {
-                    if (!v || /^file:/.test(v) || /^workspace:/.test(v)) {
-                        cfg.dependencies[k] = "*";
-                    }
-                });
-                files[pxt.CONFIG_NAME] = JSON.stringify(cfg, null, 4);
-                for (var _i = 0, _a = _this.getFiles(); _i < _a.length; _i++) {
-                    var f = _a[_i];
-                    var str = _this.readFile(f);
-                    if (str == null)
-                        pxt.U.userError("referenced file missing: " + f);
-                    files[f] = str;
-                }
-                return pxt.U.sortObjectFields(files);
-            });
-        };
-        MainPackage.prototype.compressToFileAsync = function (editor) {
-            var _this = this;
-            return this.filesToBePublishedAsync(true)
-                .then(function (files) {
-                var project = {
-                    meta: {
-                        cloudId: pxt.CLOUD_ID + pxt.appTarget.id,
-                        targetVersions: pxt.appTarget.versions,
-                        editor: editor || pxt.BLOCKS_PROJECT_NAME,
-                        name: _this.config.name
-                    },
-                    source: JSON.stringify(files, null, 2)
-                };
-                return pxt.lzmaCompressAsync(JSON.stringify(project, null, 2));
-            });
-        };
-        MainPackage.prototype.computePartDefinitions = function (parts) {
-            if (!parts || !parts.length)
-                return {};
-            var res = {};
-            this.sortedDeps().forEach(function (d) {
-                var pjson = d.readFile("pxtparts.json");
-                if (pjson) {
-                    try {
-                        var p = JSON.parse(pjson);
-                        for (var k in p) {
-                            if (parts.indexOf(k) >= 0) {
-                                var part = res[k] = p[k];
-                                if (typeof part.visual.image === "string" && /\.svg$/i.test(part.visual.image)) {
-                                    var f = d.readFile(part.visual.image);
-                                    if (!f)
-                                        pxt.reportError("parts", "invalid part definition", { "error": "missing visual " + part.visual.image });
-                                    part.visual.image = "data:image/svg+xml," + encodeURIComponent(f);
-                                }
-                            }
-                        }
-                    }
-                    catch (e) {
-                        pxt.reportError("parts", "invalid pxtparts.json file");
-                    }
-                }
-            });
-            return res;
-        };
-        return MainPackage;
-    }(Package));
-    pxt.MainPackage = MainPackage;
     var _targetConfig = undefined;
     function targetConfigAsync() {
         if (!_targetConfig && !pxt.Cloud.isOnline())
@@ -1997,6 +1380,23 @@ var pxt;
     pxt.CLOUD_ID = "pxt/";
     pxt.BLOCKS_PROJECT_NAME = "blocksprj";
     pxt.JAVASCRIPT_PROJECT_NAME = "tsprj";
+    function outputName(trg) {
+        if (trg === void 0) { trg = null; }
+        if (!trg)
+            trg = pxt.appTarget.compile;
+        if (trg.useUF2)
+            return ts.pxtc.BINARY_UF2;
+        else if (trg.useELF)
+            return ts.pxtc.BINARY_ELF;
+        else
+            return ts.pxtc.BINARY_HEX;
+    }
+    pxt.outputName = outputName;
+    function isOutputText(trg) {
+        if (trg === void 0) { trg = null; }
+        return outputName(trg) == ts.pxtc.BINARY_HEX;
+    }
+    pxt.isOutputText = isOutputText;
 })(pxt || (pxt = {}));
 /// <reference path="main.ts"/>
 var pxt;
@@ -2121,43 +1521,36 @@ var pxt;
                         "min": pxt.Util.lf("smaller value of 2 numbers"),
                         "max": pxt.Util.lf("larger value of 2 numbers")
                     },
-                    url: '/reference/math',
+                    url: '/blocks/math',
                     operators: {
                         'op': ["min", "max"]
                     },
-                    category: 'math'
+                    category: 'math',
+                    outputShape: Blockly.OUTPUT_SHAPE_ROUND
                 },
                 'math_op3': {
                     name: pxt.Util.lf("absolute number"),
                     tooltip: pxt.Util.lf("absolute value of a number"),
-                    url: '/referece/math/abs',
+                    url: '/blocks/math/abs',
                     category: 'math',
                     block: {
                         message0: pxt.Util.lf("absolute of %1")
-                    }
-                },
-                'device_random': {
-                    name: pxt.Util.lf("pick random number"),
-                    tooltip: pxt.Util.lf("Returns a random integer between 0 and the specified bound (inclusive)."),
-                    url: '/reference/math/random',
-                    category: 'math',
-                    block: {
-                        message0: pxt.Util.lf("pick random 0 to %1")
-                    }
+                    },
+                    outputShape: Blockly.OUTPUT_SHAPE_ROUND
                 },
                 'math_number': {
                     name: pxt.Util.lf("{id:block}number"),
-                    url: '/types/number',
+                    url: '/blocks/math/random',
                     category: 'math'
                 },
                 'math_number_minmax': {
                     name: pxt.Util.lf("{id:block}number"),
-                    url: '/reference/math',
+                    url: '/blocks/math/random',
                     category: 'math'
                 },
                 'math_arithmetic': {
                     name: pxt.Util.lf("arithmetic operation"),
-                    url: '/reference/math',
+                    url: '/blocks/math',
                     tooltip: {
                         ADD: pxt.Util.lf("Return the sum of the two numbers."),
                         MINUS: pxt.Util.lf("Return the difference of the two numbers."),
@@ -2180,7 +1573,7 @@ var pxt;
                 'math_modulo': {
                     name: pxt.Util.lf("division remainder"),
                     tooltip: pxt.Util.lf("Return the remainder from dividing the two numbers."),
-                    url: '/reference/math',
+                    url: '/blocks/math',
                     category: 'math',
                     block: {
                         MATH_MODULO_TITLE: pxt.Util.lf("remainder of %1 ÷ %2")
@@ -2244,7 +1637,7 @@ var pxt;
                 'lists_create_with': {
                     name: pxt.Util.lf("create an array"),
                     tooltip: pxt.Util.lf("Creates a new array."),
-                    url: '/reference/arrays/create',
+                    url: '/blocks/arrays/create',
                     category: 'arrays',
                     blockTextSearch: "LISTS_CREATE_WITH_INPUT_WITH",
                     block: {
@@ -2257,7 +1650,7 @@ var pxt;
                 'lists_length': {
                     name: pxt.Util.lf("array length"),
                     tooltip: pxt.Util.lf("Returns the number of items in an array."),
-                    url: '/reference/arrays/length',
+                    url: '/blocks/arrays/length',
                     category: 'arrays',
                     block: {
                         LISTS_LENGTH_TITLE: pxt.Util.lf("length of array %1")
@@ -2266,7 +1659,7 @@ var pxt;
                 'lists_index_get': {
                     name: pxt.Util.lf("get a value in an array"),
                     tooltip: pxt.Util.lf("Returns the value at the given index in an array."),
-                    url: '/reference/arrays/get',
+                    url: '/blocks/arrays/get',
                     category: 'arrays',
                     block: {
                         message0: pxt.Util.lf("%1 get value at %2")
@@ -2275,7 +1668,7 @@ var pxt;
                 'lists_index_set': {
                     name: pxt.Util.lf("set a value in an array"),
                     tooltip: pxt.Util.lf("Sets the value at the given index in an array"),
-                    url: '/reference/arrays/set',
+                    url: '/blocks/arrays/set',
                     category: 'arrays',
                     block: {
                         message0: pxt.Util.lf("%1 set value at %2 to %3")
@@ -2388,15 +1781,10 @@ var pxt;
         }
     })(blocks = pxt.blocks || (pxt.blocks = {}));
 })(pxt || (pxt = {}));
-/// <reference path="../typings/globals/winrt/index.d.ts"/>
 var pxt;
 (function (pxt) {
     var BrowserUtils;
     (function (BrowserUtils) {
-        function isWinRT() {
-            return typeof Windows !== "undefined";
-        }
-        BrowserUtils.isWinRT = isWinRT;
         function isIFrame() {
             try {
                 return window && window.self !== window.top;
@@ -2434,6 +1822,11 @@ var pxt;
             return hasNavigator() && /arm/i.test(navigator.platform);
         }
         BrowserUtils.isARM = isARM;
+        // Detects if we are running inside the UWP runtime (Edge)
+        function isUwpEdge() {
+            return typeof window !== "undefined" && !!window.Windows;
+        }
+        BrowserUtils.isUwpEdge = isUwpEdge;
         /*
         Notes on browser detection
     
@@ -2555,9 +1948,8 @@ var pxt;
                 matches = /Version\/([0-9\.]+)/i.exec(navigator.userAgent);
                 // pinned web site have a different user agent
                 // Mozilla/5.0 (iPhone; CPU iPhone OS 10_2_1 like Mac OS X) AppleWebKit/602.4.6 (KHTML, like Gecko) Mobile/14D27
-                // Mozilla/5.0 (iPad; CPU OS 10_3_3 like Mac OS X) AppleWebKit/603.3.8 (KHTML, like Gecko) Mobile/14G60
                 if (!matches)
-                    matches = /(iPod|iPhone|iPad); CPU .*?OS (\d+)/i.exec(navigator.userAgent);
+                    matches = /(iPod|iPhone|iPad) OS (\d+)/i.exec(navigator.userAgent);
             }
             else if (isChrome()) {
                 matches = /(Chrome|Chromium)\/([0-9\.]+)/i.exec(navigator.userAgent);
@@ -2775,6 +2167,7 @@ var pxt;
         // overriden by targets
         commands.deployCoreAsync = undefined;
         commands.browserDownloadAsync = undefined;
+        commands.saveOnlyAsync = undefined;
     })(commands = pxt.commands || (pxt.commands = {}));
 })(pxt || (pxt = {}));
 /// <reference path="../localtypings/pxtarget.d.ts"/>
@@ -2893,6 +2286,9 @@ var pxt;
             if (!v)
                 return null;
             v = v.trim();
+            var mm = /^\((.*)\)/.exec(v);
+            if (mm)
+                v = mm[1];
             if (/^-?(\d+|0[xX][0-9a-fA-F]+)$/.test(v))
                 return parseInt(v);
             return null;
@@ -2924,9 +2320,21 @@ var pxt;
             }
             pxt.debug("Generating new extinfo");
             var res = pxtc.emptyExtInfo();
-            var isPlatformio = pxt.appTarget.compileService && !!pxt.appTarget.compileService.platformioIni;
+            var compileService = pxt.appTarget.compileService;
+            if (!compileService)
+                compileService = {
+                    gittag: "none",
+                    serviceId: "nocompile"
+                };
+            var isPlatformio = !!compileService.platformioIni;
+            var isCodal = compileService.buildEngine == "codal";
+            var isDockerMake = compileService.buildEngine == "dockermake";
+            var isYotta = !isPlatformio && !isCodal && !isDockerMake;
             if (isPlatformio)
                 sourcePath = "/src/";
+            else if (isCodal || isDockerMake)
+                sourcePath = "/pxtapp/";
+            var pxtConfig = "// Configuration defines\n";
             var pointersInc = "\nPXT_SHIMS_BEGIN\n";
             var includesInc = "#include \"pxt.h\"\n";
             var thisErrors = "";
@@ -2938,12 +2346,7 @@ var pxt;
             var shimsDTS = nsWriter("declare namespace");
             var enumsDTS = nsWriter("declare namespace");
             var allErrors = "";
-            var compileService = pxt.appTarget.compileService;
-            if (!compileService)
-                compileService = {
-                    gittag: "none",
-                    serviceId: "nocompile"
-                };
+            var knownEnums = {};
             var enumVals = {
                 "true": "1",
                 "false": "0",
@@ -2954,6 +2357,7 @@ var pxt;
             function toJs(name) {
                 return name.trim().replace(/[\_\*]$/, "");
             }
+            var makefile = "";
             for (var _b = 0, _c = mainPkg.sortedDeps(); _b < _c.length; _b++) {
                 var pkg = _c[_b];
                 if (pkg.getFiles().indexOf(constsName) >= 0) {
@@ -2966,6 +2370,9 @@ var pxt;
                         }
                     });
                 }
+                if (!makefile && pkg.getFiles().indexOf("Makefile") >= 0) {
+                    makefile = pkg.host().readFile(pkg, "Makefile");
+                }
             }
             function parseCpp(src, isHeader) {
                 var currNs = "";
@@ -2976,6 +2383,12 @@ var pxt;
                 var indexedInstanceIdx = -1;
                 // replace #if 0 .... #endif with newlines
                 src = src.replace(/^\s*#\s*if\s+0\s*$[^]*?^\s*#\s*endif\s*$/mg, function (f) { return f.replace(/[^\n]/g, ""); });
+                // special handling of C++ namespace that ends with Methods (e.g. FooMethods)
+                // such a namespace will be converted into a TypeScript interface
+                // this enables simple objects with methods to be defined. See, for example:
+                // https://github.com/Microsoft/pxt-microbit/blob/master/libs/core/buffer.cpp
+                // within that namespace, the first parameter of each function should have
+                // the type Foo
                 function interfaceName() {
                     var n = currNs.replace(/Methods$/, "");
                     if (n == currNs)
@@ -2989,9 +2402,15 @@ var pxt;
                         case "void": return "void";
                         // TODO: need int16_t
                         case "int32_t":
+                        case "int":
+                            return "int32";
                         case "uint32_t":
                         case "unsigned":
-                        case "int": return "number";
+                            return "uint32";
+                        case "TNumber":
+                        case "float":
+                        case "double":
+                            return "number";
                         case "uint16_t": return "uint16";
                         case "int16_t":
                         case "short": return "int16";
@@ -3001,10 +2420,39 @@ var pxt;
                         case "sbyte": return "int8";
                         case "bool": return "boolean";
                         case "StringData*": return "string";
+                        case "String": return "string";
                         case "ImageLiteral": return "string";
                         case "Action": return "() => void";
+                        case "TValue": return "any";
                         default:
                             return toJs(tp);
+                    }
+                }
+                function mapRunTimeType(tp) {
+                    tp = tp.replace(/\s+/g, "");
+                    switch (tp) {
+                        case "int32_t":
+                        case "uint32_t":
+                        case "unsigned":
+                        case "uint16_t":
+                        case "int16_t":
+                        case "short":
+                        case "uint8_t":
+                        case "byte":
+                        case "int8_t":
+                        case "sbyte":
+                        case "int":
+                            return "I";
+                        case "void": return "V";
+                        case "float": return "F";
+                        case "TNumber": return "N";
+                        case "TValue": return "T";
+                        case "bool": return "B";
+                        case "double": return "D";
+                        default:
+                            if (U.lookup(knownEnums, tp))
+                                return "I";
+                            return "_";
                     }
                 }
                 var outp = "";
@@ -3014,18 +2462,21 @@ var pxt;
                 shimsDTS.setNs("");
                 src.split(/\r?\n/).forEach(function (ln) {
                     ++lineNo;
+                    // remove comments (NC = no comments)
                     var lnNC = ln.replace(/\/\/.*/, "").replace(/\/\*/, "");
                     if (inEnum && lnNC.indexOf("}") >= 0) {
                         inEnum = false;
                         enumsDTS.write("}");
                     }
                     if (inEnum) {
+                        // parse the enum case, with lots of optional stuff (?)
                         var mm = /^\s*(\w+)\s*(=\s*(.*?))?,?\s*$/.exec(lnNC);
                         if (mm) {
                             var nm = mm[1];
                             var v = mm[3];
                             var opt = "";
                             if (v) {
+                                // user-supplied value
                                 v = v.trim();
                                 var curr = U.lookup(enumVals, v);
                                 if (curr != null) {
@@ -3037,6 +2488,7 @@ var pxt;
                                     err("cannot determine value of " + lnNC);
                             }
                             else {
+                                // no user-supplied value
                                 enumVal++;
                                 v = enumVal + "";
                             }
@@ -3046,6 +2498,7 @@ var pxt;
                             enumsDTS.write(ln);
                         }
                     }
+                    // TODO: why do we allow class/struct here?
                     var enM = /^\s*enum\s+(|class\s+|struct\s+)(\w+)\s*({|$)/.exec(lnNC);
                     if (enM) {
                         inEnum = true;
@@ -3058,11 +2511,12 @@ var pxt;
                             currAttrs = "";
                             currDocComment = "";
                         }
-                        enumsDTS.write("declare enum " + toJs(enM[2]) + " " + enM[3]);
+                        enumsDTS.write("declare const enum " + toJs(enM[2]) + " " + enM[3]);
                         if (!isHeader) {
                             protos.setNs(currNs);
                             protos.write("enum " + enM[2] + " : int;");
                         }
+                        knownEnums[enM[2]] = true;
                     }
                     if (inEnum) {
                         outp += ln + "\n";
@@ -3124,16 +2578,19 @@ var pxt;
                         }
                         return;
                     }
+                    // function definition
                     m = /^\s*(\w+)([\*\&]*\s+[\*\&]*)(\w+)\s*\(([^\(\)]*)\)\s*(;\s*$|\{|$)/.exec(ln);
                     if (currAttrs && m) {
                         indexedInstanceAttrs = null;
                         var parsedAttrs_1 = pxtc.parseCommentString(currAttrs);
+                        // top-level functions (outside of a namespace) are not permitted
                         if (!currNs)
                             err("missing namespace declaration");
                         var retTp = (m[1] + m[2]).replace(/\s+/g, "");
                         var funName = m[3];
                         var origArgs = m[4];
                         currAttrs = currAttrs.trim().replace(/ \w+\.defl=\w+/g, "");
+                        var argsFmt_1 = mapRunTimeType(retTp);
                         var args = origArgs.split(/,/).filter(function (s) { return !!s; }).map(function (s) {
                             s = s.trim();
                             var m = /(.*)=\s*(-?\w+)$/.exec(s);
@@ -3150,6 +2607,7 @@ var pxt;
                                 return "";
                             }
                             var argName = m[2];
+                            argsFmt_1 += mapRunTimeType(m[1]);
                             if (parsedAttrs_1.paramDefl[argName]) {
                                 defl = parsedAttrs_1.paramDefl[argName];
                                 qm = "?";
@@ -3167,10 +2625,10 @@ var pxt;
                         var numArgs = args.length;
                         var fi = {
                             name: currNs + "::" + funName,
-                            type: retTp == "void" ? "P" : "F",
-                            args: numArgs,
+                            argsFmt: argsFmt_1,
                             value: null
                         };
+                        //console.log(`${ln.trim()} : ${argsFmt}`)
                         if (currDocComment) {
                             shimsDTS.setNs(toJs(currNs));
                             shimsDTS.write("");
@@ -3202,10 +2660,10 @@ var pxt;
                             protos.write(retTp + " " + funName + "(" + origArgs + ");");
                         }
                         res.functions.push(fi);
-                        if (isPlatformio)
-                            pointersInc += "PXT_FNPTR(::" + fi.name + "),\n";
-                        else
+                        if (isYotta)
                             pointersInc += "(uint32_t)(void*)::" + fi.name + ",\n";
+                        else
+                            pointersInc += "PXT_FNPTR(::" + fi.name + "),\n";
                         return;
                     }
                     m = /^\s*(\w+)\s+(\w+)\s*;/.exec(ln);
@@ -3247,6 +2705,8 @@ var pxt;
                 if (j0 && j0.dependencies) {
                     U.jsonCopyFrom(res.platformio.dependencies, j0.dependencies);
                 }
+                if (res.npmDependencies && pkg.config.npmDependencies)
+                    U.jsonCopyFrom(res.npmDependencies, pkg.config.npmDependencies);
                 var json = pkg.config.yotta;
                 if (!json)
                     return;
@@ -3286,7 +2746,7 @@ var pxt;
                 }
             }
             // This is overridden on the build server, but we need it for command line build
-            if (!isPlatformio && pxt.appTarget.compile && pxt.appTarget.compile.hasHex) {
+            if (isYotta && pxt.appTarget.compile && pxt.appTarget.compile.hasHex) {
                 var cs = pxt.appTarget.compileService;
                 U.assert(!!cs.yottaCorePackage);
                 U.assert(!!cs.githubCorePackage);
@@ -3315,11 +2775,13 @@ var pxt;
                         var isHeader = U.endsWith(fn, ".h");
                         if (isHeader || U.endsWith(fn, ".cpp")) {
                             var fullName = pkg.config.name + "/" + fn;
-                            if (pkg.config.name == "core" && isHeader)
+                            if ((pkg.config.name == "base" || pkg.config.name == "core") && isHeader)
                                 fullName = fn;
                             if (isHeader)
-                                includesInc += "#include \"" + (isPlatformio ? "" : sourcePath.slice(1)) + fullName + "\"\n";
+                                includesInc += "#include \"" + (isYotta ? sourcePath.slice(1) : "") + fullName + "\"\n";
                             var src = pkg.readFile(fn);
+                            if (src == null)
+                                U.userError(lf("C++ file {0} is missing in package {1}.", fn, pkg.config.name));
                             fileName = fullName;
                             // parseCpp() will remove doc comments, to prevent excessive recompilation
                             src = parseCpp(src, isHeader);
@@ -3328,6 +2790,10 @@ var pxt;
                                 res.onlyPublic = false;
                             if (pkg.verProtocol() && pkg.verProtocol() != "pub" && pkg.verProtocol() != "embed")
                                 res.onlyPublic = false;
+                        }
+                        if (U.endsWith(fn, ".c") || U.endsWith(fn, ".S") || U.endsWith(fn, ".s")) {
+                            var src = pkg.readFile(fn);
+                            res.extensionFiles[sourcePath + pkg.config.name + "/" + fn.replace(/\.S$/, ".s")] = src;
                         }
                     }
                     if (thisErrors) {
@@ -3340,7 +2806,32 @@ var pxt;
             // merge optional settings
             U.jsonCopyFrom(optSettings, currSettings);
             var configJson = U.jsonUnFlatten(optSettings);
-            if (isPlatformio) {
+            if (isDockerMake) {
+                var packageJson = {
+                    name: "pxt-app",
+                    private: true,
+                    dependencies: res.npmDependencies,
+                };
+                res.generatedFiles["/package.json"] = JSON.stringify(packageJson, null, 4) + "\n";
+            }
+            else if (isCodal) {
+                var cs = pxt.appTarget.compileService;
+                var codalJson_1 = {
+                    "target": cs.codalTarget + ".json",
+                    "definitions": U.clone(cs.codalDefinitions) || {},
+                    "application": "pxtapp",
+                    "output_folder": "build",
+                    // include these, because we use hash of this file to see if anything changed
+                    "pxt_gitrepo": cs.githubCorePackage,
+                    "pxt_gittag": cs.gittag,
+                };
+                U.iterMap(U.jsonFlatten(configJson), function (k, v) {
+                    k = k.toUpperCase().replace(/\./g, "_").replace("CODAL_", "DEVICE_");
+                    codalJson_1.definitions[k] = v;
+                });
+                res.generatedFiles["/codal.json"] = JSON.stringify(codalJson_1, null, 4) + "\n";
+            }
+            else if (isPlatformio) {
                 var iniLines_1 = pxt.appTarget.compileService.platformioIni.slice();
                 // TODO merge configjson
                 iniLines_1.push("lib_deps =");
@@ -3367,16 +2858,39 @@ var pxt;
                 };
                 res.generatedFiles["/module.json"] = JSON.stringify(moduleJson, null, 4) + "\n";
             }
+            if (pxt.appTarget.compile && pxt.appTarget.compile.boxDebug) {
+                pxtConfig += "#define PXT_BOX_DEBUG 1\n";
+                pxtConfig += "#define PXT_MEMLEAK_DEBUG 1\n";
+            }
             res.generatedFiles[sourcePath + "pointers.cpp"] = includesInc + protos.finish() + pointersInc + "\nPXT_SHIMS_END\n";
-            res.generatedFiles["/config.json"] = JSON.stringify(configJson, null, 4) + "\n";
+            res.generatedFiles[sourcePath + "pxtconfig.h"] = pxtConfig;
+            if (isYotta)
+                res.generatedFiles["/config.json"] = JSON.stringify(configJson, null, 4) + "\n";
             res.generatedFiles[sourcePath + "main.cpp"] = "\n#include \"pxt.h\"\n#ifdef PXT_MAIN\nPXT_MAIN\n#else\nint main() {\n    uBit.init();\n    pxt::start();\n    while (1) uBit.sleep(10000);\n    return 0;\n}\n#endif\n";
+            if (makefile) {
+                var allfiles_1 = Object.keys(res.extensionFiles).concat(Object.keys(res.generatedFiles));
+                var inc_1 = "";
+                var objs = [];
+                var add = function (name, ext) {
+                    var files = allfiles_1.filter(function (f) { return U.endsWith(f, ext); }).map(function (s) { return s.slice(1); });
+                    inc_1 += name + " = " + files.join(" ") + "\n";
+                };
+                add("PXT_C", ".c");
+                add("PXT_CPP", ".cpp");
+                add("PXT_S", ".s");
+                add("PXT_HEADERS", ".h");
+                inc_1 += "PXT_SOURCES = $(PXT_C) $(PXT_S) $(PXT_CPP)\n";
+                inc_1 += "PXT_OBJS = $(addprefix bld/, $(PXT_C:.c=.o) $(PXT_S:.s=.o) $(PXT_CPP:.cpp=.o))\n";
+                res.generatedFiles["/Makefile"] = makefile;
+                res.generatedFiles["/Makefile.inc"] = inc_1;
+            }
             var tmp = res.extensionFiles;
             U.jsonCopyFrom(tmp, res.generatedFiles);
             var creq = {
                 config: compileService.serviceId,
                 tag: compileService.gittag,
                 replaceFiles: tmp,
-                dependencies: (!isPlatformio ? res.yotta.dependencies : null)
+                dependencies: (isYotta ? res.yotta.dependencies : null)
             };
             var data = JSON.stringify(creq);
             res.sha = U.sha256(data);
@@ -3502,25 +3016,32 @@ var pxt;
         }
         cpp.unpackSourceFromHexFileAsync = unpackSourceFromHexFileAsync;
         function unpackSourceFromHexAsync(dat) {
-            var rawEmbed;
-            var bin = pxt.appTarget.compile.useUF2 ? ts.pxtc.UF2.toBin(dat) : undefined;
-            if (bin) {
-                rawEmbed = extractSourceFromBin(bin.buf);
+            function error(e) {
+                pxt.debug(e);
+                return Promise.reject(new Error(e));
             }
-            else {
+            var rawEmbed;
+            // UF2?
+            if (pxt.HF2.read32(dat, 0) == ts.pxtc.UF2.UF2_MAGIC_START0) {
+                var bin = ts.pxtc.UF2.toBin(dat);
+                if (bin)
+                    rawEmbed = extractSourceFromBin(bin.buf);
+            }
+            // ELF?
+            if (pxt.HF2.read32(dat, 0) == 0x464c457f) {
+                rawEmbed = extractSourceFromBin(dat);
+            }
+            // HEX? (check for colon)
+            if (dat[0] == 0x3a) {
                 var str = fromUTF8Bytes(dat);
                 rawEmbed = extractSource(str || "");
             }
-            if (!rawEmbed)
-                return undefined;
-            if (!rawEmbed.meta || !rawEmbed.text) {
-                pxt.debug("This .hex file doesn't contain source.");
-                return undefined;
+            if (!rawEmbed || !rawEmbed.meta || !rawEmbed.text) {
+                return error("This .hex file doesn't contain source.");
             }
             var hd = JSON.parse(rawEmbed.meta);
             if (!hd) {
-                pxt.debug("This .hex file is not valid.");
-                return undefined;
+                return error("This .hex file is not valid.");
             }
             else if (hd.compression == "LZMA") {
                 return pxt.lzmaDecompressAsync(rawEmbed.text)
@@ -3535,8 +3056,7 @@ var pxt;
                 });
             }
             else if (hd.compression) {
-                pxt.debug("Compression type " + hd.compression + " not supported.");
-                return undefined;
+                return error("Compression type " + hd.compression + " not supported.");
             }
             else {
                 return Promise.resolve({ source: fromUTF8Bytes(rawEmbed.text) });
@@ -4326,7 +3846,7 @@ var pxt;
                 markdown += "\n```package\n" + opts.repo.name.replace(/^pxt-/, '') + "=github:" + opts.repo.fullName + "#" + (opts.repo.tag || "master") + "\n```\n";
             //Uses the CmdLink definitions to replace links to YouTube and Vimeo (limited at the moment)
             markdown = markdown.replace(/^\s*https?:\/\/(\S+)\s*$/mg, function (f, lnk) {
-                var _loop_3 = function(ent) {
+                var _loop_1 = function(ent) {
                     var m = ent.rx.exec(lnk);
                     if (m) {
                         return { value: ent.cmd.replace(/\$(\d+)/g, function (f, k) {
@@ -4336,8 +3856,8 @@ var pxt;
                 };
                 for (var _i = 0, links_1 = links; _i < links_1.length; _i++) {
                     var ent = links_1[_i];
-                    var state_3 = _loop_3(ent);
-                    if (typeof state_3 === "object") return state_3.value;
+                    var state_1 = _loop_1(ent);
+                    if (typeof state_1 === "object") return state_1.value;
                 }
                 return f;
             });
@@ -4536,7 +4056,7 @@ var pxt;
             md = md.replace(/\r/g, "");
             var lines = md.split(/\n/);
             var skipThese = {};
-            var _loop_4 = function(l) {
+            var _loop_2 = function(l) {
                 var m = /^\s*(#+)\s*(.*?)(#(\S+)\s*)?$/.exec(l);
                 var templSect = null;
                 if (template && m) {
@@ -4584,7 +4104,7 @@ var pxt;
             };
             for (var _i = 0, lines_1 = lines; _i < lines_1.length; _i++) {
                 var l = lines_1[_i];
-                _loop_4(l);
+                _loop_2(l);
             }
             return openSections[0];
         }
@@ -5050,9 +4570,10 @@ var pxt;
 (function (pxt) {
     var HF2;
     (function (HF2) {
-        var HF2_CMD_BININFO = 0x0001; // no arguments
-        var HF2_MODE_BOOTLOADER = 0x01;
-        var HF2_MODE_USERSPACE = 0x02;
+        // see https://github.com/Microsoft/uf2/blob/master/hf2.md for full spec
+        HF2.HF2_CMD_BININFO = 0x0001; // no arguments
+        HF2.HF2_MODE_BOOTLOADER = 0x01;
+        HF2.HF2_MODE_USERSPACE = 0x02;
         /*
         struct HF2_BININFO_Result {
             uint32_t mode;
@@ -5061,13 +4582,13 @@ var pxt;
             uint32_t max_message_size;
         };
         */
-        var HF2_CMD_INFO = 0x0002;
+        HF2.HF2_CMD_INFO = 0x0002;
         // no arguments
         // results is utf8 character array
-        var HF2_CMD_RESET_INTO_APP = 0x0003; // no arguments, no result
-        var HF2_CMD_RESET_INTO_BOOTLOADER = 0x0004; // no arguments, no result
-        var HF2_CMD_START_FLASH = 0x0005; // no arguments, no result
-        var HF2_CMD_WRITE_FLASH_PAGE = 0x0006;
+        HF2.HF2_CMD_RESET_INTO_APP = 0x0003; // no arguments, no result
+        HF2.HF2_CMD_RESET_INTO_BOOTLOADER = 0x0004; // no arguments, no result
+        HF2.HF2_CMD_START_FLASH = 0x0005; // no arguments, no result
+        HF2.HF2_CMD_WRITE_FLASH_PAGE = 0x0006;
         /*
         struct HF2_WRITE_FLASH_PAGE_Command {
             uint32_t target_addr;
@@ -5075,7 +4596,7 @@ var pxt;
         };
         */
         // no result
-        var HF2_CMD_CHKSUM_PAGES = 0x0007;
+        HF2.HF2_CMD_CHKSUM_PAGES = 0x0007;
         /*
         struct HF2_CHKSUM_PAGES_Command {
             uint32_t target_addr;
@@ -5085,7 +4606,7 @@ var pxt;
             uint16_t chksums[num_pages];
         };
         */
-        var HF2_CMD_READ_WORDS = 0x0008;
+        HF2.HF2_CMD_READ_WORDS = 0x0008;
         /*
         struct HF2_READ_WORDS_Command {
             uint32_t target_addr;
@@ -5095,7 +4616,7 @@ var pxt;
             uint32_t words[num_words];
         };
         */
-        var HF2_CMD_WRITE_WORDS = 0x0009;
+        HF2.HF2_CMD_WRITE_WORDS = 0x0009;
         /*
         struct HF2_WRITE_WORDS_Command {
             uint32_t target_addr;
@@ -5104,15 +4625,22 @@ var pxt;
         };
         */
         // no result
-        var HF2_FLAG_SERIAL_OUT = 0x80;
-        var HF2_FLAG_SERIAL_ERR = 0xC0;
-        var HF2_FLAG_CMDPKT_LAST = 0x40;
-        var HF2_FLAG_CMDPKT_BODY = 0x00;
-        var HF2_FLAG_MASK = 0xC0;
-        var HF2_SIZE_MASK = 63;
-        var HF2_STATUS_OK = 0x00;
-        var HF2_STATUS_INVALID_CMD = 0x01;
-        var HF2_STATUS_EXEC_ERR = 0x02;
+        HF2.HF2_CMD_DMESG = 0x0010;
+        // no arguments
+        // results is utf8 character array
+        HF2.HF2_FLAG_SERIAL_OUT = 0x80;
+        HF2.HF2_FLAG_SERIAL_ERR = 0xC0;
+        HF2.HF2_FLAG_CMDPKT_LAST = 0x40;
+        HF2.HF2_FLAG_CMDPKT_BODY = 0x00;
+        HF2.HF2_FLAG_MASK = 0xC0;
+        HF2.HF2_SIZE_MASK = 63;
+        HF2.HF2_STATUS_OK = 0x00;
+        HF2.HF2_STATUS_INVALID_CMD = 0x01;
+        HF2.HF2_STATUS_EXEC_ERR = 0x02;
+        HF2.HF2_STATUS_EVENT = 0x80;
+        // the eventId is overlayed on the tag+status; the mask corresponds
+        // to the HF2_STATUS_EVENT above
+        HF2.HF2_EV_MASK = 0x800000;
         function write32(buf, pos, v) {
             buf[pos + 0] = (v >> 0) & 0xff;
             buf[pos + 1] = (v >> 8) & 0xff;
@@ -5133,8 +4661,30 @@ var pxt;
             return buf[pos] | (buf[pos + 1] << 8);
         }
         HF2.read16 = read16;
+        function encodeU32LE(words) {
+            var r = new Uint8Array(words.length * 4);
+            for (var i = 0; i < words.length; ++i)
+                write32(r, i * 4, words[i]);
+            return r;
+        }
+        HF2.encodeU32LE = encodeU32LE;
+        function decodeU32LE(buf) {
+            var res = [];
+            for (var i = 0; i < buf.length; i += 4)
+                res.push(read32(buf, i));
+            return res;
+        }
+        HF2.decodeU32LE = decodeU32LE;
+        var logEnabled = false;
+        function enableLog() {
+            logEnabled = true;
+        }
+        HF2.enableLog = enableLog;
         function log(msg) {
-            console.log("HF2: " + msg);
+            if (logEnabled)
+                pxt.log("HF2: " + msg);
+            else
+                pxt.debug("HF2: " + msg);
         }
         var Wrapper = (function () {
             function Wrapper(io) {
@@ -5142,29 +4692,31 @@ var pxt;
                 this.io = io;
                 this.cmdSeq = pxt.U.randomUint32();
                 this.lock = new pxt.U.PromiseQueue();
+                this.rawMode = false;
                 this.maxMsgSize = 63; // when running in forwarding mode, we do not really know
                 this.bootloaderMode = false;
                 this.reconnectTries = 0;
                 this.msgs = new pxt.U.PromiseBuffer();
+                this.eventHandlers = {};
                 this.onSerial = function (buf, isStderr) { };
                 var frames = [];
                 io.onSerial = function (b, e) { return _this.onSerial(b, e); };
                 io.onData = function (buf) {
-                    var tp = buf[0] & HF2_FLAG_MASK;
+                    var tp = buf[0] & HF2.HF2_FLAG_MASK;
                     var len = buf[0] & 63;
                     //console.log(`msg tp=${tp} len=${len}`)
                     var frame = new Uint8Array(len);
                     pxt.U.memcpy(frame, 0, buf, 1, len);
-                    if (tp & HF2_FLAG_SERIAL_OUT) {
-                        _this.onSerial(frame, tp == HF2_FLAG_SERIAL_ERR);
+                    if (tp & HF2.HF2_FLAG_SERIAL_OUT) {
+                        _this.onSerial(frame, tp == HF2.HF2_FLAG_SERIAL_ERR);
                         return;
                     }
                     frames.push(frame);
-                    if (tp == HF2_FLAG_CMDPKT_BODY) {
+                    if (tp == HF2.HF2_FLAG_CMDPKT_BODY) {
                         return;
                     }
                     else {
-                        pxt.U.assert(tp == HF2_FLAG_CMDPKT_LAST);
+                        pxt.U.assert(tp == HF2.HF2_FLAG_CMDPKT_LAST);
                         var total = 0;
                         for (var _i = 0, frames_1 = frames; _i < frames_1.length; _i++) {
                             var f = frames_1[_i];
@@ -5178,7 +4730,23 @@ var pxt;
                             ptr += f.length;
                         }
                         frames = [];
-                        _this.msgs.push(r);
+                        if (r[2] & HF2.HF2_STATUS_EVENT) {
+                            // asynchronous event
+                            io.onEvent(r);
+                        }
+                        else {
+                            _this.msgs.push(r);
+                        }
+                    }
+                };
+                io.onEvent = function (buf) {
+                    var evid = read32(buf, 0);
+                    var f = pxt.U.lookup(_this.eventHandlers, evid + "");
+                    if (f) {
+                        f(buf.slice(4));
+                    }
+                    else {
+                        log("unhandled event: " + evid.toString(16));
                     }
                 };
                 io.onError = function (err) {
@@ -5196,12 +4764,17 @@ var pxt;
                 this.bootloaderMode = false;
                 this.msgs.drain();
             };
+            Wrapper.prototype.onEvent = function (id, f) {
+                pxt.U.assert(!!(id & HF2.HF2_EV_MASK));
+                this.eventHandlers[id + ""] = f;
+            };
             Wrapper.prototype.reconnectAsync = function (first) {
                 var _this = this;
                 if (first === void 0) { first = false; }
                 this.resetState();
                 if (first)
                     return this.initAsync();
+                log("reconnect raw=" + this.rawMode);
                 return this.io.reconnectAsync()
                     .then(function () { return _this.initAsync(); })
                     .catch(function (e) {
@@ -5215,6 +4788,10 @@ var pxt;
                         throw e;
                     }
                 });
+            };
+            Wrapper.prototype.disconnectAsync = function () {
+                log("disconnect");
+                return this.io.disconnectAsync();
             };
             Wrapper.prototype.error = function (m) {
                 return this.io.error(m);
@@ -5250,12 +4827,12 @@ var pxt;
                         if (res[3])
                             info = "; info=" + res[3];
                         switch (res[2]) {
-                            case HF2_STATUS_OK:
+                            case HF2.HF2_STATUS_OK:
                                 return res.slice(4);
-                            case HF2_STATUS_INVALID_CMD:
+                            case HF2.HF2_STATUS_INVALID_CMD:
                                 _this.error("invalid command" + info);
                                 break;
-                            case HF2_STATUS_EXEC_ERR:
+                            case HF2.HF2_STATUS_EXEC_ERR:
                                 _this.error("execution error" + info);
                                 break;
                             default:
@@ -5288,13 +4865,13 @@ var pxt;
                         return Promise.resolve();
                     if (len > 63) {
                         len = 63;
-                        frame[0] = HF2_FLAG_CMDPKT_BODY;
+                        frame[0] = HF2.HF2_FLAG_CMDPKT_BODY;
                     }
                     else {
-                        frame[0] = HF2_FLAG_CMDPKT_LAST;
+                        frame[0] = HF2.HF2_FLAG_CMDPKT_LAST;
                     }
                     if (serial)
-                        frame[0] = serial == 1 ? HF2_FLAG_SERIAL_OUT : HF2_FLAG_SERIAL_ERR;
+                        frame[0] = serial == 1 ? HF2.HF2_FLAG_SERIAL_OUT : HF2.HF2_FLAG_SERIAL_ERR;
                     frame[0] |= len;
                     for (var i = 0; i < len; ++i)
                         frame[i + 1] = buf[pos + i];
@@ -5308,7 +4885,7 @@ var pxt;
                 if (this.bootloaderMode)
                     return Promise.resolve();
                 log("Switching into bootloader mode");
-                return this.talkAsync(HF2_CMD_START_FLASH)
+                return this.talkAsync(HF2.HF2_CMD_START_FLASH)
                     .then(function () { return _this.initAsync(); })
                     .then(function () {
                     if (!_this.bootloaderMode)
@@ -5317,16 +4894,22 @@ var pxt;
             };
             Wrapper.prototype.reflashAsync = function (blocks) {
                 var _this = this;
+                log("reflash");
                 return this.flashAsync(blocks)
                     .then(function () { return Promise.delay(100); })
                     .then(function () { return _this.reconnectAsync(); });
+            };
+            Wrapper.prototype.writeWordsAsync = function (addr, words) {
+                pxt.U.assert(words.length <= 64); // just sanity check
+                return this.talkAsync(HF2.HF2_CMD_WRITE_WORDS, encodeU32LE([addr, words.length].concat(words)))
+                    .then(function () { });
             };
             Wrapper.prototype.readWordsAsync = function (addr, numwords) {
                 var args = new Uint8Array(8);
                 write32(args, 0, addr);
                 write32(args, 4, numwords);
                 pxt.U.assert(numwords <= 64); // just sanity check
-                return this.talkAsync(HF2_CMD_READ_WORDS, args);
+                return this.talkAsync(HF2.HF2_CMD_READ_WORDS, args);
             };
             Wrapper.prototype.flashAsync = function (blocks) {
                 var _this = this;
@@ -5340,7 +4923,7 @@ var pxt;
                     var buf = new Uint8Array(4 + b.payloadSize);
                     write32(buf, 0, b.targetAddr);
                     pxt.U.memcpy(buf, 4, b.data, 0, b.payloadSize);
-                    return _this.talkAsync(HF2_CMD_WRITE_FLASH_PAGE, buf)
+                    return _this.talkAsync(HF2.HF2_CMD_WRITE_FLASH_PAGE, buf)
                         .then(function () { return loopAsync(pos + 1); });
                 };
                 return this.switchToBootloaderAsync()
@@ -5365,7 +4948,7 @@ var pxt;
                     log("Flashing done at " + Math.round(blocks.length * _this.pageSize / t1 * 1000 / 1024) + " kB/s in " + t0 + "ms (reset " + (t0 - t1) + "ms). Resetting.");
                 })
                     .then(function () {
-                    return _this.talkAsync(HF2_CMD_RESET_INTO_APP)
+                    return _this.talkAsync(HF2.HF2_CMD_RESET_INTO_APP)
                         .catch(function (e) {
                         // error expected here - device is resetting
                     });
@@ -5374,15 +4957,17 @@ var pxt;
             };
             Wrapper.prototype.initAsync = function () {
                 var _this = this;
+                if (this.rawMode)
+                    return Promise.resolve();
                 return Promise.resolve()
-                    .then(function () { return _this.talkAsync(HF2_CMD_BININFO); })
+                    .then(function () { return _this.talkAsync(HF2.HF2_CMD_BININFO); })
                     .then(function (binfo) {
-                    _this.bootloaderMode = binfo[0] == HF2_MODE_BOOTLOADER;
+                    _this.bootloaderMode = binfo[0] == HF2.HF2_MODE_BOOTLOADER;
                     _this.pageSize = read32(binfo, 4);
                     _this.flashSize = read32(binfo, 8) * _this.pageSize;
                     _this.maxMsgSize = read32(binfo, 12);
                     log("Connected; msgSize " + _this.maxMsgSize + "B; flash " + _this.flashSize / 1024 + "kB; " + (_this.bootloaderMode ? "bootloader" : "application") + " mode");
-                    return _this.talkAsync(HF2_CMD_INFO);
+                    return _this.talkAsync(HF2.HF2_CMD_INFO);
                 })
                     .then(function (buf) {
                     _this.infoRaw = pxt.U.fromUTF8(pxt.U.uint8ArrayToString(buf));
@@ -5397,7 +4982,7 @@ var pxt;
                         Version: m[1],
                         Features: m[2],
                     };
-                    log("Board-ID: " + _this.info.BoardID);
+                    log("Board-ID: " + _this.info.BoardID + " v" + _this.info.Parsed.Version + " f" + _this.info.Parsed.Features);
                 })
                     .then(function () {
                     _this.reconnectTries = 0;
@@ -5461,6 +5046,1438 @@ var pxt;
         }
         HF2.onlyChangedBlocksAsync = onlyChangedBlocksAsync;
     })(HF2 = pxt.HF2 || (pxt.HF2 = {}));
+})(pxt || (pxt = {}));
+var pxt;
+(function (pxt) {
+    // keep in sync with RefCounted.h in Codal
+    pxt.REF_TAG_STRING = 1;
+    pxt.REF_TAG_BUFFER = 2;
+    pxt.REF_TAG_IMAGE = 3;
+    pxt.REF_TAG_NUMBER = 32;
+    pxt.REF_TAG_ACTION = 33;
+})(pxt || (pxt = {}));
+var pxt;
+(function (pxt) {
+    var HWDBG;
+    (function (HWDBG) {
+        var U = pxt.Util;
+        var H = pxt.HF2;
+        var HF2_DBG_GET_GLOBAL_STATE = 0x53fc66e0;
+        var HF2_DBG_RESUME = 0x27a55931;
+        var HF2_DBG_RESTART = 0x1120bd93;
+        var HF2_DBG_GET_STACK = 0x70901510;
+        var HF2_EV_DBG_PAUSED = 0x3692f9fd;
+        var r32 = H.read32;
+        var isHalted = false;
+        var lastCompileResult;
+        var onHalted;
+        var haltHandler;
+        var cachedStaticState;
+        var currBreakpoint;
+        var callInfos;
+        var lastFlash;
+        var hid;
+        function taggedSpecialValue(n) { return (n << 2) | 2; }
+        HWDBG.taggedUndefined = 0;
+        HWDBG.taggedNull = taggedSpecialValue(1);
+        HWDBG.taggedFalse = taggedSpecialValue(2);
+        HWDBG.taggedTrue = taggedSpecialValue(16);
+        HWDBG.postMessage = function (msg) { return console.log(msg); };
+        function clearAsync() {
+            isHalted = false;
+            lastCompileResult = null;
+            cachedStaticState = null;
+            return Promise.resolve();
+        }
+        function decodeValue(n) {
+            if (n & 1)
+                return n >> 1;
+            if (n == 0)
+                return undefined;
+            if (n & 2) {
+                if (n == HWDBG.taggedNull)
+                    return null;
+                if (n == HWDBG.taggedFalse)
+                    return false;
+                if (n == HWDBG.taggedTrue)
+                    return true;
+                return { tagged: n >> 2 };
+            }
+            return { ptr: n };
+        }
+        HWDBG.decodeValue = decodeValue;
+        function readMemAsync(addr, numbytes) {
+            U.assert(!(addr & 3));
+            U.assert(addr >= 0);
+            if (addr < 2 * 1024 * 1024) {
+                // assume these sit in flash
+                var res = new Uint8Array(numbytes);
+                addr -= lastFlash.start;
+                U.memcpy(res, 0, lastFlash.buf, addr, numbytes);
+                return Promise.resolve(res);
+            }
+            var maxBytes = hid.maxMsgSize - 32;
+            if (numbytes > maxBytes) {
+                var promises = [];
+                while (numbytes > 0) {
+                    var n = Math.min(maxBytes, numbytes);
+                    promises.push(readMemAsync(addr, n));
+                    numbytes -= n;
+                    addr += n;
+                }
+                return Promise.all(promises)
+                    .then(U.uint8ArrayConcat);
+            }
+            else {
+                return hid.readWordsAsync(addr, Math.ceil(numbytes / 4))
+                    .then(function (rr) {
+                    if (rr.length > numbytes)
+                        return rr.slice(0, numbytes);
+                    else
+                        return rr;
+                });
+            }
+        }
+        function heapExpandAsync(v) {
+            if (typeof v != "object" || !v)
+                return Promise.resolve(v);
+            if (typeof v.ptr == "number") {
+                // there should be no unaligned pointers
+                if (v.ptr & 3)
+                    return Promise.resolve({ unalignedPtr: v.ptr });
+                var tag_1 = 0;
+                // 56 bytes of data fit in one HID packet (with 5 bytes of header and 3 bytes of padding)
+                return readMemAsync(v.ptr, 56)
+                    .then(function (buf) {
+                    tag_1 = H.read16(buf, 2);
+                    var neededLength = buf.length;
+                    if (tag_1 == pxt.REF_TAG_STRING || tag_1 == pxt.REF_TAG_BUFFER) {
+                        neededLength = H.read16(buf, 4) + 6;
+                    }
+                    else if (tag_1 == pxt.REF_TAG_IMAGE) {
+                        neededLength = H.read16(buf, 4) * H.read16(buf, 8) + 8;
+                    }
+                    else if (tag_1 == pxt.REF_TAG_NUMBER) {
+                        neededLength = 8 + 4;
+                    }
+                    else {
+                    }
+                    if (neededLength > buf.length) {
+                        return readMemAsync(v.ptr + buf.length, neededLength - buf.length)
+                            .then(function (secondary) { return U.uint8ArrayConcat([buf, secondary]); });
+                    }
+                    else if (neededLength < buf.length) {
+                        return buf.slice(0, neededLength);
+                    }
+                    else {
+                        return buf;
+                    }
+                })
+                    .then(function (buf) {
+                    if (tag_1 == pxt.REF_TAG_STRING)
+                        return U.uint8ArrayToString(buf.slice(6));
+                    else if (tag_1 == pxt.REF_TAG_STRING)
+                        return { type: "buffer", data: buf.slice(6) };
+                    else if (tag_1 == pxt.REF_TAG_IMAGE)
+                        return {
+                            type: "image",
+                            data: buf.slice(8),
+                            width: H.read16(buf, 4),
+                            height: H.read16(buf, 8),
+                        };
+                    else if (tag_1 == pxt.REF_TAG_NUMBER)
+                        return new Float64Array(buf.buffer.slice(4))[0];
+                    else
+                        return {
+                            type: "unknown",
+                            tag: tag_1,
+                            refcnt: H.read16(buf, 0),
+                            data: buf.slice(4)
+                        };
+                });
+            }
+            else {
+                return Promise.resolve(v);
+            }
+        }
+        HWDBG.heapExpandAsync = heapExpandAsync;
+        function heapExpandMapAsync(vars) {
+            var promises = [];
+            var _loop_3 = function(k) {
+                promises.push(heapExpandAsync(vars[k])
+                    .then(function (r) {
+                    vars[k] = r;
+                    //console.log("set", k, "to", r, "prev", vars[k], "NOW", vars)
+                }));
+            };
+            for (var _i = 0, _a = Object.keys(vars); _i < _a.length; _i++) {
+                var k = _a[_i];
+                _loop_3(k);
+            }
+            return Promise.all(promises)
+                .then(function () {
+                //console.log("FIN", vars)
+            });
+        }
+        HWDBG.heapExpandMapAsync = heapExpandMapAsync;
+        function buildFrames(stack, msg) {
+            var currAddr = currBreakpoint.binAddr;
+            var sp = 0;
+            var pi = lastCompileResult.procDebugInfo.filter(function (p) {
+                return p.codeStartLoc <= currAddr && currAddr <= p.codeEndLoc;
+            })[0];
+            while (true) {
+                if (!pi)
+                    break; // ???
+                if (pi == lastCompileResult.procDebugInfo[0])
+                    break; // main
+                var bp = findPrevBrkp(currAddr);
+                var info = U.clone(bp);
+                info.functionName = pi.name;
+                msg.stackframes.push({
+                    locals: {},
+                    funcInfo: info,
+                    breakpointId: bp.id,
+                });
+                var frame = msg.stackframes[msg.stackframes.length - 1];
+                var idx = 0;
+                for (var _i = 0, _a = pi.locals; _i < _a.length; _i++) {
+                    var l = _a[_i];
+                    U.assert(l.index == idx++);
+                    frame.locals[l.name] = decodeValue(stack[sp++]);
+                }
+                currAddr = stack[sp++] & 0x7ffffffe;
+                var ci = callInfos[currAddr + ""];
+                for (var _b = 0, _c = pi.args; _b < _c.length; _b++) {
+                    var l = _c[_b];
+                    frame.locals[l.name] = decodeValue(stack[sp + (pi.args.length - 1 - l.index)]);
+                }
+                if (!ci)
+                    break;
+                pi = ci.from;
+                sp += ci.stack - pi.localsMark;
+            }
+        }
+        function findPrevBrkp(addr) {
+            var bb = lastCompileResult.breakpoints;
+            var brkMatch = bb[0];
+            var bestDelta = Infinity;
+            for (var _i = 0, bb_1 = bb; _i < bb_1.length; _i++) {
+                var b = bb_1[_i];
+                var delta = addr - b.binAddr;
+                // console.log(`${b.line+1}: addr=${b.binAddr} d=${delta}`)
+                if (delta >= 0 && delta < bestDelta) {
+                    bestDelta = delta;
+                    brkMatch = b;
+                }
+            }
+            return brkMatch;
+        }
+        function corePaused(buf) {
+            if (isHalted)
+                return Promise.resolve();
+            isHalted = true;
+            var msg;
+            return getHwStateAsync()
+                .then(function (st) {
+                var w = H.decodeU32LE(buf);
+                var pc = w[0];
+                var globals = {};
+                var _loop_4 = function(l) {
+                    var gbuf = st.globals;
+                    var readV = function () {
+                        switch (l.type) {
+                            case "uint32": return H.read32(gbuf, l.index);
+                            case "int32": return H.read32(gbuf, l.index) | 0;
+                            case "uint16": return H.read16(gbuf, l.index);
+                            case "int16": return (H.read16(gbuf, l.index) << 16) >> 16;
+                            case "uint8": return gbuf[l.index];
+                            case "int8": return (gbuf[l.index] << 24) >> 24;
+                            default: return null;
+                        }
+                    };
+                    var v = readV();
+                    if (v === null) {
+                        U.assert((l.index & 3) == 0);
+                        v = decodeValue(H.read32(gbuf, l.index));
+                    }
+                    globals[l.name] = v;
+                };
+                for (var _i = 0, _a = lastCompileResult.procDebugInfo[0].locals; _i < _a.length; _i++) {
+                    var l = _a[_i];
+                    _loop_4(l);
+                }
+                currBreakpoint = findPrevBrkp(pc);
+                msg = {
+                    type: 'debugger',
+                    subtype: 'breakpoint',
+                    breakpointId: currBreakpoint.id,
+                    globals: globals,
+                    stackframes: []
+                };
+                haltHandler();
+                return hid.talkAsync(HF2_DBG_GET_STACK);
+            })
+                .then(function (stack) {
+                buildFrames(H.decodeU32LE(stack), msg);
+                var maps = [msg.globals].concat(msg.stackframes.map(function (s) { return s.locals; }));
+                return Promise.map(maps, heapExpandMapAsync);
+            })
+                .then(function () { return HWDBG.postMessage(msg); });
+        }
+        function clearHalted() {
+            isHalted = false;
+            onHalted = new Promise(function (resolve, reject) {
+                haltHandler = resolve;
+            });
+        }
+        function startDebugAsync(compileRes, hidWr) {
+            hid = hidWr;
+            hid.onEvent(HF2_EV_DBG_PAUSED, corePaused);
+            return clearAsync()
+                .then(function () {
+                lastCompileResult = compileRes;
+                callInfos = {};
+                var procLookup = [];
+                for (var _i = 0, _a = compileRes.procDebugInfo; _i < _a.length; _i++) {
+                    var pdi = _a[_i];
+                    procLookup[pdi.idx] = pdi;
+                }
+                for (var _b = 0, _c = compileRes.procDebugInfo; _b < _c.length; _b++) {
+                    var pdi = _c[_b];
+                    //console.log(pdi)
+                    for (var _d = 0, _e = pdi.calls; _d < _e.length; _d++) {
+                        var ci = _e[_d];
+                        callInfos[ci.addr + ""] = {
+                            from: pdi,
+                            to: procLookup[ci.procIndex],
+                            stack: ci.stack
+                        };
+                    }
+                }
+            })
+                .then(function () {
+                var f = lastCompileResult.outfiles[pxtc.BINARY_UF2];
+                var blockBuf = U.stringToUint8Array(atob(f));
+                lastFlash = pxtc.UF2.toBin(blockBuf);
+                var blocks = pxtc.UF2.parseFile(blockBuf);
+                return hid.reflashAsync(blocks); // this will reset into app at the end
+            })
+                .then(function () { return hid.talkAsync(HF2_DBG_RESTART).catch(function (e) { }); })
+                .then(function () { return Promise.delay(200); })
+                .then(function () { return hid.reconnectAsync(); })
+                .then(clearHalted)
+                .then(waitForHaltAsync);
+        }
+        HWDBG.startDebugAsync = startDebugAsync;
+        function handleMessage(msg) {
+            console.log("HWDBGMSG", msg);
+            if (msg.type != "debugger")
+                return;
+            var stepInto = false;
+            switch (msg.subtype) {
+                case 'stepinto':
+                    stepInto = true;
+                case 'stepover':
+                    resumeAsync(stepInto);
+                    break;
+            }
+        }
+        HWDBG.handleMessage = handleMessage;
+        function resumeAsync(into) {
+            if (into === void 0) { into = false; }
+            return Promise.resolve()
+                .then(function () { return hid.talkAsync(HF2_DBG_RESUME, H.encodeU32LE([into ? 1 : 3])); })
+                .then(clearHalted);
+        }
+        HWDBG.resumeAsync = resumeAsync;
+        function waitForHaltAsync() {
+            if (!onHalted)
+                onHalted = Promise.resolve();
+            return onHalted;
+        }
+        HWDBG.waitForHaltAsync = waitForHaltAsync;
+        function getStaticStateAsync() {
+            if (cachedStaticState)
+                return Promise.resolve(cachedStaticState);
+            return hid.talkAsync(HF2_DBG_GET_GLOBAL_STATE)
+                .then(function (buf) { return (cachedStaticState = {
+                numGlobals: r32(buf, 0),
+                globalsPtr: r32(buf, 4)
+            }); });
+        }
+        function getHwStateAsync() {
+            return getStaticStateAsync()
+                .then(function (st) { return hid.readWordsAsync(st.globalsPtr, st.numGlobals); })
+                .then(function (buf) {
+                var res = {
+                    staticState: cachedStaticState,
+                    globals: buf
+                };
+                return res;
+            });
+        }
+        HWDBG.getHwStateAsync = getHwStateAsync;
+    })(HWDBG = pxt.HWDBG || (pxt.HWDBG = {}));
+})(pxt || (pxt = {}));
+var pxt;
+(function (pxt) {
+    var blocks;
+    (function (blocks) {
+        (function (NT) {
+            NT[NT["Prefix"] = 0] = "Prefix";
+            NT[NT["Infix"] = 1] = "Infix";
+            NT[NT["Block"] = 2] = "Block";
+            NT[NT["NewLine"] = 3] = "NewLine";
+        })(blocks.NT || (blocks.NT = {}));
+        var NT = blocks.NT;
+        (function (GlueMode) {
+            GlueMode[GlueMode["None"] = 0] = "None";
+            GlueMode[GlueMode["WithSpace"] = 1] = "WithSpace";
+            GlueMode[GlueMode["NoSpace"] = 2] = "NoSpace";
+        })(blocks.GlueMode || (blocks.GlueMode = {}));
+        var GlueMode = blocks.GlueMode;
+        var reservedWords = ["break", "case", "catch", "class", "const", "continue", "debugger",
+            "default", "delete", "do", "else", "enum", "export", "extends", "false", "finally",
+            "for", "function", "if", "import", "in", "instanceof", "new", "null", "return",
+            "super", "switch", "this", "throw", "true", "try", "typeof", "var", "void", "while",
+            "with"];
+        var placeholders = {};
+        function stringLit(s) {
+            if (s.length > 20 && /\n/.test(s))
+                return "`" + s.replace(/[\\`${}]/g, function (f) { return "\\" + f; }) + "`";
+            else
+                return JSON.stringify(s);
+        }
+        blocks.stringLit = stringLit;
+        function mkNode(tp, pref, children) {
+            return {
+                type: tp,
+                op: pref,
+                children: children
+            };
+        }
+        blocks.mkNode = mkNode;
+        function mkNewLine() {
+            return mkNode(NT.NewLine, "", []);
+        }
+        blocks.mkNewLine = mkNewLine;
+        function mkPrefix(pref, children) {
+            return mkNode(NT.Prefix, pref, children);
+        }
+        blocks.mkPrefix = mkPrefix;
+        function mkInfix(child0, op, child1) {
+            return mkNode(NT.Infix, op, child0 == null ? [child1] : [child0, child1]);
+        }
+        blocks.mkInfix = mkInfix;
+        function mkText(s) {
+            return mkPrefix(s, []);
+        }
+        blocks.mkText = mkText;
+        function mkBlock(nodes) {
+            return mkNode(NT.Block, "", nodes);
+        }
+        blocks.mkBlock = mkBlock;
+        function mkGroup(nodes) {
+            return mkPrefix("", nodes);
+        }
+        blocks.mkGroup = mkGroup;
+        function mkStmt() {
+            var nodes = [];
+            for (var _i = 0; _i < arguments.length; _i++) {
+                nodes[_i - 0] = arguments[_i];
+            }
+            var last = nodes[nodes.length - 1];
+            if (last && last.type == NT.Block) {
+            }
+            else {
+                nodes.push(mkNewLine());
+            }
+            return mkGroup(nodes);
+        }
+        blocks.mkStmt = mkStmt;
+        function mkCommaSep(nodes, withNewlines) {
+            if (withNewlines === void 0) { withNewlines = false; }
+            var r = [];
+            for (var _i = 0, nodes_1 = nodes; _i < nodes_1.length; _i++) {
+                var n = nodes_1[_i];
+                if (withNewlines) {
+                    if (r.length > 0)
+                        r.push(mkText(","));
+                    r.push(mkNewLine());
+                }
+                else if (r.length > 0) {
+                    r.push(mkText(", "));
+                }
+                r.push(n);
+            }
+            if (withNewlines)
+                r.push(mkNewLine());
+            return mkGroup(r);
+        }
+        blocks.mkCommaSep = mkCommaSep;
+        // A series of utility functions for constructing various J* AST nodes.
+        var Helpers;
+        (function (Helpers) {
+            function mkArrayLiteral(args) {
+                return mkGroup([
+                    mkText("["),
+                    mkCommaSep(args, false),
+                    mkText("]")
+                ]);
+            }
+            Helpers.mkArrayLiteral = mkArrayLiteral;
+            function mkNumberLiteral(x) {
+                return mkText(x.toString());
+            }
+            Helpers.mkNumberLiteral = mkNumberLiteral;
+            function mkBooleanLiteral(x) {
+                return mkText(x ? "true" : "false");
+            }
+            Helpers.mkBooleanLiteral = mkBooleanLiteral;
+            function mkStringLiteral(x) {
+                return mkText(stringLit(x));
+            }
+            Helpers.mkStringLiteral = mkStringLiteral;
+            function mkPropertyAccess(name, thisArg) {
+                return mkGroup([
+                    mkInfix(thisArg, ".", mkText(name)),
+                ]);
+            }
+            Helpers.mkPropertyAccess = mkPropertyAccess;
+            function mkCall(name, args, externalInputs, method) {
+                if (externalInputs === void 0) { externalInputs = false; }
+                if (method === void 0) { method = false; }
+                if (method)
+                    return mkGroup([
+                        mkInfix(args[0], ".", mkText(name)),
+                        mkText("("),
+                        mkCommaSep(args.slice(1), externalInputs),
+                        mkText(")")
+                    ]);
+                else
+                    return mkGroup([
+                        mkText(name),
+                        mkText("("),
+                        mkCommaSep(args, externalInputs),
+                        mkText(")")
+                    ]);
+            }
+            Helpers.mkCall = mkCall;
+            // Call function [name] from the standard device library with arguments
+            // [args].
+            function stdCall(name, args, externalInputs) {
+                return mkCall(name, args, externalInputs);
+            }
+            Helpers.stdCall = stdCall;
+            // Call extension method [name] on the first argument
+            function extensionCall(name, args, externalInputs) {
+                return mkCall(name, args, externalInputs, true);
+            }
+            Helpers.extensionCall = extensionCall;
+            // Call function [name] from the specified [namespace] in the micro:bit
+            // library.
+            function namespaceCall(namespace, name, args, externalInputs) {
+                return mkCall(namespace + "." + name, args, externalInputs);
+            }
+            Helpers.namespaceCall = namespaceCall;
+            function mathCall(name, args) {
+                return namespaceCall("Math", name, args, false);
+            }
+            Helpers.mathCall = mathCall;
+            function mkGlobalRef(name) {
+                return mkText(name);
+            }
+            Helpers.mkGlobalRef = mkGlobalRef;
+            function mkSimpleCall(p, args) {
+                pxt.U.assert(args.length == 2);
+                return mkInfix(args[0], p, args[1]);
+            }
+            Helpers.mkSimpleCall = mkSimpleCall;
+            function mkWhile(condition, body) {
+                return mkGroup([
+                    mkText("while ("),
+                    condition,
+                    mkText(")"),
+                    mkBlock(body)
+                ]);
+            }
+            Helpers.mkWhile = mkWhile;
+            function mkComment(text) {
+                return mkStmt(mkText("// " + text));
+            }
+            Helpers.mkComment = mkComment;
+            function mkAssign(x, e) {
+                return mkStmt(mkSimpleCall("=", [x, e]));
+            }
+            Helpers.mkAssign = mkAssign;
+            function mkParenthesizedExpression(expression) {
+                return mkGroup([
+                    mkText("("),
+                    expression,
+                    mkText(")")
+                ]);
+            }
+            Helpers.mkParenthesizedExpression = mkParenthesizedExpression;
+        })(Helpers = blocks.Helpers || (blocks.Helpers = {}));
+        blocks.H = Helpers;
+        // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Operator_Precedence
+        var infixPriTable = {
+            // 0 = comma/sequence
+            // 1 = spread (...)
+            // 2 = yield, yield*
+            // 3 = assignment
+            "=": 3,
+            "+=": 3,
+            "-=": 3,
+            "?": 4,
+            ":": 4,
+            "||": 5,
+            "&&": 6,
+            "|": 7,
+            "^": 8,
+            "&": 9,
+            // 10 = equality
+            "==": 10,
+            "!=": 10,
+            "===": 10,
+            "!==": 10,
+            // 11 = comparison (excludes in, instanceof)
+            "<": 11,
+            ">": 11,
+            "<=": 11,
+            ">=": 11,
+            // 12 = bitwise shift
+            ">>": 12,
+            ">>>": 12,
+            "<<": 12,
+            "+": 13,
+            "-": 13,
+            "*": 14,
+            "/": 14,
+            "%": 14,
+            "**": 15,
+            "!": 16,
+            "~": 16,
+            "P-": 16,
+            "P+": 16,
+            "++": 16,
+            "--": 16,
+            ".": 18,
+        };
+        function flattenNode(app) {
+            var sourceMap = [];
+            var sourceMapById = {};
+            var output = "";
+            var indent = "";
+            var variables = [{}];
+            function flatten(e0) {
+                function rec(e, outPrio) {
+                    if (e.type != NT.Infix) {
+                        for (var _i = 0, _a = e.children; _i < _a.length; _i++) {
+                            var c = _a[_i];
+                            rec(c, -1);
+                        }
+                        return;
+                    }
+                    var r = [];
+                    function pushOp(c) {
+                        if (c[0] == "P")
+                            c = c.slice(1);
+                        r.push(mkText(c));
+                    }
+                    var infixPri = pxt.U.lookup(infixPriTable, e.op);
+                    if (infixPri == null)
+                        pxt.U.oops("bad infix op: " + e.op);
+                    if (infixPri < outPrio)
+                        pushOp("(");
+                    if (e.children.length == 1) {
+                        pushOp(e.op);
+                        rec(e.children[0], infixPri);
+                        r.push(e.children[0]);
+                    }
+                    else {
+                        var bindLeft = infixPri != 3 && e.op != "**";
+                        var letType = undefined;
+                        rec(e.children[0], bindLeft ? infixPri : infixPri + 0.1);
+                        r.push(e.children[0]);
+                        if (letType && letType != "number") {
+                            pushOp(": ");
+                            pushOp(letType);
+                        }
+                        if (e.op == ".")
+                            pushOp(".");
+                        else
+                            pushOp(" " + e.op + " ");
+                        rec(e.children[1], !bindLeft ? infixPri : infixPri + 0.1);
+                        r.push(e.children[1]);
+                    }
+                    if (infixPri < outPrio)
+                        pushOp(")");
+                    e.type = NT.Prefix;
+                    e.op = "";
+                    e.children = r;
+                }
+                rec(e0, -1);
+            }
+            var root = mkGroup(app);
+            flatten(root);
+            emit(root);
+            // never return empty string - TS compiler service thinks it's an error
+            if (!output)
+                output += "\n";
+            return { output: output, sourceMap: sourceMap };
+            function emit(n) {
+                if (n.glueToBlock) {
+                    removeLastIndent();
+                    if (n.glueToBlock == GlueMode.WithSpace) {
+                        output += " ";
+                    }
+                }
+                var start = getCurrentLine();
+                switch (n.type) {
+                    case NT.Infix:
+                        pxt.U.oops("no infix should be left");
+                        break;
+                    case NT.NewLine:
+                        output += "\n" + indent;
+                        break;
+                    case NT.Block:
+                        block(n);
+                        break;
+                    case NT.Prefix:
+                        if (n.canIndentInside)
+                            output += n.op.replace(/\n/g, "\n" + indent + "    ");
+                        else
+                            output += n.op;
+                        n.children.forEach(emit);
+                        break;
+                    default:
+                        break;
+                }
+                var end = getCurrentLine();
+                if (n.id) {
+                    if (sourceMapById[n.id]) {
+                        var node = sourceMapById[n.id];
+                        node.start = Math.min(node.start, start);
+                        node.end = Math.max(node.end, end);
+                    }
+                    else {
+                        var interval = { id: n.id, start: start, end: end };
+                        sourceMapById[n.id] = interval;
+                        sourceMap.push(interval);
+                    }
+                }
+            }
+            function getCurrentLine() {
+                var i = 0;
+                output.replace(/\n/g, function (a) { i++; return a; });
+                return i;
+            }
+            function write(s) {
+                output += s.replace(/\n/g, "\n" + indent);
+            }
+            function removeLastIndent() {
+                output = output.replace(/\n *$/, "");
+            }
+            function block(n) {
+                var finalNl = n.noFinalNewline ? "" : "\n";
+                if (n.children.length == 0) {
+                    write(" {\n\t\n}" + finalNl);
+                    return;
+                }
+                var vars = pxt.U.clone(variables[variables.length - 1] || {});
+                variables.push(vars);
+                indent += "    ";
+                if (output[output.length - 1] != " ")
+                    write(" ");
+                write("{\n");
+                for (var _i = 0, _a = n.children; _i < _a.length; _i++) {
+                    var nn = _a[_i];
+                    emit(nn);
+                }
+                indent = indent.slice(4);
+                removeLastIndent();
+                write("\n}" + finalNl);
+                variables.pop();
+            }
+        }
+        blocks.flattenNode = flattenNode;
+        function isReservedWord(str) {
+            return reservedWords.indexOf(str) !== -1;
+        }
+        blocks.isReservedWord = isReservedWord;
+    })(blocks = pxt.blocks || (pxt.blocks = {}));
+})(pxt || (pxt = {}));
+/// <reference path="../typings/globals/bluebird/index.d.ts"/>
+/// <reference path="../localtypings/pxtpackage.d.ts"/>
+/// <reference path="../localtypings/pxtparts.d.ts"/>
+/// <reference path="../localtypings/pxtarget.d.ts"/>
+/// <reference path="util.ts"/>
+var pxt;
+(function (pxt) {
+    var lf = pxt.U.lf;
+    var Package = (function () {
+        function Package(id, _verspec, parent, addedBy) {
+            this.id = id;
+            this._verspec = _verspec;
+            this.parent = parent;
+            this.level = -1;
+            this.isLoaded = false;
+            if (parent) {
+                this.level = this.parent.level + 1;
+            }
+            this.addedBy = [addedBy];
+        }
+        Package.getConfigAsync = function (id, fullVers) {
+            return Promise.resolve().then(function () {
+                if (pxt.github.isGithubId(fullVers)) {
+                    var repoInfo_1 = pxt.github.parseRepoId(fullVers);
+                    return pxt.packagesConfigAsync()
+                        .then(function (config) { return pxt.github.repoAsync(repoInfo_1.fullName, config); }) // Make sure repo exists and is whitelisted
+                        .then(function (gitRepo) { return gitRepo ? pxt.github.pkgConfigAsync(repoInfo_1.fullName, repoInfo_1.tag) : null; });
+                }
+                else {
+                    // If it's not from GH, assume it's a bundled package
+                    // TODO: Add logic for shared packages if we enable that
+                    return JSON.parse(pxt.appTarget.bundledpkgs[Package.upgradePackageReference(id, fullVers)][pxt.CONFIG_NAME]);
+                }
+            });
+        };
+        Package.upgradePackageReference = function (pkg, val) {
+            if (val != "*")
+                return pkg;
+            var upgrades = pxt.appTarget.compile ? pxt.appTarget.compile.upgrades : undefined;
+            var newPackage = pkg;
+            if (upgrades) {
+                upgrades.filter(function (rule) { return rule.type == "package"; })
+                    .forEach(function (rule) {
+                    for (var match in rule.map) {
+                        if (newPackage == match) {
+                            newPackage = rule.map[match];
+                        }
+                    }
+                });
+            }
+            return newPackage;
+        };
+        Package.prototype.version = function () {
+            return this.resolvedVersion || this._verspec;
+        };
+        Package.prototype.verProtocol = function () {
+            var spl = this.version().split(':');
+            if (spl.length > 1)
+                return spl[0];
+            else
+                return "";
+        };
+        Package.prototype.verArgument = function () {
+            var p = this.verProtocol();
+            if (p)
+                return this.version().slice(p.length + 1);
+            return this.version();
+        };
+        Package.prototype.commonDownloadAsync = function () {
+            var _this = this;
+            var proto = this.verProtocol();
+            if (proto == "pub") {
+                return pxt.Cloud.downloadScriptFilesAsync(this.verArgument());
+            }
+            else if (proto == "github") {
+                return pxt.packagesConfigAsync()
+                    .then(function (config) { return pxt.github.downloadPackageAsync(_this.verArgument(), config); })
+                    .then(function (resp) { return resp.files; });
+            }
+            else if (proto == "embed") {
+                var resp = pxt.getEmbeddedScript(this.verArgument());
+                return Promise.resolve(resp);
+            }
+            else
+                return Promise.resolve(null);
+        };
+        Package.prototype.host = function () { return this.parent._host; };
+        Package.prototype.readFile = function (fn) {
+            return this.host().readFile(this, fn);
+        };
+        Package.prototype.resolveDep = function (id) {
+            if (this.parent.deps.hasOwnProperty(id))
+                return this.parent.deps[id];
+            return null;
+        };
+        Package.prototype.saveConfig = function () {
+            var cfg = JSON.stringify(this.config, null, 4) || "\n";
+            this.host().writeFile(this, pxt.CONFIG_NAME, cfg);
+        };
+        Package.prototype.resolveVersionAsync = function () {
+            var v = this._verspec;
+            if (pxt.getEmbeddedScript(this.id)) {
+                this.resolvedVersion = v = "embed:" + this.id;
+            }
+            else if (!v || v == "*") {
+                pxt.U.userError(lf("version not specified for {0}", this.id));
+            }
+            return Promise.resolve(v);
+        };
+        Package.prototype.downloadAsync = function () {
+            var _this = this;
+            var kindCfg = "";
+            return this.resolveVersionAsync()
+                .then(function (verNo) {
+                if (!/^embed:/.test(verNo) &&
+                    _this.config && _this.config.installedVersion == verNo)
+                    return;
+                pxt.debug('downloading ' + verNo);
+                return _this.host().downloadPackageAsync(_this)
+                    .then(function () {
+                    var confStr = _this.readFile(pxt.CONFIG_NAME);
+                    if (!confStr)
+                        pxt.U.userError("package " + _this.id + " is missing " + pxt.CONFIG_NAME);
+                    _this.parseConfig(confStr);
+                    if (_this.level != 0)
+                        _this.config.installedVersion = _this.version();
+                    _this.saveConfig();
+                })
+                    .then(function () {
+                    pxt.debug("installed " + _this.id + " /" + verNo);
+                });
+            });
+        };
+        Package.prototype.validateConfig = function () {
+            if (!this.config.dependencies)
+                pxt.U.userError("Missing dependencies in config of: " + this.id);
+            if (!Array.isArray(this.config.files))
+                pxt.U.userError("Missing files in config of: " + this.id);
+            if (typeof this.config.name != "string" || !this.config.name ||
+                (this.config.public && !/^[a-z][a-z0-9\-_]+$/i.test(this.config.name)))
+                pxt.U.userError("Invalid package name: " + this.config.name);
+            if (this.config.targetVersions
+                && this.config.targetVersions.target
+                && pxt.semver.strcmp(this.config.targetVersions.target, pxt.appTarget.versions.target) > 0)
+                pxt.U.userError(lf("Package {0} requires target version {1} (you are running {2})", this.config.name, this.config.targetVersions.target, pxt.appTarget.versions.target));
+        };
+        Package.prototype.isPackageInUse = function (pkgId, ts) {
+            if (ts === void 0) { ts = this.readFile("main.ts"); }
+            // Build the RegExp that will determine whether the dependency is in use. Try to use upgrade rules,
+            // otherwise fallback to the package's name
+            var regex = null;
+            var upgrades = pxt.appTarget.compile ? pxt.appTarget.compile.upgrades : undefined;
+            if (upgrades) {
+                upgrades.filter(function (rule) { return rule.type == "missingPackage"; }).forEach(function (rule) {
+                    Object.keys(rule.map).forEach(function (match) {
+                        if (rule.map[match] === pkgId) {
+                            regex = new RegExp(match, "g");
+                        }
+                    });
+                });
+            }
+            if (!regex) {
+                regex = new RegExp(pkgId + "\\.", "g");
+            }
+            return regex.test(ts);
+        };
+        Package.prototype.getMissingPackages = function (config, ts) {
+            var upgrades = pxt.appTarget.compile ? pxt.appTarget.compile.upgrades : undefined;
+            var missing = {};
+            if (ts && upgrades)
+                upgrades.filter(function (rule) { return rule.type == "missingPackage"; })
+                    .forEach(function (rule) {
+                    var _loop_5 = function(match) {
+                        var regex = new RegExp(match, 'g');
+                        var pkg = rule.map[match];
+                        ts.replace(regex, function (m) {
+                            if (!config.dependencies[pkg]) {
+                                missing[pkg] = "*";
+                            }
+                            return "";
+                        });
+                    };
+                    for (var match in rule.map) {
+                        _loop_5(match);
+                    }
+                });
+            return missing;
+        };
+        /**
+         * For the given package config or ID, looks through all the currently installed packages to find conflicts in
+         * Yotta settings and version spec
+         */
+        Package.prototype.findConflictsAsync = function (pkgOrId, version) {
+            var _this = this;
+            var conflicts = [];
+            var pkgCfg;
+            return Promise.resolve()
+                .then(function () {
+                // Get the package config if it's not already provided
+                if (typeof pkgOrId === "string") {
+                    return Package.getConfigAsync(pkgOrId, version);
+                }
+                else {
+                    return Promise.resolve(pkgOrId);
+                }
+            })
+                .then(function (cfg) {
+                pkgCfg = cfg;
+                // Iterate through all installed packages and check for conflicting settings
+                if (pkgCfg) {
+                    var yottaCfg_1 = pkgCfg.yotta ? pxt.U.jsonFlatten(pkgCfg.yotta.config) : null;
+                    _this.parent.sortedDeps().forEach(function (depPkg) {
+                        var foundYottaConflict = false;
+                        if (yottaCfg_1) {
+                            var depConfig = depPkg.config || JSON.parse(depPkg.readFile(pxt.CONFIG_NAME));
+                            var hasYottaSettings = !!depConfig && !!depConfig.yotta && !!depPkg.config.yotta.config;
+                            if (hasYottaSettings) {
+                                var depYottaCfg = pxt.U.jsonFlatten(depConfig.yotta.config);
+                                for (var _i = 0, _a = Object.keys(yottaCfg_1); _i < _a.length; _i++) {
+                                    var settingName = _a[_i];
+                                    var depSetting = depYottaCfg[settingName];
+                                    var isJustDefaults = pkgCfg.yotta.configIsJustDefaults || depConfig.yotta.configIsJustDefaults;
+                                    if (depYottaCfg.hasOwnProperty(settingName) && depSetting !== yottaCfg_1[settingName] && !isJustDefaults && (!depPkg.parent.config.yotta || !depPkg.parent.config.yotta.ignoreConflicts)) {
+                                        var conflict = new pxt.cpp.PkgConflictError(lf("conflict on yotta setting {0} between packages {1} and {2}", settingName, pkgCfg.name, depPkg.id));
+                                        conflict.pkg0 = depPkg;
+                                        conflict.settingName = settingName;
+                                        conflicts.push(conflict);
+                                        foundYottaConflict = true;
+                                    }
+                                }
+                            }
+                        }
+                        if (!foundYottaConflict && pkgCfg.name === depPkg.id && depPkg._verspec != version && !/^file:/.test(depPkg._verspec) && !/^file:/.test(version)) {
+                            var conflict = new pxt.cpp.PkgConflictError(lf("version mismatch for package {0} (installed: {1}, installing: {2})", depPkg, depPkg._verspec, version));
+                            conflict.pkg0 = depPkg;
+                            conflict.isVersionConflict = true;
+                            conflicts.push(conflict);
+                        }
+                    });
+                }
+                // Also check for conflicts for all the specified package's dependencies (recursively)
+                return Object.keys(pkgCfg.dependencies).reduce(function (soFar, pkgDep) {
+                    return soFar
+                        .then(function () { return _this.findConflictsAsync(pkgDep, pkgCfg.dependencies[pkgDep]); })
+                        .then(function (childConflicts) { return conflicts.push.apply(conflicts, childConflicts); });
+                }, Promise.resolve());
+            })
+                .then(function () {
+                // For each conflicting package, we need to include their ancestor tree in the list of conflicts
+                // For example, if package A depends on package B, and package B is in conflict with package C,
+                // then package A is also technically in conflict with C
+                var allAncestors = function (p) {
+                    var ancestors = [];
+                    p.addedBy.forEach(function (a) {
+                        if (a.id !== _this.id) {
+                            ancestors.push.apply(allAncestors(a));
+                            ancestors.push(a);
+                        }
+                    });
+                    return ancestors;
+                };
+                var additionalConflicts = [];
+                conflicts.forEach(function (c) {
+                    additionalConflicts.push.apply(additionalConflicts, allAncestors(c.pkg0).map(function (anc) {
+                        var confl = new pxt.cpp.PkgConflictError(c.isVersionConflict ?
+                            lf("a dependency of {0} has a version mismatch with package {1} (installed: {1}, installing: {2})", anc.id, pkgCfg.name, c.pkg0._verspec, version) :
+                            lf("conflict on yotta setting {0} between packages {1} and {2}", c.settingName, pkgCfg.name, c.pkg0.id));
+                        confl.pkg0 = anc;
+                        return confl;
+                    }));
+                });
+                conflicts.push.apply(conflicts, additionalConflicts);
+                // Remove duplicate conflicts (happens if more than one package had the same ancestor)
+                conflicts = conflicts.filter(function (c, index) {
+                    for (var i = 0; i < index; ++i) {
+                        if (c.pkg0.id === conflicts[i].pkg0.id) {
+                            return false;
+                        }
+                    }
+                    return true;
+                });
+                return conflicts;
+            });
+        };
+        Package.prototype.upgradeAPI = function (fileContents) {
+            var upgrades = pxt.appTarget.compile ? pxt.appTarget.compile.upgrades : undefined;
+            var updatedContents = fileContents;
+            if (upgrades) {
+                upgrades.filter(function (rule) { return rule.type == "api"; })
+                    .forEach(function (rule) {
+                    for (var match in rule.map) {
+                        var regex = new RegExp(match, 'g');
+                        updatedContents = updatedContents.replace(regex, rule.map[match]);
+                    }
+                });
+            }
+            return updatedContents;
+        };
+        Package.prototype.parseConfig = function (cfgSrc) {
+            var cfg = JSON.parse(cfgSrc);
+            this.config = cfg;
+            var currentConfig = JSON.stringify(this.config);
+            for (var dep in this.config.dependencies) {
+                var value = Package.upgradePackageReference(dep, this.config.dependencies[dep]);
+                if (value != dep) {
+                    delete this.config.dependencies[dep];
+                    if (value) {
+                        this.config.dependencies[value] = "*";
+                    }
+                }
+            }
+            if (JSON.stringify(this.config) != currentConfig) {
+                this.saveConfig();
+            }
+            this.validateConfig();
+        };
+        Package.prototype.loadAsync = function (isInstall) {
+            var _this = this;
+            if (isInstall === void 0) { isInstall = false; }
+            if (this.isLoaded)
+                return Promise.resolve();
+            var initPromise = Promise.resolve();
+            this.isLoaded = true;
+            var str = this.readFile(pxt.CONFIG_NAME);
+            if (str == null) {
+                if (!isInstall)
+                    pxt.U.userError("Package not installed: " + this.id + ", did you forget to run `pxt install`?");
+            }
+            else {
+                initPromise = initPromise.then(function () { return _this.parseConfig(str); });
+            }
+            if (isInstall)
+                initPromise = initPromise.then(function () { return _this.downloadAsync(); });
+            var loadDepsRecursive = function (dependencies) {
+                return pxt.U.mapStringMapAsync(dependencies, function (id, ver) {
+                    var mod = _this.resolveDep(id);
+                    ver = ver || "*";
+                    if (mod) {
+                        if (mod._verspec != ver && !/^file:/.test(mod._verspec) && !/^file:/.test(ver))
+                            pxt.U.userError("Version spec mismatch on " + id);
+                        mod.level = Math.min(mod.level, _this.level + 1);
+                        mod.addedBy.push(_this);
+                        return Promise.resolve();
+                    }
+                    else {
+                        mod = new Package(id, ver, _this.parent, _this);
+                        _this.parent.deps[id] = mod;
+                        return mod.loadAsync(isInstall);
+                    }
+                });
+            };
+            return initPromise
+                .then(function () { return loadDepsRecursive(_this.config.dependencies); })
+                .then(function () {
+                if (_this.level === 0) {
+                    // Check for missing packages. We need to add them 1 by 1 in case they conflict with eachother.
+                    var mainTs = _this.readFile("main.ts");
+                    if (!mainTs)
+                        return Promise.resolve(null);
+                    var missingPackages_1 = _this.getMissingPackages(_this.config, mainTs);
+                    var didAddPackages_1 = false;
+                    var addPackagesPromise = Promise.resolve();
+                    Object.keys(missingPackages_1).reduce(function (addPackagesPromise, missing) {
+                        return addPackagesPromise
+                            .then(function () { return _this.findConflictsAsync(missing, missingPackages_1[missing]); })
+                            .then(function (conflicts) {
+                            if (conflicts.length) {
+                                var conflictNames = conflicts.map(function (c) { return c.pkg0.id; }).join(", ");
+                                var settingNames = conflicts.map(function (c) { return c.settingName; }).filter(function (s) { return !!s; }).join(", ");
+                                pxt.log("skipping missing package " + missing + " because it conflicts with the following packages: " + conflictNames + " (conflicting settings: " + settingNames + ")");
+                                return Promise.resolve(null);
+                            }
+                            else {
+                                pxt.log("adding missing package " + missing);
+                                didAddPackages_1 = true;
+                                _this.config.dependencies[missing] = "*";
+                                var addDependency = {};
+                                addDependency[missing] = missingPackages_1[missing];
+                                return loadDepsRecursive(addDependency);
+                            }
+                        });
+                    }, Promise.resolve(null))
+                        .then(function () {
+                        if (didAddPackages_1) {
+                            _this.saveConfig();
+                            _this.validateConfig();
+                        }
+                        return Promise.resolve(null);
+                    });
+                }
+                return Promise.resolve(null);
+            })
+                .then(function () { return null; });
+        };
+        Package.prototype.getFiles = function () {
+            if (this.level == 0)
+                return this.config.files.concat(this.config.testFiles || []);
+            else
+                return this.config.files.slice(0);
+        };
+        Package.prototype.addSnapshot = function (files, exts) {
+            if (exts === void 0) { exts = [""]; }
+            var _loop_6 = function(fn) {
+                if (exts.some(function (e) { return pxt.U.endsWith(fn, e); })) {
+                    files[this_1.id + "/" + fn] = this_1.readFile(fn);
+                }
+            };
+            var this_1 = this;
+            for (var _i = 0, _a = this.getFiles(); _i < _a.length; _i++) {
+                var fn = _a[_i];
+                _loop_6(fn);
+            }
+            files[this.id + "/" + pxt.CONFIG_NAME] = this.readFile(pxt.CONFIG_NAME);
+        };
+        /**
+         * Returns localized strings qName -> translation
+         */
+        Package.prototype.packageLocalizationStringsAsync = function (lang) {
+            var _this = this;
+            var targetId = pxt.appTarget.id;
+            var filenames = [this.id + "-jsdoc", this.id];
+            var r = {};
+            var theme = pxt.appTarget.appTheme || {};
+            // live loc of bundled packages
+            if (pxt.Util.localizeLive && this.id != "this" && pxt.appTarget.bundledpkgs[this.id]) {
+                pxt.log("loading live translations for " + this.id);
+                var code_1 = pxt.Util.userLanguage();
+                return Promise.all(filenames.map(function (fn) { return pxt.Util.downloadLiveTranslationsAsync(code_1, targetId + "/" + fn + "-strings.json", theme.crowdinBranch)
+                    .then(function (tr) { return pxt.Util.jsonMergeFrom(r, tr); })
+                    .catch(function (e) { return pxt.log("error while downloading " + targetId + "/" + fn + "-strings.json"); }); })).then(function () { return r; });
+            }
+            else {
+                var files_1 = this.config.files;
+                filenames.map(function (name) {
+                    var fn = "_locales/" + lang.toLowerCase() + "/" + name + "-strings.json";
+                    if (files_1.indexOf(fn) > -1)
+                        return JSON.parse(_this.readFile(fn));
+                    if (lang.length > 2) {
+                        fn = "_locales/" + lang.substring(0, 2).toLowerCase() + "/" + name + "-strings.json";
+                        if (files_1.indexOf(fn) > -1)
+                            return JSON.parse(_this.readFile(fn));
+                    }
+                    return undefined;
+                }).filter(function (d) { return !!d; }).forEach(function (d) { return pxt.Util.jsonMergeFrom(r, d); });
+                return Promise.resolve(r);
+            }
+        };
+        return Package;
+    }());
+    pxt.Package = Package;
+    var MainPackage = (function (_super) {
+        __extends(MainPackage, _super);
+        function MainPackage(_host) {
+            _super.call(this, "this", "file:.", null, null);
+            this._host = _host;
+            this.deps = {};
+            this.parent = this;
+            this.addedBy = [this];
+            this.level = 0;
+            this.deps[this.id] = this;
+        }
+        MainPackage.prototype.installAllAsync = function () {
+            return this.loadAsync(true);
+        };
+        MainPackage.prototype.sortedDeps = function () {
+            var _this = this;
+            var visited = {};
+            var ids = [];
+            var rec = function (p) {
+                if (!p || pxt.U.lookup(visited, p.id))
+                    return;
+                visited[p.id] = true;
+                if (p.config && p.config.dependencies) {
+                    var deps = Object.keys(p.config.dependencies);
+                    deps.sort(function (a, b) { return pxt.U.strcmp(a, b); });
+                    deps.forEach(function (id) { return rec(_this.resolveDep(id)); });
+                    ids.push(p.id);
+                }
+            };
+            rec(this);
+            return ids.map(function (id) { return _this.resolveDep(id); });
+        };
+        MainPackage.prototype.localizationStringsAsync = function (lang) {
+            var loc = {};
+            return Promise.all(pxt.Util.values(this.deps).map(function (dep) {
+                return dep.packageLocalizationStringsAsync(lang)
+                    .then(function (depLoc) {
+                    if (depLoc)
+                        for (var k in depLoc)
+                            if (!loc[k])
+                                loc[k] = depLoc[k];
+                });
+            }))
+                .then(function () { return loc; });
+        };
+        MainPackage.prototype.getTargetOptions = function () {
+            var res = pxt.U.clone(pxt.appTarget.compile);
+            pxt.U.assert(!!res);
+            return res;
+        };
+        MainPackage.prototype.getCompileOptionsAsync = function (target) {
+            var _this = this;
+            if (target === void 0) { target = this.getTargetOptions(); }
+            var opts = {
+                sourceFiles: [],
+                fileSystem: {},
+                target: target,
+                hexinfo: { hex: [] }
+            };
+            var generateFile = function (fn, cont) {
+                if (_this.config.files.indexOf(fn) < 0)
+                    pxt.U.userError(lf("please add '{0}' to \"files\" in {1}", fn, pxt.CONFIG_NAME));
+                cont = "// Auto-generated. Do not edit.\n" + cont + "\n// Auto-generated. Do not edit. Really.\n";
+                if (_this.host().readFile(_this, fn) !== cont) {
+                    pxt.log("updating " + fn + " (size=" + cont.length + ")...");
+                    _this.host().writeFile(_this, fn, cont);
+                }
+            };
+            var upgradeFile = function (fn, cont) {
+                var updatedCont = _this.upgradeAPI(cont);
+                if (updatedCont != cont) {
+                    // save file (force write)
+                    pxt.log("updating APIs in " + fn + " (size=" + cont.length + ")...");
+                    _this.host().writeFile(_this, fn, updatedCont, true);
+                }
+                return updatedCont;
+            };
+            return this.loadAsync()
+                .then(function () {
+                pxt.debug("building: " + _this.sortedDeps().map(function (p) { return p.config.name; }).join(", "));
+                var ext = pxt.cpp.getExtensionInfo(_this);
+                if (ext.shimsDTS)
+                    generateFile("shims.d.ts", ext.shimsDTS);
+                if (ext.enumsDTS)
+                    generateFile("enums.d.ts", ext.enumsDTS);
+                return (target.isNative
+                    ? _this.host().getHexInfoAsync(ext)
+                    : Promise.resolve(null))
+                    .then(function (inf) {
+                    ext = pxt.U.flatClone(ext);
+                    delete ext.compileData;
+                    delete ext.generatedFiles;
+                    delete ext.extensionFiles;
+                    opts.extinfo = ext;
+                    opts.hexinfo = inf;
+                });
+            })
+                .then(function () { return _this.config.binaryonly || pxt.appTarget.compile.shortPointers || !opts.target.isNative ? null : _this.filesToBePublishedAsync(true); })
+                .then(function (files) {
+                if (files) {
+                    files = pxt.U.mapMap(files, upgradeFile);
+                    var headerString_1 = JSON.stringify({
+                        name: _this.config.name,
+                        comment: _this.config.description,
+                        status: "unpublished",
+                        scriptId: _this.config.installedVersion,
+                        cloudId: pxt.CLOUD_ID + pxt.appTarget.id,
+                        editor: target.preferredEditor ? target.preferredEditor : (pxt.U.lookup(files, "main.blocks") ? pxt.BLOCKS_PROJECT_NAME : pxt.JAVASCRIPT_PROJECT_NAME),
+                        targetVersions: pxt.appTarget.versions
+                    });
+                    var programText_1 = JSON.stringify(files);
+                    return pxt.lzmaCompressAsync(headerString_1 + programText_1)
+                        .then(function (buf) {
+                        opts.embedMeta = JSON.stringify({
+                            compression: "LZMA",
+                            headerSize: headerString_1.length,
+                            textSize: programText_1.length,
+                            name: _this.config.name,
+                            eURL: pxt.appTarget.appTheme.embedUrl,
+                            eVER: pxt.appTarget.versions ? pxt.appTarget.versions.target : "",
+                            pxtTarget: pxt.appTarget.id,
+                        });
+                        opts.embedBlob = btoa(pxt.U.uint8ArrayToString(buf));
+                    });
+                }
+                else {
+                    return Promise.resolve();
+                }
+            })
+                .then(function () {
+                for (var _i = 0, _a = _this.sortedDeps(); _i < _a.length; _i++) {
+                    var pkg = _a[_i];
+                    for (var _b = 0, _c = pkg.getFiles(); _b < _c.length; _b++) {
+                        var f = _c[_b];
+                        if (/\.(ts|asm)$/.test(f)) {
+                            var sn = f;
+                            if (pkg.level > 0)
+                                sn = "pxt_modules/" + pkg.id + "/" + f;
+                            opts.sourceFiles.push(sn);
+                            opts.fileSystem[sn] = pkg.readFile(f);
+                        }
+                    }
+                }
+                return opts;
+            });
+        };
+        MainPackage.prototype.filesToBePublishedAsync = function (allowPrivate) {
+            var _this = this;
+            if (allowPrivate === void 0) { allowPrivate = false; }
+            var files = {};
+            return this.loadAsync()
+                .then(function () {
+                if (!allowPrivate && !_this.config.public)
+                    pxt.U.userError('Only packages with "public":true can be published');
+                var cfg = pxt.U.clone(_this.config);
+                delete cfg.installedVersion;
+                pxt.U.iterMap(cfg.dependencies, function (k, v) {
+                    if (!v || /^file:/.test(v) || /^workspace:/.test(v)) {
+                        cfg.dependencies[k] = "*";
+                    }
+                });
+                files[pxt.CONFIG_NAME] = JSON.stringify(cfg, null, 4);
+                for (var _i = 0, _a = _this.getFiles(); _i < _a.length; _i++) {
+                    var f = _a[_i];
+                    var str = _this.readFile(f);
+                    if (str == null)
+                        pxt.U.userError("referenced file missing: " + f);
+                    files[f] = str;
+                }
+                return pxt.U.sortObjectFields(files);
+            });
+        };
+        MainPackage.prototype.compressToFileAsync = function (editor) {
+            var _this = this;
+            return this.filesToBePublishedAsync(true)
+                .then(function (files) {
+                var project = {
+                    meta: {
+                        cloudId: pxt.CLOUD_ID + pxt.appTarget.id,
+                        targetVersions: pxt.appTarget.versions,
+                        editor: editor || pxt.BLOCKS_PROJECT_NAME,
+                        name: _this.config.name
+                    },
+                    source: JSON.stringify(files, null, 2)
+                };
+                return pxt.lzmaCompressAsync(JSON.stringify(project, null, 2));
+            });
+        };
+        MainPackage.prototype.computePartDefinitions = function (parts) {
+            if (!parts || !parts.length)
+                return {};
+            var res = {};
+            this.sortedDeps().forEach(function (d) {
+                var pjson = d.readFile("pxtparts.json");
+                if (pjson) {
+                    try {
+                        var p = JSON.parse(pjson);
+                        for (var k in p) {
+                            if (parts.indexOf(k) >= 0) {
+                                var part = res[k] = p[k];
+                                if (typeof part.visual.image === "string" && /\.svg$/i.test(part.visual.image)) {
+                                    var f = d.readFile(part.visual.image);
+                                    if (!f)
+                                        pxt.reportError("parts", "invalid part definition", { "error": "missing visual " + part.visual.image });
+                                    part.visual.image = "data:image/svg+xml," + encodeURIComponent(f);
+                                }
+                            }
+                        }
+                    }
+                    catch (e) {
+                        pxt.reportError("parts", "invalid pxtparts.json file");
+                    }
+                }
+            });
+            return res;
+        };
+        return MainPackage;
+    }(Package));
+    pxt.MainPackage = MainPackage;
 })(pxt || (pxt = {}));
 // see http://semver.org/
 var pxt;
@@ -5603,12 +6620,14 @@ var ts;
         pxtc.U = pxtc.Util;
         pxtc.ON_START_TYPE = "pxt-on-start";
         pxtc.ON_START_COMMENT = pxtc.U.lf("on start");
+        pxtc.HANDLER_COMMENT = pxtc.U.lf("code goes here");
         pxtc.TS_STATEMENT_TYPE = "typescript_statement";
         pxtc.TS_OUTPUT_TYPE = "typescript_expression";
         pxtc.BINARY_JS = "binary.js";
-        pxtc.BINARY_HEX = "binary.hex";
         pxtc.BINARY_ASM = "binary.asm";
+        pxtc.BINARY_HEX = "binary.hex";
         pxtc.BINARY_UF2 = "binary.uf2";
+        pxtc.BINARY_ELF = "binary.elf";
         (function (SymbolKind) {
             SymbolKind[SymbolKind["None"] = 0] = "None";
             SymbolKind[SymbolKind["Method"] = 1] = "Method";
@@ -5712,7 +6731,11 @@ var ts;
         }
         pxtc.localizeApisAsync = localizeApisAsync;
         function emptyExtInfo() {
-            var pio = pxt.appTarget.compileService && !!pxt.appTarget.compileService.platformioIni;
+            var cs = pxt.appTarget.compileService;
+            if (!cs)
+                cs = {};
+            var pio = !!cs.platformioIni;
+            var docker = cs.buildEngine == "dockermake";
             var r = {
                 functions: [],
                 generatedFiles: {},
@@ -5725,13 +6748,15 @@ var ts;
             };
             if (pio)
                 r.platformio = { dependencies: {} };
+            else if (docker)
+                r.npmDependencies = {};
             else
                 r.yotta = { config: {}, dependencies: {} };
             return r;
         }
         pxtc.emptyExtInfo = emptyExtInfo;
         var numberAttributes = ["weight", "imageLiteral"];
-        var booleanAttributes = ["advanced"];
+        var booleanAttributes = ["advanced", "handlerStatement"];
         function parseCommentString(cmt) {
             var res = {
                 paramDefl: {},
@@ -5806,6 +6831,9 @@ var ts;
             if (res.trackArgs) {
                 res.trackArgs = res.trackArgs.split(/[ ,]+/).map(function (s) { return parseInt(s) || 0; });
             }
+            if (res.blockExternalInputs && !res.inlineInputMode) {
+                res.inlineInputMode = "external";
+            }
             res.paramHelp = {};
             res.jsDoc = "";
             cmt = cmt.replace(/\/\*\*([^]*?)\*\//g, function (full, doccmt) {
@@ -5846,6 +6874,14 @@ var ts;
                 }
                 catch (e) {
                     res.subcategories = undefined;
+                }
+            }
+            if (res.groups) {
+                try {
+                    res.groups = JSON.parse(res.groups);
+                }
+                catch (e) {
+                    res.groups = undefined;
                 }
             }
             return res;
@@ -5907,6 +6943,9 @@ var ts;
             UF2.UF2_MAGIC_START0 = 0x0A324655; // "UF2\n"
             UF2.UF2_MAGIC_START1 = 0x9E5D5157; // Randomly selected
             UF2.UF2_MAGIC_END = 0x0AB16F30; // Ditto
+            UF2.UF2_FLAG_NONE = 0x00000000;
+            UF2.UF2_FLAG_NOFLASH = 0x00000001;
+            UF2.UF2_FLAG_FILE = 0x00001000;
             function parseBlock(block) {
                 var wordAt = function (k) {
                     return (block[k] + (block[k + 1] << 8) + (block[k + 2] << 16) + (block[k + 3] << 24)) >>> 0;
@@ -5915,13 +6954,28 @@ var ts;
                     wordAt(0) != UF2.UF2_MAGIC_START0 || wordAt(4) != UF2.UF2_MAGIC_START1 ||
                     wordAt(block.length - 4) != UF2.UF2_MAGIC_END)
                     return null;
+                var flags = wordAt(8);
+                var payloadSize = wordAt(16);
+                if (payloadSize > 476)
+                    payloadSize = 256;
+                var filename = null;
+                if (flags & UF2.UF2_FLAG_FILE) {
+                    var fnbuf = block.slice(32 + payloadSize);
+                    var len = fnbuf.indexOf(0);
+                    if (len >= 0) {
+                        fnbuf = fnbuf.slice(0, len);
+                    }
+                    filename = pxtc.U.fromUTF8(pxtc.U.uint8ArrayToString(fnbuf));
+                }
                 return {
-                    flags: wordAt(8),
+                    flags: flags,
                     targetAddr: wordAt(12),
-                    payloadSize: wordAt(16),
+                    payloadSize: payloadSize,
                     blockNo: wordAt(20),
                     numBlocks: wordAt(24),
-                    data: block.slice(32, 512 - 4)
+                    fileSize: wordAt(28),
+                    data: block.slice(32, 32 + payloadSize),
+                    filename: filename
                 };
             }
             UF2.parseBlock = parseBlock;
@@ -5995,6 +7049,155 @@ var ts;
                 return res;
             }
             UF2.readBytes = readBytes;
+            function setWord(block, ptr, v) {
+                block[ptr] = (v & 0xff);
+                block[ptr + 1] = ((v >> 8) & 0xff);
+                block[ptr + 2] = ((v >> 16) & 0xff);
+                block[ptr + 3] = ((v >> 24) & 0xff);
+            }
+            function newBlockFile() {
+                return {
+                    currBlock: null,
+                    currPtr: -1,
+                    blocks: [],
+                    ptrs: [],
+                    filesize: 0
+                };
+            }
+            UF2.newBlockFile = newBlockFile;
+            function finalizeFile(f) {
+                for (var i = 0; i < f.blocks.length; ++i) {
+                    setWord(f.blocks[i], 20, i);
+                    setWord(f.blocks[i], 24, f.blocks.length);
+                    if (f.filename)
+                        setWord(f.blocks[i], 28, f.filesize);
+                }
+            }
+            UF2.finalizeFile = finalizeFile;
+            function concatFiles(fs) {
+                for (var _i = 0, fs_1 = fs; _i < fs_1.length; _i++) {
+                    var f = fs_1[_i];
+                    finalizeFile(f);
+                    f.filename = null;
+                }
+                var r = newBlockFile();
+                r.blocks = pxtc.U.concat(fs.map(function (f) { return f.blocks; }));
+                for (var _a = 0, fs_2 = fs; _a < fs_2.length; _a++) {
+                    var f = fs_2[_a];
+                    f.blocks = [];
+                }
+                return r;
+            }
+            UF2.concatFiles = concatFiles;
+            function serializeFile(f) {
+                finalizeFile(f);
+                var res = "";
+                for (var _i = 0, _a = f.blocks; _i < _a.length; _i++) {
+                    var b = _a[_i];
+                    res += pxtc.Util.uint8ArrayToString(b);
+                }
+                return res;
+            }
+            UF2.serializeFile = serializeFile;
+            function readBytesFromFile(f, addr, length) {
+                //console.log(`read @${addr} len=${length}`)
+                var needAddr = addr >> 8;
+                var bl;
+                if (needAddr == f.currPtr)
+                    bl = f.currBlock;
+                else {
+                    for (var i = 0; i < f.ptrs.length; ++i) {
+                        if (f.ptrs[i] == needAddr) {
+                            bl = f.blocks[i];
+                            break;
+                        }
+                    }
+                    if (bl) {
+                        f.currPtr = needAddr;
+                        f.currBlock = bl;
+                    }
+                }
+                if (!bl)
+                    return null;
+                var res = new Uint8Array(length);
+                var toRead = Math.min(length, 256 - (addr & 0xff));
+                pxtc.U.memcpy(res, 0, bl, (addr & 0xff) + 32, toRead);
+                var leftOver = length - toRead;
+                if (leftOver > 0) {
+                    var le = readBytesFromFile(f, addr + toRead, leftOver);
+                    pxtc.U.memcpy(res, toRead, le);
+                }
+                return res;
+            }
+            UF2.readBytesFromFile = readBytesFromFile;
+            function writeBytes(f, addr, bytes) {
+                var currBlock = f.currBlock;
+                var needAddr = addr >> 8;
+                // account for unaligned writes
+                var thisChunk = 256 - (addr & 0xff);
+                if (bytes.length > thisChunk) {
+                    var b = new Uint8Array(bytes);
+                    writeBytes(f, addr, b.slice(0, thisChunk));
+                    while (thisChunk < bytes.length) {
+                        var nextOff = Math.min(thisChunk + 256, bytes.length);
+                        writeBytes(f, addr + thisChunk, b.slice(thisChunk, nextOff));
+                        thisChunk = nextOff;
+                    }
+                    return;
+                }
+                if (needAddr != f.currPtr) {
+                    var i = 0;
+                    currBlock = null;
+                    for (var i_1 = 0; i_1 < f.ptrs.length; ++i_1) {
+                        if (f.ptrs[i_1] == needAddr) {
+                            currBlock = f.blocks[i_1];
+                            break;
+                        }
+                    }
+                    if (!currBlock) {
+                        currBlock = new Uint8Array(512);
+                        setWord(currBlock, 0, UF2.UF2_MAGIC_START0);
+                        setWord(currBlock, 4, UF2.UF2_MAGIC_START1);
+                        setWord(currBlock, 8, f.filename ? UF2.UF2_FLAG_FILE : UF2.UF2_FLAG_NONE);
+                        setWord(currBlock, 12, needAddr << 8);
+                        setWord(currBlock, 16, 256);
+                        setWord(currBlock, 20, f.blocks.length);
+                        setWord(currBlock, 512 - 4, UF2.UF2_MAGIC_END);
+                        if (f.filename) {
+                            pxtc.U.memcpy(currBlock, 32 + 256, pxtc.U.stringToUint8Array(pxtc.U.toUTF8(f.filename)));
+                        }
+                        f.blocks.push(currBlock);
+                        f.ptrs.push(needAddr);
+                    }
+                    f.currPtr = needAddr;
+                    f.currBlock = currBlock;
+                }
+                var p = (addr & 0xff) + 32;
+                for (var i = 0; i < bytes.length; ++i)
+                    currBlock[p + i] = bytes[i];
+                f.filesize = Math.max(f.filesize, bytes.length + addr);
+            }
+            UF2.writeBytes = writeBytes;
+            function writeHex(f, hex) {
+                var upperAddr = "0000";
+                for (var i = 0; i < hex.length; ++i) {
+                    var m = /:02000004(....)/.exec(hex[i]);
+                    if (m) {
+                        upperAddr = m[1];
+                    }
+                    m = /^:..(....)00(.*)[0-9A-F][0-9A-F]$/.exec(hex[i]);
+                    if (m) {
+                        var newAddr = parseInt(upperAddr + m[1], 16);
+                        var hh = m[2];
+                        var arr = [];
+                        for (var j = 0; j < hh.length; j += 2) {
+                            arr.push(parseInt(hh[j] + hh[j + 1], 16));
+                        }
+                        writeBytes(f, newAddr, arr);
+                    }
+                }
+            }
+            UF2.writeHex = writeHex;
         })(UF2 = pxtc.UF2 || (pxtc.UF2 = {}));
     })(pxtc = ts.pxtc || (ts.pxtc = {}));
 })(ts || (ts = {}));
@@ -6077,6 +7280,29 @@ var ts;
                 ch > 127 /* maxAsciiCharacter */ && isUnicodeIdentifierPart(ch, languageVersion);
         }
         pxtc.isIdentifierPart = isIdentifierPart;
+        pxtc.reservedWords = ["abstract", "any", "as", "break",
+            "case", "catch", "class", "continue", "const", "constructor", "debugger",
+            "declare", "default", "delete", "do", "else", "enum", "export", "extends",
+            "false", "finally", "for", "from", "function", "get", "if", "implements",
+            "import", "in", "instanceof", "interface", "is", "let", "module", "namespace",
+            "new", "null", "package", "private", "protected", "public",
+            "require", "global", "return", "set", "static", "super", "switch",
+            "symbol", "this", "throw", "true", "try", "type", "typeof", "var", "void",
+            "while", "with", "yield", "async", "await", "of",
+            // PXT Specific
+            "Math"];
+        function escapeIdentifier(name) {
+            if (!name)
+                return '_';
+            var n = name.replace(/\s+/g, "_").replace(/[^a-zA-Z0-9_$]/g, function (a) {
+                return ts.pxtc.isIdentifierPart(a.charCodeAt(0), ts.pxtc.ScriptTarget.ES5) ? a : "";
+            });
+            if (!n || !ts.pxtc.isIdentifierStart(n.charCodeAt(0), ts.pxtc.ScriptTarget.ES5) || pxtc.reservedWords.indexOf(n) !== -1) {
+                n = "_" + n;
+            }
+            return n;
+        }
+        pxtc.escapeIdentifier = escapeIdentifier;
         var unicodeES5IdentifierStart = [170, 170, 181, 181, 186, 186, 192, 214, 216, 246, 248, 705, 710, 721, 736, 740, 748, 748, 750, 750, 880, 884, 886, 887, 890, 893, 902, 902, 904, 906, 908, 908, 910, 929, 931, 1013, 1015, 1153, 1162, 1319, 1329, 1366, 1369, 1369, 1377, 1415, 1488, 1514, 1520, 1522, 1568, 1610, 1646, 1647, 1649, 1747, 1749, 1749, 1765, 1766, 1774, 1775, 1786, 1788, 1791, 1791, 1808, 1808, 1810, 1839, 1869, 1957, 1969, 1969, 1994, 2026, 2036, 2037, 2042, 2042, 2048, 2069, 2074, 2074, 2084, 2084, 2088, 2088, 2112, 2136, 2208, 2208, 2210, 2220, 2308, 2361, 2365, 2365, 2384, 2384, 2392, 2401, 2417, 2423, 2425, 2431, 2437, 2444, 2447, 2448, 2451, 2472, 2474, 2480, 2482, 2482, 2486, 2489, 2493, 2493, 2510, 2510, 2524, 2525, 2527, 2529, 2544, 2545, 2565, 2570, 2575, 2576, 2579, 2600, 2602, 2608, 2610, 2611, 2613, 2614, 2616, 2617, 2649, 2652, 2654, 2654, 2674, 2676, 2693, 2701, 2703, 2705, 2707, 2728, 2730, 2736, 2738, 2739, 2741, 2745, 2749, 2749, 2768, 2768, 2784, 2785, 2821, 2828, 2831, 2832, 2835, 2856, 2858, 2864, 2866, 2867, 2869, 2873, 2877, 2877, 2908, 2909, 2911, 2913, 2929, 2929, 2947, 2947, 2949, 2954, 2958, 2960, 2962, 2965, 2969, 2970, 2972, 2972, 2974, 2975, 2979, 2980, 2984, 2986, 2990, 3001, 3024, 3024, 3077, 3084, 3086, 3088, 3090, 3112, 3114, 3123, 3125, 3129, 3133, 3133, 3160, 3161, 3168, 3169, 3205, 3212, 3214, 3216, 3218, 3240, 3242, 3251, 3253, 3257, 3261, 3261, 3294, 3294, 3296, 3297, 3313, 3314, 3333, 3340, 3342, 3344, 3346, 3386, 3389, 3389, 3406, 3406, 3424, 3425, 3450, 3455, 3461, 3478, 3482, 3505, 3507, 3515, 3517, 3517, 3520, 3526, 3585, 3632, 3634, 3635, 3648, 3654, 3713, 3714, 3716, 3716, 3719, 3720, 3722, 3722, 3725, 3725, 3732, 3735, 3737, 3743, 3745, 3747, 3749, 3749, 3751, 3751, 3754, 3755, 3757, 3760, 3762, 3763, 3773, 3773, 3776, 3780, 3782, 3782, 3804, 3807, 3840, 3840, 3904, 3911, 3913, 3948, 3976, 3980, 4096, 4138, 4159, 4159, 4176, 4181, 4186, 4189, 4193, 4193, 4197, 4198, 4206, 4208, 4213, 4225, 4238, 4238, 4256, 4293, 4295, 4295, 4301, 4301, 4304, 4346, 4348, 4680, 4682, 4685, 4688, 4694, 4696, 4696, 4698, 4701, 4704, 4744, 4746, 4749, 4752, 4784, 4786, 4789, 4792, 4798, 4800, 4800, 4802, 4805, 4808, 4822, 4824, 4880, 4882, 4885, 4888, 4954, 4992, 5007, 5024, 5108, 5121, 5740, 5743, 5759, 5761, 5786, 5792, 5866, 5870, 5872, 5888, 5900, 5902, 5905, 5920, 5937, 5952, 5969, 5984, 5996, 5998, 6000, 6016, 6067, 6103, 6103, 6108, 6108, 6176, 6263, 6272, 6312, 6314, 6314, 6320, 6389, 6400, 6428, 6480, 6509, 6512, 6516, 6528, 6571, 6593, 6599, 6656, 6678, 6688, 6740, 6823, 6823, 6917, 6963, 6981, 6987, 7043, 7072, 7086, 7087, 7098, 7141, 7168, 7203, 7245, 7247, 7258, 7293, 7401, 7404, 7406, 7409, 7413, 7414, 7424, 7615, 7680, 7957, 7960, 7965, 7968, 8005, 8008, 8013, 8016, 8023, 8025, 8025, 8027, 8027, 8029, 8029, 8031, 8061, 8064, 8116, 8118, 8124, 8126, 8126, 8130, 8132, 8134, 8140, 8144, 8147, 8150, 8155, 8160, 8172, 8178, 8180, 8182, 8188, 8305, 8305, 8319, 8319, 8336, 8348, 8450, 8450, 8455, 8455, 8458, 8467, 8469, 8469, 8473, 8477, 8484, 8484, 8486, 8486, 8488, 8488, 8490, 8493, 8495, 8505, 8508, 8511, 8517, 8521, 8526, 8526, 8544, 8584, 11264, 11310, 11312, 11358, 11360, 11492, 11499, 11502, 11506, 11507, 11520, 11557, 11559, 11559, 11565, 11565, 11568, 11623, 11631, 11631, 11648, 11670, 11680, 11686, 11688, 11694, 11696, 11702, 11704, 11710, 11712, 11718, 11720, 11726, 11728, 11734, 11736, 11742, 11823, 11823, 12293, 12295, 12321, 12329, 12337, 12341, 12344, 12348, 12353, 12438, 12445, 12447, 12449, 12538, 12540, 12543, 12549, 12589, 12593, 12686, 12704, 12730, 12784, 12799, 13312, 19893, 19968, 40908, 40960, 42124, 42192, 42237, 42240, 42508, 42512, 42527, 42538, 42539, 42560, 42606, 42623, 42647, 42656, 42735, 42775, 42783, 42786, 42888, 42891, 42894, 42896, 42899, 42912, 42922, 43000, 43009, 43011, 43013, 43015, 43018, 43020, 43042, 43072, 43123, 43138, 43187, 43250, 43255, 43259, 43259, 43274, 43301, 43312, 43334, 43360, 43388, 43396, 43442, 43471, 43471, 43520, 43560, 43584, 43586, 43588, 43595, 43616, 43638, 43642, 43642, 43648, 43695, 43697, 43697, 43701, 43702, 43705, 43709, 43712, 43712, 43714, 43714, 43739, 43741, 43744, 43754, 43762, 43764, 43777, 43782, 43785, 43790, 43793, 43798, 43808, 43814, 43816, 43822, 43968, 44002, 44032, 55203, 55216, 55238, 55243, 55291, 63744, 64109, 64112, 64217, 64256, 64262, 64275, 64279, 64285, 64285, 64287, 64296, 64298, 64310, 64312, 64316, 64318, 64318, 64320, 64321, 64323, 64324, 64326, 64433, 64467, 64829, 64848, 64911, 64914, 64967, 65008, 65019, 65136, 65140, 65142, 65276, 65313, 65338, 65345, 65370, 65382, 65470, 65474, 65479, 65482, 65487, 65490, 65495, 65498, 65500,];
         var unicodeES5IdentifierPart = [170, 170, 181, 181, 186, 186, 192, 214, 216, 246, 248, 705, 710, 721, 736, 740, 748, 748, 750, 750, 768, 884, 886, 887, 890, 893, 902, 902, 904, 906, 908, 908, 910, 929, 931, 1013, 1015, 1153, 1155, 1159, 1162, 1319, 1329, 1366, 1369, 1369, 1377, 1415, 1425, 1469, 1471, 1471, 1473, 1474, 1476, 1477, 1479, 1479, 1488, 1514, 1520, 1522, 1552, 1562, 1568, 1641, 1646, 1747, 1749, 1756, 1759, 1768, 1770, 1788, 1791, 1791, 1808, 1866, 1869, 1969, 1984, 2037, 2042, 2042, 2048, 2093, 2112, 2139, 2208, 2208, 2210, 2220, 2276, 2302, 2304, 2403, 2406, 2415, 2417, 2423, 2425, 2431, 2433, 2435, 2437, 2444, 2447, 2448, 2451, 2472, 2474, 2480, 2482, 2482, 2486, 2489, 2492, 2500, 2503, 2504, 2507, 2510, 2519, 2519, 2524, 2525, 2527, 2531, 2534, 2545, 2561, 2563, 2565, 2570, 2575, 2576, 2579, 2600, 2602, 2608, 2610, 2611, 2613, 2614, 2616, 2617, 2620, 2620, 2622, 2626, 2631, 2632, 2635, 2637, 2641, 2641, 2649, 2652, 2654, 2654, 2662, 2677, 2689, 2691, 2693, 2701, 2703, 2705, 2707, 2728, 2730, 2736, 2738, 2739, 2741, 2745, 2748, 2757, 2759, 2761, 2763, 2765, 2768, 2768, 2784, 2787, 2790, 2799, 2817, 2819, 2821, 2828, 2831, 2832, 2835, 2856, 2858, 2864, 2866, 2867, 2869, 2873, 2876, 2884, 2887, 2888, 2891, 2893, 2902, 2903, 2908, 2909, 2911, 2915, 2918, 2927, 2929, 2929, 2946, 2947, 2949, 2954, 2958, 2960, 2962, 2965, 2969, 2970, 2972, 2972, 2974, 2975, 2979, 2980, 2984, 2986, 2990, 3001, 3006, 3010, 3014, 3016, 3018, 3021, 3024, 3024, 3031, 3031, 3046, 3055, 3073, 3075, 3077, 3084, 3086, 3088, 3090, 3112, 3114, 3123, 3125, 3129, 3133, 3140, 3142, 3144, 3146, 3149, 3157, 3158, 3160, 3161, 3168, 3171, 3174, 3183, 3202, 3203, 3205, 3212, 3214, 3216, 3218, 3240, 3242, 3251, 3253, 3257, 3260, 3268, 3270, 3272, 3274, 3277, 3285, 3286, 3294, 3294, 3296, 3299, 3302, 3311, 3313, 3314, 3330, 3331, 3333, 3340, 3342, 3344, 3346, 3386, 3389, 3396, 3398, 3400, 3402, 3406, 3415, 3415, 3424, 3427, 3430, 3439, 3450, 3455, 3458, 3459, 3461, 3478, 3482, 3505, 3507, 3515, 3517, 3517, 3520, 3526, 3530, 3530, 3535, 3540, 3542, 3542, 3544, 3551, 3570, 3571, 3585, 3642, 3648, 3662, 3664, 3673, 3713, 3714, 3716, 3716, 3719, 3720, 3722, 3722, 3725, 3725, 3732, 3735, 3737, 3743, 3745, 3747, 3749, 3749, 3751, 3751, 3754, 3755, 3757, 3769, 3771, 3773, 3776, 3780, 3782, 3782, 3784, 3789, 3792, 3801, 3804, 3807, 3840, 3840, 3864, 3865, 3872, 3881, 3893, 3893, 3895, 3895, 3897, 3897, 3902, 3911, 3913, 3948, 3953, 3972, 3974, 3991, 3993, 4028, 4038, 4038, 4096, 4169, 4176, 4253, 4256, 4293, 4295, 4295, 4301, 4301, 4304, 4346, 4348, 4680, 4682, 4685, 4688, 4694, 4696, 4696, 4698, 4701, 4704, 4744, 4746, 4749, 4752, 4784, 4786, 4789, 4792, 4798, 4800, 4800, 4802, 4805, 4808, 4822, 4824, 4880, 4882, 4885, 4888, 4954, 4957, 4959, 4992, 5007, 5024, 5108, 5121, 5740, 5743, 5759, 5761, 5786, 5792, 5866, 5870, 5872, 5888, 5900, 5902, 5908, 5920, 5940, 5952, 5971, 5984, 5996, 5998, 6000, 6002, 6003, 6016, 6099, 6103, 6103, 6108, 6109, 6112, 6121, 6155, 6157, 6160, 6169, 6176, 6263, 6272, 6314, 6320, 6389, 6400, 6428, 6432, 6443, 6448, 6459, 6470, 6509, 6512, 6516, 6528, 6571, 6576, 6601, 6608, 6617, 6656, 6683, 6688, 6750, 6752, 6780, 6783, 6793, 6800, 6809, 6823, 6823, 6912, 6987, 6992, 7001, 7019, 7027, 7040, 7155, 7168, 7223, 7232, 7241, 7245, 7293, 7376, 7378, 7380, 7414, 7424, 7654, 7676, 7957, 7960, 7965, 7968, 8005, 8008, 8013, 8016, 8023, 8025, 8025, 8027, 8027, 8029, 8029, 8031, 8061, 8064, 8116, 8118, 8124, 8126, 8126, 8130, 8132, 8134, 8140, 8144, 8147, 8150, 8155, 8160, 8172, 8178, 8180, 8182, 8188, 8204, 8205, 8255, 8256, 8276, 8276, 8305, 8305, 8319, 8319, 8336, 8348, 8400, 8412, 8417, 8417, 8421, 8432, 8450, 8450, 8455, 8455, 8458, 8467, 8469, 8469, 8473, 8477, 8484, 8484, 8486, 8486, 8488, 8488, 8490, 8493, 8495, 8505, 8508, 8511, 8517, 8521, 8526, 8526, 8544, 8584, 11264, 11310, 11312, 11358, 11360, 11492, 11499, 11507, 11520, 11557, 11559, 11559, 11565, 11565, 11568, 11623, 11631, 11631, 11647, 11670, 11680, 11686, 11688, 11694, 11696, 11702, 11704, 11710, 11712, 11718, 11720, 11726, 11728, 11734, 11736, 11742, 11744, 11775, 11823, 11823, 12293, 12295, 12321, 12335, 12337, 12341, 12344, 12348, 12353, 12438, 12441, 12442, 12445, 12447, 12449, 12538, 12540, 12543, 12549, 12589, 12593, 12686, 12704, 12730, 12784, 12799, 13312, 19893, 19968, 40908, 40960, 42124, 42192, 42237, 42240, 42508, 42512, 42539, 42560, 42607, 42612, 42621, 42623, 42647, 42655, 42737, 42775, 42783, 42786, 42888, 42891, 42894, 42896, 42899, 42912, 42922, 43000, 43047, 43072, 43123, 43136, 43204, 43216, 43225, 43232, 43255, 43259, 43259, 43264, 43309, 43312, 43347, 43360, 43388, 43392, 43456, 43471, 43481, 43520, 43574, 43584, 43597, 43600, 43609, 43616, 43638, 43642, 43643, 43648, 43714, 43739, 43741, 43744, 43759, 43762, 43766, 43777, 43782, 43785, 43790, 43793, 43798, 43808, 43814, 43816, 43822, 43968, 44010, 44012, 44013, 44016, 44025, 44032, 55203, 55216, 55238, 55243, 55291, 63744, 64109, 64112, 64217, 64256, 64262, 64275, 64279, 64285, 64296, 64298, 64310, 64312, 64316, 64318, 64318, 64320, 64321, 64323, 64324, 64326, 64433, 64467, 64829, 64848, 64911, 64914, 64967, 65008, 65019, 65024, 65039, 65056, 65062, 65075, 65076, 65101, 65103, 65136, 65140, 65142, 65276, 65296, 65305, 65313, 65338, 65343, 65343, 65345, 65370, 65382, 65470, 65474, 65479, 65482, 65487, 65490, 65495, 65498, 65500,];
         var unicodeES3IdentifierStart = [170, 170, 181, 181, 186, 186, 192, 214, 216, 246, 248, 543, 546, 563, 592, 685, 688, 696, 699, 705, 720, 721, 736, 740, 750, 750, 890, 890, 902, 902, 904, 906, 908, 908, 910, 929, 931, 974, 976, 983, 986, 1011, 1024, 1153, 1164, 1220, 1223, 1224, 1227, 1228, 1232, 1269, 1272, 1273, 1329, 1366, 1369, 1369, 1377, 1415, 1488, 1514, 1520, 1522, 1569, 1594, 1600, 1610, 1649, 1747, 1749, 1749, 1765, 1766, 1786, 1788, 1808, 1808, 1810, 1836, 1920, 1957, 2309, 2361, 2365, 2365, 2384, 2384, 2392, 2401, 2437, 2444, 2447, 2448, 2451, 2472, 2474, 2480, 2482, 2482, 2486, 2489, 2524, 2525, 2527, 2529, 2544, 2545, 2565, 2570, 2575, 2576, 2579, 2600, 2602, 2608, 2610, 2611, 2613, 2614, 2616, 2617, 2649, 2652, 2654, 2654, 2674, 2676, 2693, 2699, 2701, 2701, 2703, 2705, 2707, 2728, 2730, 2736, 2738, 2739, 2741, 2745, 2749, 2749, 2768, 2768, 2784, 2784, 2821, 2828, 2831, 2832, 2835, 2856, 2858, 2864, 2866, 2867, 2870, 2873, 2877, 2877, 2908, 2909, 2911, 2913, 2949, 2954, 2958, 2960, 2962, 2965, 2969, 2970, 2972, 2972, 2974, 2975, 2979, 2980, 2984, 2986, 2990, 2997, 2999, 3001, 3077, 3084, 3086, 3088, 3090, 3112, 3114, 3123, 3125, 3129, 3168, 3169, 3205, 3212, 3214, 3216, 3218, 3240, 3242, 3251, 3253, 3257, 3294, 3294, 3296, 3297, 3333, 3340, 3342, 3344, 3346, 3368, 3370, 3385, 3424, 3425, 3461, 3478, 3482, 3505, 3507, 3515, 3517, 3517, 3520, 3526, 3585, 3632, 3634, 3635, 3648, 3654, 3713, 3714, 3716, 3716, 3719, 3720, 3722, 3722, 3725, 3725, 3732, 3735, 3737, 3743, 3745, 3747, 3749, 3749, 3751, 3751, 3754, 3755, 3757, 3760, 3762, 3763, 3773, 3773, 3776, 3780, 3782, 3782, 3804, 3805, 3840, 3840, 3904, 3911, 3913, 3946, 3976, 3979, 4096, 4129, 4131, 4135, 4137, 4138, 4176, 4181, 4256, 4293, 4304, 4342, 4352, 4441, 4447, 4514, 4520, 4601, 4608, 4614, 4616, 4678, 4680, 4680, 4682, 4685, 4688, 4694, 4696, 4696, 4698, 4701, 4704, 4742, 4744, 4744, 4746, 4749, 4752, 4782, 4784, 4784, 4786, 4789, 4792, 4798, 4800, 4800, 4802, 4805, 4808, 4814, 4816, 4822, 4824, 4846, 4848, 4878, 4880, 4880, 4882, 4885, 4888, 4894, 4896, 4934, 4936, 4954, 5024, 5108, 5121, 5740, 5743, 5750, 5761, 5786, 5792, 5866, 6016, 6067, 6176, 6263, 6272, 6312, 7680, 7835, 7840, 7929, 7936, 7957, 7960, 7965, 7968, 8005, 8008, 8013, 8016, 8023, 8025, 8025, 8027, 8027, 8029, 8029, 8031, 8061, 8064, 8116, 8118, 8124, 8126, 8126, 8130, 8132, 8134, 8140, 8144, 8147, 8150, 8155, 8160, 8172, 8178, 8180, 8182, 8188, 8319, 8319, 8450, 8450, 8455, 8455, 8458, 8467, 8469, 8469, 8473, 8477, 8484, 8484, 8486, 8486, 8488, 8488, 8490, 8493, 8495, 8497, 8499, 8505, 8544, 8579, 12293, 12295, 12321, 12329, 12337, 12341, 12344, 12346, 12353, 12436, 12445, 12446, 12449, 12538, 12540, 12542, 12549, 12588, 12593, 12686, 12704, 12727, 13312, 19893, 19968, 40869, 40960, 42124, 44032, 55203, 63744, 64045, 64256, 64262, 64275, 64279, 64285, 64285, 64287, 64296, 64298, 64310, 64312, 64316, 64318, 64318, 64320, 64321, 64323, 64324, 64326, 64433, 64467, 64829, 64848, 64911, 64914, 64967, 65008, 65019, 65136, 65138, 65140, 65140, 65142, 65276, 65313, 65338, 65345, 65370, 65382, 65470, 65474, 65479, 65482, 65487, 65490, 65495, 65498, 65500,];
@@ -6147,16 +7373,26 @@ var pxt;
                 this.ready = false;
                 this.onData = function (v) { };
                 this.onError = function (e) { };
+                this.onEvent = function (v) { };
                 this.readLoop();
             }
             HID.prototype.error = function (msg) {
                 throw new USBError(pxt.U.lf("USB error on device {0} ({1})", this.dev.productName, msg));
             };
-            HID.prototype.reconnectAsync = function () {
+            HID.prototype.disconnectAsync = function () {
                 var _this = this;
+                if (!this.dev)
+                    return Promise.resolve();
                 this.ready = false;
                 return this.dev.close()
-                    .then(function () { return Promise.delay(500); })
+                    .then(function () {
+                    _this.dev = null;
+                    return Promise.delay(500);
+                });
+            };
+            HID.prototype.reconnectAsync = function () {
+                var _this = this;
+                return this.disconnectAsync()
                     .then(requestDeviceAsync)
                     .then(function (dev) {
                     _this.dev = dev;
@@ -6367,11 +7603,12 @@ var ts;
             // The Instruction also knows how to convert the particular instance into
             // machine code (EmitResult)
             var Instruction = (function () {
-                function Instruction(ei, format, opcode, mask, jsFormat) {
+                function Instruction(ei, format, opcode, mask, is32bit) {
                     var _this = this;
                     this.opcode = opcode;
                     this.mask = mask;
-                    this.jsFormat = jsFormat;
+                    this.is32bit = is32bit;
+                    this.canBeShared = false;
                     pxtc.assert((opcode & mask) == opcode);
                     this.ei = ei;
                     this.code = format.replace(/\s+/g, " ");
@@ -6383,8 +7620,6 @@ var ts;
                     var words = tokenize(format);
                     this.name = words[0];
                     this.args = words.slice(1);
-                    // a bit of a hack here...
-                    this.is32bit = (jsFormat != undefined);
                 }
                 Instruction.prototype.emit = function (ln) {
                     var tokens = ln.words;
@@ -6543,6 +7778,8 @@ var ts;
                     this.words = tokenize(s) || [];
                     if (this.words.length == 0)
                         this.type = "empty";
+                    else if (this.words[0][0] == "@")
+                        this.type = "directive";
                 };
                 return Line;
             }());
@@ -6922,7 +8159,7 @@ var ts;
                         // push {...}
                         // @stackmark locals   ; locals := sp
                         // ... some push/pops ...
-                        // ldr r0, [pc, locals@3] ; load local number 3
+                        // ldr r0, [sp, locals@3] ; load local number 3
                         // ... some push/pops ...
                         // @stackempty locals ; expect an empty stack here
                         case "@stackmark":
@@ -6980,6 +8217,8 @@ var ts;
                         if (this.checkStack && this.stack < 0)
                             this.pushError(lf("stack underflow"));
                         ln.location = this.location();
+                        ln.opcode = op.opcode;
+                        ln.stack = op.stack;
                         this.emitShort(op.opcode);
                         if (op.opcode2 != null)
                             this.emitShort(op.opcode2);
@@ -7014,12 +8253,48 @@ var ts;
                     }
                     this.pushError(lf("assembly error"), hints);
                 };
-                File.prototype.mkLine = function (tx) {
-                    var l = new Line(this, tx);
-                    l.scope = this.scope;
-                    l.lineNo = this.currLineNo;
-                    this.lines.push(l);
-                    return l;
+                File.prototype.buildLine = function (tx, lst) {
+                    var _this = this;
+                    var mkLine = function (tx) {
+                        var l = new Line(_this, tx);
+                        l.scope = _this.scope;
+                        l.lineNo = _this.currLineNo;
+                        lst.push(l);
+                        return l;
+                    };
+                    var l = mkLine(tx);
+                    var words = tokenize(l.text) || [];
+                    l.words = words;
+                    var w0 = words[0] || "";
+                    if (w0.charAt(w0.length - 1) == ":") {
+                        var m = /^([\.\w]+):$/.exec(words[0]);
+                        if (m) {
+                            l.type = "label";
+                            l.text = m[1] + ":";
+                            l.words = [m[1]];
+                            if (words.length > 1) {
+                                words.shift();
+                                l = mkLine(tx.replace(/^[^:]*:/, ""));
+                                l.words = words;
+                                w0 = words[0] || "";
+                            }
+                            else {
+                                return;
+                            }
+                        }
+                    }
+                    var c0 = w0.charAt(0);
+                    if (c0 == "." || c0 == "@") {
+                        l.type = "directive";
+                        if (l.words[0] == "@scope")
+                            this.handleDirective(l);
+                    }
+                    else {
+                        if (l.words.length == 0)
+                            l.type = "empty";
+                        else
+                            l.type = "instruction";
+                    }
                 };
                 File.prototype.prepLines = function (text) {
                     var _this = this;
@@ -7031,39 +8306,7 @@ var ts;
                             return;
                         _this.currLineNo++;
                         _this.realCurrLineNo++;
-                        var l = _this.mkLine(tx);
-                        var words = tokenize(l.text) || [];
-                        l.words = words;
-                        var w0 = words[0] || "";
-                        if (w0.charAt(w0.length - 1) == ":") {
-                            var m = /^([\.\w]+):$/.exec(words[0]);
-                            if (m) {
-                                l.type = "label";
-                                l.text = m[1] + ":";
-                                l.words = [m[1]];
-                                if (words.length > 1) {
-                                    words.shift();
-                                    l = _this.mkLine(tx.replace(/^[^:]*:/, ""));
-                                    l.words = words;
-                                    w0 = words[0] || "";
-                                }
-                                else {
-                                    return;
-                                }
-                            }
-                        }
-                        var c0 = w0.charAt(0);
-                        if (c0 == "." || c0 == "@") {
-                            l.type = "directive";
-                            if (l.words[0] == "@scope")
-                                _this.handleDirective(l);
-                        }
-                        else {
-                            if (l.words.length == 0)
-                                l.type = "empty";
-                            else
-                                l.type = "instruction";
-                        }
+                        _this.buildLine(tx, _this.lines);
                     });
                 };
                 File.prototype.iterLines = function () {
@@ -7112,14 +8355,21 @@ var ts;
                         }
                     });
                 };
-                File.prototype.getSource = function (clean) {
+                File.prototype.getSource = function (clean, numStmts) {
                     var _this = this;
+                    if (numStmts === void 0) { numStmts = 1; }
                     var lenTotal = this.buf ? this.buf.length * 2 : 0;
                     var lenThumb = this.labels["_program_end"] || lenTotal;
+                    var lenFrag = this.labels["_frag_start"] || 0;
+                    if (lenFrag)
+                        lenFrag = this.labels["_js_end"] - lenFrag;
+                    var lenLit = this.labels["_program_end"];
+                    if (lenLit)
+                        lenLit -= this.labels["_js_end"];
                     var res = 
                     // ARM-specific
-                    lf("; thumb size: {0} bytes; src size {1} bytes\n", lenThumb, lenTotal - lenThumb) +
-                        lf("; assembly: {0} lines\n", this.lines.length) +
+                    lf("; code sizes (bytes): {0} (incl. {1} frags, and {2} lits); src size {3}\n", lenThumb, lenFrag, lenLit, lenTotal - lenThumb) +
+                        lf("; assembly: {0} lines; density: {1} bytes/stmt\n", this.lines.length, Math.round(100 * (lenThumb - lenLit) / numStmts) / 100) +
                         this.stats + "\n\n";
                     var skipOne = false;
                     this.lines.forEach(function (ln, i) {
@@ -7194,6 +8444,10 @@ var ts;
                         this.directiveError(lf("stack misaligned at the end of the file"));
                     if (this.errors.length > 0)
                         return;
+                    this.ei.expandLdlit(this);
+                    this.ei.commonalize(this);
+                    this.labels = {};
+                    this.iterLines();
                     this.finalEmit = true;
                     this.reallyFinalEmit = this.disablePeepHole;
                     this.iterLines();
@@ -7262,11 +8516,12 @@ var ts;
                         var mask = (max << 1) | 1;
                         return e & mask;
                     };
-                    this.addInst = function (name, code, mask, jsFormat) {
-                        var ins = new Instruction(_this, name, code, mask, jsFormat);
+                    this.addInst = function (name, code, mask, is32Bit) {
+                        var ins = new Instruction(_this, name, code, mask, is32Bit);
                         if (!_this.instructions.hasOwnProperty(ins.name))
                             _this.instructions[ins.name] = [];
                         _this.instructions[ins.name].push(ins);
+                        return ins;
                     };
                     this.encoders = {};
                     this.instructions = {};
@@ -7313,6 +8568,10 @@ var ts;
                 };
                 AbstractProcessor.prototype.testAssembler = function () {
                     pxtc.assert(false);
+                };
+                AbstractProcessor.prototype.commonalize = function (file) {
+                };
+                AbstractProcessor.prototype.expandLdlit = function (f) {
                 };
                 return AbstractProcessor;
             }());
@@ -7535,7 +8794,15 @@ var pxt;
         Cloud.privatePostAsync = privatePostAsync;
         function isLoggedIn() { return !!Cloud.accessToken; }
         Cloud.isLoggedIn = isLoggedIn;
-        function isOnline() { return _isOnline; }
+        function isNavigatorOnline() {
+            return navigator && navigator.onLine;
+        }
+        function isOnline() {
+            if (typeof navigator !== "undefined" && isNavigatorOnline()) {
+                _isOnline = true;
+            }
+            return _isOnline;
+        }
         Cloud.isOnline = isOnline;
         function getServiceUrl() {
             return Cloud.apiRoot.replace(/\/api\/$/, "");

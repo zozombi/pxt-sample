@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en"  data-manifest="" data-framework="typescript">
+<html lang="en"  manifest="/pxt-sample/release.manifest" data-framework="typescript">
 
 <head>
     <meta charset="utf-8">
@@ -85,7 +85,7 @@
     "workerjs": "/pxt-sample/worker.js",
     "tdworkerjs": "/pxt-sample/tdworker.js",
     "monacoworkerjs": "/pxt-sample/monacoworker.js",
-    "pxtVersion": "0.12.130",
+    "pxtVersion": "2.0.27",
     "pxtRelId": "",
     "pxtCdnUrl": "/pxt-sample/",
     "commitCdnUrl": "/pxt-sample/",
@@ -94,6 +94,7 @@
     "targetVersion": "0.0.0",
     "targetRelId": "",
     "targetUrl": "",
+    "targetId": "sample",
     "simUrl": "/pxt-sample/simulator.html",
     "partsUrl": "/pxt-sample/siminstructions.html",
     "runUrl": "/pxt-sample/run.html",
@@ -106,12 +107,12 @@
     <script type="text/javascript">
         (function () {
         var loading = document.getElementById('loading');
-        var id = /id=([^&?]+)/i.exec(window.location.href);
-        var code = /code=([^&?]+)/i.exec(window.location.href);
-        var localToken = /local_token=([^&?]+)/i.exec(window.location.href);
-        var hex = !!/hex=1/i.exec(window.location.href);
-        var footer = !/nofooter=1/i.exec(window.location.href);
-        var debugSim = !!/debugSim=1/i.exec(window.location.href);
+        var id = /id(?:[:=])([^&?]+)/i.exec(window.location.href);
+        var code = /code(?:[:=])([^&?]+)/i.exec(window.location.href);
+        var localToken = /local_token(?:[:=])([^&?]+)/i.exec(window.location.href);
+        var hex = !!/hex(?:[:=])1/i.exec(window.location.href);
+        var footer = !/nofooter(?:[:=])1/i.exec(window.location.href);
+        var debugSim = !!/debugSim(?:[:=])1/i.exec(window.location.href);
         var sims = document.getElementById('simulators');
 
         if (!id && !code && !debugSim) {

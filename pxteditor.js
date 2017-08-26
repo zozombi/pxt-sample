@@ -104,6 +104,11 @@ var pxt;
                                 .then(function (img) { resp = img; });
                             break;
                         }
+                        case "toggletrace": {
+                            var togglemsg_1 = data;
+                            p = p.then(function () { return projectView.toggleTrace(togglemsg_1.intervalSpeed); });
+                            break;
+                        }
                     }
                 }
                 p.done(function () { return sendResponse(data, resp, true, undefined); }, function (err) { return sendResponse(data, resp, false, err); });

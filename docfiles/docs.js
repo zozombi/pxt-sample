@@ -69,7 +69,7 @@ function setupSemantic() {
     // don't show related videos
     $.fn.embed.settings.sources.youtube.url = '//www.youtube.com/embed/{id}?rel=0'
 
-    //This is an adapted version of the original template code in Semantic UI 
+    //This is an adapted version of the original template code in Semantic UI
     $.fn.embed.settings.templates.placeholder = function (image, icon) {
         var html = '';
         if (icon) {
@@ -135,6 +135,24 @@ function setupSemantic() {
         $('.ui.footer').append($('<div class="ui center aligned small container"/>').text('user agent: ' + navigator.userAgent))
 }
 
+function setupBlocklyAsync() {
+    let promise = Promise.resolve();
+    if (pxt.appTarget.appTheme && pxt.appTarget.appTheme.extendEditor) {
+        let opts = {};
+        promise = promise.then(function () {
+                return pxt.BrowserUtils.loadScriptAsync(pxt.webConfig.commitCdnUrl + "editor.js")
+            }).then(function () {
+                return pxt.editor.initExtensionsAsync(opts)
+            }).then(function (res) {
+                if (res.fieldEditors)
+                    res.fieldEditors.forEach(function (fi) {
+                        pxt.blocks.registerFieldEditor(fi.selector, fi.editor, fi.validator);
+                    })
+            })
+    }
+    return promise;
+}
+
 function renderSnippets() {
     var codeElems = $('code')
     for (var i = 0; i < codeElems.length; i++) {
@@ -146,22 +164,25 @@ function renderSnippets() {
     ksRunnerReady(function () {
         setupSidebar();
         setupSemantic();
-        pxt.runner.renderAsync({
-            snippetClass: 'lang-blocks',
-            signatureClass: 'lang-sig',
-            blocksClass: 'lang-block',
-            shuffleClass: 'lang-shuffle',
-            simulatorClass: 'lang-sim',
-            linksClass: 'lang-cards',
-            namespacesClass: 'lang-namespaces',
-            codeCardClass: 'lang-codecard',
-            packageClass: 'lang-package',
-            projectClass: 'lang-project',
-            snippetReplaceParent: true,
-            simulator: true,
-            hex: true,
-            hexName: path,
-            downloadScreenshots: downloadScreenshots
+        setupBlocklyAsync()
+        .then(function () {
+            return pxt.runner.renderAsync({
+                snippetClass: 'lang-blocks',
+                signatureClass: 'lang-sig',
+                blocksClass: 'lang-block',
+                shuffleClass: 'lang-shuffle',
+                simulatorClass: 'lang-sim',
+                linksClass: 'lang-cards',
+                namespacesClass: 'lang-namespaces',
+                codeCardClass: 'lang-codecard',
+                packageClass: 'lang-package',
+                projectClass: 'lang-project',
+                snippetReplaceParent: true,
+                simulator: true,
+                hex: true,
+                hexName: path,
+                downloadScreenshots: downloadScreenshots
+            });
         }).done();
     });
 }
