@@ -261,146 +261,147 @@ var pxt;
             }
         }
         function infer(e, w) {
-            w.getAllBlocks().filter(function (b) { return !b.disabled; }).forEach(function (b) {
-                try {
-                    switch (b.type) {
-                        case "math_op2":
-                            unionParam(e, b, "x", ground(pNumber.type));
-                            unionParam(e, b, "y", ground(pNumber.type));
-                            break;
-                        case "math_op3":
-                            unionParam(e, b, "x", ground(pNumber.type));
-                            break;
-                        case "math_arithmetic":
-                        case "logic_compare":
-                            switch (b.getFieldValue("OP")) {
-                                case "ADD":
-                                case "MINUS":
-                                case "MULTIPLY":
-                                case "DIVIDE":
-                                case "LT":
-                                case "LTE":
-                                case "GT":
-                                case "GTE":
-                                case "POWER":
-                                    unionParam(e, b, "A", ground(pNumber.type));
-                                    unionParam(e, b, "B", ground(pNumber.type));
-                                    break;
-                                case "AND":
-                                case "OR":
-                                    attachPlaceholderIf(e, b, "A", pBoolean.type);
-                                    attachPlaceholderIf(e, b, "B", pBoolean.type);
-                                    break;
-                                case "EQ":
-                                case "NEQ":
-                                    attachPlaceholderIf(e, b, "A");
-                                    attachPlaceholderIf(e, b, "B");
-                                    var p1_1 = returnType(e, getInputTargetBlock(b, "A"));
-                                    var p2 = returnType(e, getInputTargetBlock(b, "B"));
+            if (w)
+                w.getAllBlocks().filter(function (b) { return !b.disabled; }).forEach(function (b) {
+                    try {
+                        switch (b.type) {
+                            case "math_op2":
+                                unionParam(e, b, "x", ground(pNumber.type));
+                                unionParam(e, b, "y", ground(pNumber.type));
+                                break;
+                            case "math_op3":
+                                unionParam(e, b, "x", ground(pNumber.type));
+                                break;
+                            case "math_arithmetic":
+                            case "logic_compare":
+                                switch (b.getFieldValue("OP")) {
+                                    case "ADD":
+                                    case "MINUS":
+                                    case "MULTIPLY":
+                                    case "DIVIDE":
+                                    case "LT":
+                                    case "LTE":
+                                    case "GT":
+                                    case "GTE":
+                                    case "POWER":
+                                        unionParam(e, b, "A", ground(pNumber.type));
+                                        unionParam(e, b, "B", ground(pNumber.type));
+                                        break;
+                                    case "AND":
+                                    case "OR":
+                                        attachPlaceholderIf(e, b, "A", pBoolean.type);
+                                        attachPlaceholderIf(e, b, "B", pBoolean.type);
+                                        break;
+                                    case "EQ":
+                                    case "NEQ":
+                                        attachPlaceholderIf(e, b, "A");
+                                        attachPlaceholderIf(e, b, "B");
+                                        var p1_1 = returnType(e, getInputTargetBlock(b, "A"));
+                                        var p2 = returnType(e, getInputTargetBlock(b, "B"));
+                                        try {
+                                            union(p1_1, p2);
+                                        }
+                                        catch (e) {
+                                            throwBlockError("Comparing objects of different types", b);
+                                        }
+                                        var t = find(p1_1).type;
+                                        if (t != pString.type && t != pBoolean.type && t != pNumber.type && t != null)
+                                            throwBlockError("I can only compare strings, booleans and numbers", b);
+                                        break;
+                                }
+                                break;
+                            case "logic_operation":
+                                attachPlaceholderIf(e, b, "A", pBoolean.type);
+                                attachPlaceholderIf(e, b, "B", pBoolean.type);
+                                break;
+                            case "logic_negate":
+                                attachPlaceholderIf(e, b, "BOOL", pBoolean.type);
+                                break;
+                            case "controls_if":
+                                for (var i = 0; i <= b.elseifCount_; ++i)
+                                    attachPlaceholderIf(e, b, "IF" + i, pBoolean.type);
+                                break;
+                            case "controls_simple_for":
+                                unionParam(e, b, "TO", ground(pNumber.type));
+                                break;
+                            case "controls_for_of":
+                                unionParam(e, b, "LIST", ground("Array"));
+                                var listTp = returnType(e, getInputTargetBlock(b, "LIST"));
+                                var elementTp = lookup(e, escapeVarName(b.getFieldValue("VAR"), e)).type;
+                                genericLink(listTp, elementTp);
+                                break;
+                            case "variables_set":
+                            case "variables_change":
+                                var x = escapeVarName(b.getFieldValue("VAR"), e);
+                                var p1 = lookup(e, x).type;
+                                attachPlaceholderIf(e, b, "VALUE");
+                                var rhs = getInputTargetBlock(b, "VALUE");
+                                if (rhs) {
+                                    var tr = returnType(e, rhs);
                                     try {
-                                        union(p1_1, p2);
+                                        union(p1, tr);
                                     }
                                     catch (e) {
-                                        throwBlockError("Comparing objects of different types", b);
+                                        throwBlockError("Assigning a value of the wrong type to variable " + x, b);
                                     }
-                                    var t = find(p1_1).type;
-                                    if (t != pString.type && t != pBoolean.type && t != pNumber.type && t != null)
-                                        throwBlockError("I can only compare strings, booleans and numbers", b);
-                                    break;
-                            }
-                            break;
-                        case "logic_operation":
-                            attachPlaceholderIf(e, b, "A", pBoolean.type);
-                            attachPlaceholderIf(e, b, "B", pBoolean.type);
-                            break;
-                        case "logic_negate":
-                            attachPlaceholderIf(e, b, "BOOL", pBoolean.type);
-                            break;
-                        case "controls_if":
-                            for (var i = 0; i <= b.elseifCount_; ++i)
-                                attachPlaceholderIf(e, b, "IF" + i, pBoolean.type);
-                            break;
-                        case "controls_simple_for":
-                            unionParam(e, b, "TO", ground(pNumber.type));
-                            break;
-                        case "controls_for_of":
-                            unionParam(e, b, "LIST", ground("Array"));
-                            var listTp = returnType(e, getInputTargetBlock(b, "LIST"));
-                            var elementTp = lookup(e, escapeVarName(b.getFieldValue("VAR"), e)).type;
-                            genericLink(listTp, elementTp);
-                            break;
-                        case "variables_set":
-                        case "variables_change":
-                            var x = escapeVarName(b.getFieldValue("VAR"), e);
-                            var p1 = lookup(e, x).type;
-                            attachPlaceholderIf(e, b, "VALUE");
-                            var rhs = getInputTargetBlock(b, "VALUE");
-                            if (rhs) {
-                                var tr = returnType(e, rhs);
-                                try {
-                                    union(p1, tr);
                                 }
-                                catch (e) {
-                                    throwBlockError("Assigning a value of the wrong type to variable " + x, b);
-                                }
-                            }
-                            break;
-                        case "controls_repeat_ext":
-                            unionParam(e, b, "TIMES", ground(pNumber.type));
-                            break;
-                        case "device_while":
-                            attachPlaceholderIf(e, b, "COND", pBoolean.type);
-                            break;
-                        case "lists_index_get":
-                            unionParam(e, b, "LIST", ground("Array"));
-                            unionParam(e, b, "INDEX", ground(pNumber.type));
-                            var listType = returnType(e, getInputTargetBlock(b, "LIST"));
-                            var ret = returnType(e, b);
-                            genericLink(listType, ret);
-                            break;
-                        case "lists_index_set":
-                            unionParam(e, b, "LIST", ground("Array"));
-                            attachPlaceholderIf(e, b, "VALUE");
-                            handleGenericType(b, "LIST");
-                            unionParam(e, b, "INDEX", ground(pNumber.type));
-                            break;
-                        default:
-                            if (b.type in e.stdCallTable) {
-                                var call_1 = e.stdCallTable[b.type];
-                                call_1.args.forEach(function (p, i) {
-                                    var isInstance = call_1.isExtensionMethod && i === 0;
-                                    if (p.field && !b.getFieldValue(p.field)) {
-                                        var i_1 = b.inputList.filter(function (i) { return i.name == p.field; })[0];
-                                        if (i_1.connection && i_1.connection.check_) {
-                                            if (isInstance && connectionCheck(i_1) === "Array") {
-                                                var gen = handleGenericType(b, p.field);
-                                                if (gen) {
-                                                    return;
+                                break;
+                            case "controls_repeat_ext":
+                                unionParam(e, b, "TIMES", ground(pNumber.type));
+                                break;
+                            case "device_while":
+                                attachPlaceholderIf(e, b, "COND", pBoolean.type);
+                                break;
+                            case "lists_index_get":
+                                unionParam(e, b, "LIST", ground("Array"));
+                                unionParam(e, b, "INDEX", ground(pNumber.type));
+                                var listType = returnType(e, getInputTargetBlock(b, "LIST"));
+                                var ret = returnType(e, b);
+                                genericLink(listType, ret);
+                                break;
+                            case "lists_index_set":
+                                unionParam(e, b, "LIST", ground("Array"));
+                                attachPlaceholderIf(e, b, "VALUE");
+                                handleGenericType(b, "LIST");
+                                unionParam(e, b, "INDEX", ground(pNumber.type));
+                                break;
+                            default:
+                                if (b.type in e.stdCallTable) {
+                                    var call_1 = e.stdCallTable[b.type];
+                                    call_1.args.forEach(function (p, i) {
+                                        var isInstance = call_1.isExtensionMethod && i === 0;
+                                        if (p.field && !b.getFieldValue(p.field)) {
+                                            var i_1 = b.inputList.filter(function (i) { return i.name == p.field; })[0];
+                                            if (i_1.connection && i_1.connection.check_) {
+                                                if (isInstance && connectionCheck(i_1) === "Array") {
+                                                    var gen = handleGenericType(b, p.field);
+                                                    if (gen) {
+                                                        return;
+                                                    }
                                                 }
-                                            }
-                                            // All of our injected blocks have single output checks, but the builtin
-                                            // blockly ones like string.length and array.length might have multiple
-                                            for (var j = 0; j < i_1.connection.check_.length; j++) {
-                                                try {
-                                                    var t = i_1.connection.check_[j];
-                                                    unionParam(e, b, p.field, ground(t));
-                                                    break;
-                                                }
-                                                catch (e) {
+                                                // All of our injected blocks have single output checks, but the builtin
+                                                // blockly ones like string.length and array.length might have multiple
+                                                for (var j = 0; j < i_1.connection.check_.length; j++) {
+                                                    try {
+                                                        var t = i_1.connection.check_[j];
+                                                        unionParam(e, b, p.field, ground(t));
+                                                        break;
+                                                    }
+                                                    catch (e) {
+                                                    }
                                                 }
                                             }
                                         }
-                                    }
-                                });
-                            }
+                                    });
+                                }
+                        }
                     }
-                }
-                catch (err) {
-                    var be = err.block || b;
-                    be.setWarningText(err + "");
-                    e.errors.push(be);
-                }
-            });
+                    catch (err) {
+                        var be = err.block || b;
+                        be.setWarningText(err + "");
+                        e.errors.push(be);
+                    }
+                });
             // Last pass: if some variable has no type (because it was never used or
             // assigned to), just unify it with int...
             e.bindings.forEach(function (b) {
@@ -1271,17 +1272,18 @@ var pxt;
                 });
             // determine for-loop compatibility: for each get or
             // set block, 1) make sure that the variable is bound, then 2) mark the variable if needed.
-            w.getAllBlocks().filter(function (b) { return !b.disabled; }).forEach(function (b) {
-                if (b.type == "variables_get" || b.type == "variables_set" || b.type == "variables_change") {
-                    var x = escapeVarName(b.getFieldValue("VAR"), e);
-                    if (lookup(e, x) == null)
-                        e = extend(e, x, null);
-                    var binding = lookup(e, x);
-                    if (binding.declaredInLocalScope && !variableIsScoped(b, x))
-                        // loop index is read outside the loop.
-                        binding.mustBeGlobal = true;
-                }
-            });
+            if (w)
+                w.getAllBlocks().filter(function (b) { return !b.disabled; }).forEach(function (b) {
+                    if (b.type == "variables_get" || b.type == "variables_set" || b.type == "variables_change") {
+                        var x = escapeVarName(b.getFieldValue("VAR"), e);
+                        if (lookup(e, x) == null)
+                            e = extend(e, x, null);
+                        var binding = lookup(e, x);
+                        if (binding.declaredInLocalScope && !variableIsScoped(b, x))
+                            // loop index is read outside the loop.
+                            binding.mustBeGlobal = true;
+                    }
+                });
             return e;
         }
         blocks.mkEnv = mkEnv;

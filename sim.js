@@ -4,30 +4,38 @@ var __extends = (this && this.__extends) || function (d, b) {
     d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
 };
 /// <reference path="../libs/core/enums.d.ts"/>
-var turtle;
-(function (turtle) {
-    /**
-     * Moves the sprite forward
-     * @param steps number of steps to move, eg: 1
-     */
-    //% weight=90		
-    //% block		
-    //% shim=turtle::forwardAsync promise		
-    function forward(steps) {
-    }
-    turtle.forward = forward;
-    /**
-     * Moves the sprite forward
-     * @param direction the direction to turn, eg: Direction.Left
-     * @param angle degrees to turn, eg:90
-     */
-    //% weight=85		
-    //% blockId=sampleTurn block="turn %direction|by %angle degrees"		
-    //% shim=turtle::turnAsync promise		
-    function turn(direction, angle) {
-    }
-    turtle.turn = turn;
-})(turtle || (turtle = {}));
+var pxsim;
+(function (pxsim) {
+    var turtle;
+    (function (turtle) {
+        /**
+         * Moves the sprite forward
+         * @param steps number of steps to move, eg: 1
+         */
+        //% weight=90
+        //% block
+        function forwardAsync(steps) {
+            return pxsim.board().sprite.forwardAsync(steps);
+        }
+        turtle.forwardAsync = forwardAsync;
+        /**
+         * Moves the sprite forward
+         * @param direction the direction to turn, eg: Direction.Left
+         * @param angle degrees to turn, eg:90
+         */
+        //% weight=85
+        //% blockId=sampleTurn block="turn %direction|by %angle degrees"
+        function turnAsync(direction, angle) {
+            var b = pxsim.board();
+            if (direction == 0 /* Left */)
+                b.sprite.angle -= angle;
+            else
+                b.sprite.angle += angle;
+            return Promise.delay(400);
+        }
+        turtle.turnAsync = turnAsync;
+    })(turtle = pxsim.turtle || (pxsim.turtle = {}));
+})(pxsim || (pxsim = {}));
 var pxsim;
 (function (pxsim) {
     var loops;
@@ -54,6 +62,7 @@ var pxsim;
         loops.pauseAsync = pauseAsync;
     })(loops = pxsim.loops || (pxsim.loops = {}));
 })(pxsim || (pxsim = {}));
+function logMsg(m) { console.log(m); }
 var pxsim;
 (function (pxsim) {
     var console;
@@ -63,10 +72,62 @@ var pxsim;
          */
         //% 
         function log(msg) {
-            console.log("CONSOLE: " + msg);
+            logMsg("CONSOLE: " + msg);
+            // why doesn't that work?
+            pxsim.board().writeSerial(msg + "\n");
         }
         console.log = log;
     })(console = pxsim.console || (pxsim.console = {}));
+})(pxsim || (pxsim = {}));
+var pxsim;
+(function (pxsim) {
+    /**
+     * A ghost on the screen.
+     */
+    //%
+    var Sprite = (function () {
+        function Sprite() {
+            /**
+             * The X-coordiante
+             */
+            //%
+            this.x = 100;
+            /**
+            * The Y-coordiante
+            */
+            //%
+            this.y = 100;
+            this.angle = 90;
+        }
+        Sprite.prototype.foobar = function () { };
+        /**
+         * Move the thing forward
+         */
+        //%
+        Sprite.prototype.forwardAsync = function (steps) {
+            var deg = this.angle / 180 * Math.PI;
+            this.x += Math.cos(deg) * steps * 10;
+            this.y += Math.sin(deg) * steps * 10;
+            pxsim.board().updateView();
+            return Promise.delay(400);
+        };
+        return Sprite;
+    }());
+    pxsim.Sprite = Sprite;
+})(pxsim || (pxsim = {}));
+var pxsim;
+(function (pxsim) {
+    var sprites;
+    (function (sprites) {
+        /**
+         * Creates a new sprite
+         */
+        //% block
+        function createSprite() {
+            return new pxsim.Sprite();
+        }
+        sprites.createSprite = createSprite;
+    })(sprites = pxsim.sprites || (pxsim.sprites = {}));
 })(pxsim || (pxsim = {}));
 /// <reference path="../node_modules/pxt-core/typings/globals/bluebird/index.d.ts"/>
 /// <reference path="../node_modules/pxt-core/built/pxtsim.d.ts"/>
@@ -93,12 +154,18 @@ var pxsim;
         __extends(Board, _super);
         function Board() {
             _super.call(this);
-            this.element = document.getElementById('sim');
+            this.element = document.getElementById('svgcanvas');
+            this.spriteElement = this.element.getElementById('svgsprite');
+            this.sprite = new pxsim.Sprite();
         }
         Board.prototype.initAsync = function (msg) {
             document.body.innerHTML = ''; // clear children
             document.body.appendChild(this.element);
             return Promise.resolve();
+        };
+        Board.prototype.updateView = function () {
+            this.spriteElement.cx.baseVal.value = this.sprite.x;
+            this.spriteElement.cy.baseVal.value = this.sprite.y;
         };
         return Board;
     }(pxsim.BaseBoard));

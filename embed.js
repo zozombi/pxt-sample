@@ -7,7 +7,7 @@
     "workerjs": "/pxt-sample/worker.js",
     "tdworkerjs": "/pxt-sample/tdworker.js",
     "monacoworkerjs": "/pxt-sample/monacoworker.js",
-    "pxtVersion": "2.0.27",
+    "pxtVersion": "2.0.31",
     "pxtRelId": "",
     "pxtCdnUrl": "/pxt-sample/",
     "commitCdnUrl": "/pxt-sample/",

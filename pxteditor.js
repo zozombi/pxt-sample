@@ -64,6 +64,9 @@ var pxt;
                         case "showsimulator":
                             p = p.then(function () { return projectView.expandSimulator(); });
                             break;
+                        case "closeflyout":
+                            p = p.then(function () { return projectView.closeFlyout(); });
+                            break;
                         case "redo":
                             p = p.then(function () {
                                 var editor = projectView.editor;
