@@ -71,214 +71,189 @@ see &lt;a href=&quot;https://makecode.com/packages&quot;&gt;https://makecode.com
 
 <body id='root' class='root'>
 
+<div id="accessibleMenu" role="menubar">
+    
+            <a href="#maincontent" class="ui item link" tabindex="0" role="menuitem">Skip to main content</a>
+        
+</div>
+
 
 <!-- include tocheader.html -->
 <div class="ui vertical accent inverted sidebar menu left hideprint">
-    <a href="/pxt-sample/docs/.html" class="header item">
-        
+    <div class="item">
+        <a href="/pxt-sample/docs/.html" class="header focused" tabindex="0" title="Go to editor">
+            
+        </a>
         &nbsp; &nbsp;
         Documentation
-    </a>
+    </div>
     <div class="item">
-        <form id="tocsearch1" method="get" action="https://www.bing.com/search">
+        <form id="tocsearch1" role="form" method="get" action="https://www.bing.com/search">
             <div class="ui fluid icon input">
                 <input type="hidden" name="q1" value="site:http://microsoft.github.io/pxt-sample/" />
-                <input type="search" name="q" placeholder="Search...">
-                <i onclick="document.getElementById('tocsearch1').submit();" class="search link icon"></i>
+                
+                <input type="search" name="q" placeholder="Search..." aria-label="Search Documentation">
+                <i onclick="document.getElementById('tocsearch1').submit();" tabindex="0" class="search link icon" aria-label="Search" role="button"></i>
+            
             </div>
         </form>
     </div>
     <!-- TOC Menu -->
-    
+    <div class="menuContainer">
+        
     <div class="item" title="">
-        <a class="header " href="/pxt-sample/docs/blocks.html">Blocks</a>
+        <a class="header " href="/pxt-sample/docs/blocks.html" role="menu">Blocks</a>
         <div class="menu">
             
-    <a class="item " href="/pxt-sample/docs/blocks/on-start.html">On Start</a>
+    <a class="item " href="/pxt-sample/docs/blocks/on-start.html" role="menuitem">On Start</a>
 
 
-    <div class="ui inverted accordion item visible" title="">
+    <div class="ui inverted accordion item visible" role="tree" title="">
         <div class=" title">
             <i class="dropdown icon"></i>
-            <a class="header" href="/pxt-sample/docs/blocks/loops.html">Loops</a>
+            <a class="header" role="treeitem" aria-expanded="false" href="/pxt-sample/docs/blocks/loops.html">Loops</a>
         </div>
         <div class=" content">
             
-    <a class="item " href="/pxt-sample/docs/blocks/loops/repeat.html">repeat</a>
+    <a class="item " href="/pxt-sample/docs/blocks/loops/repeat.html" role="menuitem">repeat</a>
 
 
-    <a class="item " href="/pxt-sample/docs/blocks/loops/for.html">for</a>
+    <a class="item " href="/pxt-sample/docs/blocks/loops/for.html" role="menuitem">for</a>
 
 
-    <a class="item " href="/pxt-sample/docs/blocks/loops/while.html">while</a>
+    <a class="item " href="/pxt-sample/docs/blocks/loops/while.html" role="menuitem">while</a>
 
         </div>
     </div>
 
 
-    <div class="ui inverted accordion item visible" title="">
+    <div class="ui inverted accordion item visible" role="tree" title="">
         <div class=" title">
             <i class="dropdown icon"></i>
-            <a class="header" href="/pxt-sample/docs/blocks/logic.html">Logic</a>
+            <a class="header" role="treeitem" aria-expanded="false" href="/pxt-sample/docs/blocks/logic.html">Logic</a>
         </div>
         <div class=" content">
             
-    <a class="item " href="/pxt-sample/docs/blocks/logic/if.html">if</a>
+    <a class="item " href="/pxt-sample/docs/blocks/logic/if.html" role="menuitem">if</a>
 
 
-    <a class="item " href="/pxt-sample/docs/blocks/logic/boolean.html">Boolean</a>
+    <a class="item " href="/pxt-sample/docs/blocks/logic/boolean.html" role="menuitem">Boolean</a>
 
         </div>
     </div>
 
 
-    <div class="ui inverted accordion item visible" title="">
+    <div class="ui inverted accordion item visible" role="tree" title="">
         <div class=" title">
             <i class="dropdown icon"></i>
-            <a class="header" href="/pxt-sample/docs/blocks/variables.html">Variables</a>
+            <a class="header" role="treeitem" aria-expanded="false" href="/pxt-sample/docs/blocks/variables.html">Variables</a>
         </div>
         <div class=" content">
             
-    <a class="item " href="/pxt-sample/docs/blocks/variables/assign.html">assign</a>
+    <a class="item " href="/pxt-sample/docs/blocks/variables/assign.html" role="menuitem">assign</a>
 
 
-    <a class="item " href="/pxt-sample/docs/blocks/variables/change.html">change var</a>
+    <a class="item " href="/pxt-sample/docs/blocks/variables/change.html" role="menuitem">change var</a>
 
 
-    <a class="item " href="/pxt-sample/docs/blocks/variables/var.html">var</a>
-
-        </div>
-    </div>
-
-
-    <a class="item " href="/pxt-sample/docs/blocks/math.html">Math</a>
-
-
-    <a class="item " href="/pxt-sample/docs/blocks/javascript-blocks.html">JavaScript blocks</a>
-
-
-    <a class="item " href="/pxt-sample/docs/blocks/custom.html">Custom blocks</a>
+    <a class="item " href="/pxt-sample/docs/blocks/variables/var.html" role="menuitem">var</a>
 
         </div>
     </div>
 
 
-    <div class="item" title="">
-        <a class="header " href="/pxt-sample/docs/javascript.html">JavaScript</a>
-        <div class="menu">
-            
-    <a class="item " href="/pxt-sample/docs/javascript/call.html">Calling</a>
+    <a class="item " href="/pxt-sample/docs/blocks/math.html" role="menuitem">Math</a>
 
 
-    <a class="item " href="/pxt-sample/docs/javascript/sequence.html">Sequencing</a>
+    <a class="item " href="/pxt-sample/docs/blocks/javascript-blocks.html" role="menuitem">JavaScript blocks</a>
 
 
-    <a class="item " href="/pxt-sample/docs/javascript/variables.html">Variables</a>
-
-
-    <a class="item " href="/pxt-sample/docs/javascript/operators.html">Operators</a>
-
-
-    <a class="item " href="/pxt-sample/docs/javascript/statements.html">Statements</a>
-
-
-    <a class="item " href="/pxt-sample/docs/javascript/functions.html">Functions</a>
-
-
-    <a class="item " href="/pxt-sample/docs/javascript/types.html">Types</a>
-
-
-    <a class="item " href="/pxt-sample/docs/javascript/classes.html">Classes</a>
-
-
-    <a class="item " href="/pxt-sample/docs/javascript/interfaces.html">Interfaces</a>
-
-
-    <a class="item " href="/pxt-sample/docs/javascript/generics.html">Generics</a>
+    <a class="item " href="/pxt-sample/docs/blocks/custom.html" role="menuitem">Custom blocks</a>
 
         </div>
     </div>
 
 
     <div class="item" title="">
-        <a class="header " href="/pxt-sample/docs/types.html">Types</a>
+        <a class="header " href="/pxt-sample/docs/javascript.html" role="menu">JavaScript</a>
         <div class="menu">
             
-    <a class="item " href="/pxt-sample/docs/types/number.html">Number</a>
+    <a class="item " href="/pxt-sample/docs/javascript/call.html" role="menuitem">Calling</a>
 
 
-    <a class="item " href="/pxt-sample/docs/types/string.html">String</a>
+    <a class="item " href="/pxt-sample/docs/javascript/sequence.html" role="menuitem">Sequencing</a>
 
 
-    <a class="item " href="/pxt-sample/docs/types/boolean.html">Boolean</a>
+    <a class="item " href="/pxt-sample/docs/javascript/variables.html" role="menuitem">Variables</a>
 
 
-    <a class="item " href="/pxt-sample/docs/types/array.html">Array</a>
+    <a class="item " href="/pxt-sample/docs/javascript/operators.html" role="menuitem">Operators</a>
 
 
-    <a class="item " href="/pxt-sample/docs/types/function.html">Function</a>
+    <a class="item " href="/pxt-sample/docs/javascript/statements.html" role="menuitem">Statements</a>
+
+
+    <a class="item " href="/pxt-sample/docs/javascript/functions.html" role="menuitem">Functions</a>
+
+
+    <a class="item " href="/pxt-sample/docs/javascript/types.html" role="menuitem">Types</a>
+
+
+    <a class="item " href="/pxt-sample/docs/javascript/classes.html" role="menuitem">Classes</a>
+
+
+    <a class="item " href="/pxt-sample/docs/javascript/interfaces.html" role="menuitem">Interfaces</a>
+
+
+    <a class="item " href="/pxt-sample/docs/javascript/generics.html" role="menuitem">Generics</a>
 
         </div>
     </div>
 
 
     <div class="item" title="">
-        <a class="header " href=""></a>
+        <a class="header " href="/pxt-sample/docs/types.html" role="menu">Types</a>
         <div class="menu">
             
-    <a class="item " href="/pxt-sample/docs/support.html">Support</a>
+    <a class="item " href="/pxt-sample/docs/types/number.html" role="menuitem">Number</a>
 
 
-    <a class="item " href="/pxt-sample/docs/faq.html">FAQ</a>
+    <a class="item " href="/pxt-sample/docs/types/string.html" role="menuitem">String</a>
 
 
-    <a class="item " href="/pxt-sample/docs/translate.html">Translate</a>
+    <a class="item " href="/pxt-sample/docs/types/boolean.html" role="menuitem">Boolean</a>
 
 
-    <a class="item " href="/pxt-sample/docs/share.html">Sharing projects</a>
+    <a class="item " href="/pxt-sample/docs/types/array.html" role="menuitem">Array</a>
 
 
-    <a class="item " href="/pxt-sample/docs/offline.html">Offline support</a>
-
-
-    <a class="item " href="/pxt-sample/docs/streaming.html">Streaming</a>
+    <a class="item " href="/pxt-sample/docs/types/function.html" role="menuitem">Function</a>
 
         </div>
     </div>
 
 
-    <div class="item" title="">
-        <a class="header " href=""></a>
-        <div class="menu">
-            
-    <a class="item " href="/pxt-sample/docs/cli.html">Command Line Interface</a>
 
-
-    <a class="item " href="/pxt-sample/docs/code.html">Visual Studio Code support</a>
-
-
-    <a class="item " href="/pxt-sample/docs/raspberry-pi.html">Coding on Raspberry Pi</a>
-
-        </div>
     </div>
-
-    <a href="/pxt-sample/docs/.html" class="header item">
+    <a href="/pxt-sample/docs/.html" class="header item bottom">
         Published by Microsoft
     </a>
 </div>
 
 <div class="ui fixed accent borderless inverted main menu hideprint">
   <div class="ui container">
-    <a id="togglesidebar" class="launch icon item">
-      <i class="content icon"></i>
-    </a>
+    
+            <a id="togglesidebar" class="launch icon item" tabindex="0" title="Side menu" aria-label="Side menu" role="menu" aria-expanded="false">
+                <i class="content icon"></i>
+            </a>
+        
 
     <div class="item">
         
     </div>
     
     <div class="right menu">
-        <a href="/pxt-sample/docs/.html" class="header item">
+        <a href="/pxt-sample/docs/.html" class="header item" tabindex="0" title="Go to editor">
             
         </a>
     </div>
@@ -295,195 +270,162 @@ see &lt;a href=&quot;https://makecode.com/packages&quot;&gt;https://makecode.com
 <!-- include toc.html -->
 <div class="toc ui accent inverted hideprint">
     <div class="ui vertical accent inverted sticky menu tocmenu">
-        <a href="/pxt-sample/docs/.html" class="header item">
-            
+        <div class="item">
+            <a href="/pxt-sample/docs/.html" class="header focused" tabindex="0" title="Go to editor">
+                
+            </a>
             &nbsp; &nbsp;
             Documentation
-        </a>
+        </div>
         <div class="item">
-            <form id="tocsearch2" method="get" target="_blank" action="https://www.bing.com/search">
+            <form id="tocsearch2" role="form" method="get" target="_blank" action="https://www.bing.com/search">
                 <div class="ui fluid icon input">
                     <input type="hidden" name="q1" value="site:http://microsoft.github.io/pxt-sample/" />
-                    <input type="search" name="q" placeholder="Search...">
-                    <i onclick="document.getElementById('tocsearch2').submit();" class="search link icon"></i>
+                    
+                <input type="search" name="q" placeholder="Search..." aria-label="Search Documentation">
+                <i onclick="document.getElementById('tocsearch2').submit();" tabindex="0" class="search link icon" aria-label="Search" role="button"></i>
+            
                 </div>
             </form>
         </div>
         <!-- TOC Menu -->
-        
+        <div class="menuContainer">
+            
     <div class="item" title="">
-        <a class="header " href="/pxt-sample/docs/blocks.html">Blocks</a>
+        <a class="header " href="/pxt-sample/docs/blocks.html" role="menu">Blocks</a>
         <div class="menu">
             
-    <a class="item " href="/pxt-sample/docs/blocks/on-start.html">On Start</a>
+    <a class="item " href="/pxt-sample/docs/blocks/on-start.html" role="menuitem">On Start</a>
 
 
-    <div class="ui inverted accordion item visible" title="">
+    <div class="ui inverted accordion item visible" role="tree" title="">
         <div class=" title">
             <i class="dropdown icon"></i>
-            <a class="header" href="/pxt-sample/docs/blocks/loops.html">Loops</a>
+            <a class="header" role="treeitem" aria-expanded="false" href="/pxt-sample/docs/blocks/loops.html">Loops</a>
         </div>
         <div class=" content">
             
-    <a class="item " href="/pxt-sample/docs/blocks/loops/repeat.html">repeat</a>
+    <a class="item " href="/pxt-sample/docs/blocks/loops/repeat.html" role="menuitem">repeat</a>
 
 
-    <a class="item " href="/pxt-sample/docs/blocks/loops/for.html">for</a>
+    <a class="item " href="/pxt-sample/docs/blocks/loops/for.html" role="menuitem">for</a>
 
 
-    <a class="item " href="/pxt-sample/docs/blocks/loops/while.html">while</a>
+    <a class="item " href="/pxt-sample/docs/blocks/loops/while.html" role="menuitem">while</a>
 
         </div>
     </div>
 
 
-    <div class="ui inverted accordion item visible" title="">
+    <div class="ui inverted accordion item visible" role="tree" title="">
         <div class=" title">
             <i class="dropdown icon"></i>
-            <a class="header" href="/pxt-sample/docs/blocks/logic.html">Logic</a>
+            <a class="header" role="treeitem" aria-expanded="false" href="/pxt-sample/docs/blocks/logic.html">Logic</a>
         </div>
         <div class=" content">
             
-    <a class="item " href="/pxt-sample/docs/blocks/logic/if.html">if</a>
+    <a class="item " href="/pxt-sample/docs/blocks/logic/if.html" role="menuitem">if</a>
 
 
-    <a class="item " href="/pxt-sample/docs/blocks/logic/boolean.html">Boolean</a>
+    <a class="item " href="/pxt-sample/docs/blocks/logic/boolean.html" role="menuitem">Boolean</a>
 
         </div>
     </div>
 
 
-    <div class="ui inverted accordion item visible" title="">
+    <div class="ui inverted accordion item visible" role="tree" title="">
         <div class=" title">
             <i class="dropdown icon"></i>
-            <a class="header" href="/pxt-sample/docs/blocks/variables.html">Variables</a>
+            <a class="header" role="treeitem" aria-expanded="false" href="/pxt-sample/docs/blocks/variables.html">Variables</a>
         </div>
         <div class=" content">
             
-    <a class="item " href="/pxt-sample/docs/blocks/variables/assign.html">assign</a>
+    <a class="item " href="/pxt-sample/docs/blocks/variables/assign.html" role="menuitem">assign</a>
 
 
-    <a class="item " href="/pxt-sample/docs/blocks/variables/change.html">change var</a>
+    <a class="item " href="/pxt-sample/docs/blocks/variables/change.html" role="menuitem">change var</a>
 
 
-    <a class="item " href="/pxt-sample/docs/blocks/variables/var.html">var</a>
-
-        </div>
-    </div>
-
-
-    <a class="item " href="/pxt-sample/docs/blocks/math.html">Math</a>
-
-
-    <a class="item " href="/pxt-sample/docs/blocks/javascript-blocks.html">JavaScript blocks</a>
-
-
-    <a class="item " href="/pxt-sample/docs/blocks/custom.html">Custom blocks</a>
+    <a class="item " href="/pxt-sample/docs/blocks/variables/var.html" role="menuitem">var</a>
 
         </div>
     </div>
 
 
-    <div class="item" title="">
-        <a class="header " href="/pxt-sample/docs/javascript.html">JavaScript</a>
-        <div class="menu">
-            
-    <a class="item " href="/pxt-sample/docs/javascript/call.html">Calling</a>
+    <a class="item " href="/pxt-sample/docs/blocks/math.html" role="menuitem">Math</a>
 
 
-    <a class="item " href="/pxt-sample/docs/javascript/sequence.html">Sequencing</a>
+    <a class="item " href="/pxt-sample/docs/blocks/javascript-blocks.html" role="menuitem">JavaScript blocks</a>
 
 
-    <a class="item " href="/pxt-sample/docs/javascript/variables.html">Variables</a>
-
-
-    <a class="item " href="/pxt-sample/docs/javascript/operators.html">Operators</a>
-
-
-    <a class="item " href="/pxt-sample/docs/javascript/statements.html">Statements</a>
-
-
-    <a class="item " href="/pxt-sample/docs/javascript/functions.html">Functions</a>
-
-
-    <a class="item " href="/pxt-sample/docs/javascript/types.html">Types</a>
-
-
-    <a class="item " href="/pxt-sample/docs/javascript/classes.html">Classes</a>
-
-
-    <a class="item " href="/pxt-sample/docs/javascript/interfaces.html">Interfaces</a>
-
-
-    <a class="item " href="/pxt-sample/docs/javascript/generics.html">Generics</a>
+    <a class="item " href="/pxt-sample/docs/blocks/custom.html" role="menuitem">Custom blocks</a>
 
         </div>
     </div>
 
 
     <div class="item" title="">
-        <a class="header " href="/pxt-sample/docs/types.html">Types</a>
+        <a class="header " href="/pxt-sample/docs/javascript.html" role="menu">JavaScript</a>
         <div class="menu">
             
-    <a class="item " href="/pxt-sample/docs/types/number.html">Number</a>
+    <a class="item " href="/pxt-sample/docs/javascript/call.html" role="menuitem">Calling</a>
 
 
-    <a class="item " href="/pxt-sample/docs/types/string.html">String</a>
+    <a class="item " href="/pxt-sample/docs/javascript/sequence.html" role="menuitem">Sequencing</a>
 
 
-    <a class="item " href="/pxt-sample/docs/types/boolean.html">Boolean</a>
+    <a class="item " href="/pxt-sample/docs/javascript/variables.html" role="menuitem">Variables</a>
 
 
-    <a class="item " href="/pxt-sample/docs/types/array.html">Array</a>
+    <a class="item " href="/pxt-sample/docs/javascript/operators.html" role="menuitem">Operators</a>
 
 
-    <a class="item " href="/pxt-sample/docs/types/function.html">Function</a>
+    <a class="item " href="/pxt-sample/docs/javascript/statements.html" role="menuitem">Statements</a>
+
+
+    <a class="item " href="/pxt-sample/docs/javascript/functions.html" role="menuitem">Functions</a>
+
+
+    <a class="item " href="/pxt-sample/docs/javascript/types.html" role="menuitem">Types</a>
+
+
+    <a class="item " href="/pxt-sample/docs/javascript/classes.html" role="menuitem">Classes</a>
+
+
+    <a class="item " href="/pxt-sample/docs/javascript/interfaces.html" role="menuitem">Interfaces</a>
+
+
+    <a class="item " href="/pxt-sample/docs/javascript/generics.html" role="menuitem">Generics</a>
 
         </div>
     </div>
 
 
     <div class="item" title="">
-        <a class="header " href=""></a>
+        <a class="header " href="/pxt-sample/docs/types.html" role="menu">Types</a>
         <div class="menu">
             
-    <a class="item " href="/pxt-sample/docs/support.html">Support</a>
+    <a class="item " href="/pxt-sample/docs/types/number.html" role="menuitem">Number</a>
 
 
-    <a class="item " href="/pxt-sample/docs/faq.html">FAQ</a>
+    <a class="item " href="/pxt-sample/docs/types/string.html" role="menuitem">String</a>
 
 
-    <a class="item " href="/pxt-sample/docs/translate.html">Translate</a>
+    <a class="item " href="/pxt-sample/docs/types/boolean.html" role="menuitem">Boolean</a>
 
 
-    <a class="item " href="/pxt-sample/docs/share.html">Sharing projects</a>
+    <a class="item " href="/pxt-sample/docs/types/array.html" role="menuitem">Array</a>
 
 
-    <a class="item " href="/pxt-sample/docs/offline.html">Offline support</a>
-
-
-    <a class="item " href="/pxt-sample/docs/streaming.html">Streaming</a>
+    <a class="item " href="/pxt-sample/docs/types/function.html" role="menuitem">Function</a>
 
         </div>
     </div>
 
 
-    <div class="item" title="">
-        <a class="header " href=""></a>
-        <div class="menu">
-            
-    <a class="item " href="/pxt-sample/docs/cli.html">Command Line Interface</a>
-
-
-    <a class="item " href="/pxt-sample/docs/code.html">Visual Studio Code support</a>
-
-
-    <a class="item " href="/pxt-sample/docs/raspberry-pi.html">Coding on Raspberry Pi</a>
 
         </div>
-    </div>
-
-        <a href="/pxt-sample/docs/.html" class="header item">
+        <a href="/pxt-sample/docs/.html" class="header item bottom">
             Published by Microsoft
         </a>
     </div>
@@ -491,7 +433,7 @@ see &lt;a href=&quot;https://makecode.com/packages&quot;&gt;https://makecode.com
 <!-- end include toc.html -->
 
     
-    <div class="article">
+    <div class="article" id="maincontent">
         
         
 <!-- include header.html -->
@@ -505,9 +447,11 @@ see &lt;a href=&quot;https://makecode.com/packages&quot;&gt;https://makecode.com
 
 
         <div id="docs" class="main ui container mainbody">
-            <button id="printbtn" class="circular ui icon right floated button hideprint">
+            
+            <button id="printbtn" class="circular ui icon right floated button hideprint" title="Print this page">
                 <i class="icon print"></i>
             </button>
+        
             
     <div class="ui text">
         <h1 id="docs-for-sample-target">Docs for Sample Target</h1><p>This is a pure javascript sample target for <a href="https://makecode.com">Microsoft MakeCode</a>. 
@@ -535,23 +479,23 @@ see <a href="https://makecode.com/packages">https://makecode.com/packages</a> .<
 
 
 <!-- include footer.html -->
-<footer class="ui inverted accent vertical footer segment hideprint" role="contentinfo">
-    <div class="ui center aligned container">
-        <div class="ui horizontal inverted small divided link list">
-            <a class="item" href="https://makecode.com/" title="Microsoft MakeCode" target="_blank" rel="noopener">Powered by Microsoft MakeCode</a>
-            <!-- <a class="item" href="https://makecode.com/contact">Contact Us</a> -->
-            <a class="item" href="https://makecode.com/privacy" target="_blank" rel="noopener">Privacy &amp; Cookies</a>
-            <a class="item" href="https://makecode.com/termsofuse" target="_blank" rel="noopener">Terms Of Use</a>
-            <a class="item" href="https://makecode.com/trademarks" target="_blank" rel="noopener">Trademarks</a>
-            <div class="item">© 2017 Microsoft</div>
-            <!-- we need to force the browser to load this font -->
-            <div style='font-family: Icons; color: #010101; opacity: 0;' aria-hidden="true">.</div>
+    <footer class="ui inverted accent vertical footer segment hideprint" aria-hidden="false">
+        <div class="ui center aligned container">
+            <div class="ui horizontal inverted small divided link list">
+                <a class="item" href="https://makecode.com/" title="Microsoft MakeCode" target="_blank" rel="noopener">Powered by Microsoft MakeCode</a>
+                <!-- <a class="item" href="https://makecode.com/contact" target="_blank" rel="noopener">Contact Us</a> -->
+                <a class="item" href="https://makecode.com/privacy" target="_blank" rel="noopener">Privacy &amp; Cookies</a>
+                <a class="item" href="https://makecode.com/termsofuse" target="_blank" rel="noopener"> Terms Of Use</a>
+                <a class="item" href="https://makecode.com/trademarks" target="_blank" rel="noopener">Trademarks</a>
+                <div class="item">© 2017 Microsoft</div>
+                <!-- we need to force the browser to load this font -->
+                <div style='font-family: Icons; color: #010101;' aria-hidden="true">.</div>
+            </div>
+            <a class="item" href="https://www.microsoft.com/" target="_blank" rel="noopener" aria-label="Microsoft Home Page">
+                <img class="ui centered image" src="https://az851932.vo.msecnd.net/pub/pmapoirq">
+            </a>
         </div>
-        <a class="item" href="https://www.microsoft.com/" aria-label="Visit the Microsoft website" target="_blank" rel="noopener">
-            <img class="ui centered image" src="https://az851932.vo.msecnd.net/pub/pmapoirq" alt="Microsoft logo">
-        </a>
-    </div>
-</footer>
+    </footer>
 <!-- end include footer.html -->
 
 
@@ -596,6 +540,8 @@ see <a href="https://makecode.com/packages">https://makecode.com/packages</a> .<
 
 <!-- macro top-dropdown -->
 
+<!-- macro top-dropdown-noheading -->
+
 <!-- macro inner-dropdown -->
 
 <!-- macro nested-dropdown -->
@@ -632,6 +578,7 @@ see <a href="https://makecode.com/packages">https://makecode.com/packages</a> .<
     });
     appInsights.trackPageView(null, null, {urlReferrer: document.referrer});
 </script>
+
 <!-- end include tracking.html -->
 
 

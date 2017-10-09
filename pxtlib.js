@@ -521,6 +521,31 @@ var ts;
                 return str.replace(/.*?:\/\//g, "");
             }
             Util.stripUrlProtocol = stripUrlProtocol;
+            function normalizePath(path) {
+                if (path) {
+                    path = path.replace(/\\/g, "/");
+                }
+                return path;
+            }
+            Util.normalizePath = normalizePath;
+            function pathJoin(a, b) {
+                normalizePath(a);
+                normalizePath(b);
+                if (!a && !b)
+                    return undefined;
+                else if (!a)
+                    return b;
+                else if (!b)
+                    return a;
+                if (a.charAt(a.length - 1) !== "/") {
+                    a += "/";
+                }
+                if (b.charAt(0) == "/") {
+                    b = b.substring(1);
+                }
+                return a + b;
+            }
+            Util.pathJoin = pathJoin;
             Util.isNodeJS = false;
             function requestAsync(options) {
                 return Util.httpRequestCoreAsync(options)
@@ -766,8 +791,10 @@ var ts;
                 return f() + f() + "-" + f() + "-4" + f().slice(-3) + "-" + f() + "-" + f() + f() + f();
             }
             Util.guidGen = guidGen;
+            // Localization functions. Please port any modifications over to pxtsim/localization.ts
             var _localizeLang = "en";
             var _localizeStrings = {};
+            var _translationsCache = {};
             Util.localizeLive = false;
             /**
              * Returns the current user language, prepended by "live-" if in live mode
@@ -817,40 +844,84 @@ var ts;
                 _localizeStrings = strs;
             }
             Util.setLocalizedStrings = setLocalizedStrings;
-            function updateLocalizationAsync(targetId, simulator, baseUrl, code, pxtBranch, targetBranch, live) {
-                // normalize code (keep synched with localized files)
+            function normalizeLanguageCode(code) {
                 if (!/^(es|pt|si|sv|zh)/i.test(code))
                     code = code.split("-")[0];
+                return code;
+            }
+            function updateLocalizationAsync(targetId, simulator, baseUrl, code, pxtBranch, targetBranch, live) {
+                code = normalizeLanguageCode(code);
+                if (code === _localizeLang)
+                    return Promise.resolve();
+                return downloadTranslationsAsync(targetId, simulator, baseUrl, code, pxtBranch, targetBranch, live)
+                    .then(function (translations) {
+                    if (translations) {
+                        _localizeLang = code;
+                        _localizeStrings = translations;
+                        if (live) {
+                            Util.localizeLive = true;
+                        }
+                    }
+                    return Promise.resolve();
+                });
+            }
+            Util.updateLocalizationAsync = updateLocalizationAsync;
+            function downloadSimulatorLocalizationAsync(targetId, baseUrl, code, pxtBranch, targetBranch, live) {
+                code = normalizeLanguageCode(code);
+                if (code === _localizeLang)
+                    return Promise.resolve(undefined);
+                return downloadTranslationsAsync(targetId, true, baseUrl, code, pxtBranch, targetBranch, live);
+            }
+            Util.downloadSimulatorLocalizationAsync = downloadSimulatorLocalizationAsync;
+            function downloadTranslationsAsync(targetId, simulator, baseUrl, code, pxtBranch, targetBranch, live) {
+                code = normalizeLanguageCode(code);
+                var translationsCacheId = code + "/" + live + "/" + simulator;
+                if (_translationsCache[translationsCacheId]) {
+                    return Promise.resolve(_translationsCache[translationsCacheId]);
+                }
                 var stringFiles = simulator
                     ? [{ branch: targetBranch, path: targetId + "/sim-strings.json" }]
                     : [
                         { branch: pxtBranch, path: "strings.json" },
                         { branch: targetBranch, path: targetId + "/target-strings.json" }
                     ];
-                if (_localizeLang != code && live) {
-                    _localizeStrings = {};
-                    _localizeLang = code;
-                    Util.localizeLive = true;
+                var translations;
+                if (live) {
+                    var hadError_1 = false;
                     return Promise.mapSeries(stringFiles, function (file) {
                         return downloadLiveTranslationsAsync(code, file.path, file.branch)
-                            .then(function (tr) { return Object.keys(tr)
-                            .filter(function (k) { return !!tr[k]; })
-                            .forEach(function (k) { return _localizeStrings[k] = tr[k]; }); }, function (e) { return console.log("failed to load localizations for file " + file); });
+                            .then(function (tr) {
+                            if (!translations) {
+                                translations = {};
+                            }
+                            Object.keys(tr)
+                                .filter(function (k) { return !!tr[k]; })
+                                .forEach(function (k) { return translations[k] = tr[k]; });
+                        }, function (e) {
+                            console.log("failed to load localizations for file " + file);
+                            hadError_1 = true;
+                        });
+                    })
+                        .then(function () {
+                        // Cache translations unless there was an error for one of the files
+                        if (!hadError_1) {
+                            _translationsCache[translationsCacheId] = translations;
+                        }
+                        return Promise.resolve(translations);
                     });
                 }
-                if (_localizeLang != code) {
-                    return Util.httpGetJsonAsync(baseUrl + "locales/" + code + "/strings.json")
-                        .then(function (tr) {
-                        _localizeStrings = tr || {};
-                        _localizeLang = code;
-                    }, function (e) {
-                        console.error('failed to load localizations');
-                    });
-                }
-                //
-                return Promise.resolve(undefined);
+                return Util.httpGetJsonAsync(baseUrl + "locales/" + code + "/strings.json")
+                    .then(function (tr) {
+                    if (tr) {
+                        translations = tr;
+                        _translationsCache[translationsCacheId] = translations;
+                    }
+                }, function (e) {
+                    console.error('failed to load localizations');
+                })
+                    .then(function () { return translations; });
             }
-            Util.updateLocalizationAsync = updateLocalizationAsync;
+            Util.downloadTranslationsAsync = downloadTranslationsAsync;
             function htmlEscape(_input) {
                 if (!_input)
                     return _input; // null, undefined, empty string test
@@ -1249,9 +1320,20 @@ var pxt;
             comp.jsRefCounting = true;
         if (!comp.hasHex && comp.floatingPoint === undefined)
             comp.floatingPoint = true;
-        if (comp.nativeType == "AVR") {
+        if (comp.hasHex && !comp.nativeType)
+            comp.nativeType = pxtc.NATIVE_TYPE_THUMB;
+        if (comp.nativeType == pxtc.NATIVE_TYPE_AVR) {
             comp.shortPointers = true;
             comp.flashCodeAlign = 0x10;
+        }
+        if (comp.nativeType == pxtc.NATIVE_TYPE_CS) {
+            comp.floatingPoint = true;
+            comp.needsUnboxing = true;
+            comp.jsRefCounting = false;
+        }
+        if (comp.taggedInts) {
+            comp.floatingPoint = true;
+            comp.needsUnboxing = true;
         }
         if (!pxt.appTarget.appTheme)
             pxt.appTarget.appTheme = {};
@@ -1377,6 +1459,7 @@ var pxt;
     }
     pxt.packagesConfigAsync = packagesConfigAsync;
     pxt.CONFIG_NAME = "pxt.json";
+    pxt.SERIAL_EDITOR_FILE = "serial.txt";
     pxt.CLOUD_ID = "pxt/";
     pxt.BLOCKS_PROJECT_NAME = "blocksprj";
     pxt.JAVASCRIPT_PROJECT_NAME = "tsprj";
@@ -1384,6 +1467,8 @@ var pxt;
         if (trg === void 0) { trg = null; }
         if (!trg)
             trg = pxt.appTarget.compile;
+        if (trg.nativeType == ts.pxtc.NATIVE_TYPE_CS)
+            return ts.pxtc.BINARY_CS;
         if (trg.useUF2)
             return ts.pxtc.BINARY_UF2;
         else if (trg.useELF)
@@ -1421,14 +1506,20 @@ var pxt;
             // collect blockly parameter name mapping
             var instance = (fn.kind == ts.pxtc.SymbolKind.Method || fn.kind == ts.pxtc.SymbolKind.Property) && !fn.attributes.defaultInstance;
             var attrNames = {};
+            var handlerArgs = [];
             if (instance)
                 attrNames["this"] = { name: "this", type: fn.namespace };
             if (fn.parameters)
-                fn.parameters.forEach(function (pr) { return attrNames[pr.name] = {
-                    name: pr.name,
-                    type: pr.type,
-                    shadowValue: pr.default || undefined
-                }; });
+                fn.parameters.forEach(function (pr) {
+                    attrNames[pr.name] = {
+                        name: pr.name,
+                        type: pr.type,
+                        shadowValue: pr.default || undefined
+                    };
+                    if (pr.handlerParameters) {
+                        pr.handlerParameters.forEach(function (arg) { return handlerArgs.push(arg); });
+                    }
+                });
             if (fn.attributes.block) {
                 Object.keys(attrNames).forEach(function (k) { return attrNames[k].name = ""; });
                 var rx = /%([a-zA-Z0-9_]+)(=([a-zA-Z0-9_]+))?/g;
@@ -1449,7 +1540,10 @@ var pxt;
                         at.shadowType = m[3];
                 }
             }
-            return attrNames;
+            return {
+                attrNames: attrNames,
+                handlerArgs: handlerArgs
+            };
         }
         blocks.parameterNames = parameterNames;
         function parseFields(b) {
@@ -1525,18 +1619,16 @@ var pxt;
                     operators: {
                         'op': ["min", "max"]
                     },
-                    category: 'math',
-                    outputShape: Blockly.OUTPUT_SHAPE_ROUND
+                    category: 'math'
                 },
                 'math_op3': {
                     name: pxt.Util.lf("absolute number"),
                     tooltip: pxt.Util.lf("absolute value of a number"),
-                    url: '/blocks/math/abs',
+                    url: '/reference/math',
                     category: 'math',
                     block: {
                         message0: pxt.Util.lf("absolute of %1")
-                    },
-                    outputShape: Blockly.OUTPUT_SHAPE_ROUND
+                    }
                 },
                 'math_number': {
                     name: pxt.Util.lf("{id:block}number"),
@@ -1637,7 +1729,7 @@ var pxt;
                 'lists_create_with': {
                     name: pxt.Util.lf("create an array"),
                     tooltip: pxt.Util.lf("Creates a new array."),
-                    url: '/blocks/arrays/create',
+                    url: '/reference/arrays/create',
                     category: 'arrays',
                     blockTextSearch: "LISTS_CREATE_WITH_INPUT_WITH",
                     block: {
@@ -1650,7 +1742,7 @@ var pxt;
                 'lists_length': {
                     name: pxt.Util.lf("array length"),
                     tooltip: pxt.Util.lf("Returns the number of items in an array."),
-                    url: '/blocks/arrays/length',
+                    url: '/reference/arrays/length',
                     category: 'arrays',
                     block: {
                         LISTS_LENGTH_TITLE: pxt.Util.lf("length of array %1")
@@ -1659,7 +1751,7 @@ var pxt;
                 'lists_index_get': {
                     name: pxt.Util.lf("get a value in an array"),
                     tooltip: pxt.Util.lf("Returns the value at the given index in an array."),
-                    url: '/blocks/arrays/get',
+                    url: '/reference/arrays/get',
                     category: 'arrays',
                     block: {
                         message0: pxt.Util.lf("%1 get value at %2")
@@ -1668,7 +1760,7 @@ var pxt;
                 'lists_index_set': {
                     name: pxt.Util.lf("set a value in an array"),
                     tooltip: pxt.Util.lf("Sets the value at the given index in an array"),
-                    url: '/blocks/arrays/set',
+                    url: '/reference/arrays/set',
                     category: 'arrays',
                     block: {
                         message0: pxt.Util.lf("%1 set value at %2 to %3")
@@ -1734,16 +1826,16 @@ var pxt;
                 'text_length': {
                     name: pxt.Util.lf("number of characters in the string"),
                     tooltip: pxt.Util.lf("Returns the number of letters (including spaces) in the provided text."),
-                    url: 'types/string/length',
+                    url: 'reference/text/length',
                     category: 'text',
                     block: {
-                        TEXT_LENGTH_TITLE: pxt.Util.lf("length of text %1")
+                        TEXT_LENGTH_TITLE: pxt.Util.lf("length of %1")
                     }
                 },
                 'text_join': {
                     name: pxt.Util.lf("join items to create text"),
                     tooltip: pxt.Util.lf("Create a piece of text by joining together any number of items."),
-                    url: 'types/string/join',
+                    url: 'reference/text/join',
                     category: 'text',
                     block: {
                         TEXT_JOIN_TITLE_CREATEWITH: pxt.Util.lf("join")
@@ -2327,10 +2419,17 @@ var pxt;
                     gittag: "none",
                     serviceId: "nocompile"
                 };
+            var compile = pxt.appTarget.compile;
+            if (!compile)
+                compile = {
+                    isNative: false,
+                    hasHex: false,
+                };
+            var isCSharp = compile.nativeType == pxtc.NATIVE_TYPE_CS;
             var isPlatformio = !!compileService.platformioIni;
             var isCodal = compileService.buildEngine == "codal";
             var isDockerMake = compileService.buildEngine == "dockermake";
-            var isYotta = !isPlatformio && !isCodal && !isDockerMake;
+            var isYotta = !isCSharp && !isPlatformio && !isCodal && !isDockerMake;
             if (isPlatformio)
                 sourcePath = "/src/";
             else if (isCodal || isDockerMake)
@@ -2338,6 +2437,7 @@ var pxt;
             var pxtConfig = "// Configuration defines\n";
             var pointersInc = "\nPXT_SHIMS_BEGIN\n";
             var includesInc = "#include \"pxt.h\"\n";
+            var fullCS = "";
             var thisErrors = "";
             var dTsNamespace = "";
             var err = function (s) { return thisErrors += "   " + fileName + "(" + lineNo + "): " + s + "\n"; };
@@ -2375,11 +2475,148 @@ var pxt;
                     makefile = pkg.host().readFile(pkg, "Makefile");
                 }
             }
+            function stripComments(ln) {
+                return ln.replace(/\/\/.*/, "").replace(/\/\*/, "");
+            }
+            var enumVal = 0;
+            var inEnum = false;
+            var currNs = "";
+            var currDocComment = "";
+            var currAttrs = "";
+            var inDocComment = false;
+            var outp = "";
+            function handleComments(ln) {
+                if (inEnum) {
+                    outp += ln + "\n";
+                    return true;
+                }
+                if (/^\s*\/\*\*/.test(ln)) {
+                    inDocComment = true;
+                    currDocComment = ln + "\n";
+                    if (/\*\//.test(ln))
+                        inDocComment = false;
+                    outp += "//\n";
+                    return true;
+                }
+                if (inDocComment) {
+                    currDocComment += ln + "\n";
+                    if (/\*\//.test(ln)) {
+                        inDocComment = false;
+                    }
+                    outp += "//\n";
+                    return true;
+                }
+                if (/^\s*\/\/%/.test(ln)) {
+                    currAttrs += ln + "\n";
+                    outp += "//\n";
+                    return true;
+                }
+                outp += ln + "\n";
+                return false;
+            }
+            function enterEnum(cpname, brace) {
+                inEnum = true;
+                enumVal = -1;
+                enumsDTS.write("");
+                enumsDTS.write("");
+                if (currAttrs || currDocComment) {
+                    enumsDTS.write(currDocComment);
+                    enumsDTS.write(currAttrs);
+                    currAttrs = "";
+                    currDocComment = "";
+                }
+                enumsDTS.write("declare const enum " + toJs(cpname) + " " + brace);
+                knownEnums[cpname] = true;
+            }
+            function processEnumLine(ln) {
+                var lnNC = stripComments(ln);
+                if (inEnum && lnNC.indexOf("}") >= 0) {
+                    inEnum = false;
+                    enumsDTS.write("}");
+                }
+                if (!inEnum)
+                    return;
+                // parse the enum case, with lots of optional stuff (?)
+                var mm = /^\s*(\w+)\s*(=\s*(.*?))?,?\s*$/.exec(lnNC);
+                if (mm) {
+                    var nm = mm[1];
+                    var v = mm[3];
+                    var opt = "";
+                    if (v) {
+                        // user-supplied value
+                        v = v.trim();
+                        var curr = U.lookup(enumVals, v);
+                        if (curr != null) {
+                            opt = "  // " + v;
+                            v = curr;
+                        }
+                        enumVal = parseCppInt(v);
+                        if (enumVal == null)
+                            err("cannot determine value of " + lnNC);
+                    }
+                    else {
+                        // no user-supplied value
+                        enumVal++;
+                        v = enumVal + "";
+                    }
+                    enumsDTS.write("    " + toJs(nm) + " = " + v + "," + opt);
+                }
+                else {
+                    enumsDTS.write(ln);
+                }
+            }
+            function finishNamespace() {
+                shimsDTS.setNs("");
+                shimsDTS.write("");
+                shimsDTS.write("");
+                if (currAttrs || currDocComment) {
+                    shimsDTS.write(currDocComment);
+                    shimsDTS.write(currAttrs);
+                    currAttrs = "";
+                    currDocComment = "";
+                }
+            }
+            function parseArg(parsedAttrs, s) {
+                s = s.trim();
+                var m = /(.*)=\s*(-?\w+)$/.exec(s);
+                var defl = "";
+                var qm = "";
+                if (m) {
+                    defl = m[2];
+                    qm = "?";
+                    s = m[1].trim();
+                }
+                m = /^(.*?)(\w+)$/.exec(s);
+                if (!m) {
+                    err("invalid argument: " + s);
+                    return {
+                        name: "???",
+                        type: "int"
+                    };
+                }
+                var argName = m[2];
+                if (parsedAttrs.paramDefl[argName]) {
+                    defl = parsedAttrs.paramDefl[argName];
+                    qm = "?";
+                }
+                var numVal = defl ? U.lookup(enumVals, defl) : null;
+                if (numVal != null)
+                    defl = numVal;
+                if (defl) {
+                    if (parseCppInt(defl) == null)
+                        err("Invalid default value (non-integer): " + defl);
+                    currAttrs += " " + argName + ".defl=" + defl;
+                }
+                return {
+                    name: argName + qm,
+                    type: m[1]
+                };
+            }
             function parseCpp(src, isHeader) {
-                var currNs = "";
-                var currDocComment = "";
-                var currAttrs = "";
-                var inDocComment = false;
+                currNs = "";
+                currDocComment = "";
+                currAttrs = "";
+                inDocComment = false;
                 var indexedInstanceAttrs;
                 var indexedInstanceIdx = -1;
                 // replace #if 0 .... #endif with newlines
@@ -2456,95 +2693,28 @@ var pxt;
                             return "_";
                     }
                 }
-                var outp = "";
-                var inEnum = false;
-                var enumVal = 0;
+                outp = "";
+                inEnum = false;
+                enumVal = 0;
                 enumsDTS.setNs("");
                 shimsDTS.setNs("");
                 src.split(/\r?\n/).forEach(function (ln) {
                     ++lineNo;
                     // remove comments (NC = no comments)
-                    var lnNC = ln.replace(/\/\/.*/, "").replace(/\/\*/, "");
-                    if (inEnum && lnNC.indexOf("}") >= 0) {
-                        inEnum = false;
-                        enumsDTS.write("}");
-                    }
-                    if (inEnum) {
-                        // parse the enum case, with lots of optional stuff (?)
-                        var mm = /^\s*(\w+)\s*(=\s*(.*?))?,?\s*$/.exec(lnNC);
-                        if (mm) {
-                            var nm = mm[1];
-                            var v = mm[3];
-                            var opt = "";
-                            if (v) {
-                                // user-supplied value
-                                v = v.trim();
-                                var curr = U.lookup(enumVals, v);
-                                if (curr != null) {
-                                    opt = "  // " + v;
-                                    v = curr;
-                                }
-                                enumVal = parseCppInt(v);
-                                if (enumVal == null)
-                                    err("cannot determine value of " + lnNC);
-                            }
-                            else {
-                                // no user-supplied value
-                                enumVal++;
-                                v = enumVal + "";
-                            }
-                            enumsDTS.write("    " + toJs(nm) + " = " + v + "," + opt);
-                        }
-                        else {
-                            enumsDTS.write(ln);
-                        }
-                    }
-                    // TODO: why do we allow class/struct here?
+                    var lnNC = stripComments(ln);
+                    processEnumLine(ln);
+                    // "enum class" and "enum struct" is C++ syntax to force scoping of
+                    // enum members
                     var enM = /^\s*enum\s+(|class\s+|struct\s+)(\w+)\s*({|$)/.exec(lnNC);
                     if (enM) {
-                        inEnum = true;
-                        enumVal = -1;
-                        enumsDTS.write("");
-                        enumsDTS.write("");
-                        if (currAttrs || currDocComment) {
-                            enumsDTS.write(currDocComment);
-                            enumsDTS.write(currAttrs);
-                            currAttrs = "";
-                            currDocComment = "";
-                        }
-                        enumsDTS.write("declare const enum " + toJs(enM[2]) + " " + enM[3]);
+                        enterEnum(enM[2], enM[3]);
                         if (!isHeader) {
                             protos.setNs(currNs);
                             protos.write("enum " + enM[2] + " : int;");
                         }
-                        knownEnums[enM[2]] = true;
                     }
-                    if (inEnum) {
-                        outp += ln + "\n";
+                    if (handleComments(ln))
                         return;
-                    }
-                    if (/^\s*\/\*\*/.test(ln)) {
-                        inDocComment = true;
-                        currDocComment = ln + "\n";
-                        if (/\*\//.test(ln))
-                            inDocComment = false;
-                        outp += "//\n";
-                        return;
-                    }
-                    if (inDocComment) {
-                        currDocComment += ln + "\n";
-                        if (/\*\//.test(ln)) {
-                            inDocComment = false;
-                        }
-                        outp += "//\n";
-                        return;
-                    }
-                    if (/^\s*\/\/%/.test(ln)) {
-                        currAttrs += ln + "\n";
-                        outp += "//\n";
-                        return;
-                    }
-                    outp += ln + "\n";
                     if (/^typedef.*;\s*$/.test(ln)) {
                         protos.setNs(currNs);
                         protos.write(ln);
@@ -2554,28 +2724,14 @@ var pxt;
                         //if (currNs) err("more than one namespace declaration not supported")
                         currNs = m[1];
                         if (interfaceName()) {
-                            shimsDTS.setNs("");
-                            shimsDTS.write("");
-                            shimsDTS.write("");
-                            if (currAttrs || currDocComment) {
-                                shimsDTS.write(currDocComment);
-                                shimsDTS.write(currAttrs);
-                                currAttrs = "";
-                                currDocComment = "";
-                            }
+                            finishNamespace();
                             var tpName = interfaceName();
                             shimsDTS.setNs(currNs, "declare interface " + tpName + " {");
                         }
                         else if (currAttrs || currDocComment) {
-                            shimsDTS.setNs("");
-                            shimsDTS.write("");
-                            shimsDTS.write("");
-                            shimsDTS.write(currDocComment);
-                            shimsDTS.write(currAttrs);
+                            finishNamespace();
                             shimsDTS.setNs(toJs(currNs));
                             enumsDTS.setNs(toJs(currNs));
-                            currAttrs = "";
-                            currDocComment = "";
                         }
                         return;
                     }
@@ -2593,35 +2749,9 @@ var pxt;
                         currAttrs = currAttrs.trim().replace(/ \w+\.defl=\w+/g, "");
                         var argsFmt_1 = mapRunTimeType(retTp);
                         var args = origArgs.split(/,/).filter(function (s) { return !!s; }).map(function (s) {
-                            s = s.trim();
-                            var m = /(.*)=\s*(-?\w+)$/.exec(s);
-                            var defl = "";
-                            var qm = "";
-                            if (m) {
-                                defl = m[2];
-                                qm = "?";
-                                s = m[1].trim();
-                            }
-                            m = /^(.*?)(\w+)$/.exec(s);
-                            if (!m) {
-                                err("invalid argument: " + s);
-                                return "";
-                            }
-                            var argName = m[2];
-                            argsFmt_1 += mapRunTimeType(m[1]);
-                            if (parsedAttrs_1.paramDefl[argName]) {
-                                defl = parsedAttrs_1.paramDefl[argName];
-                                qm = "?";
-                            }
-                            var numVal = defl ? U.lookup(enumVals, defl) : null;
-                            if (numVal != null)
-                                defl = numVal;
-                            if (defl) {
-                                if (parseCppInt(defl) == null)
-                                    err("Invalid default value (non-integer): " + defl);
-                                currAttrs += " " + argName + ".defl=" + defl;
-                            }
-                            return "" + argName + qm + ": " + mapType(m[1]);
+                            var r = parseArg(parsedAttrs_1, s);
+                            argsFmt_1 += mapRunTimeType(r.type);
+                            return r.name + ": " + mapType(r.type);
                         });
                         var numArgs = args.length;
                         var fi = {
@@ -2698,6 +2828,144 @@ var pxt;
                 });
                 return outp;
             }
+            function parseCs(src) {
+                currNs = "";
+                currDocComment = "";
+                currAttrs = "";
+                inDocComment = false;
+                // replace #if false .... #endif with newlines
+                src = src.replace(/^\s*#\s*if\s+false\s*$[^]*?^\s*#\s*endif\s*$/mg, function (f) { return f.replace(/[^\n]/g, ""); });
+                lineNo = 0;
+                // the C# types we can map to TypeScript
+                function mapType(tp) {
+                    switch (tp.replace(/\s+/g, "")) {
+                        case "void": return "void";
+                        case "int": return "int32";
+                        case "uint": return "uint32";
+                        case "float":
+                        case "double": return "number";
+                        case "ushort": return "uint16";
+                        case "short": return "int16";
+                        case "byte": return "uint8";
+                        case "sbyte": return "int8";
+                        case "bool": return "boolean";
+                        case "string":
+                        case "String": return "string";
+                        case "Function": return "() => void";
+                        case "object": return "any";
+                        default:
+                            return toJs(tp);
+                    }
+                }
+                function isNumberType(tp) {
+                    tp = tp.replace(/\s+/g, "");
+                    if (U.lookup(knownEnums, tp))
+                        return true;
+                    var mt = mapType(tp);
+                    if (mt == "number" || /^u?int\d+$/.test(mt))
+                        return true;
+                    return false;
+                }
+                function mapRunTimeType(tp) {
+                    tp = tp.replace(/\s+/g, "");
+                    if (isNumberType(tp))
+                        tp = "#" + tp;
+                    return tp + ";";
+                }
+                outp = ""; // we don't really care about this one for C#
+                inEnum = false;
+                enumVal = 0;
+                enumsDTS.setNs("");
+                shimsDTS.setNs("");
+                src.split(/\r?\n/).forEach(function (ln) {
+                    ++lineNo;
+                    // remove comments (NC = no comments)
+                    var lnNC = stripComments(ln);
+                    processEnumLine(ln);
+                    var enM = /^\s*(public) enum\s+(\w+)\s*({|$)/.exec(lnNC);
+                    if (enM) {
+                        enterEnum(enM[2], enM[3]);
+                    }
+                    if (handleComments(ln))
+                        return;
+                    var m = /^\s*public (static\s+|partial\s+)*class\s+(\w+)/.exec(ln);
+                    if (m) {
+                        currNs = m[2];
+                        if (currAttrs || currDocComment) {
+                            finishNamespace();
+                            shimsDTS.setNs(toJs(currNs));
+                            enumsDTS.setNs(toJs(currNs));
+                        }
+                        return;
+                    }
+                    // function definition
+                    m = /^\s*public static (async\s+)*([\w\[\]<>]+)\s+(\w+)\(([^\(\)]*)\)\s*(;\s*$|\{|$)/.exec(ln);
+                    if (currAttrs && m) {
+                        var parsedAttrs = pxtc.parseCommentString(currAttrs);
+                        // top-level functions (outside of a namespace) are not permitted
+                        if (!currNs)
+                            err("missing namespace declaration");
+                        var retTp = m[2];
+                        var funName = m[3];
+                        var origArgs = m[4];
+                        var isAsync = false;
+                        currAttrs = currAttrs.trim().replace(/ \w+\.defl=\w+/g, "");
+                        if (retTp == "Task") {
+                            retTp = "void";
+                            isAsync = true;
+                        }
+                        else {
+                            var mm = /^Task<(.*)>$/.exec(retTp);
+                            if (mm) {
+                                isAsync = true;
+                                retTp = mm[1];
+                            }
+                        }
+                        var argsFmt = mapRunTimeType(retTp);
+                        if (isAsync) {
+                            argsFmt = "async;" + argsFmt;
+                            currAttrs += " async";
+                        }
+                        var args = [];
+                        for (var _i = 0, _a = origArgs.split(/,/); _i < _a.length; _i++) {
+                            var s = _a[_i];
+                            if (!s)
+                                continue;
+                            var r = parseArg(parsedAttrs, s);
+                            var mapped = mapRunTimeType(r.type);
+                            argsFmt += mapped;
+                            if (mapped != "CTX;")
+                                args.push(r.name + ": " + mapType(r.type));
+                        }
+                        var fi = {
+                            name: currNs + "::" + funName,
+                            argsFmt: argsFmt,
+                            value: null
+                        };
+                        //console.log(`${ln.trim()} : ${argsFmt}`)
+                        if (currDocComment) {
+                            shimsDTS.setNs(toJs(currNs));
+                            shimsDTS.write("");
+                            shimsDTS.write(currDocComment);
+                            currAttrs += " shim=" + fi.name;
+                            shimsDTS.write(currAttrs);
+                            funName = toJs(funName);
+                            shimsDTS.write("function " + funName + "(" + args.join(", ") + "): " + mapType(retTp) + ";");
+                        }
+                        currDocComment = "";
+                        currAttrs = "";
+                        res.functions.push(fi);
+                        return;
+                    }
+                    if (currAttrs && ln.trim()) {
+                        err("declaration not understood: " + ln);
+                        currAttrs = "";
+                        currDocComment = "";
+                        return;
+                    }
+                });
+                return outp;
+            }
             var currSettings = U.clone(compileService.yottaConfig || {});
             var optSettings = {};
             var settingSrc = {};
@@ -2747,8 +3015,8 @@ var pxt;
                 }
             }
             // This is overridden on the build server, but we need it for command line build
-            if (isYotta && pxt.appTarget.compile && pxt.appTarget.compile.hasHex) {
-                var cs = pxt.appTarget.compileService;
+            if (isYotta && compile.hasHex) {
+                var cs = compileService;
                 U.assert(!!cs.yottaCorePackage);
                 U.assert(!!cs.githubCorePackage);
                 U.assert(!!cs.gittag);
@@ -2771,10 +3039,11 @@ var pxt;
                     else {
                         U.assert(!seenMain);
                     }
+                    var ext = isCSharp ? ".cs" : ".cpp";
                     for (var _f = 0, _g = pkg.getFiles(); _f < _g.length; _f++) {
                         var fn = _g[_f];
-                        var isHeader = U.endsWith(fn, ".h");
-                        if (isHeader || U.endsWith(fn, ".cpp")) {
+                        var isHeader = !isCSharp && U.endsWith(fn, ".h");
+                        if (isHeader || U.endsWith(fn, ext)) {
                             var fullName = pkg.config.name + "/" + fn;
                             if ((pkg.config.name == "base" || pkg.config.name == "core") && isHeader)
                                 fullName = fn;
@@ -2784,15 +3053,23 @@ var pxt;
                             if (src == null)
                                 U.userError(lf("C++ file {0} is missing in package {1}.", fn, pkg.config.name));
                             fileName = fullName;
-                            // parseCpp() will remove doc comments, to prevent excessive recompilation
-                            src = parseCpp(src, isHeader);
-                            res.extensionFiles[sourcePath + fullName] = src;
+                            if (isCSharp) {
+                                pxt.debug("Parse C#: " + fullName);
+                                parseCs(src);
+                                fullCS += ("\n\n\n#line 1 \"" + fullName + "\"\n") + src;
+                            }
+                            else {
+                                // parseCpp() will remove doc comments, to prevent excessive recompilation
+                                pxt.debug("Parse C++: " + fullName);
+                                src = parseCpp(src, isHeader);
+                                res.extensionFiles[sourcePath + fullName] = src;
+                            }
                             if (pkg.level == 0)
                                 res.onlyPublic = false;
                             if (pkg.verProtocol() && pkg.verProtocol() != "pub" && pkg.verProtocol() != "embed")
                                 res.onlyPublic = false;
                         }
-                        if (U.endsWith(fn, ".c") || U.endsWith(fn, ".S") || U.endsWith(fn, ".s")) {
+                        if (!isCSharp && (U.endsWith(fn, ".c") || U.endsWith(fn, ".S") || U.endsWith(fn, ".s"))) {
                             var src = pkg.readFile(fn);
                             res.extensionFiles[sourcePath + pkg.config.name + "/" + fn.replace(/\.S$/, ".s")] = src;
                         }
@@ -2804,10 +3081,15 @@ var pxt;
             }
             if (allErrors)
                 U.userError(allErrors);
+            fullCS += "\n#line default\n";
             // merge optional settings
             U.jsonCopyFrom(optSettings, currSettings);
             var configJson = U.jsonUnFlatten(optSettings);
-            if (isDockerMake) {
+            if (isCSharp) {
+                res.extensionFiles["/lib.cs"] = fullCS;
+                res.generatedFiles["/module.json"] = "{}";
+            }
+            else if (isDockerMake) {
                 var packageJson = {
                     name: "pxt-app",
                     private: true,
@@ -2816,7 +3098,7 @@ var pxt;
                 res.generatedFiles["/package.json"] = JSON.stringify(packageJson, null, 4) + "\n";
             }
             else if (isCodal) {
-                var cs = pxt.appTarget.compileService;
+                var cs = compileService;
                 var codalJson_1 = {
                     "target": cs.codalTarget + ".json",
                     "definitions": U.clone(cs.codalDefinitions) || {},
@@ -2833,7 +3115,7 @@ var pxt;
                 res.generatedFiles["/codal.json"] = JSON.stringify(codalJson_1, null, 4) + "\n";
             }
             else if (isPlatformio) {
-                var iniLines_1 = pxt.appTarget.compileService.platformioIni.slice();
+                var iniLines_1 = compileService.platformioIni.slice();
                 // TODO merge configjson
                 iniLines_1.push("lib_deps =");
                 U.iterMap(res.platformio.dependencies, function (pkg, ver) {
@@ -2845,9 +3127,8 @@ var pxt;
             else {
                 res.yotta.config = configJson;
                 var name_1 = "pxt-app";
-                if (pxt.appTarget.compileService && pxt.appTarget.compileService.yottaBinary)
-                    name_1 = pxt.appTarget.compileService.yottaBinary
-                        .replace(/-combined/, "").replace(/\.hex$/, "");
+                if (compileService.yottaBinary)
+                    name_1 = compileService.yottaBinary.replace(/-combined/, "").replace(/\.hex$/, "");
                 var moduleJson = {
                     "name": name_1,
                     "version": "0.0.0",
@@ -2863,11 +3144,13 @@ var pxt;
                 pxtConfig += "#define PXT_BOX_DEBUG 1\n";
                 pxtConfig += "#define PXT_MEMLEAK_DEBUG 1\n";
             }
-            res.generatedFiles[sourcePath + "pointers.cpp"] = includesInc + protos.finish() + pointersInc + "\nPXT_SHIMS_END\n";
-            res.generatedFiles[sourcePath + "pxtconfig.h"] = pxtConfig;
-            if (isYotta)
-                res.generatedFiles["/config.json"] = JSON.stringify(configJson, null, 4) + "\n";
-            res.generatedFiles[sourcePath + "main.cpp"] = "\n#include \"pxt.h\"\n#ifdef PXT_MAIN\nPXT_MAIN\n#else\nint main() {\n    uBit.init();\n    pxt::start();\n    while (1) uBit.sleep(10000);\n    return 0;\n}\n#endif\n";
+            if (!isCSharp) {
+                res.generatedFiles[sourcePath + "pointers.cpp"] = includesInc + protos.finish() + pointersInc + "\nPXT_SHIMS_END\n";
+                res.generatedFiles[sourcePath + "pxtconfig.h"] = pxtConfig;
+                if (isYotta)
+                    res.generatedFiles["/config.json"] = JSON.stringify(configJson, null, 4) + "\n";
+                res.generatedFiles[sourcePath + "main.cpp"] = "\n#include \"pxt.h\"\n#ifdef PXT_MAIN\nPXT_MAIN\n#else\nint main() {\n    uBit.init();\n    pxt::start();\n    while (1) uBit.sleep(10000);\n    return 0;\n}\n#endif\n";
+            }
             if (makefile) {
                 var allfiles_1 = Object.keys(res.extensionFiles).concat(Object.keys(res.generatedFiles));
                 var inc_1 = "";
@@ -3484,6 +3767,52 @@ var pxt;
             return startAsync();
         }
         crowdin.uploadTranslationAsync = uploadTranslationAsync;
+        /**
+         * Scans files in crowdin and report files that are not on disk anymore
+         */
+        function listFilesAsync(branch, prj, key, crowdinPath) {
+            var q = { json: "true" };
+            var infoUri = apiUri(branch, prj, key, "info", q);
+            function flatten(allFiles, files, parentDir) {
+                var n = files.name;
+                var d = parentDir ? parentDir + "/" + n : n;
+                files.fullName = d;
+                switch (files.node_type) {
+                    case "file":
+                        allFiles.push(files);
+                        break;
+                    case "directory":
+                        (files.files || []).forEach(function (f) { return flatten(allFiles, f, d); });
+                        break;
+                    case "branch":
+                        (files.files || []).forEach(function (f) { return flatten(allFiles, f, parentDir); });
+                        break;
+                }
+            }
+            pxt.log("crowdin: listing files under " + crowdinPath + " in branch " + branch);
+            pxt.debug("ur: " + infoUri);
+            return pxt.Util.httpGetTextAsync(infoUri).then(function (respText) {
+                var info = JSON.parse(respText);
+                if (!info)
+                    throw new Error("info failed");
+                var files = info.files;
+                var allFiles = [];
+                // if branch, filter out
+                if (branch)
+                    files = files.filter(function (f) { return f.node_type == "branch" && f.name == branch; });
+                // flatten the files
+                files.forEach(function (f) { return flatten(allFiles, f, ""); });
+                // filter out crowdin folder
+                allFiles = allFiles.filter(function (f) { return f.fullName.indexOf(crowdinPath) == 0; });
+                pxt.log("crowdin: found " + allFiles.length + " under " + crowdinPath);
+                return allFiles.map(function (f) {
+                    return {
+                        fullName: f.fullName
+                    };
+                });
+            });
+        }
+        crowdin.listFilesAsync = listFilesAsync;
     })(crowdin = pxt.crowdin || (pxt.crowdin = {}));
 })(pxt || (pxt = {}));
 /// <reference path='../typings/globals/marked/index.d.ts' />
@@ -3663,15 +3992,25 @@ var pxt;
                 mparams["LINK"] = m.path;
                 if (tocPath.indexOf(m) >= 0) {
                     mparams["ACTIVE"] = 'active';
+                    mparams["EXPANDED"] = 'true';
                     currentTocEntry = m;
                     breadcrumb.push({
                         name: m.name,
                         href: m.path
                     });
                 }
+                else {
+                    mparams["EXPANDED"] = 'false';
+                }
                 if (m.subitems && m.subitems.length > 0) {
-                    if (lev == 0)
-                        templ = toc["top-dropdown"];
+                    if (lev == 0) {
+                        if (m.name !== "") {
+                            templ = toc["top-dropdown"];
+                        }
+                        else {
+                            templ = toc["top-dropdown-noHeading"];
+                        }
+                    }
                     else if (lev == 1)
                         templ = toc["inner-dropdown"];
                     else
@@ -3691,18 +4030,18 @@ var pxt;
                 params["appstoremeta"] = "<meta name=\"apple-itunes-app\" content=\"app-id=" + U.htmlEscape(theme.appStoreID) + "\"/>";
             var breadcrumbHtml = '';
             if (breadcrumb.length > 1) {
-                breadcrumbHtml = "\n            <div class=\"ui breadcrumb\">\n                " + breadcrumb.map(function (b, i) {
-                    return ("<a class=\"" + (i == breadcrumb.length - 1 ? "active" : "") + " section\"\n                        href=\"" + html2Quote(b.href) + "\">" + html2Quote(b.name) + "</a>");
+                breadcrumbHtml = "\n            <nav class=\"ui breadcrumb\" aria-label=\"" + lf("Breadcrumb") + "\">\n                " + breadcrumb.map(function (b, i) {
+                    return ("<a class=\"" + (i == breadcrumb.length - 1 ? "active" : "") + " section\"\n                        href=\"" + html2Quote(b.href) + "\" aria-current=\"" + (i == breadcrumb.length - 1 ? "page" : "") + "\">" + html2Quote(b.name) + "</a>");
                 })
-                    .join('<i class="right chevron icon divider"></i>') + "\n            </div>";
+                    .join('<i class="right chevron icon divider"></i>') + "\n            </nav>";
             }
             params["breadcrumb"] = breadcrumbHtml;
             if (currentTocEntry) {
                 if (currentTocEntry.prevPath) {
-                    params["prev"] = "<a href=\"" + currentTocEntry.prevPath + "\" class=\"navigation navigation-prev \" aria-label=\"Previous page: " + currentTocEntry.prevName + "\">\n                                    <i class=\"icon angle left\"></i>\n                                </a>";
+                    params["prev"] = "<a href=\"" + currentTocEntry.prevPath + "\" class=\"navigation navigation-prev \" title=\"" + ('Previous page: {0}', currentTocEntry.prevName) + "\">\n                                    <i class=\"icon angle left\"></i>\n                                </a>";
                 }
                 if (currentTocEntry.nextPath) {
-                    params["next"] = "<a href=\"" + currentTocEntry.nextPath + "\" class=\"navigation navigation-next \" aria-label=\"Next page: " + currentTocEntry.nextName + "\">\n                                    <i class=\"icon angle right\"></i>\n                                </a>";
+                    params["next"] = "<a href=\"" + currentTocEntry.nextPath + "\" class=\"navigation navigation-next \" title=\"" + ('Next page {0}', currentTocEntry.nextName) + "\">\n                                    <i class=\"icon angle right\"></i>\n                                </a>";
                 }
             }
             if (theme.boardName)
@@ -3713,7 +4052,7 @@ var pxt;
                 params["homeurl"] = html2Quote(theme.homeUrl);
             params["targetid"] = theme.id || "???";
             params["targetname"] = theme.name || "Microsoft MakeCode";
-            params["targetlogo"] = theme.docsLogo ? "<img class=\"ui mini image\" src=\"" + U.toDataUri(theme.docsLogo) + "\" />" : "";
+            params["targetlogo"] = theme.docsLogo ? "<img aria-hidden=\"true\" role=\"presentation\" class=\"ui mini image\" src=\"" + U.toDataUri(theme.docsLogo) + "\" />" : "";
             var ghURLs = d.ghEditURLs || [];
             if (ghURLs.length) {
                 var ghText = "<p style=\"margin-top:1em\">\n";
@@ -3729,9 +4068,25 @@ var pxt;
             else {
                 params["github"] = "";
             }
+            // Add accessiblity menu 
+            var accMenuHtml = "\n            <a href=\"#maincontent\" class=\"ui item link\" tabindex=\"0\" role=\"menuitem\">" + lf("Skip to main content") + "</a>\n        ";
+            params['accMenu'] = accMenuHtml;
+            // Add print button
+            var printBtnHtml = "\n            <button id=\"printbtn\" class=\"circular ui icon right floated button hideprint\" title=\"" + lf("Print this page") + "\">\n                <i class=\"icon print\"></i>\n            </button>\n        ";
+            params['printBtn'] = printBtnHtml;
+            // Add sidebar toggle
+            var sidebarToggleHtml = "\n            <a id=\"togglesidebar\" class=\"launch icon item\" tabindex=\"0\" title=\"Side menu\" aria-label=\"" + lf("Side menu") + "\" role=\"menu\" aria-expanded=\"false\">\n                <i class=\"content icon\"></i>\n            </a>\n        ";
+            params['sidebarToggle'] = sidebarToggleHtml;
+            // Add search bars
+            var searchBarIds = ['tocsearch1', 'tocsearch2'];
+            var searchBarsHtml = searchBarIds.map(function (searchBarId) {
+                return "\n                <input type=\"search\" name=\"q\" placeholder=\"" + lf("Search...") + "\" aria-label=\"" + lf("Search Documentation") + "\">\n                <i onclick=\"document.getElementById('" + searchBarId + "').submit();\" tabindex=\"0\" class=\"search link icon\" aria-label=\"" + lf("Search") + "\" role=\"button\"></i>\n            ";
+            });
+            params["searchBar1"] = searchBarsHtml[0];
+            params["searchBar2"] = searchBarsHtml[1];
             var style = '';
             if (theme.accentColor)
-                style += "\n.ui.accent { color: " + theme.accentColor + "; }\n.ui.inverted.accent { background: " + theme.accentColor + "; }\n";
+                style += "\n.ui.accent { color: " + theme.accentColor + "; }\n.ui.inverted.accent { background: " + theme.accentColor + "; }\n#accessibleMenu a { background: " + theme.accentColor + "; }\n";
             params["targetstyle"] = style;
             for (var _a = 0, _b = Object.keys(theme); _a < _b.length; _a++) {
                 var k = _b[_a];
@@ -3742,14 +4097,19 @@ var pxt;
             d.finish = function () { return injectHtml(d.html, params, [
                 "body",
                 "menu",
+                "accMenu",
                 "TOC",
                 "prev",
                 "next",
+                "printBtn",
                 "breadcrumb",
                 "targetlogo",
                 "github",
                 "JSON",
-                "appstoremeta"
+                "appstoremeta",
+                "sidebarToggle",
+                "searchBar1",
+                "searchBar2"
             ]); };
         }
         docs.prepTemplate = prepTemplate;
@@ -3804,7 +4164,7 @@ var pxt;
                 marked = docs.requireMarked();
                 var renderer = new marked.Renderer();
                 renderer.image = function (href, title, text) {
-                    var out = '<img class="ui image" src="' + href + '" alt="' + text + '"';
+                    var out = '<img class="ui centered image" src="' + href + '" alt="' + text + '"';
                     if (title) {
                         out += ' title="' + title + '"';
                     }
@@ -3920,7 +4280,7 @@ var pxt;
             }
             // try getting a better custom image for twitter
             var imgM = /<div class="ui embed mdvid"[^<>]+?data-placeholder="([^"]+)"[^>]*\/?>/i.exec(html)
-                || /<img class="ui image" src="([^"]+)"[^>]*\/?>/i.exec(html);
+                || /<img class="ui [^"]*image" src="([^"]+)"[^>]*\/?>/i.exec(html);
             if (imgM)
                 pubinfo["cardLogo"] = html2Quote(imgM[1]);
             pubinfo["twitter"] = html2Quote(opts.theme.twitter || "@msmakecode");
@@ -6625,10 +6985,14 @@ var ts;
         pxtc.TS_STATEMENT_TYPE = "typescript_statement";
         pxtc.TS_OUTPUT_TYPE = "typescript_expression";
         pxtc.BINARY_JS = "binary.js";
+        pxtc.BINARY_CS = "binary.cs";
         pxtc.BINARY_ASM = "binary.asm";
         pxtc.BINARY_HEX = "binary.hex";
         pxtc.BINARY_UF2 = "binary.uf2";
         pxtc.BINARY_ELF = "binary.elf";
+        pxtc.NATIVE_TYPE_THUMB = "thumb";
+        pxtc.NATIVE_TYPE_AVR = "AVR";
+        pxtc.NATIVE_TYPE_CS = "C#";
         (function (SymbolKind) {
             SymbolKind[SymbolKind["None"] = 0] = "None";
             SymbolKind[SymbolKind["Method"] = 1] = "Method";
@@ -6716,11 +7080,11 @@ var ts;
                     }
                 }
                 else if (fn.attributes.block && locBlock) {
-                    var ps = pxt.blocks.parameterNames(fn);
+                    var ps = pxt.blocks.parameterNames(fn).attrNames;
                     var oldBlock = fn.attributes.block;
                     fn.attributes.block = pxt.blocks.normalizeBlock(locBlock);
                     if (oldBlock != fn.attributes.block) {
-                        var locps = pxt.blocks.parameterNames(fn);
+                        var locps = pxt.blocks.parameterNames(fn).attrNames;
                         if (JSON.stringify(ps) != JSON.stringify(locps)) {
                             pxt.log("block has non matching arguments: " + oldBlock + " vs " + fn.attributes.block);
                             fn.attributes.block = oldBlock;
@@ -6757,7 +7121,7 @@ var ts;
         }
         pxtc.emptyExtInfo = emptyExtInfo;
         var numberAttributes = ["weight", "imageLiteral"];
-        var booleanAttributes = ["advanced", "handlerStatement"];
+        var booleanAttributes = ["advanced", "handlerStatement", "afterOnStart", "optionalVariableArgs"];
         function parseCommentString(cmt) {
             var res = {
                 paramDefl: {},
@@ -8798,6 +9162,7 @@ var pxt;
         function isNavigatorOnline() {
             return navigator && navigator.onLine;
         }
+        Cloud.isNavigatorOnline = isNavigatorOnline;
         function isOnline() {
             if (typeof navigator !== "undefined" && isNavigatorOnline()) {
                 _isOnline = true;

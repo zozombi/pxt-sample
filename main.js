@@ -32,14 +32,16 @@ var filelist = require("./filelist");
 var container = require("./container");
 var scriptsearch = require("./scriptsearch");
 var projects = require("./projects");
+var extensions = require("./extensions");
 var sounds = require("./sounds");
 var make = require("./make");
 var baseToolbox = require("./toolbox");
 var monacoToolbox = require("./monacoSnippets");
 var monaco = require("./monaco");
 var pxtjson = require("./pxtjson");
+var serial = require("./serial");
 var blocks = require("./blocks");
-var logview = require("./logview");
+var serialindicator = require("./serialindicator");
 var draganddrop = require("./draganddrop");
 var electron = require("./electron");
 var Cloud = pxt.Cloud;
@@ -172,7 +174,10 @@ var ProjectView = (function (_super) {
         pxt.debug("page visibility: " + active);
         this.setState({ active: active });
         if (!active) {
-            this.stopSimulator();
+            if (this.state.running) {
+                this.stopSimulator();
+                this.setState({ resumeOnVisibility: true });
+            }
             this.saveFileAsync().done();
         }
         else {
@@ -182,8 +187,10 @@ var ProjectView = (function (_super) {
                 workspace.initAsync()
                     .done(function () { return id_1 ? _this.loadHeaderAsync(workspace.getHeader(id_1)) : Promise.resolve(); });
             }
-            else if (pxt.appTarget.simulator.autoRun && !this.state.running)
+            else if (this.state.resumeOnVisibility && !this.state.running) {
+                this.setState({ resumeOnVisibility: false });
                 this.runSimulator();
+            }
         }
     };
     ProjectView.prototype.saveSettings = function () {
@@ -221,6 +228,16 @@ var ProjectView = (function (_super) {
             document.fireEvent('onresize');
         }
     };
+    ProjectView.prototype.updateEditorLogo = function (left, rgba) {
+        if (pxt.appTarget.appTheme.hideMenuBar) {
+            var editorLogo = document.getElementById('editorlogo');
+            if (editorLogo) {
+                editorLogo.style.left = left + "px";
+                editorLogo.style.display = 'block';
+                editorLogo.style.background = rgba || '';
+            }
+        }
+    };
     ProjectView.prototype.saveFileAsync = function () {
         var _this = this;
         if (!this.editorFile)
@@ -245,15 +262,24 @@ var ProjectView = (function (_super) {
         return this.editor == this.textEditor
             && this.editorFile && !this.editorFile.isReadonly() && /(\.ts|pxt.json)$/.test(this.editorFile.name);
     };
-    ProjectView.prototype.openJavaScript = function () {
+    ProjectView.prototype.openJavaScript = function (giveFocusOnLoading) {
+        if (giveFocusOnLoading === void 0) { giveFocusOnLoading = true; }
         pxt.tickEvent("menu.javascript");
         if (this.isJavaScriptActive()) {
-            if (this.state.embedSimView)
+            if (this.state.embedSimView) {
                 this.setState({ embedSimView: false });
+            }
+            if (giveFocusOnLoading) {
+                this.textEditor.editor.focus();
+            }
             return;
         }
-        if (this.isBlocksActive())
+        if (this.textEditor) {
+            this.textEditor.giveFocusOnLoading = giveFocusOnLoading;
+        }
+        if (this.isBlocksActive()) {
             this.blocksEditor.openTypeScript();
+        }
         else
             this.setFile(pkg.mainEditorPkg().files["main.ts"]);
     };
@@ -283,9 +309,25 @@ var ProjectView = (function (_super) {
             this.setFile(pkg.mainEditorPkg().files["main.blocks"]);
         this.shouldTryDecompile = false;
     };
+    ProjectView.prototype.openSerial = function (isSim) {
+        if (!pxt.appTarget.serial || !pxt.appTarget.serial.useEditor)
+            return; // not supported in this editor
+        if (this.editor == this.serialEditor && this.serialEditor.isSim == isSim)
+            return; // already showing
+        var mainEditorPkg = pkg.mainEditorPkg();
+        if (!mainEditorPkg)
+            return; // no project loaded
+        if (!mainEditorPkg.lookupFile("this/" + pxt.SERIAL_EDITOR_FILE)) {
+            mainEditorPkg.setFile(pxt.SERIAL_EDITOR_FILE, "serial\n");
+        }
+        this.serialEditor.setSim(isSim);
+        var event = "serial." + (isSim ? "simulator" : "device") + "EditorOpened";
+        pxt.tickEvent(event);
+        this.setFile(mainEditorPkg.lookupFile("this/" + pxt.SERIAL_EDITOR_FILE));
+    };
     ProjectView.prototype.openPreviousEditor = function () {
         if (this.prevEditorId == "monacoEditor") {
-            this.openJavaScript();
+            this.openJavaScript(false);
         }
         else {
             this.openBlocks();
@@ -320,6 +362,7 @@ var ProjectView = (function (_super) {
         var _this = this;
         this.textEditor = new monaco.Editor(this);
         this.pxtJsonEditor = new pxtjson.Editor(this);
+        this.serialEditor = new serial.Editor(this);
         this.blocksEditor = new blocks.Editor(this);
         var changeHandler = function () {
             if (_this.editorFile) {
@@ -333,7 +376,7 @@ var ProjectView = (function (_super) {
                 _this.stopSimulator();
             _this.editorChangeHandler();
         };
-        this.allEditors = [this.pxtJsonEditor, this.blocksEditor, this.textEditor];
+        this.allEditors = [this.pxtJsonEditor, this.blocksEditor, this.serialEditor, this.textEditor];
         this.allEditors.forEach(function (e) { return e.changeCallback = changeHandler; });
         this.editor = this.allEditors[this.allEditors.length - 1];
     };
@@ -355,7 +398,7 @@ var ProjectView = (function (_super) {
             },
             editor: this.state.header ? this.state.header.editor : ''
         });
-        if (pxt.appTarget.appTheme.allowParentController)
+        if (pxt.appTarget.appTheme.allowParentController || pxt.appTarget.appTheme.allowPackageExtensions)
             pxt.editor.bindEditorMessages(this);
         this.forceUpdate(); // we now have editors prepared
     };
@@ -372,7 +415,7 @@ var ProjectView = (function (_super) {
         this.saveSettings();
         var hc = this.state.highContrast;
         // save file before change
-        this.saveFileAsync()
+        return this.saveFileAsync()
             .then(function () {
             _this.editorFile = _this.state.currFile; // TODO
             var previousEditor = _this.editor;
@@ -384,7 +427,8 @@ var ProjectView = (function (_super) {
             .then(function () { return _this.editor.loadFileAsync(_this.editorFile, hc); })
             .then(function () {
             _this.saveFileAsync().done(); // make sure state is up to date
-            _this.typecheck();
+            if (_this.editor == _this.textEditor || _this.editor == _this.blocksEditor)
+                _this.typecheck();
             var e = _this.settings.fileHistory.filter(function (e) { return e.id == _this.state.header.id && e.name == _this.editorFile.getName(); })[0];
             if (e)
                 _this.editor.setViewState(e.pos);
@@ -431,10 +475,12 @@ var ProjectView = (function (_super) {
                 this.textEditor.openBlocks();
             }
             else if (tsFile_1) {
-                this.textEditor.decompileAsync(tsFile_1.name).then(function (success) {
-                    if (!success) {
+                this.textEditor.decompileAsync(tsFile_1.name).then(function (resp) {
+                    if (!resp.success) {
                         _this.setFile(tsFile_1);
-                        _this.textEditor.showConversionFailedDialog(fn.name);
+                        var tooLarge_1 = false;
+                        resp.diagnostics.forEach(function (d) { return tooLarge_1 = (tooLarge_1 || d.code === 9266 /* error code when script is too large */); });
+                        _this.textEditor.showConversionFailedDialog(fn.name, tooLarge_1);
                     }
                     else {
                         _this.setFile(fn);
@@ -443,6 +489,9 @@ var ProjectView = (function (_super) {
             }
         }
         else {
+            if (this.isTextEditor() || this.isPxtJsonEditor()) {
+                this.textEditor.giveFocusOnLoading = false;
+            }
             this.setFile(fn);
         }
     };
@@ -506,6 +555,7 @@ var ProjectView = (function (_super) {
         if (!tc)
             return;
         if (step > -1) {
+            tc.focusInitialized = false;
             var tutorialOptions = this.state.tutorialOptions;
             tutorialOptions.tutorialStep = step;
             this.setState({ tutorialOptions: tutorialOptions });
@@ -517,6 +567,7 @@ var ProjectView = (function (_super) {
         }
     };
     ProjectView.prototype.handleMessage = function (msg) {
+        var _this = this;
         switch (msg.type) {
             case "popoutcomplete":
                 this.setState({ sideDocsCollapsed: true, sideDocsLoadUrl: '' });
@@ -537,27 +588,41 @@ var ProjectView = (function (_super) {
                             this.showTutorialHint();
                         else
                             tutorial.TutorialContent.refresh();
-                        core.hideLoading();
+                        core.hideLoading("tutorial");
+                        break;
+                    case 'error':
+                        var te = msg;
+                        pxt.reportException(te.message);
+                        core.errorNotification(lf("We're having trouble loading this tutorial, please try again later."));
+                        this.setState({ tutorialOptions: undefined });
+                        // Delete the project created for this tutorial
+                        var curr = pkg.mainEditorPkg().header;
+                        curr.isDeleted = true;
+                        workspace.saveAsync(curr, {})
+                            .then(function () {
+                            _this.home.showHome();
+                        }).finally(function () {
+                            core.hideLoading("tutorial");
+                        });
                         break;
                 }
                 break;
         }
     };
     ProjectView.prototype.reloadHeaderAsync = function () {
-        return this.loadHeaderAsync(this.state.header, this.state.filters);
+        return this.loadHeaderAsync(this.state.header, this.state.editorState);
     };
-    ProjectView.prototype.loadHeaderAsync = function (h, filters) {
+    ProjectView.prototype.loadHeaderAsync = function (h, editorState, inTutorial) {
         var _this = this;
         if (!h)
             return Promise.resolve();
         this.stopSimulator(true);
         pxt.blocks.cleanBlocks();
-        var logs = this.refs["logs"];
-        logs.clear();
+        this.clearSerial();
         this.setState({
             showFiles: false,
-            filters: filters,
-            tutorialOptions: undefined
+            editorState: editorState,
+            tutorialOptions: inTutorial ? this.state.tutorialOptions : undefined
         });
         return pkg.loadPkgAsync(h.id)
             .then(function () {
@@ -573,11 +638,6 @@ var ProjectView = (function (_super) {
             if (pkg.File.blocksFileNameRx.test(file.getName()) && file.getVirtualFileName()) {
                 if (!file.content)
                     file = main.lookupFile("this/" + file.getVirtualFileName()) || file;
-                else
-                    _this.textEditor.decompileAsync(file.getVirtualFileName()).then(function (success) {
-                        if (!success)
-                            file = main.lookupFile("this/" + file.getVirtualFileName()) || file;
-                    });
             }
             _this.setState({
                 header: h,
@@ -589,7 +649,7 @@ var ProjectView = (function (_super) {
                 _this.shouldTryDecompile = true;
             }
             pkg.getEditorPkg(pkg.mainPkg).onupdate = function () {
-                _this.loadHeaderAsync(h, _this.state.filters).done();
+                _this.loadHeaderAsync(h, _this.state.editorState).done();
             };
             pkg.mainPkg.getCompileOptionsAsync()
                 .catch(function (e) {
@@ -600,10 +660,10 @@ var ProjectView = (function (_super) {
                         class: "pink",
                         icon: "trash",
                         onclick: function () {
-                            core.showLoading(lf("Removing {0}...", lib.id));
+                            core.showLoading("removedep", lf("Removing {0}...", lib.id));
                             pkg.mainEditorPkg().removeDepAsync(lib.id)
                                 .then(function () { return _this.reloadHeaderAsync(); })
-                                .done(function () { return core.hideLoading(); });
+                                .done(function () { return core.hideLoading("removedep"); });
                         }
                     }); };
                     core.dialogAsync({
@@ -636,7 +696,7 @@ var ProjectView = (function (_super) {
             return workspace.saveAsync(curr, {})
                 .then(function () {
                 if (workspace.getHeaders().length > 0) {
-                    _this.projects.showOpenProject();
+                    _this.home.showHome();
                 }
                 else {
                     _this.newProject();
@@ -679,33 +739,35 @@ var ProjectView = (function (_super) {
         return tdlegacy.td2tsAsync(td);
     };
     ProjectView.prototype.importHex = function (data, createNewIfFailed) {
-        var _this = this;
         if (createNewIfFailed === void 0) { createNewIfFailed = false; }
+        function loadFailed() {
+            pxt.appTarget.appTheme.showHomeScreen ? this.home.showHome() : this.newProject();
+        }
         var targetId = pxt.appTarget.id;
         if (!data || !data.meta) {
             core.warningNotification(lf("Sorry, we could not recognize this file."));
             if (createNewIfFailed)
-                this.newProject();
+                loadFailed();
             return;
         }
         var importer = this.hexFileImporters.filter(function (fi) { return fi.canImport(data); })[0];
         if (importer) {
             pxt.tickEvent("import." + importer.id);
-            core.showLoading(lf("loading project..."));
+            core.showLoading("importhex", lf("loading project..."));
             importer.importAsync(this, data)
-                .done(function () { return core.hideLoading(); }, function (e) {
+                .done(function () { return core.hideLoading("importhex"); }, function (e) {
                 pxt.reportException(e, { importer: importer.id });
-                core.hideLoading();
+                core.hideLoading("importhex");
                 core.errorNotification(lf("Oops, something went wrong when importing your project"));
                 if (createNewIfFailed)
-                    _this.newProject();
+                    loadFailed();
             });
         }
         else {
             core.warningNotification(lf("Sorry, we could not import this project."));
             pxt.tickEvent("warning.importfailed");
             if (createNewIfFailed)
-                this.newProject();
+                loadFailed();
         }
     };
     ProjectView.prototype.importProjectFile = function (file) {
@@ -714,11 +776,12 @@ var ProjectView = (function (_super) {
             return;
         ts.pxtc.Util.fileReadAsBufferAsync(file)
             .then(function (buf) { return pxt.lzmaDecompressAsync(buf); })
-            .done(function (contents) {
+            .then(function (contents) {
             var data = JSON.parse(contents);
             _this.importHex(data);
-        }, function (e) {
+        }).catch(function (e) {
             core.warningNotification(lf("Sorry, we could not import this project."));
+            pxt.appTarget.appTheme.showHomeScreen ? _this.home.showHome() : _this.newProject();
         });
     };
     ProjectView.prototype.importFile = function (file) {
@@ -746,7 +809,7 @@ var ProjectView = (function (_super) {
             }
         }
     };
-    ProjectView.prototype.importProjectAsync = function (project, filters) {
+    ProjectView.prototype.importProjectAsync = function (project, editorState) {
         var _this = this;
         var h = project.header;
         if (!h) {
@@ -760,20 +823,34 @@ var ProjectView = (function (_super) {
             };
         }
         return workspace.installAsync(h, project.text)
-            .then(function (hd) { return _this.loadHeaderAsync(hd, filters); });
+            .then(function (hd) { return _this.loadHeaderAsync(hd, editorState); });
     };
     ProjectView.prototype.initDragAndDrop = function () {
         var _this = this;
         draganddrop.setupDragAndDrop(document.body, function (file) { return file.size < 1000000 && isHexFile(file.name) || isBlocksFile(file.name); }, function (files) {
             if (files) {
                 pxt.tickEvent("dragandrop.open");
+                _this.home.hide();
                 _this.importFile(files[0]);
             }
         });
     };
-    ProjectView.prototype.openProject = function (tab) {
+    ProjectView.prototype.openHome = function () {
         pxt.tickEvent("menu.open");
-        this.projects.showOpenProject(tab);
+        this.home.showHome();
+    };
+    ProjectView.prototype.exitAndSave = function () {
+        pxt.tickEvent("menu.exitAndSave");
+        if (this.state.projectName !== lf("Untitled")) {
+            this.openHome();
+        }
+        else {
+            this.exitAndSaveDialog.show();
+        }
+    };
+    ProjectView.prototype.brandIconClick = function () {
+        pxt.tickEvent("menu.brand");
+        this.exitAndSave();
     };
     ProjectView.prototype.exportProjectToFileAsync = function () {
         var mpkg = pkg.mainPkg;
@@ -811,8 +888,14 @@ var ProjectView = (function (_super) {
         pxt.tickEvent("menu.addpackage");
         this.scriptSearch.showAddPackages();
     };
+    ProjectView.prototype.openExtension = function (extension, url, consentRequired) {
+        pxt.tickEvent("menu.openextension", { extension: extension });
+        this.extensions.showExtension(extension, url, consentRequired);
+    };
+    ProjectView.prototype.handleExtensionRequest = function (request) {
+        this.extensions.handleExtensionRequest(request);
+    };
     ProjectView.prototype.newEmptyProject = function (name, documentation) {
-        this.setState({ tutorialOptions: {} });
         this.newProject({
             filesOverride: { "main.blocks": "<xml xmlns=\"http://www.w3.org/1999/xhtml\"></xml>" },
             name: name, documentation: documentation
@@ -821,10 +904,10 @@ var ProjectView = (function (_super) {
     ProjectView.prototype.newProject = function (options) {
         if (options === void 0) { options = {}; }
         pxt.tickEvent("menu.newproject");
-        core.showLoading(lf("creating new project..."));
+        core.showLoading("newproject", lf("creating new project..."));
         this.createProjectAsync(options)
             .then(function () { return Promise.delay(500); })
-            .done(function () { return core.hideLoading(); });
+            .done(function () { return core.hideLoading("newproject"); });
     };
     ProjectView.prototype.createProjectAsync = function (options) {
         var _this = this;
@@ -846,7 +929,7 @@ var ProjectView = (function (_super) {
             pubCurrent: false,
             target: pxt.appTarget.id,
             temporary: options.temporary
-        }, files).then(function (hd) { return _this.loadHeaderAsync(hd, options.filters); });
+        }, files).then(function (hd) { return _this.loadHeaderAsync(hd, { filters: options.filters }, options.inTutorial); });
     };
     ProjectView.prototype.switchTypeScript = function () {
         var mainPkg = pkg.mainEditorPkg();
@@ -882,7 +965,7 @@ var ProjectView = (function (_super) {
             });
         });
         if (open) {
-            return core.showLoadingAsync(lf("switching to JavaScript..."), promise, 0);
+            return core.showLoadingAsync("switchtojs", lf("switching to JavaScript..."), promise, 0);
         }
         else {
             return promise;
@@ -895,7 +978,7 @@ var ProjectView = (function (_super) {
             header: lf("Reset"),
             body: lf("You are about to clear all projects. Are you sure? This operation cannot be undone."),
             agreeLbl: lf("Reset"),
-            agreeClass: "red",
+            agreeClass: "red focused",
             agreeIcon: "sign out",
             disagreeLbl: lf("Cancel")
         }).then(function (r) {
@@ -913,6 +996,7 @@ var ProjectView = (function (_super) {
         var opts = {
             header: lf("Rename your project"),
             agreeLbl: lf("Save"),
+            agreeClass: "green",
             input: lf("Enter your project name here")
         };
         return core.confirmAsync(opts).then(function (res) {
@@ -966,7 +1050,7 @@ var ProjectView = (function (_super) {
         }
         var simRestart = this.state.running;
         this.setState({ compiling: true });
-        this.clearLog();
+        this.clearSerial();
         this.editor.beforeCompile();
         if (simRestart)
             this.stopSimulator();
@@ -1097,6 +1181,7 @@ var ProjectView = (function (_super) {
         else {
             document.removeEventListener('keydown', this.closeOnEscape);
         }
+        this.closeFlyout();
         this.setState({ fullscreen: !this.state.fullscreen });
     };
     ProjectView.prototype.closeFlyout = function () {
@@ -1119,9 +1204,14 @@ var ProjectView = (function (_super) {
                 _this.startSimulator();
         });
     };
-    ProjectView.prototype.clearLog = function () {
-        var logs = this.refs["logs"];
-        logs.clear();
+    ProjectView.prototype.clearSerial = function () {
+        this.serialEditor.clear();
+        var simIndicator = this.refs["simIndicator"];
+        var devIndicator = this.refs["devIndicator"];
+        if (simIndicator)
+            simIndicator.clear();
+        if (devIndicator)
+            devIndicator.clear();
     };
     ProjectView.prototype.hwDebug = function () {
         var start = Promise.resolve();
@@ -1147,14 +1237,13 @@ var ProjectView = (function (_super) {
             pxt.tickEvent(opts.debug ? "debug" : "run", { editor: editorId });
         if (!opts.background)
             this.editor.beforeCompile();
-        if (this.state.tracing) {
+        if (this.state.tracing)
             opts.trace = true;
-        }
         this.stopSimulator();
-        this.clearLog();
         var state = this.editor.snapshotState();
         return compiler.compileAsync(opts)
             .then(function (resp) {
+            _this.clearSerial();
             _this.editor.setDiagnostics(_this.editorFile, state);
             if (resp.outfiles[pxtc.BINARY_JS]) {
                 simulator.run(pkg.mainPkg, opts.debug, resp, _this.state.mute, _this.state.highContrast);
@@ -1166,8 +1255,11 @@ var ProjectView = (function (_super) {
         });
     };
     ProjectView.prototype.editText = function () {
+        var _this = this;
         if (this.editor != this.textEditor) {
-            this.updateEditorFile(this.textEditor);
+            this.updateEditorFile(this.textEditor).then(function () {
+                _this.textEditor.editor.focus();
+            });
             this.forceUpdate();
         }
     };
@@ -1186,13 +1278,19 @@ var ProjectView = (function (_super) {
             onLoaded: function ($el) {
                 input = $el.find('input')[0];
             },
-            htmlBody: "<div class=\"ui form\">\n  <div class=\"ui field\">\n    <label>" + lf("Select a {0} file to open.", ext) + "</label>\n    <input type=\"file\" class=\"ui button blue fluid\"></input>\n  </div>\n</div>",
+            htmlBody: "<div class=\"ui form\">\n  <div class=\"ui field\">\n    <label id=\"selectFileToOpenLabel\">" + lf("Select a {0} file to open.", ext) + "</label>\n    <input type=\"file\" tabindex=\"0\" autofocus aria-describedby=\"selectFileToOpenLabel\" class=\"ui blue fluid focused\"></input>\n  </div>\n</div>",
         }).done(function (res) {
             if (res) {
                 pxt.tickEvent("menu.open.file");
                 _this.importFile(input.files[0]);
             }
+            else {
+                _this.home.showHome();
+            }
         });
+    };
+    ProjectView.prototype.importProjectDialog = function () {
+        this.importDialog.show();
     };
     ProjectView.prototype.showReportAbuse = function () {
         var _this = this;
@@ -1209,7 +1307,7 @@ var ProjectView = (function (_super) {
                     urlInput.val(shareUrl + _this.state.header.pubId);
             },
             agreeLbl: lf("Submit"),
-            htmlBody: "<div class=\"ui form\">\n  <div class=\"ui field\">\n    <label>" + lf("What is the URL of the offensive project?") + "</label>\n    <input type=\"url\" placeholder=\"Enter project URL here...\"></input>\n  </div>\n  <div class=\"ui field\">\n    <label>" + lf("Why do you find it offensive?") + "</label>\n    <textarea></textarea>\n  </div>\n</div>",
+            htmlBody: "<div class=\"ui form\">\n  <div class=\"ui field\">\n    <label>" + lf("What is the URL of the offensive project?") + "</label>\n    <input type=\"url\" class=\"focused\" tabindex=\"0\" autofocus placeholder=\"Enter project URL here...\"></input>\n  </div>\n  <div class=\"ui field\">\n    <label>" + lf("Why do you find it offensive?") + "</label>\n    <textarea></textarea>\n  </div>\n</div>",
         }).done(function (res) {
             if (res) {
                 pxt.tickEvent("menu.reportabuse.send");
@@ -1225,12 +1323,18 @@ var ProjectView = (function (_super) {
                         .then(function (res) {
                         core.infoNotification(lf("Report sent. Thank you!"));
                     })
-                        .catch(core.handleNetworkError);
+                        .catch(function (e) {
+                        if (e.statusCode == 404)
+                            core.warningNotification(lf("Oops, we could not find this script."));
+                        else
+                            core.handleNetworkError(e);
+                    });
                 }
             }
         });
     };
     ProjectView.prototype.importUrlDialog = function () {
+        var _this = this;
         var input;
         var shareUrl = pxt.appTarget.appTheme.shareUrl || "https://makecode.com/";
         core.confirmAsync({
@@ -1238,7 +1342,7 @@ var ProjectView = (function (_super) {
             onLoaded: function ($el) {
                 input = $el.find('input')[0];
             },
-            htmlBody: "<div class=\"ui form\">\n<div class=\"ui icon violet message\">\n    <i class=\"user icon\"></i>\n    <div class=\"content\">\n        <h3 class=\"header\">\n            " + lf("User-provided content") + "\n        </h3>\n        <p>\n            " + lf("The content below is provided by a user, and is not endorsed by Microsoft.") + "\n            " + lf("If you think it's not appropriate, please report abuse through Settings -> Report Abuse.") + "\n        </p>\n    </div>\n</div>\n  <div class=\"ui field\">\n    <label>" + lf("Copy the URL of the project.") + "</label>\n    <input type=\"url\" placeholder=\"" + shareUrl + "...\" class=\"ui button blue fluid\"></input>\n  </div>\n</div>",
+            htmlBody: "<div class=\"ui form\">\n<div class=\"ui icon violet message\">\n    <i class=\"user icon\"></i>\n    <div class=\"content\">\n        <h3 class=\"header\">\n            " + lf("User-provided content") + "\n        </h3>\n        <p>\n            " + lf("The content below is provided by a user, and is not endorsed by Microsoft.") + "\n            " + lf("If you think it's not appropriate, please report abuse through Settings -> Report Abuse.") + "\n        </p>\n    </div>\n</div>\n  <div class=\"ui field\">\n    <label id=\"selectUrlToOpenLabel\">" + lf("Copy the URL of the project.") + "</label>\n    <input type=\"url\" tabindex=\"0\" autofocus aria-describedby=\"selectUrlToOpenLabel\" placeholder=\"" + shareUrl + "...\" class=\"ui blue fluid\"></input>\n  </div>\n</div>",
         }).done(function (res) {
             if (res) {
                 pxt.tickEvent("menu.open.url");
@@ -1249,6 +1353,9 @@ var ProjectView = (function (_super) {
                 else {
                     loadHeaderBySharedId(id);
                 }
+            }
+            else {
+                _this.home.showHome();
             }
         });
     };
@@ -1310,34 +1417,40 @@ var ProjectView = (function (_super) {
         this.debouncedSaveProjectName();
     };
     ProjectView.prototype.saveProjectNameAsync = function () {
-        var _this = this;
         if (!this.state.projectName || !this.state.header)
             return Promise.resolve();
         try {
-            // nothing to do?
-            if (pkg.mainPkg.config.name == this.state.projectName)
-                return Promise.resolve();
-            //Save the name in the target MainPackage as well
-            pkg.mainPkg.config.name = this.state.projectName;
-            pxt.debug('saving project name to ' + this.state.projectName);
-            var f = pkg.mainEditorPkg().lookupFile("this/" + pxt.CONFIG_NAME);
-            var config = JSON.parse(f.content);
-            config.name = this.state.projectName;
-            return f.setContentAsync(JSON.stringify(config, null, 4) + "\n")
-                .then(function () {
-                if (_this.state.header)
-                    _this.setState({
-                        projectName: _this.state.header.name
-                    });
-            });
+            return this.updateHeaderNameAsync(this.state.projectName);
         }
         catch (e) {
             pxt.reportException(e);
             return Promise.resolve();
         }
     };
+    ProjectView.prototype.updateHeaderNameAsync = function (name) {
+        var _this = this;
+        // nothing to do?
+        if (pkg.mainPkg.config.name == name)
+            return Promise.resolve();
+        //Save the name in the target MainPackage as well
+        pkg.mainPkg.config.name = name;
+        pxt.debug('saving project name to ' + name);
+        var f = pkg.mainEditorPkg().lookupFile("this/" + pxt.CONFIG_NAME);
+        var config = JSON.parse(f.content);
+        config.name = name;
+        return f.setContentAsync(JSON.stringify(config, null, 4) + "\n")
+            .then(function () {
+            if (_this.state.header)
+                _this.setState({
+                    projectName: name
+                });
+        });
+    };
     ProjectView.prototype.isTextEditor = function () {
         return this.editor == this.textEditor;
+    };
+    ProjectView.prototype.isPxtJsonEditor = function () {
+        return this.editor == this.pxtJsonEditor;
     };
     ProjectView.prototype.isBlocksEditor = function () {
         return this.editor == this.blocksEditor;
@@ -1345,11 +1458,14 @@ var ProjectView = (function (_super) {
     ProjectView.prototype.about = function () {
         pxt.tickEvent("menu.about");
         var compileService = pxt.appTarget.compileService;
+        var description = pxt.appTarget.description || pxt.appTarget.title;
+        var githubUrl = pxt.appTarget.appTheme.githubUrl;
         core.confirmAsync({
             header: lf("About {0}", pxt.appTarget.name),
             hideCancel: true,
             agreeLbl: lf("Ok"),
-            htmlBody: "\n<p>" + Util.htmlEscape(pxt.appTarget.description) + "</p>\n<p>" + lf("{0} version:", Util.htmlEscape(pxt.appTarget.name)) + " <a href=\"" + Util.htmlEscape(pxt.appTarget.appTheme.githubUrl) + "/releases/tag/v" + Util.htmlEscape(pxt.appTarget.versions.target) + "\" target=\"_blank\">" + Util.htmlEscape(pxt.appTarget.versions.target) + "</a></p>\n<p>" + lf("{0} version:", "Microsoft MakeCode") + " <a href=\"https://github.com/Microsoft/pxt/releases/tag/v" + Util.htmlEscape(pxt.appTarget.versions.pxt) + "\" target=\"_blank\">" + Util.htmlEscape(pxt.appTarget.versions.pxt) + "</a></p>\n" + (compileService && compileService.githubCorePackage && compileService.gittag ? "<p>" + lf("{0} version:", "C++ runtime") + " <a href=\"" + Util.htmlEscape("https://github.com/" + compileService.githubCorePackage + '/releases/tag/' + compileService.gittag) + "\" target=\"_blank\">" + Util.htmlEscape(compileService.gittag) + "</a></p>" : "") + "\n"
+            agreeClass: "positive focused",
+            htmlBody: "\n" + (description ? "<p>" + Util.htmlEscape(description) + "</p>" : "") + "\n" + (githubUrl ? "<p>" + lf("{0} version:", Util.htmlEscape(pxt.appTarget.name)) + " <a class=\"focused\" href=\"" + Util.htmlEscape(githubUrl) + "/releases/tag/v" + Util.htmlEscape(pxt.appTarget.versions.target) + "\" aria-label=\"" + lf("{0} version : {1}", Util.htmlEscape(pxt.appTarget.name), Util.htmlEscape(pxt.appTarget.versions.target)) + "\" target=\"_blank\">" + Util.htmlEscape(pxt.appTarget.versions.target) + "</a></p>" : "") + "\n<p>" + lf("{0} version:", "Microsoft MakeCode") + " <a href=\"https://github.com/Microsoft/pxt/releases/tag/v" + Util.htmlEscape(pxt.appTarget.versions.pxt) + "\" aria-label=\"" + lf("{0} version: {1}", "Microsoft MakeCode", Util.htmlEscape(pxt.appTarget.versions.pxt)) + "\" target=\"_blank\">" + Util.htmlEscape(pxt.appTarget.versions.pxt) + "</a></p>\n" + (compileService && compileService.githubCorePackage && compileService.gittag ? "<p>" + lf("{0} version:", "C++ runtime") + " <a href=\"" + Util.htmlEscape("https://github.com/" + compileService.githubCorePackage + '/releases/tag/' + compileService.gittag) + "\" aria-label=\"" + lf("{0} version: {1}", "C++ runtime", Util.htmlEscape(compileService.gittag)) + "\" target=\"_blank\">" + Util.htmlEscape(compileService.gittag) + "</a></p>" : "") + "\n"
         }).done();
     };
     ProjectView.prototype.embed = function () {
@@ -1375,100 +1491,85 @@ var ProjectView = (function (_super) {
         Util.assert(!this.state.sideDocsLoadUrl && targetTheme && !!targetTheme.sideDoc);
         this.startTutorial(targetTheme.sideDoc);
     };
-    ProjectView.prototype.openTutorials = function () {
-        //        this.setState({tutorialOptions: undefined});
-        pxt.tickEvent("menu.openTutorials");
-        this.projects.showOpenTutorials();
-    };
-    ProjectView.prototype.startTutorial = function (tutorialId) {
+    ProjectView.prototype.startTutorial = function (tutorialId, tutorialTitle) {
         pxt.tickEvent("tutorial.start");
-        core.showLoading(lf("starting tutorial..."));
-        this.startTutorialAsync(tutorialId)
-            .then(function () { return Promise.delay(500); });
+        // Check for Internet access
+        if (!pxt.Cloud.isNavigatorOnline()) {
+            core.errorNotification(lf("No Internet access, please connect and try again."));
+            this.home.showHome();
+        }
+        else {
+            core.showLoading("tutorial", lf("starting tutorial..."));
+            this.startTutorialAsync(tutorialId, tutorialTitle);
+        }
     };
-    ProjectView.prototype.startTutorialAsync = function (tutorialId) {
+    ProjectView.prototype.startTutorialAsync = function (tutorialId, tutorialTitle) {
         var _this = this;
-        var title = tutorialId;
+        var title = tutorialTitle || tutorialId.split('/').reverse()[0].replace('-', ' '); // drop any kind of sub-paths
         var result = [];
         sounds.initTutorial(); // pre load sounds
-        return pxt.Cloud.downloadMarkdownAsync(tutorialId)
-            .then(function (md) {
-            var titleRegex = /^#\s*(.*)/g.exec(md);
-            if (!titleRegex || titleRegex.length < 1)
-                return;
-            title = titleRegex[1].trim();
-            var steps = md.split(/^###[^#].*$/gmi);
-            for (var step = 1; step < steps.length; step++) {
-                var stepmd = "###" + steps[step];
-                result.push(stepmd);
-            }
-            //TODO: parse for tutorial options, mainly initial blocks
-        }).then(function () {
-            return _this.createProjectAsync({
-                name: title
-            });
-        }).then(function () {
+        return Promise.resolve()
+            .then(function () {
             var tutorialOptions = {
                 tutorial: tutorialId,
                 tutorialName: title,
-                tutorialStep: 0,
-                tutorialSteps: result
+                tutorialStep: 0
             };
-            _this.setState({ tutorialOptions: tutorialOptions, tracing: undefined });
+            _this.setState({ tutorialOptions: tutorialOptions, editorState: { searchBar: false }, tracing: undefined });
             var tc = _this.refs["tutorialcontent"];
             tc.setPath(tutorialId);
+        }).then(function () {
+            return _this.createProjectAsync({
+                name: title,
+                inTutorial: true
+            });
         }).catch(function (e) {
-            core.hideLoading();
+            core.hideLoading("tutorial");
             core.handleNetworkError(e);
         });
     };
-    ProjectView.prototype.exitTutorial = function (keep) {
-        pxt.tickEvent("tutorial.exit");
-        core.showLoading(lf("leaving tutorial..."));
-        this.exitTutorialAsync(keep)
-            .then(function () { return Promise.delay(500); })
-            .done(function () { return core.hideLoading(); });
-    };
-    ProjectView.prototype.exitTutorialAsync = function (keep) {
+    ProjectView.prototype.completeTutorial = function () {
         var _this = this;
-        // tutorial project is temporary, no need to delete
+        pxt.tickEvent("tutorial.complete");
+        core.showLoading("leavingtutorial", lf("leaving tutorial..."));
+        this.exitTutorialAsync()
+            .then(function () {
+            var curr = pkg.mainEditorPkg().header;
+            return _this.loadHeaderAsync(curr);
+        }).done(function () {
+            core.hideLoading("leavingtutorial");
+        });
+    };
+    ProjectView.prototype.exitTutorial = function () {
+        var _this = this;
+        pxt.tickEvent("tutorial.exit");
+        core.showLoading("leavingtutorial", lf("leaving tutorial..."));
+        this.exitTutorialAsync()
+            .done(function () {
+            core.hideLoading("leavingtutorial");
+            _this.openHome();
+        });
+    };
+    ProjectView.prototype.exitTutorialAsync = function () {
+        var _this = this;
         var curr = pkg.mainEditorPkg().header;
         var files = pkg.mainEditorPkg().getAllFiles();
-        if (!keep) {
-            curr.isDeleted = true;
-        }
-        else {
-            curr.temporary = false;
-        }
-        this.setState({ active: false, filters: undefined });
-        return workspace.saveAsync(curr, {})
-            .then(function () { return keep ? workspace.installAsync(curr, files) : Promise.resolve(null); })
-            .then(function () {
-            if (workspace.getHeaders().length > 0) {
-                return _this.loadHeaderAsync(workspace.getHeaders()[0], null);
-            }
-            else {
-                return _this.newProject();
-            }
-        })
+        return workspace.saveAsync(curr, files)
+            .then(function () { return Promise.delay(500); })
             .finally(function () {
-            core.hideLoading();
-            _this.setState({ active: true, tutorialOptions: undefined, tracing: undefined });
+            _this.setState({ tutorialOptions: undefined, tracing: undefined, editorState: undefined });
+            core.resetFocus();
         });
     };
     ProjectView.prototype.toggleHighContrast = function () {
         var _this = this;
-        var hc = !this.state.highContrast;
-        pxt.tickEvent("menu.highcontrast", { on: hc ? 1 : 0 });
-        this.setState({ highContrast: hc }, function () { return _this.restartSimulator(); });
+        var highContrastOn = !this.state.highContrast;
+        pxt.tickEvent("menu.highcontrast", { on: highContrastOn ? 1 : 0 });
+        this.setState({ highContrast: highContrastOn }, function () { return _this.restartSimulator(); });
+        core.highContrast = highContrastOn;
         if (this.editor && this.editor.isReady) {
-            this.editor.setHighContrast(hc);
+            this.editor.setHighContrast(highContrastOn);
         }
-    };
-    ProjectView.prototype.completeTutorial = function () {
-        //        this.setState({tutorialOptions: undefined});
-        pxt.tickEvent("tutorial.complete");
-        this.tutorialComplete.show();
     };
     ProjectView.prototype.showTutorialHint = function () {
         var th = this.refs["tutorialhint"];
@@ -1510,65 +1611,65 @@ var ProjectView = (function (_super) {
         var tutorialOptions = this.state.tutorialOptions;
         var inTutorial = !!tutorialOptions && !!tutorialOptions.tutorial;
         var docMenu = targetTheme.docMenu && targetTheme.docMenu.length && !sandbox && !inTutorial;
-        var gettingStarted = !sandbox && !inTutorial && !this.state.sideDocsLoadUrl && targetTheme && targetTheme.sideDoc && isBlocks && !targetTheme.useStartPage;
-        var gettingStartedTooltip = lf("Open beginner tutorial");
         var run = true; // !compileBtn || !pxt.appTarget.simulator.autoRun || !isBlocks;
         var restart = run && !simOpts.hideRestart;
         var trace = run && simOpts.enableTrace;
         var fullscreen = run && !inTutorial && !simOpts.hideFullscreen;
         var audio = run && !inTutorial && targetTheme.hasAudio;
-        var useModulator = compile.useModulator;
         var hideMenuBar = targetTheme.hideMenuBar, hideEditorToolbar = targetTheme.hideEditorToolbar;
         var isHeadless = simOpts.headless;
-        var cookieKey = "cookieconsent";
-        var cookieConsented = targetTheme.hideCookieNotice || electron.isElectron || pxt.winrt.isWinRT() || !!pxt.storage.getLocal(cookieKey)
-            || sandbox;
         var simActive = this.state.embedSimView;
         var blockActive = this.isBlocksActive();
         var javascriptActive = this.isJavaScriptActive();
         var traceTooltip = this.state.tracing ? lf("Disable Slow-Mo") : lf("Slow-Mo");
         var selectLanguage = targetTheme.selectLanguage;
         var betaUrl = targetTheme.betaUrl;
-        var consentCookie = function () {
-            pxt.storage.setLocal(cookieKey, "1");
-            _this.forceUpdate();
-        };
+        var showEditorToolbar = !hideEditorToolbar && this.editor.hasEditorToolbar();
+        var useSerialEditor = pxt.appTarget.serial && !!pxt.appTarget.serial.useEditor;
         var showSideDoc = sideDocs && this.state.sideDocsLoadUrl && !this.state.sideDocsCollapsed;
         var shouldHideEditorFloats = (this.state.hideEditorFloats || this.state.collapseEditorTools) && (!inTutorial || isHeadless);
         var shouldCollapseEditorTools = this.state.collapseEditorTools && (!inTutorial || isHeadless);
         // For apps, if the user is not on the live website, display a warning banner
-        var isApp = electron.isElectron || pxt.winrt.isWinRT() || !!window.ipcRenderer;
+        var isApp = electron.isElectron || pxt.winrt.isWinRT();
         var isLocalServe = location.hostname === "localhost";
         var isExperimentalUrlPath = location.pathname !== "/"
             && (targetTheme.appPathNames || []).indexOf(location.pathname) === -1;
         var showExperimentalBanner = !isLocalServe && isApp && !this.state.hideExperimentalBanner && isExperimentalUrlPath;
         var liveUrl = pxt.appTarget.appTheme.homeUrl + location.search + location.hash;
+        // cookie concent
+        var cookieKey = "cookieconsent";
+        var cookieConsented = targetTheme.hideCookieNotice || isApp || !!pxt.storage.getLocal(cookieKey)
+            || sandbox;
+        var consentCookie = function () {
+            pxt.storage.setLocal(cookieKey, "1");
+            _this.forceUpdate();
+        };
         // update window title
         document.title = this.state.header ? this.state.header.name + " - " + pxt.appTarget.name : pxt.appTarget.name;
         var rootClasses = sui.cx([
             shouldHideEditorFloats ? " hideEditorFloats" : '',
             shouldCollapseEditorTools ? " collapsedEditorTools" : '',
             this.state.fullscreen ? 'fullscreensim' : '',
+            this.state.highContrast ? 'hc' : '',
             showSideDoc ? 'sideDocs' : '',
             pxt.shell.layoutTypeClass(),
             inTutorial ? 'tutorial' : '',
             pxt.options.light ? 'light' : '',
             pxt.BrowserUtils.isTouchEnabled() ? 'has-touch' : '',
             hideMenuBar ? 'hideMenuBar' : '',
-            hideEditorToolbar ? 'hideEditorToolbar' : '',
+            !showEditorToolbar ? 'hideEditorToolbar' : '',
             sandbox && simActive ? 'simView' : '',
             'full-abs',
             'dimmable'
         ]);
-        return (React.createElement("div", {id: 'root', className: rootClasses}, showExperimentalBanner ? React.createElement("div", {id: "experimentalBanner", className: "ui icon top attached fixed negative mini message"}, React.createElement("i", {className: "warning circle icon"}), React.createElement("i", {className: "close icon", onClick: function () { return _this.hideBanner(); }}), React.createElement("div", {className: "content"}, React.createElement("div", {className: "header"}, lf("You are viewing an experimental version of the editor")), React.createElement("a", {href: liveUrl}, lf("Take me back")))) : undefined, useModulator ? React.createElement("audio", {id: "modulatorAudioOutput", controls: true}) : undefined, useModulator ? React.createElement("div", {id: "modulatorWrapper"}, React.createElement("div", {id: "modulatorBubble"}, React.createElement("canvas", {id: "modulatorWavStrip"}))) : undefined, hideMenuBar ? undefined :
-            React.createElement("div", {id: "menubar", role: "banner"}, React.createElement("div", {className: "ui borderless fixed " + (targetTheme.invertedMenu ? "inverted" : '') + " menu", role: "menubar"}, !sandbox ? React.createElement("div", {className: "left menu"}, React.createElement("span", {id: "logo", className: "ui item logo"}, targetTheme.logo || targetTheme.portraitLogo
-                ? React.createElement("a", {className: "ui image", target: "_blank", rel: "noopener", href: targetTheme.logoUrl}, React.createElement("img", {className: "ui logo " + (targetTheme.portraitLogo ? " portrait hide" : ''), src: Util.toDataUri(targetTheme.logo || targetTheme.portraitLogo), alt: targetTheme.boardName + " Logo"}))
-                : React.createElement("span", {className: "name"}, targetTheme.name), targetTheme.portraitLogo ? (React.createElement("a", {className: "ui", target: "_blank", rel: "noopener", href: targetTheme.logoUrl}, React.createElement("img", {className: 'ui mini image portrait only', src: Util.toDataUri(targetTheme.portraitLogo), alt: targetTheme.boardName + " Logo"}))) : null), !inTutorial ? React.createElement(sui.Item, {class: "icon openproject", role: "menuitem", textClass: "landscape only", icon: "folder open large", text: lf("Projects"), onClick: function () { return _this.openProject(); }}) : null, !inTutorial && this.state.header && sharingEnabled ? React.createElement(sui.Item, {class: "icon shareproject", role: "menuitem", textClass: "widedesktop only", text: lf("Share"), icon: "share alternate large", onClick: function () { return _this.embed(); }}) : null, inTutorial ? React.createElement(sui.Item, {class: "tutorialname", role: "menuitem", textClass: "landscape only", text: tutorialOptions.tutorialName}) : null) : React.createElement("div", {className: "left menu"}, React.createElement("span", {id: "logo", className: "ui item logo"}, React.createElement("img", {className: "ui mini image", src: Util.toDataUri(rightLogo), onClick: function () { return _this.launchFullEditor(); }, alt: targetTheme.boardName + " Logo"}))), !inTutorial && !targetTheme.blocksOnly ? React.createElement(sui.Item, {class: "editor-menuitem"}, React.createElement("div", {className: "ui grid padded"}, sandbox ? React.createElement(sui.Item, {class: "sim-menuitem thin portrait only", textClass: "landscape only", text: lf("Simulator"), icon: simActive && this.state.running ? "stop" : "play", active: simActive, onClick: function () { return _this.openSimView(); }, title: !simActive ? lf("Show Simulator") : runTooltip}) : undefined, React.createElement(sui.Item, {class: "blocks-menuitem", textClass: "landscape only", text: lf("Blocks"), icon: "xicon blocks", active: blockActive, onClick: function () { return _this.openBlocks(); }, title: lf("Convert code to Blocks")}), React.createElement(sui.Item, {class: "javascript-menuitem", textClass: "landscape only", text: lf("JavaScript"), icon: "xicon js", active: javascriptActive, onClick: function () { return _this.openJavaScript(); }, title: lf("Convert code to JavaScript")}), React.createElement("div", {className: "ui item toggle"}))) : undefined, inTutorial ? React.createElement(tutorial.TutorialMenuItem, {parent: this}) : undefined, React.createElement("div", {className: "right menu"}, docMenu ? React.createElement(container.DocsMenuItem, {parent: this}) : undefined, sandbox || inTutorial ? undefined :
-                React.createElement(sui.DropdownMenuItem, {icon: 'setting large', title: lf("More..."), class: "more-dropdown-menuitem"}, this.state.header ? React.createElement(sui.Item, {role: "menuitem", icon: "options", text: lf("Project Settings"), onClick: function () { return _this.setFile(pkg.mainEditorPkg().lookupFile("this/pxt.json")); }}) : undefined, this.state.header && packages ? React.createElement(sui.Item, {role: "menuitem", icon: "disk outline", text: lf("Add Package..."), onClick: function () { return _this.addPackage(); }}) : undefined, this.state.header ? React.createElement(sui.Item, {role: "menuitem", icon: "trash", text: lf("Delete Project"), onClick: function () { return _this.removeProject(); }}) : undefined, reportAbuse ? React.createElement(sui.Item, {role: "menuitem", icon: "warning circle", text: lf("Report Abuse..."), onClick: function () { return _this.showReportAbuse(); }}) : undefined, React.createElement("div", {className: "ui divider"}), selectLanguage ? React.createElement(sui.Item, {icon: "xicon globe", role: "menuitem", text: lf("Language"), onClick: function () { return _this.selectLang(); }}) : undefined, targetTheme.highContrast ? React.createElement(sui.Item, {role: "menuitem", text: this.state.highContrast ? lf("High Contrast Off") : lf("High Contrast On"), onClick: function () { return _this.toggleHighContrast(); }}) : undefined, React.createElement(sui.Item, {role: "menuitem", icon: 'sign out', text: lf("Reset"), onClick: function () { return _this.reset(); }}), React.createElement("div", {className: "ui divider"}), targetTheme.privacyUrl ? React.createElement("a", {className: "ui item", href: targetTheme.privacyUrl, role: "menuitem", title: lf("Privacy & Cookies"), target: "_blank"}, lf("Privacy & Cookies")) : undefined, targetTheme.termsOfUseUrl ? React.createElement("a", {className: "ui item", href: targetTheme.termsOfUseUrl, role: "menuitem", title: lf("Terms Of Use"), target: "_blank"}, lf("Terms Of Use")) : undefined, React.createElement(sui.Item, {role: "menuitem", text: lf("About..."), onClick: function () { return _this.about(); }}), electron.isElectron ? React.createElement(sui.Item, {role: "menuitem", text: lf("Check for updates..."), onClick: function () { return electron.checkForUpdate(); }}) : undefined, targetTheme.feedbackUrl ? React.createElement("div", {className: "ui divider"}) : undefined, targetTheme.feedbackUrl ? React.createElement("a", {className: "ui item", href: targetTheme.feedbackUrl, role: "menuitem", title: lf("Give Feedback"), target: "_blank", rel: "noopener"}, lf("Give Feedback")) : undefined), sandbox && !targetTheme.hideEmbedEdit ? React.createElement(sui.Item, {role: "menuitem", icon: "external", textClass: "mobile hide", text: lf("Edit"), onClick: function () { return _this.launchFullEditor(); }}) : undefined, inTutorial ? React.createElement(sui.ButtonMenuItem, {class: "exit-tutorial-btn", role: "menuitem", icon: "external", text: lf("Exit tutorial"), textClass: "landscape only", onClick: function () { return _this.exitTutorial(true); }}) : undefined, !sandbox ? React.createElement("a", {id: "organization", href: targetTheme.organizationUrl, target: "blank", rel: "noopener", className: "ui item logo", onClick: function () { return pxt.tickEvent("menu.org"); }}, targetTheme.organizationWideLogo || targetTheme.organizationLogo
-                ? React.createElement("img", {className: "ui logo " + (targetTheme.organizationWideLogo ? " portrait hide" : ''), src: Util.toDataUri(targetTheme.organizationWideLogo || targetTheme.organizationLogo), alt: targetTheme.organization + " Logo"})
-                : React.createElement("span", {className: "name"}, targetTheme.organization), targetTheme.organizationLogo ? (React.createElement("img", {className: 'ui mini image portrait only', src: Util.toDataUri(targetTheme.organizationLogo), alt: targetTheme.organization + " Logo"})) : null) : undefined, betaUrl ? React.createElement("a", {href: "" + betaUrl, className: "ui red mini corner top left attached label betalabel"}, lf("Beta")) : undefined))), gettingStarted ?
-            React.createElement("div", {id: "getting-started-btn"}, React.createElement(sui.Button, {class: "portrait hide bottom attached small getting-started-btn", title: gettingStartedTooltip, text: lf("Getting Started"), onClick: function () { return _this.gettingStarted(); }}))
-            : undefined, React.createElement("div", {id: "simulator"}, React.createElement("div", {id: "filelist", className: "ui items", role: "complementary"}, React.createElement("div", {id: "boardview", className: "ui vertical editorFloat"}), !isHeadless ? React.createElement("div", {className: "ui item grid centered portrait hide simtoolbar"}, React.createElement("div", {className: "ui icon buttons " + (this.state.fullscreen ? 'massive' : ''), style: { padding: "0" }}, make ? React.createElement(sui.Button, {icon: 'configure', class: "fluid sixty secondary", text: lf("Make"), title: makeTooltip, onClick: function () { return _this.openInstructions(); }}) : undefined, run ? React.createElement(sui.Button, {key: 'runbtn', class: "play-button " + (this.state.running ? "stop" : "play"), icon: this.state.running ? "stop" : "play", title: runTooltip, onClick: function () { return _this.startStopSimulator(); }}) : undefined, restart ? React.createElement(sui.Button, {key: 'restartbtn', class: "restart-button", icon: "refresh", title: restartTooltip, onClick: function () { return _this.restartSimulator(); }}) : undefined, trace ? React.createElement(sui.Button, {key: 'debug', class: "trace-button " + (this.state.tracing ? 'orange' : ''), icon: "xicon turtle", title: traceTooltip, onClick: function () { return _this.toggleTrace(); }}) : undefined), React.createElement("div", {className: "ui icon buttons " + (this.state.fullscreen ? 'massive' : ''), style: { padding: "0" }}, audio ? React.createElement(sui.Button, {key: 'mutebtn', class: "mute-button " + (this.state.mute ? 'red' : ''), icon: "" + (this.state.mute ? 'volume off' : 'volume up'), title: muteTooltip, onClick: function () { return _this.toggleMute(); }}) : undefined, fullscreen ? React.createElement(sui.Button, {key: 'fullscreenbtn', class: "fullscreen-button", icon: "" + (this.state.fullscreen ? 'compress' : 'maximize'), title: fullscreenTooltip, onClick: function () { return _this.toggleSimulatorFullscreen(); }}) : undefined)) : undefined, React.createElement("div", {className: "ui item portrait hide"}, pxt.options.debug && !this.state.running ? React.createElement(sui.Button, {key: 'debugbtn', class: 'teal', icon: "xicon bug", text: "Sim Debug", onClick: function () { return _this.runSimulator({ debug: true }); }}) : '', pxt.options.debug ? React.createElement(sui.Button, {key: 'hwdebugbtn', class: 'teal', icon: "xicon chip", text: "Dev Debug", onClick: function () { return _this.hwDebug(); }}) : ''), React.createElement("div", {className: "ui editorFloat portrait hide"}, React.createElement(logview.LogView, {ref: "logs"})), sandbox || isBlocks ? undefined : React.createElement(filelist.FileList, {parent: this}))), React.createElement("div", {id: "maineditor", className: sandbox ? "sandbox" : "", role: "main"}, inTutorial ? React.createElement(tutorial.TutorialCard, {ref: "tutorialcard", parent: this}) : undefined, this.allEditors.map(function (e) { return e.displayOuter(); })), inTutorial ? React.createElement(tutorial.TutorialHint, {ref: "tutorialhint", parent: this}) : undefined, inTutorial ? React.createElement(tutorial.TutorialContent, {ref: "tutorialcontent", parent: this}) : undefined, hideEditorToolbar ? undefined : React.createElement("div", {id: "editortools", role: "complementary"}, React.createElement(editortoolbar.EditorToolbar, {ref: "editortools", parent: this})), sideDocs ? React.createElement(container.SideDocs, {ref: "sidedoc", parent: this}) : undefined, sandbox ? undefined : React.createElement(scriptsearch.ScriptSearch, {parent: this, ref: function (v) { return _this.scriptSearch = v; }}), sandbox ? undefined : React.createElement(projects.Projects, {parent: this, ref: function (v) { return _this.projects = v; }, hasGettingStarted: gettingStarted}), sandbox || !sharingEnabled ? undefined : React.createElement(share.ShareEditor, {parent: this, ref: function (v) { return _this.shareEditor = v; }}), selectLanguage ? React.createElement(lang.LanguagePicker, {parent: this, ref: function (v) { return _this.languagePicker = v; }}) : undefined, inTutorial ? React.createElement(tutorial.TutorialComplete, {parent: this, ref: function (v) { return _this.tutorialComplete = v; }}) : undefined, sandbox ? React.createElement("div", {className: "ui horizontal small divided link list sandboxfooter"}, targetTheme.organizationUrl && targetTheme.organization ? React.createElement("a", {className: "item", target: "_blank", rel: "noopener", href: targetTheme.organizationUrl}, targetTheme.organization) : undefined, React.createElement("a", {target: "_blank", className: "item", href: targetTheme.termsOfUseUrl, rel: "noopener"}, lf("Terms of Use")), React.createElement("a", {target: "_blank", className: "item", href: targetTheme.privacyUrl, rel: "noopener"}, lf("Privacy")), React.createElement("span", {className: "item"}, React.createElement("a", {className: "ui thin portrait only", title: compileTooltip, onClick: function () { return _this.compile(); }}, React.createElement("i", {className: "icon " + (pxt.appTarget.appTheme.downloadIcon || 'download')}), pxt.appTarget.appTheme.useUploadMessage ? lf("Upload") : lf("Download")))) : undefined, cookieConsented ? undefined : React.createElement("div", {id: 'cookiemsg', className: "ui teal inverted black segment"}, React.createElement("button", {"arial-label": lf("Ok"), className: "ui right floated icon button clear inverted", onClick: consentCookie}, React.createElement("i", {className: "remove icon"})), lf("By using this site you agree to the use of cookies for analytics."), React.createElement("a", {target: "_blank", className: "ui link", href: pxt.appTarget.appTheme.privacyUrl, rel: "noopener"}, lf("Learn more")))));
+        return (React.createElement("div", {id: 'root', className: rootClasses}, showExperimentalBanner ? React.createElement("div", {id: "experimentalBanner", className: "ui icon top attached fixed negative mini message"}, React.createElement(sui.Icon, {icon: "warning circle"}), React.createElement(sui.Icon, {icon: "close", onClick: function () { return _this.hideBanner(); }}), React.createElement("div", {className: "content"}, React.createElement("div", {className: "header"}, lf("You are viewing an experimental version of the editor")), React.createElement("a", {href: liveUrl}, lf("Take me back")))) : undefined, hideMenuBar ? undefined :
+            React.createElement("header", {id: "menubar", role: "banner", className: "ui menu"}, React.createElement("div", {id: "accessibleMenu", role: "menubar"}, React.createElement(sui.Item, {class: (targetTheme.invertedMenu ? "inverted" : '') + " menu", role: "menuitem", icon: "xicon js", text: lf("Skip to JavaScript editor"), onClick: function () { return _this.openJavaScript(); }}), selectLanguage ? React.createElement(sui.Item, {class: (targetTheme.invertedMenu ? "inverted" : '') + " menu", role: "menuitem", icon: "xicon globe", text: lf("Select Language"), onClick: function () { return _this.selectLang(); }}) : undefined, targetTheme.highContrast ? React.createElement(sui.Item, {class: (targetTheme.invertedMenu ? "inverted" : '') + " menu", role: "menuitem", text: this.state.highContrast ? lf("High Contrast Off") : lf("High Contrast On"), onClick: function () { return _this.toggleHighContrast(); }}) : undefined), React.createElement("div", {className: "ui borderless fixed " + (targetTheme.invertedMenu ? "inverted" : '') + " menu", role: "menubar", "aria-label": lf("Main menu")}, !sandbox ? React.createElement("div", {className: "left menu"}, React.createElement("a", {"aria-label": lf("{0} Logo", targetTheme.boardName), role: "menuitem", target: "blank", rel: "noopener", className: "ui item logo brand", onClick: function () { return _this.brandIconClick(); }, onKeyDown: sui.fireClickOnEnter}, targetTheme.logo || targetTheme.portraitLogo
+                ? React.createElement("img", {className: "ui logo " + (targetTheme.logo ? " portrait hide" : ''), src: Util.toDataUri(targetTheme.logo || targetTheme.portraitLogo), alt: lf("{0} Logo", targetTheme.boardName)})
+                : React.createElement("span", {className: "name"}, targetTheme.boardName), targetTheme.portraitLogo ? (React.createElement("img", {className: 'ui mini image portrait only', src: Util.toDataUri(targetTheme.portraitLogo), alt: lf("{0} Logo", targetTheme.boardName)})) : null), betaUrl ? React.createElement("a", {href: "" + betaUrl, className: "ui red mini corner top left attached label betalabel", role: "menuitem"}, lf("Beta")) : undefined, !inTutorial ? React.createElement(sui.Item, {class: "icon openproject", role: "menuitem", textClass: "landscape only", icon: "home large", ariaLabel: lf("Home screen"), text: lf("Home"), onClick: function () { return _this.exitAndSave(); }}) : null, !inTutorial && this.state.header && sharingEnabled ? React.createElement(sui.Item, {class: "icon shareproject", role: "menuitem", textClass: "widedesktop only", ariaLabel: lf("Share Project"), text: lf("Share"), icon: "share alternate large", onClick: function () { return _this.embed(); }}) : null, inTutorial ? React.createElement(sui.Item, {class: "tutorialname", tabIndex: -1, textClass: "landscape only", text: tutorialOptions.tutorialName}) : null) : React.createElement("div", {className: "left menu"}, React.createElement("span", {id: "logo", className: "ui item logo"}, React.createElement("img", {className: "ui mini image", src: Util.toDataUri(rightLogo), tabIndex: 0, onClick: function () { return _this.launchFullEditor(); }, onKeyDown: sui.fireClickOnEnter, alt: targetTheme.boardName + " Logo"}))), !inTutorial && !targetTheme.blocksOnly ? React.createElement("div", {className: "ui item link editor-menuitem"}, React.createElement("div", {className: "ui grid padded"}, sandbox ? React.createElement(sui.Item, {class: "sim-menuitem thin portrait only", role: "menuitem", textClass: "landscape only", text: lf("Simulator"), icon: simActive && this.state.running ? "stop" : "play", active: simActive, onClick: function () { return _this.openSimView(); }, title: !simActive ? lf("Show Simulator") : runTooltip}) : undefined, React.createElement(sui.Item, {class: "blocks-menuitem", role: "menuitem", textClass: "landscape only", text: lf("Blocks"), icon: "xicon blocks", active: blockActive, onClick: function () { return _this.openBlocks(); }, title: lf("Convert code to Blocks")}), React.createElement(sui.Item, {class: "javascript-menuitem", role: "menuitem", textClass: "landscape only", text: lf("JavaScript"), icon: "xicon js", active: javascriptActive, onClick: function () { return _this.openJavaScript(false); }, title: lf("Convert code to JavaScript")}), React.createElement("div", {className: "ui item toggle"}))) : undefined, inTutorial ? React.createElement(tutorial.TutorialMenuItem, {parent: this}) : undefined, React.createElement("div", {className: "right menu"}, docMenu ? React.createElement(container.DocsMenuItem, {parent: this}) : undefined, sandbox || inTutorial ? undefined :
+                React.createElement(sui.DropdownMenuItem, {icon: 'setting large', title: lf("More..."), class: "more-dropdown-menuitem"}, this.state.header ? React.createElement(sui.Item, {role: "menuitem", icon: "options", text: lf("Project Settings"), onClick: function () { return _this.setFile(pkg.mainEditorPkg().lookupFile("this/pxt.json")); }, tabIndex: -1}) : undefined, this.state.header && packages ? React.createElement(sui.Item, {role: "menuitem", icon: "disk outline", text: lf("Add Package..."), onClick: function () { return _this.addPackage(); }, tabIndex: -1}) : undefined, this.state.header ? React.createElement(sui.Item, {role: "menuitem", icon: "trash", text: lf("Delete Project"), onClick: function () { return _this.removeProject(); }, tabIndex: -1}) : undefined, reportAbuse ? React.createElement(sui.Item, {role: "menuitem", icon: "warning circle", text: lf("Report Abuse..."), onClick: function () { return _this.showReportAbuse(); }, tabIndex: -1}) : undefined, React.createElement("div", {className: "ui divider"}), selectLanguage ? React.createElement(sui.Item, {icon: "xicon globe", role: "menuitem", text: lf("Language"), onClick: function () { return _this.selectLang(); }, tabIndex: -1}) : undefined, targetTheme.highContrast ? React.createElement(sui.Item, {role: "menuitem", text: this.state.highContrast ? lf("High Contrast Off") : lf("High Contrast On"), onClick: function () { return _this.toggleHighContrast(); }, tabIndex: -1}) : undefined, React.createElement(sui.Item, {role: "menuitem", icon: 'sign out', text: lf("Reset"), onClick: function () { return _this.reset(); }, tabIndex: -1}), React.createElement("div", {className: "ui divider"}), targetTheme.privacyUrl ? React.createElement("a", {className: "ui item", href: targetTheme.privacyUrl, role: "menuitem", title: lf("Privacy & Cookies"), target: "_blank", tabIndex: -1}, lf("Privacy & Cookies")) : undefined, targetTheme.termsOfUseUrl ? React.createElement("a", {className: "ui item", href: targetTheme.termsOfUseUrl, role: "menuitem", title: lf("Terms Of Use"), target: "_blank", tabIndex: -1}, lf("Terms Of Use")) : undefined, React.createElement(sui.Item, {role: "menuitem", text: lf("About..."), onClick: function () { return _this.about(); }, tabIndex: -1}), electron.isPxtElectron ? React.createElement(sui.Item, {role: "menuitem", text: lf("Check for updates..."), onClick: function () { return electron.checkForUpdate(); }, tabIndex: -1}) : undefined, targetTheme.feedbackUrl ? React.createElement("div", {className: "ui divider"}) : undefined, targetTheme.feedbackUrl ? React.createElement("a", {className: "ui item", href: targetTheme.feedbackUrl, role: "menuitem", title: lf("Give Feedback"), target: "_blank", rel: "noopener", tabIndex: -1}, lf("Give Feedback")) : undefined), sandbox && !targetTheme.hideEmbedEdit ? React.createElement(sui.Item, {role: "menuitem", icon: "external", textClass: "mobile hide", text: lf("Edit"), onClick: function () { return _this.launchFullEditor(); }}) : undefined, inTutorial ? React.createElement(sui.ButtonMenuItem, {class: "exit-tutorial-btn", role: "menuitem", icon: "external", text: lf("Exit tutorial"), textClass: "landscape only", onClick: function () { return _this.exitTutorial(); }}) : undefined, !sandbox ? React.createElement("a", {href: targetTheme.organizationUrl, "aria-label": lf("{0} Logo", targetTheme.organization), role: "menuitem", target: "blank", rel: "noopener", className: "ui item logo organization", onClick: function () { return pxt.tickEvent("menu.org"); }}, targetTheme.organizationWideLogo || targetTheme.organizationLogo
+                ? React.createElement("img", {className: "ui logo " + (targetTheme.organizationWideLogo ? " portrait hide" : ''), src: Util.toDataUri(targetTheme.organizationWideLogo || targetTheme.organizationLogo), alt: lf("{0} Logo", targetTheme.organization)})
+                : React.createElement("span", {className: "name"}, targetTheme.organization), targetTheme.organizationLogo ? (React.createElement("img", {className: 'ui mini image portrait only', src: Util.toDataUri(targetTheme.organizationLogo), alt: lf("{0} Logo", targetTheme.organization)})) : null) : undefined))), React.createElement("div", {id: "maineditor", className: sandbox ? "sandbox" : "", role: "main"}, inTutorial ? React.createElement(tutorial.TutorialCard, {ref: "tutorialcard", parent: this}) : undefined), React.createElement("div", {id: "simulator"}, React.createElement("aside", {id: "filelist", className: "ui items"}, React.createElement("label", {htmlFor: "boardview", id: "boardviewLabel", className: "accessible-hidden", "aria-hidden": "true"}, lf("Simulator")), React.createElement("div", {id: "boardview", className: "ui vertical editorFloat", role: "region", "aria-labelledby": "boardviewLabel"}), !isHeadless ? React.createElement("aside", {className: "ui item grid centered portrait hide simtoolbar", role: "complementary", "aria-label": lf("Simulator toolbar")}, React.createElement("div", {className: "ui icon buttons " + (this.state.fullscreen ? 'massive' : ''), style: { padding: "0" }}, make ? React.createElement(sui.Button, {icon: 'configure', class: "fluid sixty secondary", text: lf("Make"), title: makeTooltip, onClick: function () { return _this.openInstructions(); }}) : undefined, run ? React.createElement(sui.Button, {key: 'runbtn', class: "play-button " + (this.state.running ? "stop" : "play"), icon: this.state.running ? "stop" : "play", title: runTooltip, onClick: function () { return _this.startStopSimulator(); }}) : undefined, restart ? React.createElement(sui.Button, {key: 'restartbtn', class: "restart-button", icon: "refresh", title: restartTooltip, onClick: function () { return _this.restartSimulator(); }}) : undefined, trace ? React.createElement(sui.Button, {key: 'debug', class: "trace-button " + (this.state.tracing ? 'orange' : ''), icon: "xicon turtle", title: traceTooltip, onClick: function () { return _this.toggleTrace(); }}) : undefined), React.createElement("div", {className: "ui icon buttons " + (this.state.fullscreen ? 'massive' : ''), style: { padding: "0" }}, audio ? React.createElement(sui.Button, {key: 'mutebtn', class: "mute-button " + (this.state.mute ? 'red' : ''), icon: "" + (this.state.mute ? 'volume off' : 'volume up'), title: muteTooltip, onClick: function () { return _this.toggleMute(); }}) : undefined, fullscreen ? React.createElement(sui.Button, {key: 'fullscreenbtn', class: "fullscreen-button", icon: "" + (this.state.fullscreen ? 'compress' : 'maximize'), title: fullscreenTooltip, onClick: function () { return _this.toggleSimulatorFullscreen(); }}) : undefined)) : undefined, React.createElement("div", {className: "ui item portrait hide"}, pxt.options.debug && !this.state.running ? React.createElement(sui.Button, {key: 'debugbtn', class: 'teal', icon: "xicon bug", text: "Sim Debug", onClick: function () { return _this.runSimulator({ debug: true }); }}) : '', pxt.options.debug ? React.createElement(sui.Button, {key: 'hwdebugbtn', class: 'teal', icon: "xicon chip", text: "Dev Debug", onClick: function () { return _this.hwDebug(); }}) : ''), useSerialEditor ?
+            React.createElement("div", {id: "serialPreview", className: "ui editorFloat portrait hide"}, React.createElement(serialindicator.SerialIndicator, {ref: "simIndicator", isSim: true, onClick: function () { return _this.openSerial(true); }}), React.createElement(serialindicator.SerialIndicator, {ref: "devIndicator", isSim: false, onClick: function () { return _this.openSerial(false); }})) : undefined, sandbox || isBlocks || this.editor == this.serialEditor ? undefined : React.createElement(filelist.FileList, {parent: this}))), React.createElement("div", {id: "maineditor", className: sandbox ? "sandbox" : "", role: "main"}, this.allEditors.map(function (e) { return e.displayOuter(); })), inTutorial ? React.createElement(tutorial.TutorialHint, {ref: "tutorialhint", parent: this}) : undefined, inTutorial ? React.createElement(tutorial.TutorialContent, {ref: "tutorialcontent", parent: this}) : undefined, showEditorToolbar ? React.createElement("div", {id: "editortools", role: "complementary", "aria-label": lf("Editor toolbar")}, React.createElement(editortoolbar.EditorToolbar, {ref: "editortools", parent: this})) : undefined, sideDocs ? React.createElement(container.SideDocs, {ref: "sidedoc", parent: this}) : undefined, sandbox ? undefined : React.createElement(scriptsearch.ScriptSearch, {parent: this, ref: function (v) { return _this.scriptSearch = v; }}), sandbox ? undefined : React.createElement(projects.Projects, {parent: this, ref: function (v) { return _this.home = v; }}), sandbox ? undefined : React.createElement(extensions.Extensions, {parent: this, ref: function (v) { return _this.extensions = v; }}), sandbox ? undefined : React.createElement(projects.ImportDialog, {parent: this, ref: function (v) { return _this.importDialog = v; }}), sandbox ? undefined : React.createElement(projects.ExitAndSaveDialog, {parent: this, ref: function (v) { return _this.exitAndSaveDialog = v; }}), sandbox || !sharingEnabled ? undefined : React.createElement(share.ShareEditor, {parent: this, ref: function (v) { return _this.shareEditor = v; }}), selectLanguage ? React.createElement(lang.LanguagePicker, {parent: this, ref: function (v) { return _this.languagePicker = v; }}) : undefined, sandbox ? React.createElement("div", {className: "ui horizontal small divided link list sandboxfooter"}, targetTheme.organizationUrl && targetTheme.organization ? React.createElement("a", {className: "item", target: "_blank", rel: "noopener", href: targetTheme.organizationUrl}, targetTheme.organization) : undefined, React.createElement("a", {target: "_blank", className: "item", href: targetTheme.termsOfUseUrl, rel: "noopener"}, lf("Terms of Use")), React.createElement("a", {target: "_blank", className: "item", href: targetTheme.privacyUrl, rel: "noopener"}, lf("Privacy")), React.createElement("span", {className: "item"}, React.createElement("a", {className: "ui thin portrait only", title: compileTooltip, onClick: function () { return _this.compile(); }}, React.createElement(sui.Icon, {icon: "icon " + (pxt.appTarget.appTheme.downloadIcon || 'download')}), pxt.appTarget.appTheme.useUploadMessage ? lf("Upload") : lf("Download")))) : undefined, cookieConsented ? undefined : React.createElement("div", {id: 'cookiemsg', className: "ui teal inverted black segment", role: "alert"}, React.createElement("button", {"aria-label": lf("Close"), tabIndex: 0, className: "ui right floated icon button clear inverted", onClick: consentCookie}, React.createElement(sui.Icon, {icon: "remove"})), lf("By using this site you agree to the use of cookies for analytics."), React.createElement("a", {target: "_blank", className: "ui link", href: pxt.appTarget.appTheme.privacyUrl, rel: "noopener"}, lf("Learn more"))), hideMenuBar ? React.createElement("div", {id: "editorlogo"}, React.createElement("a", {className: "poweredbylogo"})) : undefined));
     };
     return ProjectView;
 }(data.Component));
@@ -1613,13 +1714,24 @@ function initLogin() {
         Cloud.localToken = pxt.storage.getLocal("local_token") || "";
     }
 }
+var hidConnectionPoller;
+var hidPollerDelay;
+function startHidConnectionPoller() {
+    hidConnectionPoller = window.setInterval(initSerial, 5000);
+}
+function setHidPollerDelay() {
+    clearTimeout(hidPollerDelay);
+    clearInterval(hidConnectionPoller);
+    hidPollerDelay = window.setTimeout(startHidConnectionPoller, 5000);
+}
 function initSerial() {
     if (!pxt.appTarget.serial || !pxt.winrt.isWinRT() && (!Cloud.isLocalHost() || !Cloud.localToken))
         return;
     if (hidbridge.shouldUse()) {
-        hidbridge.initAsync()
+        hidbridge.initAsync(true)
             .then(function (dev) {
             dev.onSerial = function (buf, isErr) {
+                setHidPollerDelay();
                 window.postMessage({
                     type: 'serial',
                     id: 'n/a',
@@ -1677,6 +1789,8 @@ function enableAnalytics() {
         stats["screen.height"] = screen_1.height;
         stats["screen.availwidth"] = screen_1.availWidth;
         stats["screen.availheight"] = screen_1.availHeight;
+        stats["screen.innerWidth"] = window.innerWidth;
+        stats["screen.innerHeight"] = window.innerHeight;
         stats["screen.devicepixelratio"] = pxt.BrowserUtils.devicePixelRatio();
     }
     pxt.tickEvent("editor.loaded", stats);
@@ -1759,6 +1873,7 @@ function initTheme() {
     }
     theme.appLogo = patchCdn(theme.appLogo);
     theme.cardLogo = patchCdn(theme.cardLogo);
+    theme.homeScreenHero = patchCdn(theme.homeScreenHero);
     if (pxt.appTarget.simulator
         && pxt.appTarget.simulator.boardDefinition
         && pxt.appTarget.simulator.boardDefinition.visual) {
@@ -1779,7 +1894,7 @@ function parseHash() {
     }
     return { cmd: '', arg: '' };
 }
-function handleHash(hash) {
+function handleHash(hash, loading) {
     if (!hash)
         return false;
     var editor = theEditor;
@@ -1819,9 +1934,9 @@ function handleHash(hash) {
             editor.startTutorial(hash.arg);
             window.location.hash = "";
             return true;
-        case "projects":
-            pxt.tickEvent("hash.projects");
-            editor.openProject(hash.arg);
+        case "home":
+            pxt.tickEvent("hash.home");
+            editor.openHome();
             window.location.hash = "";
             return true;
         case "sandbox":
@@ -1836,10 +1951,14 @@ function handleHash(hash) {
             pxt.tickEvent("hash." + hash.cmd);
             var fileContents = Util.stringToUint8Array(atob(hash.arg));
             window.location.hash = "";
-            core.showLoading(lf("loading project..."));
+            core.showLoading("loadingproject", lf("loading project..."));
             theEditor.importProjectFromFileAsync(fileContents)
-                .done(function () { return core.hideLoading(); });
+                .done(function () { return core.hideLoading("loadingheader"); });
             return true;
+        case "reload":
+            if (loading)
+                window.location.hash = "";
+            return false;
     }
     return false;
 }
@@ -1860,6 +1979,7 @@ function isProjectRelatedHash(hash) {
         case "edit":
         case "sandboxproject":
         case "project":
+        case "reload":
             return true;
         default:
             return false;
@@ -1868,17 +1988,17 @@ function isProjectRelatedHash(hash) {
 function loadHeaderBySharedId(id) {
     var existing = workspace.getHeaders()
         .filter(function (h) { return h.pubCurrent && h.pubId == id; })[0];
-    core.showLoading(lf("loading project..."));
+    core.showLoading("loadingheader", lf("loading project..."));
     (existing
         ? theEditor.loadHeaderAsync(existing, null)
         : workspace.installByIdAsync(id)
             .then(function (hd) { return theEditor.loadHeaderAsync(hd, null); }))
         .catch(core.handleNetworkError)
-        .finally(function () { return core.hideLoading(); });
+        .finally(function () { return core.hideLoading("loadingheader"); });
 }
 function initHashchange() {
     window.addEventListener("hashchange", function (e) {
-        handleHash(parseHash());
+        handleHash(parseHash(), false);
     });
 }
 function initExtensionsAsync() {
@@ -1942,12 +2062,30 @@ $(document).ready(function () {
     if (!pxt.BrowserUtils.isBrowserSupported() && !/skipbrowsercheck=1/i.exec(window.location.href)) {
         pxt.tickEvent("unsupported");
         window.location.href = "/browsers";
-        core.showLoading(lf("Sorry, this browser is not supported."));
+        core.showLoading("browsernotsupported", lf("Sorry, this browser is not supported."));
         return;
     }
     initLogin();
     var hash = parseHash();
-    appcache.init(hash);
+    var appCacheUpdated = function () {
+        try {
+            // On embedded pages, preserve the loaded project
+            if (pxt.BrowserUtils.isIFrame() && hash.cmd === "pub") {
+                location.hash = "#pub:" + hash.arg;
+            }
+            else if (theEditor
+                && !theEditor.home.state.visible
+                && theEditor.state && theEditor.state.header && !theEditor.state.header.isDeleted) {
+                location.hash = "#reload";
+            }
+            location.reload();
+        }
+        catch (e) {
+            pxt.reportException(e);
+            location.reload();
+        }
+    };
+    appcache.init(appCacheUpdated);
     pxt.docs.requireMarked = function () { return require("marked"); };
     var importHex = function (hex, createNewIfFailed) {
         if (createNewIfFailed === void 0) { createNewIfFailed = false; }
@@ -1980,7 +2118,11 @@ $(document).ready(function () {
         if (useLang)
             pxt.tickEvent("locale." + useLang + (live ? ".live" : ""));
         lang.initialLang = useLang;
-        return Util.updateLocalizationAsync(pxt.appTarget.id, false, config.commitCdnUrl, useLang, pxt.appTarget.versions.pxtCrowdinBranch, pxt.appTarget.versions.branch, live);
+        return Util.updateLocalizationAsync(pxt.appTarget.id, false, config.commitCdnUrl, useLang, pxt.appTarget.versions.pxtCrowdinBranch, pxt.appTarget.versions.branch, live)
+            .then(function () { return Util.downloadSimulatorLocalizationAsync(pxt.appTarget.id, config.commitCdnUrl, useLang, pxt.appTarget.versions.pxtCrowdinBranch, pxt.appTarget.versions.branch, live); }).then(function (simStrings) {
+            if (simStrings)
+                simulator.simTranslations = simStrings;
+        });
     })
         .then(function () { return initTheme(); })
         .then(function () { return cmds.initCommandsAsync(); })
@@ -1995,9 +2137,9 @@ $(document).ready(function () {
     })
         .then(function (state) {
         if (state) {
-            theEditor.setState(state);
+            theEditor.setState({ editorState: state });
         }
-        initSerial();
+        startHidConnectionPoller();
         initScreenshots();
         initHashchange();
         electron.init();
@@ -2010,14 +2152,16 @@ $(document).ready(function () {
         var hd = workspace.getHeaders()[0];
         if (ent)
             hd = workspace.getHeader(ent.id);
-        // Only show the start page if there are no initial projects requested
+        // Only show the start screen if there are no initial projects requested
         // (e.g. from the URL hash or from WinRT activation arguments)
-        var shouldShowStartPage = !isSandbox && pxt.appTarget.appTheme.useStartPage && !hasWinRTProject && !isProjectRelatedHash(hash);
-        if (shouldShowStartPage) {
-            theEditor.projects.showInitialStartPage(hd);
+        var skipStartScreen = pxt.appTarget.appTheme.allowParentController
+            || !pxt.appTarget.appTheme.showHomeScreen || /skipHomeScreen=1/i.test(window.location.href);
+        var shouldShowHomeScreen = !isSandbox && !skipStartScreen && !hasWinRTProject && !isProjectRelatedHash(hash);
+        if (shouldShowHomeScreen) {
+            theEditor.home.showHome();
             return Promise.resolve();
         }
-        if (hash.cmd && handleHash(hash)) {
+        if (hash.cmd && handleHash(hash, true)) {
             return Promise.resolve();
         }
         if (hasWinRTProject) {
@@ -2025,7 +2169,7 @@ $(document).ready(function () {
         }
         // default handlers
         if (hd)
-            return theEditor.loadHeaderAsync(hd, theEditor.state.filters);
+            return theEditor.loadHeaderAsync(hd, theEditor.state.editorState);
         else
             theEditor.newProject();
         return Promise.resolve();
@@ -2085,29 +2229,24 @@ $(document).ready(function () {
     }, false);
 });
 
-},{"./appcache":2,"./blocks":4,"./cmds":7,"./compiler":9,"./container":10,"./core":11,"./data":12,"./draganddrop":14,"./editortoolbar":15,"./electron":16,"./filelist":17,"./hidbridge":20,"./lang":22,"./logview":23,"./make":24,"./monaco":26,"./monacoSnippets":27,"./package":28,"./projects":29,"./pxtjson":30,"./screenshot":31,"./scriptsearch":32,"./share":33,"./simulator":34,"./sounds":35,"./sui":37,"./tdlegacy":38,"./toolbox":39,"./tutorial":40,"./workspace":41,"marked":111,"react":267,"react-dom":138}],2:[function(require,module,exports){
+},{"./appcache":2,"./blocks":4,"./cmds":8,"./compiler":10,"./container":11,"./core":12,"./data":13,"./draganddrop":15,"./editortoolbar":16,"./electron":17,"./extensions":19,"./filelist":20,"./hidbridge":23,"./lang":25,"./make":26,"./monaco":28,"./monacoSnippets":29,"./package":30,"./projects":31,"./pxtjson":32,"./screenshot":33,"./scriptsearch":34,"./serial":35,"./serialindicator":36,"./share":37,"./simulator":38,"./sounds":39,"./sui":41,"./tdlegacy":42,"./toolbox":43,"./tutorial":44,"./workspace":45,"marked":118,"react":274,"react-dom":145}],2:[function(require,module,exports){
 "use strict";
 var core = require("./core");
-function init(hash) {
+function init(updated) {
     var appCache = window.applicationCache;
     if (!(pxt.appTarget.appTheme && pxt.appTarget.appTheme.noReloadOnUpdate)) {
         appCache.addEventListener('updateready', function () {
             core.infoNotification(lf("Update download complete. Reloading... "));
             setTimeout(function () {
-                // On embedded pages, preserve the loaded project
-                if (pxt.BrowserUtils.isIFrame() && hash.cmd === "pub") {
-                    location.replace(location.origin + ("/#pub:" + hash.arg));
-                }
-                else {
-                    location.reload();
-                }
-            }, 5000);
+                pxt.tickEvent('appcache.updated');
+                updated();
+            }, 3000);
         }, false);
     }
 }
 exports.init = init;
 
-},{"./core":11}],3:[function(require,module,exports){
+},{"./core":12}],3:[function(require,module,exports){
 "use strict";
 var _context; // AudioContext
 function context() {
@@ -2152,7 +2291,7 @@ function loadAsync(buffer) {
 exports.loadAsync = loadAsync;
 
 },{}],4:[function(require,module,exports){
-/// <reference path="../../localtypings/blockly.d.ts" />
+/// <reference path="../../localtypings/pxtblockly.d.ts" />
 /// <reference path="../../typings/globals/jquery/index.d.ts" />
 "use strict";
 var __extends = (this && this.__extends) || function (d, b) {
@@ -2224,23 +2363,38 @@ var Editor = (function (_super) {
             var editorDiv_1 = document.getElementById("blocksEditor");
             editorDiv_1.appendChild(loading_1);
             this.loadingXmlPromise = compiler.getBlocksAsync()
-                .finally(function () { _this.loadingXml = false; })
                 .then(function (bi) {
                 _this.blockInfo = bi;
-                var showSearch = true;
+                var showSearch = _this.showSearch;
                 var toolbox = _this.getDefaultToolbox(_this.showToolboxCategories);
                 // Search needs a toolbox with ALL blocks
                 var tbAll;
                 if (_this.showToolboxCategories !== CategoryMode.All) {
-                    tbAll = pxt.blocks.initBlocks(_this.blockInfo, toolbox, CategoryMode.All, _this.filters);
+                    tbAll = pxt.blocks.initBlocks(_this.blockInfo, toolbox, CategoryMode.All, _this.filters, _this.extensions);
                 }
-                var tb = pxt.blocks.initBlocks(_this.blockInfo, toolbox, _this.showToolboxCategories, _this.filters);
+                var tb = pxt.blocks.initBlocks(_this.blockInfo, toolbox, _this.showToolboxCategories, _this.filters, _this.extensions);
                 _this.updateToolbox(tb, _this.showToolboxCategories);
                 if (_this.showToolboxCategories !== CategoryMode.None && showSearch) {
                     pxt.blocks.initSearch(_this.editor, tb, tbAll || tb, function (searchFor) { return compiler.apiSearchAsync(searchFor)
                         .then(function (fns) { return fns; }); }, function (searchTb) { return _this.updateToolbox(searchTb, _this.showToolboxCategories, true); });
                 }
+                else {
+                    pxt.blocks.removeSearch();
+                }
                 pxt.blocks.initFlyouts(_this.editor);
+                // Register extension callbacks
+                pxt.blocks.initExtensions(_this.editor, _this.extensions, function (extensionName) {
+                    var extension = _this.extensions.filter(function (c) { return c.name == extensionName; })[0];
+                    var parsedRepo = pxt.github.parseRepoId(extension.installedVersion);
+                    var debug = pxt.Cloud.isLocalHost() && /debugExtensions/i.test(window.location.href);
+                    pxt.packagesConfigAsync()
+                        .then(function (config) {
+                        var repoStatus = pxt.github.repoStatus(parsedRepo, config);
+                        var repoName = parsedRepo.fullName.substr(parsedRepo.fullName.indexOf("/") + 1);
+                        var url = debug ? "http://localhost:3232/extension.html" : "https://" + parsedRepo.owner + ".github.io/" + repoName + "/";
+                        _this.parent.openExtension(extension.name, url, repoStatus == 0); // repoStatus can only be APPROVED or UNKNOWN at this point
+                    });
+                });
                 var xml = _this.delayLoadXml;
                 _this.delayLoadXml = undefined;
                 _this.loadBlockly(xml);
@@ -2248,10 +2402,12 @@ var Editor = (function (_super) {
                 Blockly.svgResize(_this.editor);
                 _this.isFirstBlocklyLoad = false;
             }).finally(function () {
+                _this.loadingXml = false;
                 editorDiv_1.removeChild(loading_1);
+                core.hideLoading("loadingblocks");
             });
             if (this.isFirstBlocklyLoad) {
-                core.showLoadingAsync(lf("loading..."), this.loadingXmlPromise).done();
+                core.showLoadingAsync("loadingblocks", lf("loading..."), this.loadingXmlPromise).done();
             }
             else {
                 this.loadingXmlPromise.done();
@@ -2591,6 +2747,9 @@ var Editor = (function (_super) {
             blocklyDiv.style.width = blocklyArea.offsetWidth + 'px';
             blocklyDiv.style.height = blocklyArea.offsetHeight + 'px';
             Blockly.svgResize(this.editor);
+            var blocklyToolbox = document.getElementsByClassName('blocklyToolboxDiv')[0];
+            if (blocklyToolbox)
+                this.parent.updateEditorLogo(blocklyToolbox.clientWidth);
         }
     };
     Editor.prototype.hasUndo = function () {
@@ -2614,12 +2773,12 @@ var Editor = (function (_super) {
     Editor.prototype.zoomIn = function () {
         if (!this.editor)
             return;
-        this.editor.zoomCenter(1);
+        this.editor.zoomCenter(2);
     };
     Editor.prototype.zoomOut = function () {
         if (!this.editor)
             return;
-        this.editor.zoomCenter(-1);
+        this.editor.zoomCenter(-2);
     };
     Editor.prototype.closeFlyout = function () {
         if (!this.editor)
@@ -2652,11 +2811,17 @@ var Editor = (function (_super) {
         if (this.currFile && this.currFile != file) {
             this.filterToolbox(null);
         }
-        if (this.parent.state.filters) {
-            this.filterToolbox(this.parent.state.filters);
+        if (this.parent.state.editorState && this.parent.state.editorState.filters) {
+            this.filterToolbox(this.parent.state.editorState.filters);
         }
         else {
             this.filters = null;
+        }
+        if (this.parent.state.editorState && this.parent.state.editorState.searchBar != undefined) {
+            this.showSearch = this.parent.state.editorState.searchBar;
+        }
+        else {
+            this.showSearch = true;
         }
         this.currFile = file;
         // Clear the search field if a value exists
@@ -2664,10 +2829,15 @@ var Editor = (function (_super) {
         if (searchField && searchField.value) {
             searchField.value = '';
         }
+        // Get extension packages
+        this.extensions = pkg.allEditorPkgs()
+            .map(function (ep) { return ep.getKsPkg(); }).map(function (p) { return !!p && p.config; })
+            .filter(function (config) { return !!config && !!config.extension && config.installedVersion.indexOf('github') == 0; });
         return Promise.resolve();
     };
     Editor.prototype.switchToTypeScript = function () {
         pxt.tickEvent("blocks.switchjavascript");
+        this.parent.closeFlyout();
         this.parent.switchTypeScript();
     };
     Editor.prototype.setDiagnostics = function (file) {
@@ -2742,7 +2912,7 @@ var Editor = (function (_super) {
                 maxScale: 2.5,
                 minScale: .2,
                 scaleSpeed: 1.05,
-                startScale: pxt.BrowserUtils.isMobile() ? 1.2 : 0.9
+                startScale: pxt.BrowserUtils.isMobile() ? 0.7 : 0.8
             },
             rtl: Util.isUserLanguageRtl()
         };
@@ -2766,9 +2936,9 @@ var Editor = (function (_super) {
         var toolbox = this.getDefaultToolbox(this.showToolboxCategories);
         var tbAll;
         if (this.showToolboxCategories !== CategoryMode.All) {
-            tbAll = pxt.blocks.createToolbox(this.blockInfo, toolbox, CategoryMode.All, this.filters);
+            tbAll = pxt.blocks.createToolbox(this.blockInfo, toolbox, CategoryMode.All, this.filters, this.extensions);
         }
-        var tb = pxt.blocks.createToolbox(this.blockInfo, toolbox, this.showToolboxCategories, this.filters);
+        var tb = pxt.blocks.createToolbox(this.blockInfo, toolbox, this.showToolboxCategories, this.filters, this.extensions);
         this.updateToolbox(tb, this.showToolboxCategories);
         pxt.blocks.cachedSearchTb = tb;
         pxt.blocks.cachedSearchTbAll = tbAll || tb;
@@ -2813,7 +2983,7 @@ var Editor = (function (_super) {
 }(srceditor.Editor));
 exports.Editor = Editor;
 
-},{"./compiler":9,"./core":11,"./package":28,"./srceditor":36,"./toolbox":39,"react":267}],5:[function(require,module,exports){
+},{"./compiler":10,"./core":12,"./package":30,"./srceditor":40,"./toolbox":43,"react":274}],5:[function(require,module,exports){
 /// <reference path="../../typings/globals/jquery/index.d.ts" />
 "use strict";
 var __extends = (this && this.__extends) || function (d, b) {
@@ -2848,7 +3018,270 @@ var BlocksPreview = (function (_super) {
 }(React.Component));
 exports.BlocksPreview = BlocksPreview;
 
-},{"react":267,"react-dom":138}],6:[function(require,module,exports){
+},{"react":274,"react-dom":145}],6:[function(require,module,exports){
+"use strict";
+var __extends = (this && this.__extends) || function (d, b) {
+    for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
+    function __() { this.constructor = d; }
+    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+};
+var React = require("react");
+var sui = require("./sui");
+var OUT_OF_BOUND_MARGIN = 300;
+var Carousel = (function (_super) {
+    __extends(Carousel, _super);
+    function Carousel() {
+        _super.apply(this, arguments);
+        this.arrows = [];
+        this.isDragging = false;
+        this.definitelyDragging = false;
+        this.cancelClick = false;
+        this.currentOffset = 0;
+        this.index = 0;
+        this.childrenElements = [];
+    }
+    Carousel.prototype.render = function () {
+        var _this = this;
+        this.childrenElements = [];
+        this.arrows = [];
+        var _a = this.state || {}, rightDisabled = _a.rightDisabled, leftDisabled = _a.leftDisabled;
+        return React.createElement("div", {className: "ui carouselouter"}, React.createElement("span", {className: "carouselarrow left aligned" + (leftDisabled ? " arrowdisabled" : ""), tabIndex: leftDisabled ? -1 : 0, onClick: function () { return _this.onArrowClick(true); }, ref: function (r) { return _this.arrows.push(r); }}, React.createElement(sui.Icon, {icon: "circle angle left"})), React.createElement("div", {className: "carouselcontainer", ref: function (r) { return _this.container = r; }}, React.createElement("div", {className: "carouselbody", ref: function (r) { return _this.dragSurface = r; }}, React.Children.map(this.props.children, function (child) { return React.createElement("div", {className: "carouselitem", ref: function (r) { return r && _this.childrenElements.push(r); }}, child); }))), React.createElement("span", {className: "carouselarrow right aligned" + (rightDisabled ? " arrowdisabled" : ""), tabIndex: rightDisabled ? -1 : 0, onClick: function () { return _this.onArrowClick(false); }, ref: function (r) { return _this.arrows.push(r); }}, React.createElement(sui.Icon, {icon: "circle angle right"})));
+    };
+    Carousel.prototype.onArrowClick = function (left) {
+        this.setIndex(left ? this.index - this.actualPageLength : this.index + this.actualPageLength);
+    };
+    Carousel.prototype.componentDidMount = function () {
+        var _this = this;
+        this.initDragSurface();
+        this.updateDimensions();
+        window.addEventListener("resize", function (e) {
+            _this.updateDimensions();
+        });
+    };
+    Carousel.prototype.componentDidUpdate = function () {
+        this.updateDimensions();
+    };
+    Carousel.prototype.updateDimensions = function () {
+        if (this.container) {
+            var shouldReposition = false;
+            this.containerWidth = this.container.getBoundingClientRect().width;
+            this.getArrowWidth();
+            if (this.childrenElements.length) {
+                var newWidth = this.childrenElements[0].getBoundingClientRect().width;
+                if (newWidth !== this.childWidth) {
+                    this.childWidth = newWidth;
+                    shouldReposition = true;
+                }
+                this.actualPageLength = Math.floor(this.containerWidth / this.childWidth);
+            }
+            this.dragSurface.style.width = this.totalLength() + "px";
+            this.updateArrows();
+            if (this.index >= this.maxIndex()) {
+                shouldReposition = true;
+                this.index = this.maxIndex();
+            }
+            if (shouldReposition) {
+                this.setPosition(this.indexToOffset(this.index));
+            }
+        }
+    };
+    Carousel.prototype.initDragSurface = function () {
+        var _this = this;
+        var down = function (event) {
+            _this.definitelyDragging = false;
+            _this.dragStart(getX(event));
+        };
+        var up = function (event) {
+            if (_this.isDragging) {
+                _this.dragEnd();
+                if (_this.definitelyDragging) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                }
+            }
+        };
+        var leave = function (event) {
+            if (_this.isDragging) {
+                _this.dragEnd();
+            }
+        };
+        var move = function (event) {
+            if (_this.isDragging) {
+                var x_1 = getX(event);
+                if (Math.abs(x_1 - _this.dragStartX) > 3) {
+                    _this.definitelyDragging = true;
+                }
+                event.stopPropagation();
+                event.preventDefault();
+                window.requestAnimationFrame(function () {
+                    _this.dragMove(x_1);
+                });
+            }
+        };
+        this.dragSurface.addEventListener("click", function (event) {
+            if (_this.definitelyDragging) {
+                event.stopPropagation();
+                event.preventDefault();
+            }
+        });
+        if (window.PointerEvent) {
+            this.dragSurface.addEventListener("pointerdown", down);
+            this.dragSurface.addEventListener("pointerup", up);
+            this.dragSurface.addEventListener("pointerleave", leave);
+            this.dragSurface.addEventListener("pointermove", move);
+        }
+        else {
+            this.dragSurface.addEventListener("mousedown", down);
+            this.dragSurface.addEventListener("mouseup", up);
+            this.dragSurface.addEventListener("mouseleave", leave);
+            this.dragSurface.addEventListener("mousemove", move);
+            if (pxt.BrowserUtils.isTouchEnabled()) {
+                this.dragSurface.addEventListener("touchstart", down);
+                this.dragSurface.addEventListener("touchend", up);
+                this.dragSurface.addEventListener("touchcancel", leave);
+                this.dragSurface.addEventListener("touchmove", move);
+            }
+        }
+    };
+    Carousel.prototype.dragStart = function (startX) {
+        this.isDragging = true;
+        this.dragStartX = startX;
+        this.dragStartOffset = this.currentOffset;
+        if (this.animationId) {
+            window.cancelAnimationFrame(this.animationId);
+            this.animationId = 0;
+        }
+    };
+    Carousel.prototype.dragEnd = function () {
+        this.isDragging = false;
+        this.calculateIndex();
+    };
+    Carousel.prototype.dragMove = function (x) {
+        this.dragOffset = x - this.dragStartX;
+        var newOffset = this.dragStartOffset + this.dragOffset;
+        this.setPosition(newOffset);
+    };
+    Carousel.prototype.setPosition = function (offset) {
+        if (this.dragSurface) {
+            offset = Math.max(Math.min(offset, OUT_OF_BOUND_MARGIN), this.maxScrollOffset());
+            this.currentOffset = offset;
+            this.dragSurface.style.marginLeft = offset + "px";
+        }
+    };
+    Carousel.prototype.calculateIndex = function () {
+        if (this.dragSurface) {
+            var bucketIndex = Math.abs(Math.floor(this.currentOffset / this.childWidth));
+            var index = void 0;
+            if (this.currentOffset < this.dragStartOffset) {
+                index = bucketIndex;
+            }
+            else {
+                index = bucketIndex - 1;
+            }
+            this.setIndex(index, 100);
+        }
+    };
+    Carousel.prototype.setIndex = function (index, millis) {
+        var newIndex = Math.max(Math.min(index, this.maxIndex()), 0);
+        if (!millis) {
+            millis = Math.abs(newIndex - this.index) * 100;
+        }
+        this.index = newIndex;
+        this.updateArrows();
+        this.animation = new AnimationState(this.currentOffset, this.indexToOffset(this.index), millis);
+        if (!this.animationId) {
+            this.animationId = window.requestAnimationFrame(this.easeTowardsIndex.bind(this));
+        }
+    };
+    Carousel.prototype.easeTowardsIndex = function (time) {
+        if (this.dragSurface) {
+            this.setPosition(this.animation.getPosition(time));
+            if (this.animation.isComplete) {
+                this.animation = undefined;
+                this.animationId = 0;
+            }
+            else {
+                this.animationId = window.requestAnimationFrame(this.easeTowardsIndex.bind(this));
+            }
+        }
+    };
+    Carousel.prototype.indexToOffset = function (index) {
+        if (index <= 0) {
+            return 0;
+        }
+        if (index === this.maxIndex()) {
+            return -1 * (this.totalLength() - this.containerWidth - OUT_OF_BOUND_MARGIN + this.arrowWidth * 2);
+        }
+        return -1 * (index * this.childWidth - this.childWidth * this.props.bleedPercent / 100);
+    };
+    Carousel.prototype.totalLength = function () {
+        return React.Children.count(this.props.children) * this.childWidth + OUT_OF_BOUND_MARGIN;
+    };
+    Carousel.prototype.getArrowWidth = function () {
+        var _this = this;
+        if (this.arrows.length) {
+            this.arrowWidth = 0;
+            this.arrows.forEach(function (a) {
+                if (a) {
+                    _this.arrowWidth = Math.max(a.getBoundingClientRect().width, _this.arrowWidth);
+                }
+            });
+        }
+    };
+    Carousel.prototype.maxScrollOffset = function () {
+        return Math.min(-1 * (this.totalLength() - this.actualPageLength * this.childWidth + OUT_OF_BOUND_MARGIN), 0);
+    };
+    Carousel.prototype.maxIndex = function () {
+        return Math.max(this.childrenElements.length - this.actualPageLength, 0);
+    };
+    Carousel.prototype.updateArrows = function () {
+        var _a = this.state || {}, rightDisabled = _a.rightDisabled, leftDisabled = _a.leftDisabled;
+        var newRightDisabled = this.index === this.maxIndex();
+        var newLeftDisabled = this.index === 0;
+        if (newRightDisabled !== rightDisabled || newLeftDisabled !== leftDisabled) {
+            this.setState({
+                leftDisabled: newLeftDisabled,
+                rightDisabled: newRightDisabled
+            });
+        }
+    };
+    return Carousel;
+}(React.Component));
+exports.Carousel = Carousel;
+var AnimationState = (function () {
+    function AnimationState(start, end, millis) {
+        this.start = start;
+        this.end = end;
+        this.millis = millis;
+        this.isComplete = false;
+        this.slope = (end - start) / millis;
+    }
+    AnimationState.prototype.getPosition = function (time) {
+        if (this.isComplete)
+            return this.end;
+        if (this.startTime === undefined) {
+            this.startTime = time;
+            return this.start;
+        }
+        var diff = time - this.startTime;
+        if (diff > this.millis) {
+            this.isComplete = true;
+            return this.end;
+        }
+        return this.start + Math.floor(this.slope * diff);
+    };
+    return AnimationState;
+}());
+function getX(event) {
+    if ("screenX" in event) {
+        return event.screenX;
+    }
+    else {
+        return event.changedTouches[0].screenX;
+    }
+}
+
+},{"./sui":41,"react":274}],7:[function(require,module,exports){
 "use strict";
 var db = require("./db");
 var core = require("./core");
@@ -3249,7 +3682,7 @@ exports.provider = {
     importLegacyScriptsAsync: importLegacyScriptsAsync
 };
 
-},{"./core":11,"./data":12,"./db":13,"./package":28,"./workspace":41}],7:[function(require,module,exports){
+},{"./core":12,"./data":13,"./db":14,"./package":30,"./workspace":45}],8:[function(require,module,exports){
 "use strict";
 /// <reference path="../../built/pxtlib.d.ts"/>
 var core = require("./core");
@@ -3312,13 +3745,13 @@ function showUploadInstructionsAsync(fn, url) {
         buttons: [downloadAgain ? {
                 label: fn,
                 icon: "download",
-                class: "lightgrey",
+                class: "lightgrey focused",
                 url: url,
                 fileName: fn
             } : undefined, docUrl ? {
                 label: lf("Help"),
                 icon: "help",
-                class: "lightgrey",
+                class: "lightgrey focused",
                 url: docUrl
             } : undefined],
         timeout: 10000
@@ -3401,7 +3834,7 @@ function initCommandsAsync() {
 }
 exports.initCommandsAsync = initCommandsAsync;
 
-},{"./core":11,"./hidbridge":20,"./package":28}],8:[function(require,module,exports){
+},{"./core":12,"./hidbridge":23,"./package":30}],9:[function(require,module,exports){
 "use strict";
 var __extends = (this && this.__extends) || function (d, b) {
     for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
@@ -3409,6 +3842,7 @@ var __extends = (this && this.__extends) || function (d, b) {
     d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
 };
 var React = require("react");
+var sui = require("./sui");
 var blockspreview = require("./blockspreview");
 var lf = pxt.Util.lf;
 var repeat = pxt.Util.repeatMap;
@@ -3422,6 +3856,7 @@ var CodeCardView = (function (_super) {
         $('.ui.embed').embed();
     };
     CodeCardView.prototype.render = function () {
+        var _this = this;
         var card = this.props;
         var color = card.color || "";
         if (!color) {
@@ -3435,10 +3870,12 @@ var CodeCardView = (function (_super) {
             : undefined;
         var sideUrl = url && /^\//.test(url) ? "#doc:" + url : url;
         var className = card.className;
-        var cardDiv = React.createElement("div", {className: "ui card " + color + " " + (card.onClick ? "link" : '') + " " + (className ? className : ''), title: card.title, onClick: function (e) { return card.onClick ? card.onClick(e) : undefined; }}, card.header || card.blocks || card.javascript || card.hardware || card.software || card.any ?
-            React.createElement("div", {key: "header", className: "ui content " + (card.responsive ? " tall desktop only" : "")}, React.createElement("div", {className: "right floated meta"}, card.any ? (React.createElement("i", {key: "costany", className: "ui grey circular label tiny"}, card.any > 0 ? card.any : null)) : null, repeat(card.blocks, function (k) { return React.createElement("i", {key: "costblocks" + k, className: "puzzle orange icon"}); }), repeat(card.javascript, function (k) { return React.createElement("i", {key: "costjs" + k, className: "align left blue icon"}); }), repeat(card.hardware, function (k) { return React.createElement("i", {key: "costhardware" + k, className: "certificate black icon"}); }), repeat(card.software, function (k) { return React.createElement("i", {key: "costsoftware" + k, className: "square teal icon"}); })), card.header) : null, card.label || card.blocksXml || card.typeScript || card.imageUrl || card.youTubeId ? React.createElement("div", {className: "ui image"}, card.label ? React.createElement("label", {className: "ui orange right ribbon label"}, card.label) : undefined, card.blocksXml ? React.createElement(blockspreview.BlocksPreview, {key: "promoblocks", xml: card.blocksXml}) : undefined, card.typeScript ? React.createElement("pre", {key: "promots"}, card.typeScript) : undefined, card.imageUrl ? React.createElement("div", {className: "ui cardimage", style: { backgroundImage: "url(\"" + card.imageUrl + "\")" }}) : undefined, card.youTubeId ? React.createElement("div", {className: "ui cardimage", style: { backgroundImage: "url(\"https://img.youtube.com/vi/" + card.youTubeId + "/maxresdefault.jpg\")" }}) : undefined) : undefined, card.icon || card.iconContent ?
-            React.createElement("div", {className: "ui"}, React.createElement("div", {className: "ui button massive fluid " + card.iconColor + " " + (card.iconContent ? "iconcontent" : "")}, card.icon ? React.createElement("i", {className: "" + ('icon ' + card.icon)}) : undefined, card.iconContent || undefined)) : undefined, card.shortName || card.name || card.description ?
-            React.createElement("div", {className: "content"}, card.shortName || card.name ? React.createElement("div", {className: "header"}, card.shortName || card.name) : null, card.time ? React.createElement("div", {className: "meta tall"}, card.time ? React.createElement("span", {key: "date", className: "date"}, pxt.Util.timeSince(card.time)) : null) : undefined, card.description ? React.createElement("div", {className: "description tall"}, renderMd(card.description)) : null) : undefined);
+        var cardType = card.cardType;
+        var imageUrl = card.imageUrl || (card.youTubeId ? "https://img.youtube.com/vi/" + card.youTubeId + "/maxresdefault.jpg" : undefined);
+        var cardDiv = React.createElement("div", {ref: function (el) { return _this.element = el; }, className: "ui card " + color + " " + (card.onClick ? "link" : '') + " " + (className ? className : ''), role: card.role, "aria-selected": card.role === "option" ? "true" : undefined, "aria-label": card.ariaLabel || card.title, title: card.title, onClick: function (e) { return card.onClick ? card.onClick(e) : undefined; }, tabIndex: card.onClick ? card.tabIndex || 0 : null, onKeyDown: card.onClick ? sui.fireClickOnEnter : null}, card.header || card.blocks || card.javascript || card.hardware || card.software || card.any ?
+            React.createElement("div", {key: "header", className: "ui content " + (card.responsive ? " tall desktop only" : "")}, React.createElement("div", {className: "right floated meta"}, card.any ? (React.createElement(sui.Icon, {key: "costany", icon: "ui grey circular label tiny"}, card.any > 0 ? card.any : null, " ")) : null, repeat(card.blocks, function (k) { return React.createElement(sui.Icon, {key: "costblocks" + k, icon: "puzzle orange"}); }), repeat(card.javascript, function (k) { return React.createElement(sui.Icon, {key: "costjs" + k, icon: "align left blue"}); }), repeat(card.hardware, function (k) { return React.createElement(sui.Icon, {key: "costhardware" + k, icon: "certificate black"}); }), repeat(card.software, function (k) { return React.createElement(sui.Icon, {key: "costsoftware" + k, icon: "square teal"}); })), card.header) : null, card.label || card.blocksXml || card.typeScript || imageUrl || cardType == "file" ? React.createElement("div", {className: "ui image"}, card.label ? React.createElement("label", {className: "ui " + (card.labelClass ? card.labelClass : "orange right ribbon") + " label"}, card.label) : undefined, card.blocksXml ? React.createElement(blockspreview.BlocksPreview, {key: "promoblocks", xml: card.blocksXml}) : undefined, card.typeScript ? React.createElement("pre", {key: "promots"}, card.typeScript) : undefined, imageUrl ? React.createElement("div", {className: "ui cardimage", style: { backgroundImage: "url(\"" + imageUrl + "\")" }}) : undefined, card.cardType == "file" ? React.createElement("div", {className: "ui fileimage"}) : undefined) : undefined, card.icon || card.iconContent ?
+            React.createElement("div", {className: "ui"}, React.createElement("div", {className: "ui button massive fluid " + card.iconColor + " " + (card.iconContent ? "iconcontent" : "")}, card.icon ? React.createElement(sui.Icon, {icon: "" + ('icon ' + card.icon)}) : undefined, card.iconContent || undefined)) : undefined, card.shortName || card.name || card.description ?
+            React.createElement("div", {className: "content"}, card.shortName || card.name ? React.createElement("div", {className: "header"}, card.shortName || card.name) : null, card.description ? React.createElement("div", {className: "description tall"}, renderMd(card.description)) : null) : undefined, card.time ? React.createElement("div", {className: "meta"}, card.time ? React.createElement("span", {key: "date", className: "date"}, pxt.Util.timeSince(card.time)) : null) : undefined);
         if (!card.onClick && url) {
             return (React.createElement("div", null, React.createElement("a", {href: url, target: "docs", className: "ui widedesktop hide"}, cardDiv), React.createElement("a", {href: sideUrl, className: "ui widedesktop only"}, cardDiv)));
         }
@@ -3450,7 +3887,7 @@ var CodeCardView = (function (_super) {
 }(React.Component));
 exports.CodeCardView = CodeCardView;
 
-},{"./blockspreview":5,"react":267}],9:[function(require,module,exports){
+},{"./blockspreview":5,"./sui":41,"react":274}],10:[function(require,module,exports){
 "use strict";
 var pkg = require("./package");
 var core = require("./core");
@@ -3680,7 +4117,7 @@ function newProject() {
 }
 exports.newProject = newProject;
 
-},{"./core":11,"./package":28}],10:[function(require,module,exports){
+},{"./core":12,"./package":30}],11:[function(require,module,exports){
 /// <reference path="../../typings/globals/react/index.d.ts" />
 /// <reference path="../../typings/globals/react-dom/index.d.ts" />
 /// <reference path="../../built/pxtlib.d.ts" />
@@ -3721,10 +4158,10 @@ var DocsMenuItem = (function (_super) {
     DocsMenuItem.prototype.render = function () {
         var _this = this;
         var targetTheme = pxt.appTarget.appTheme;
-        return React.createElement(sui.DropdownMenuItem, {icon: "help circle large", class: "help-dropdown-menuitem", textClass: "landscape only", title: lf("Reference, lessons, ...")}, targetTheme.docMenu.map(function (m) {
-            return !/^\//.test(m.path) ? React.createElement("a", {key: "docsmenulink" + m.path, role: "menuitem", className: "ui item link", href: m.path, target: "docs"}, Util.rlf(m.name))
-                : !m.tutorial ? React.createElement(sui.Item, {key: "docsmenu" + m.path, role: "menuitem", text: Util.rlf(m.name), class: "", onClick: function () { return _this.openDocs(m.path); }})
-                    : React.createElement(sui.Item, {key: "docsmenututorial" + m.path, role: "menuitem", text: Util.rlf(m.name), class: "", onClick: function () { return _this.openTutorial(m.path); }});
+        return React.createElement(sui.DropdownMenuItem, {icon: "help circle large", class: "help-dropdown-menuitem", textClass: "landscape only", title: lf("Help")}, targetTheme.docMenu.map(function (m) {
+            return m.tutorial ? React.createElement(sui.Item, {key: "docsmenututorial" + m.path, role: "menuitem", ariaLabel: m.name, text: Util.rlf(m.name), class: "", onClick: function () { return _this.openTutorial(m.path); }})
+                : !/^\//.test(m.path) ? React.createElement("a", {key: "docsmenulink" + m.path, role: "menuitem", "aria-label": m.name, className: "ui item link", href: m.path, target: "docs"}, Util.rlf(m.name))
+                    : React.createElement(sui.Item, {key: "docsmenu" + m.path, role: "menuitem", ariaLabel: m.name, text: Util.rlf(m.name), class: "", onClick: function () { return _this.openDocs(m.path); }});
         }));
     };
     return DocsMenuItem;
@@ -3735,6 +4172,7 @@ var SideDocs = (function (_super) {
     function SideDocs(props) {
         _super.call(this, props);
         this.firstLoad = true;
+        this.openingSideDoc = false;
     }
     SideDocs.notify = function (message) {
         var sd = document.getElementById("sidedocsframe");
@@ -3742,6 +4180,7 @@ var SideDocs = (function (_super) {
             sd.contentWindow.postMessage(message, "*");
     };
     SideDocs.prototype.setPath = function (path, blocksEditor) {
+        this.openingSideDoc = true;
         var docsUrl = pxt.webConfig.docsUrl || '/--docs';
         var mode = blocksEditor ? "blocks" : "js";
         var url = docsUrl + "#doc:" + path + ":" + mode + ":" + pxt.Util.localeInfo();
@@ -3774,9 +4213,15 @@ var SideDocs = (function (_super) {
     SideDocs.prototype.toggleVisibility = function () {
         var state = this.props.parent.state;
         this.props.parent.setState({ sideDocsCollapsed: !state.sideDocsCollapsed });
+        document.getElementById("sidedocstoggle").focus();
     };
     SideDocs.prototype.componentDidUpdate = function () {
         this.props.parent.editor.resize();
+        var sidedocstoggle = document.getElementById("sidedocstoggle");
+        if (this.openingSideDoc && sidedocstoggle) {
+            sidedocstoggle.focus();
+            this.openingSideDoc = false;
+        }
     };
     SideDocs.prototype.renderCore = function () {
         var _this = this;
@@ -3784,13 +4229,13 @@ var SideDocs = (function (_super) {
         var docsUrl = state.sideDocsLoadUrl;
         if (!docsUrl)
             return null;
-        return React.createElement("div", null, React.createElement("button", {id: "sidedocstoggle", role: "button", className: "ui icon button", onClick: function () { return _this.toggleVisibility(); }}, React.createElement("i", {className: "icon large inverted " + (state.sideDocsCollapsed ? 'book' : 'chevron right')}), state.sideDocsCollapsed ? React.createElement("i", {className: "icon large inverted chevron left hover"}) : undefined), React.createElement("div", {id: "sidedocs"}, React.createElement("div", {id: "sidedocsbar"}, React.createElement("h3", null, React.createElement("a", {className: "ui icon link", "data-content": lf("Open documentation in new tab"), title: lf("Open documentation in new tab"), onClick: function () { return _this.popOut(); }}, React.createElement("i", {className: "external icon"})))), React.createElement("div", {id: "sidedocsframe-wrapper"}, React.createElement("iframe", {id: "sidedocsframe", src: docsUrl, role: "complementary", sandbox: "allow-scripts allow-same-origin allow-forms allow-popups"}))));
+        return React.createElement("div", null, React.createElement("button", {id: "sidedocstoggle", role: "button", "aria-label": state.sideDocsCollapsed ? lf("Expand the side documentation") : lf("Collapse the side documentation"), className: "ui icon button", onClick: function () { return _this.toggleVisibility(); }}, React.createElement(sui.Icon, {icon: "icon large inverted " + (state.sideDocsCollapsed ? 'book' : 'chevron right')}), state.sideDocsCollapsed ? React.createElement(sui.Icon, {icon: "large inverted chevron left hover"}) : undefined), React.createElement("div", {id: "sidedocs"}, React.createElement("div", {id: "sidedocsframe-wrapper"}, React.createElement("iframe", {id: "sidedocsframe", src: docsUrl, title: lf("Documentation"), "aria-atomic": "true", "aria-live": "assertive", sandbox: "allow-scripts allow-same-origin allow-forms allow-popups"})), React.createElement("div", {id: "sidedocsbar"}, React.createElement("a", {className: "ui icon link", role: "link", tabIndex: 0, "data-content": lf("Open documentation in new tab"), "aria-label": lf("Open documentation in new tab"), onClick: function () { return _this.popOut(); }, onKeyDown: sui.fireClickOnEnter}, React.createElement(sui.Icon, {icon: "external"})))));
     };
     return SideDocs;
 }(data.Component));
 exports.SideDocs = SideDocs;
 
-},{"./data":12,"./sui":37,"react":267}],11:[function(require,module,exports){
+},{"./data":13,"./sui":41,"react":274}],12:[function(require,module,exports){
 /// <reference path="../../typings/globals/react/index.d.ts" />
 /// <reference path="../../typings/globals/react-dom/index.d.ts" />
 /// <reference path="../../built/pxtlib.d.ts" />
@@ -3800,49 +4245,82 @@ var Cloud = pxt.Cloud;
 var Util = pxt.Util;
 var lf = Util.lf;
 var dimmerInitialized = false;
+exports.TAB_KEY = 9;
+exports.ENTER_KEY = 13;
+exports.SPACE_KEY = 32;
 function isLoading() {
     return !!$('.ui.loading.dimmer .loadingcontent')[0];
 }
 exports.isLoading = isLoading;
-function hideLoading() {
-    $('.ui.dimmer.loading .loadingcontent').remove();
-    $('.ui.dimmer.loading').dimmer('hide');
-    if (!dimmerInitialized) {
-        initializeDimmer();
+var loadingQueue = [];
+var loadingQueueMsg = {};
+function hideLoading(id) {
+    pxt.debug("hideloading: " + id);
+    if (loadingQueueMsg[id] != undefined) {
+        // loading exists, remove from queue
+        var index = loadingQueue.indexOf(id);
+        if (index > -1)
+            loadingQueue.splice(index, 1);
+        delete loadingQueueMsg[id];
     }
-    setTimeout(function () {
+    else {
+        pxt.debug("Loading not in queue, disregard: " + id);
+    }
+    if (loadingQueue.length > 0) {
+        // Show the next loading message
+        displayNextLoading();
+    }
+    else {
+        // Hide loading
+        $('.ui.dimmer.loading .loadingcontent').remove();
         $('.ui.dimmer.loading').dimmer('hide');
-    }, 200);
+        if (!dimmerInitialized) {
+            initializeDimmer();
+        }
+        setTimeout(function () {
+            $('.ui.dimmer.loading').dimmer('hide');
+        }, 200);
+    }
 }
 exports.hideLoading = hideLoading;
-function showLoading(msg) {
+function showLoading(id, msg) {
+    pxt.debug("showloading: " + id);
     initializeDimmer();
     $('.ui.dimmer.loading').dimmer('show');
-    $('.ui.dimmer.loading').html("\n  <div class=\"content loadingcontent\">\n    <div class=\"ui text large loader msg\">" + lf("Please wait") + "</div>\n  </div>\n");
-    $('.ui.dimmer.loading .msg').text(msg);
+    $('.ui.dimmer.loading').html("\n  <div class=\"content loadingcontent\">\n    <div class=\"ui text large loader msg\" aria-live=\"assertive\">" + lf("Please wait") + "</div>\n  </div>\n");
+    loadingQueue.push(id);
+    loadingQueueMsg[id] = msg;
+    displayNextLoading();
 }
 exports.showLoading = showLoading;
+function displayNextLoading() {
+    if (!loadingQueue.length)
+        return;
+    var id = loadingQueue[loadingQueue.length - 1]; // get last item
+    var msg = loadingQueueMsg[id];
+    $('.ui.dimmer.loading .msg').text(msg);
+}
 function initializeDimmer() {
     $('#content').dimmer({ 'dimmerName': 'loading' }).dimmer({
         closable: false
     });
     dimmerInitialized = true;
 }
-var asyncLoadingTimeout;
-function showLoadingAsync(msg, operation, delay) {
+var asyncLoadingTimeout = {};
+function showLoadingAsync(id, msg, operation, delay) {
     if (delay === void 0) { delay = 700; }
-    clearTimeout(asyncLoadingTimeout);
-    asyncLoadingTimeout = setTimeout(function () {
-        showLoading(msg);
+    clearTimeout(asyncLoadingTimeout[id]);
+    asyncLoadingTimeout[id] = setTimeout(function () {
+        showLoading(id, msg);
     }, delay);
     return operation.finally(function () {
-        cancelAsyncLoading();
+        cancelAsyncLoading(id);
     });
 }
 exports.showLoadingAsync = showLoadingAsync;
-function cancelAsyncLoading() {
-    clearTimeout(asyncLoadingTimeout);
-    hideLoading();
+function cancelAsyncLoading(id) {
+    clearTimeout(asyncLoadingTimeout[id]);
+    hideLoading(id);
 }
 exports.cancelAsyncLoading = cancelAsyncLoading;
 function navigateInWindow(url) {
@@ -3869,6 +4347,21 @@ var lastTime = {};
 function htmlmsg(kind, msg) {
     var now = Date.now();
     var prev = lastTime[kind] || 0;
+    var msgTag = $('#msg');
+    if (exports.highContrast) {
+        msgTag.children().each(function (index, elem) {
+            if (!elem.classList.contains('hc')) {
+                elem.classList.add('hc');
+            }
+        });
+    }
+    else {
+        msgTag.children().each(function (index, elem) {
+            if (elem.classList.contains('hc')) {
+                elem.classList.remove('hc');
+            }
+        });
+    }
     if (now - prev < 100)
         $('#' + kind + 'msg').text(msg);
     else {
@@ -3911,20 +4404,20 @@ function dialogAsync(options) {
         .filter(function (logo) { return !!logo; })
         .map(function (logo) { return ("<img class=\"ui logo\" src=\"" + Util.toDataUri(logo) + "\" />"); })
         .join(' ');
-    var html = "\n  <div class=\"ui " + (options.size || "small") + " modal\">\n    <div class=\"header\">\n        " + Util.htmlEscape(options.header) + "\n    </div>\n    <div class=\"content\">\n      " + (options.body ? "<p>" + Util.htmlEscape(options.body) + "</p>" : "") + "\n      " + (options.htmlBody || "") + "\n      " + (options.input ? "<div class=\"ui fluid action input\">\n         <input class=\"userinput\" spellcheck=\"false\" placeholder=\"" + Util.htmlEscape(options.input) + "\" type=\"text\">\n         </div>" : "") + "\n      " + (options.copyable ? "<div class=\"ui fluid action input\">\n         <input class=\"linkinput\" readonly spellcheck=\"false\" type=\"text\" value=\"" + Util.htmlEscape(options.copyable) + "\">\n         <button class=\"ui teal right labeled icon button copybtn\" data-content=\"" + lf("Copied!") + "\">\n            " + lf("Copy") + "\n            <i class=\"copy icon\"></i>\n         </button>\n      </div>" : "") + "\n    </div>";
+    var html = "\n  <div role=\"dialog\" class=\"ui " + (options.size || "small") + " modal\">\n    <div role=\"heading\" class=\"header\">\n        " + Util.htmlEscape(options.header) + "\n    </div>\n    <div class=\"content\">\n      " + (options.body ? "<p>" + Util.htmlEscape(options.body) + "</p>" : "") + "\n      " + (options.htmlBody || "") + "\n      " + (options.input ? "<div class=\"ui fluid action input\">\n         <input class=\"userinput focused\" spellcheck=\"false\" placeholder=\"" + Util.htmlEscape(options.input) + "\" type=\"text\">\n         </div>" : "") + "\n      " + (options.copyable ? "<div class=\"ui fluid action input\">\n         <input class=\"linkinput focused\" readonly spellcheck=\"false\" type=\"text\" value=\"" + Util.htmlEscape(options.copyable) + "\">\n         <button class=\"ui teal right labeled icon button copybtn\" data-content=\"" + lf("Copied!") + "\">\n            " + lf("Copy") + "\n            <i class=\"copy icon\"></i>\n         </button>\n      </div>" : "") + "\n    </div>";
     html += "<div class=\"actions\">";
     html += logos;
     if (!options.hideCancel) {
         buttons.push({
             label: options.disagreeLbl || lf("Cancel"),
-            class: options.disagreeClass || "cancel",
+            class: (options.disagreeClass || "cancel"),
             icon: options.disagreeIcon || "cancel"
         });
     }
     var btnno = 0;
     for (var _i = 0, buttons_1 = buttons; _i < buttons_1.length; _i++) {
         var b = buttons_1[_i];
-        html += "\n      <" + (b.url ? "a" : "button") + " class=\"ui right labeled icon button approve " + (b.class || "positive") + "\" data-btnid=\"" + btnno++ + "\" " + (b.url ? "href=\"" + b.url + "\"" : "") + " " + (b.fileName ? "download=\"" + Util.htmlEscape(b.fileName) + "\"" : '') + " target=\"_blank\">\n        " + Util.htmlEscape(b.label) + "\n        <i class=\"" + (b.icon || "checkmark") + " icon\"></i>\n      </" + (b.url ? "a" : "button") + ">";
+        html += "\n      <" + (b.url ? "a" : "button") + " class=\"ui right labeled icon button approve " + (b.class || "positive") + " focused\" data-btnid=\"" + btnno++ + "\" " + (b.url ? "href=\"" + b.url + "\"" : "") + " " + (b.fileName ? "download=\"" + Util.htmlEscape(b.fileName) + "\"" : '') + " target=\"_blank\">\n        " + Util.htmlEscape(b.label) + "\n        <i class=\"" + (b.icon || "checkmark") + " icon\"></i>\n      </" + (b.url ? "a" : "button") + ">";
     }
     html += "</div>";
     html += "</div>";
@@ -3936,7 +4429,8 @@ function dialogAsync(options) {
         ip_1.on('change', function (e) { return options.inputValue = ip_1.val(); });
     }
     var done = false;
-    $('#root').append(modal);
+    var modalContext = options.modalContext || '#root';
+    $(modalContext).append(modal);
     if (options.onLoaded)
         options.onLoaded(modal);
     modal.find('img').on('load', function () {
@@ -3944,6 +4438,7 @@ function dialogAsync(options) {
     });
     modal.find(".ui.accordion").accordion();
     return new Promise(function (resolve, reject) {
+        var focusedNodeBeforeOpening = document.activeElement;
         var mo;
         var timer = options.timeout ? setTimeout(function () {
             timer = 0;
@@ -3966,10 +4461,13 @@ function dialogAsync(options) {
         mo = modal.modal({
             observeChanges: true,
             closeable: !options.hideCancel,
-            context: "#root",
+            context: modalContext,
             onHidden: function () {
                 modal.remove();
                 mo.remove();
+                if (focusedNodeBeforeOpening != null) {
+                    focusedNodeBeforeOpening.focus();
+                }
             },
             onApprove: onfinish,
             onDeny: onfinish,
@@ -3981,6 +4479,9 @@ function dialogAsync(options) {
                     resolve();
                 }
             },
+            onVisible: function () {
+                initializeFocusTabIndex(mo.get(0), true);
+            }
         });
         mo.modal("show");
     });
@@ -4047,14 +4548,14 @@ function promptAsync(options) {
             }
         });
     }
-    options.htmlBody = "<div class=\"ui fluid icon input\">\n                            <input type=\"text\" id=\"promptDialogInput\" value=\"" + options.defaultValue + "\">\n                        </div>";
+    options.htmlBody = "<div class=\"ui fluid icon input\">\n                            <input class=\"focused\" type=\"text\" id=\"promptDialogInput\" value=\"" + options.defaultValue + "\">\n                        </div>";
     options.onLoaded = function () {
         var dialogInput = document.getElementById('promptDialogInput');
         if (dialogInput) {
             dialogInput.setSelectionRange(0, 9999);
             dialogInput.onkeyup = function (e) {
                 var charCode = (typeof e.which == "number") ? e.which : e.keyCode;
-                if (charCode === 13 || charCode === 32) {
+                if (charCode === exports.ENTER_KEY) {
                     e.preventDefault();
                     document.getElementsByClassName("approve positive").item(0).click();
                 }
@@ -4125,6 +4626,83 @@ function scrollIntoView(item, margin) {
     }
 }
 exports.scrollIntoView = scrollIntoView;
+function resetFocus() {
+    var content = document.getElementById('content');
+    content.tabIndex = 0;
+    content.focus();
+    content.blur();
+    content.tabIndex = -1;
+}
+exports.resetFocus = resetFocus;
+function unregisterFocusTracking(data) {
+    if (!data) {
+        return;
+    }
+    data.firstTag.removeEventListener('keydown', data.targetArea.focusDataInfo.giveFocusToLastTagBinding);
+    data.lastTag.removeEventListener('keydown', data.targetArea.focusDataInfo.giveFocusToFirstTagBinding);
+    if (data.firstTag === data.lastTag) {
+        data.firstTag.removeEventListener('keydown', data.targetArea.focusDataInfo.giveFocusToFirstTagBinding);
+        data.lastTag.removeEventListener('keydown', data.targetArea.focusDataInfo.giveFocusToLastTagBinding);
+    }
+}
+function giveFocusToFirstTag(e) {
+    var charCode = (typeof e.which == "number") ? e.which : e.keyCode;
+    if (charCode === exports.TAB_KEY && !e.shiftKey) {
+        e.preventDefault();
+        unregisterFocusTracking(this);
+        initializeFocusTabIndex(this.targetArea, true);
+    }
+    else if (!e.currentTarget.classList.contains("focused")) {
+        unregisterFocusTracking(this);
+        initializeFocusTabIndex(this.targetArea, true, false);
+    }
+}
+function giveFocusToLastTag(e) {
+    var charCode = (typeof e.which == "number") ? e.which : e.keyCode;
+    if (charCode === exports.TAB_KEY && e.shiftKey) {
+        e.preventDefault();
+        unregisterFocusTracking(this);
+        initializeFocusTabIndex(this.targetArea, true, false);
+        this.lastTag.focus();
+    }
+    else if (!e.currentTarget.classList.contains("focused")) {
+        unregisterFocusTracking(this);
+        initializeFocusTabIndex(this.targetArea, true, false);
+    }
+}
+function initializeFocusTabIndex(element, allowResetFocus, giveFocusToFirstElement, unregisterOnly) {
+    if (allowResetFocus === void 0) { allowResetFocus = false; }
+    if (giveFocusToFirstElement === void 0) { giveFocusToFirstElement = true; }
+    if (unregisterOnly === void 0) { unregisterOnly = false; }
+    if (!allowResetFocus && element !== document.activeElement && element.contains(document.activeElement)) {
+        return;
+    }
+    unregisterFocusTracking(element.focusDataInfo);
+    if (unregisterOnly) {
+        return;
+    }
+    var focused = element.getElementsByClassName("focused");
+    if (focused.length == 0) {
+        return;
+    }
+    var firstTag = focused[0];
+    var lastTag = focused.length > 1 ? focused[focused.length - 1] : firstTag;
+    var data = {};
+    data.firstTag = firstTag;
+    data.lastTag = lastTag;
+    data.targetArea = element;
+    data.giveFocusToLastTagBinding = giveFocusToLastTag.bind(data);
+    data.giveFocusToFirstTagBinding = giveFocusToFirstTag.bind(data);
+    element.focusDataInfo = data;
+    if (firstTag !== lastTag) {
+        firstTag.addEventListener('keydown', data.giveFocusToLastTagBinding);
+    }
+    lastTag.addEventListener('keydown', data.giveFocusToFirstTagBinding);
+    if (giveFocusToFirstElement) {
+        firstTag.focus();
+    }
+}
+exports.initializeFocusTabIndex = initializeFocusTabIndex;
 // for JavaScript console
 function apiAsync(path, data) {
     return (data ?
@@ -4143,7 +4721,7 @@ function apiAsync(path, data) {
 }
 exports.apiAsync = apiAsync;
 
-},{"react-dom":138}],12:[function(require,module,exports){
+},{"react-dom":145}],13:[function(require,module,exports){
 "use strict";
 var __extends = (this && this.__extends) || function (d, b) {
     for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
@@ -4168,7 +4746,7 @@ mountVirtualApi("cloud-search", {
     isOffline: function () { return !Cloud.isOnline(); },
 });
 mountVirtualApi("gallery", {
-    getAsync: function (p) { return gallery.loadGalleryAsync(stripProtocol(p)).catch(function (e) {
+    getAsync: function (p) { return gallery.loadGalleryAsync(stripProtocol(decodeURIComponent(p))).catch(function (e) {
         return Promise.resolve(e);
     }); },
     expirationTime: function (p) { return 3600 * 1000; }
@@ -4407,7 +4985,7 @@ function wrapWorkspace(ws) {
 exports.wrapWorkspace = wrapWorkspace;
 loadCache();
 
-},{"./core":11,"./gallery":19,"react":267}],13:[function(require,module,exports){
+},{"./core":12,"./gallery":22,"react":274}],14:[function(require,module,exports){
 "use strict";
 var Promise = require("bluebird");
 window.Promise = Promise;
@@ -4490,7 +5068,7 @@ var Table = (function () {
 }());
 exports.Table = Table;
 
-},{"bluebird":44,"pouchdb":123,"pouchdb/extras/memory":121}],14:[function(require,module,exports){
+},{"bluebird":48,"pouchdb":130,"pouchdb/extras/memory":128}],15:[function(require,module,exports){
 "use strict";
 function setupDragAndDrop(r, filter, dragged) {
     var dragAndDrop = document && document.createElement && 'draggable' in document.createElement('span');
@@ -4542,7 +5120,7 @@ function setupDragAndDrop(r, filter, dragged) {
 }
 exports.setupDragAndDrop = setupDragAndDrop;
 
-},{}],15:[function(require,module,exports){
+},{}],16:[function(require,module,exports){
 /// <reference path="../../typings/globals/react/index.d.ts" />
 /// <reference path="../../typings/globals/react-dom/index.d.ts" />
 /// <reference path="../../built/pxtlib.d.ts" />
@@ -4656,36 +5234,36 @@ var EditorToolbar = (function (_super) {
             saveButtonClasses = "disabled";
         }
         return React.createElement("div", {className: "ui equal width grid right aligned padded"}, React.createElement("div", {className: "column mobile only"}, collapsed ?
-            React.createElement("div", {className: "ui equal width grid"}, React.createElement("div", {className: "left aligned column"}, React.createElement("div", {className: "ui icon small buttons"}, React.createElement(sui.Button, {icon: "" + (collapsed ? 'toggle up' : 'toggle down'), class: "collapse-button " + (collapsed ? 'collapsed' : '') + " " + (hideEditorFloats ? 'disabled' : ''), title: collapseTooltip, onClick: function () { return _this.toggleCollapse('mobile'); }}), headless && run ? React.createElement(sui.Button, {class: "play-button " + (running ? "stop" : "play"), key: 'runmenubtn', icon: running ? "stop" : "play", title: runTooltip, onClick: function () { return _this.startStopSimulator('mobile'); }}) : undefined, headless && restart ? React.createElement(sui.Button, {key: 'restartbtn', class: "restart-button", icon: "refresh", title: restartTooltip, onClick: function () { return _this.restartSimulator('mobile'); }}) : undefined, headless && trace ? React.createElement(sui.Button, {key: 'tracebtn', class: "trace-button " + (tracing ? 'orange' : ''), icon: "xicon turtle", title: traceTooltip, onClick: function () { return _this.toggleTrace('mobile'); }}) : undefined, compileBtn ? React.createElement(sui.Button, {class: "primary download-button download-button-full " + downloadButtonClasses, icon: downloadIcon, title: compileTooltip, onClick: function () { return _this.compile('mobile'); }}) : undefined)), React.createElement("div", {className: "right aligned column"}, !readOnly ?
-                React.createElement("div", {className: "ui icon small buttons"}, React.createElement(sui.Button, {icon: 'save', class: "editortools-btn save-editortools-btn " + saveButtonClasses, title: lf("Save"), onClick: function () { return _this.saveFile('mobile'); }}), showUndoRedo ? React.createElement(sui.Button, {icon: 'xicon undo', class: "editortools-btn undo-editortools-btn} " + (!hasUndo ? 'disabled' : ''), title: lf("Undo"), onClick: function () { return _this.undo('mobile'); }}) : undefined) : undefined), React.createElement("div", {className: "right aligned column"}, showZoomControls ?
+            React.createElement("div", {className: "ui equal width grid"}, React.createElement("div", {className: "left aligned column"}, React.createElement("div", {className: "ui icon small buttons"}, React.createElement(sui.Button, {icon: "" + (collapsed ? 'toggle up' : 'toggle down'), class: "collapse-button " + (collapsed ? 'collapsed' : '') + " " + (hideEditorFloats ? 'disabled' : ''), ariaLabel: lf("{0}, {1}", collapseTooltip, hideEditorFloats ? lf("Disabled") : ""), title: collapseTooltip, onClick: function () { return _this.toggleCollapse('mobile'); }}), headless && run ? React.createElement(sui.Button, {class: "play-button " + (running ? "stop" : "play"), key: 'runmenubtn', icon: running ? "stop" : "play", title: runTooltip, onClick: function () { return _this.startStopSimulator('mobile'); }}) : undefined, headless && restart ? React.createElement(sui.Button, {key: 'restartbtn', class: "restart-button", icon: "refresh", title: restartTooltip, onClick: function () { return _this.restartSimulator('mobile'); }}) : undefined, headless && trace ? React.createElement(sui.Button, {key: 'tracebtn', class: "trace-button " + (tracing ? 'orange' : ''), icon: "xicon turtle", title: traceTooltip, onClick: function () { return _this.toggleTrace('mobile'); }}) : undefined, compileBtn ? React.createElement(sui.Button, {class: "primary download-button download-button-full " + downloadButtonClasses, icon: downloadIcon, title: compileTooltip, ariaLabel: lf("Download your code"), onClick: function () { return _this.compile('mobile'); }}) : undefined)), React.createElement("div", {className: "right aligned column"}, !readOnly ?
+                React.createElement("div", {className: "ui icon small buttons"}, React.createElement(sui.Button, {icon: 'save', class: "editortools-btn save-editortools-btn " + saveButtonClasses, title: lf("Save"), ariaLabel: lf("Save the project"), onClick: function () { return _this.saveFile('mobile'); }}), showUndoRedo ? React.createElement(sui.Button, {icon: 'xicon undo', class: "editortools-btn undo-editortools-btn} " + (!hasUndo ? 'disabled' : ''), ariaLabel: lf("{0}, {1}", lf("Undo"), !hasUndo ? lf("Disabled") : ""), title: lf("Undo"), onClick: function () { return _this.undo('mobile'); }}) : undefined) : undefined), React.createElement("div", {className: "right aligned column"}, showZoomControls ?
                 React.createElement("div", {className: "ui icon small buttons"}, React.createElement(sui.Button, {icon: 'plus circle', class: "editortools-btn zoomin-editortools-btn", title: lf("Zoom In"), onClick: function () { return _this.zoomIn('mobile'); }}), React.createElement(sui.Button, {icon: 'minus circle', class: "editortools-btn zoomout-editortools-btn", title: lf("Zoom Out"), onClick: function () { return _this.zoomOut('mobile'); }})) : undefined)) :
             React.createElement("div", {className: "ui equal width grid"}, React.createElement("div", {className: "left aligned two wide column"}, React.createElement("div", {className: "ui vertical icon small buttons"}, run ? React.createElement(sui.Button, {class: "play-button " + (running ? "stop" : "play"), key: 'runmenubtn', icon: running ? "stop" : "play", title: runTooltip, onClick: function () { return _this.startStopSimulator('mobile'); }}) : undefined, restart ? React.createElement(sui.Button, {key: 'restartbtn', class: "restart-button", icon: "refresh", title: restartTooltip, onClick: function () { return _this.restartSimulator('mobile'); }}) : undefined), showCollapsed ?
-                React.createElement("div", {className: "row", style: { paddingTop: "1rem" }}, React.createElement("div", {className: "ui vertical icon small buttons"}, React.createElement(sui.Button, {icon: "" + (collapsed ? 'toggle up' : 'toggle down'), class: "collapse-button " + (collapsed ? 'collapsed' : ''), title: collapseTooltip, onClick: function () { return _this.toggleCollapse('mobile'); }}))) : undefined), React.createElement("div", {className: "three wide column"}), React.createElement("div", {className: "ui grid column"}, readOnly || !showUndoRedo ? undefined :
-                React.createElement("div", {className: "row"}, React.createElement("div", {className: "column"}, React.createElement("div", {className: "ui icon large buttons"}, React.createElement(sui.Button, {icon: 'xicon undo', class: "editortools-btn undo-editortools-btn} " + (!hasUndo ? 'disabled' : ''), title: lf("Undo"), onClick: function () { return _this.undo('mobile'); }})))), React.createElement("div", {className: "row", style: readOnly || !showUndoRedo ? undefined : { paddingTop: 0 }}, React.createElement("div", {className: "column"}, React.createElement("div", {className: "ui icon large buttons"}, trace ? React.createElement(sui.Button, {key: 'tracebtn', class: "trace-button " + (tracing ? 'orange' : ''), icon: "xicon turtle", title: traceTooltip, onClick: function () { return _this.toggleTrace('mobile'); }}) : undefined, compileBtn ? React.createElement(sui.Button, {class: "primary download-button download-button-full " + downloadButtonClasses, icon: downloadIcon, title: compileTooltip, onClick: function () { return _this.compile('mobile'); }}) : undefined)))))), React.createElement("div", {className: "column tablet only"}, collapsed ?
+                React.createElement("div", {className: "row", style: { paddingTop: "1rem" }}, React.createElement("div", {className: "ui vertical icon small buttons"}, React.createElement(sui.Button, {icon: "" + (collapsed ? 'toggle up' : 'toggle down'), class: "collapse-button " + (collapsed ? 'collapsed' : ''), title: collapseTooltip, ariaLabel: lf("{0}, {1}", collapseTooltip, collapsed ? lf("Collapsed") : "Expanded"), onClick: function () { return _this.toggleCollapse('mobile'); }}))) : undefined), React.createElement("div", {className: "three wide column"}), React.createElement("div", {className: "column"}, React.createElement("div", {className: "ui grid"}, readOnly || !showUndoRedo ? undefined :
+                React.createElement("div", {className: "row"}, React.createElement("div", {className: "column"}, React.createElement("div", {className: "ui icon large buttons"}, React.createElement(sui.Button, {icon: 'xicon undo', class: "editortools-btn undo-editortools-btn " + (!hasUndo ? 'disabled' : ''), ariaLabel: lf("{0}, {1}", lf("Undo"), !hasUndo ? lf("Disabled") : ""), title: lf("Undo"), onClick: function () { return _this.undo('mobile'); }})))), React.createElement("div", {className: "row", style: readOnly || !showUndoRedo ? undefined : { paddingTop: 0 }}, React.createElement("div", {className: "column"}, React.createElement("div", {className: "ui icon large buttons"}, trace ? React.createElement(sui.Button, {key: 'tracebtn', class: "trace-button " + (tracing ? 'orange' : ''), icon: "xicon turtle", title: traceTooltip, onClick: function () { return _this.toggleTrace('mobile'); }}) : undefined, compileBtn ? React.createElement(sui.Button, {class: "primary download-button download-button-full " + downloadButtonClasses, icon: downloadIcon, title: compileTooltip, onClick: function () { return _this.compile('mobile'); }}) : undefined))))))), React.createElement("div", {className: "column tablet only"}, collapsed ?
             React.createElement("div", {className: "ui grid seven column"}, headless ?
-                React.createElement("div", {className: "left aligned six wide column"}, React.createElement("div", {className: "ui icon buttons"}, React.createElement(sui.Button, {icon: "" + (collapsed ? 'toggle up' : 'toggle down'), class: "collapse-button " + (collapsed ? 'collapsed' : '') + " " + (hideEditorFloats ? 'disabled' : ''), title: collapseTooltip, onClick: function () { return _this.toggleCollapse('tablet'); }}), run ? React.createElement(sui.Button, {role: "menuitem", class: "play-button " + (running ? "stop" : "play"), key: 'runmenubtn', icon: running ? "stop" : "play", title: runTooltip, onClick: function () { return _this.startStopSimulator('tablet'); }}) : undefined, restart ? React.createElement(sui.Button, {key: 'restartbtn', class: "restart-button", icon: "refresh", title: restartTooltip, onClick: function () { return _this.restartSimulator('tablet'); }}) : undefined, trace ? React.createElement(sui.Button, {key: 'tracebtn', class: "trace-button " + (tracing ? 'orange' : ''), icon: "xicon turtle", title: traceTooltip, onClick: function () { return _this.toggleTrace('tablet'); }}) : undefined, compileBtn ? React.createElement(sui.Button, {class: "primary download-button download-button-full " + downloadButtonClasses, icon: downloadIcon, title: compileTooltip, onClick: function () { return _this.compile('tablet'); }}) : undefined)) :
-                React.createElement("div", {className: "left aligned six wide column"}, React.createElement("div", {className: "ui icon buttons"}, React.createElement(sui.Button, {icon: "" + (collapsed ? 'toggle up' : 'toggle down'), class: "collapse-button " + (collapsed ? 'collapsed' : '') + " " + (hideEditorFloats ? 'disabled' : ''), title: collapseTooltip, onClick: function () { return _this.toggleCollapse('tablet'); }}), compileBtn ? React.createElement(sui.Button, {class: "primary download-button download-button-full " + downloadButtonClasses, icon: downloadIcon, text: downloadText, title: compileTooltip, onClick: function () { return _this.compile('tablet'); }}) : undefined)), React.createElement("div", {className: "column four wide"}, readOnly ? undefined :
-                React.createElement(sui.Button, {icon: 'save', class: "small editortools-btn save-editortools-btn " + saveButtonClasses, title: lf("Save"), onClick: function () { return _this.saveFile('tablet'); }})), React.createElement("div", {className: "column six wide right aligned"}, showUndoRedo ?
-                React.createElement("div", {className: "ui icon small buttons"}, React.createElement(sui.Button, {icon: 'xicon undo', class: "editortools-btn undo-editortools-btn} " + (!hasUndo ? 'disabled' : ''), title: lf("Undo"), onClick: function () { return _this.undo('tablet'); }}), React.createElement(sui.Button, {icon: 'xicon redo', class: "editortools-btn redo-editortools-btn} " + (!hasRedo ? 'disabled' : ''), title: lf("Redo"), onClick: function () { return _this.redo('tablet'); }})) : undefined, showZoomControls ?
+                React.createElement("div", {className: "left aligned six wide column"}, React.createElement("div", {className: "ui icon buttons"}, React.createElement(sui.Button, {icon: "" + (collapsed ? 'toggle up' : 'toggle down'), class: "collapse-button " + (collapsed ? 'collapsed' : '') + " " + (hideEditorFloats ? 'disabled' : ''), ariaLabel: lf("{0}, {1}", collapseTooltip, hideEditorFloats ? lf("Disabled") : ""), title: collapseTooltip, onClick: function () { return _this.toggleCollapse('tablet'); }}), run ? React.createElement(sui.Button, {role: "menuitem", class: "play-button " + (running ? "stop" : "play"), key: 'runmenubtn', icon: running ? "stop" : "play", title: runTooltip, onClick: function () { return _this.startStopSimulator('tablet'); }}) : undefined, restart ? React.createElement(sui.Button, {key: 'restartbtn', class: "restart-button", icon: "refresh", title: restartTooltip, onClick: function () { return _this.restartSimulator('tablet'); }}) : undefined, trace ? React.createElement(sui.Button, {key: 'tracebtn', class: "trace-button " + (tracing ? 'orange' : ''), icon: "xicon turtle", title: traceTooltip, onClick: function () { return _this.toggleTrace('tablet'); }}) : undefined, compileBtn ? React.createElement(sui.Button, {class: "primary download-button download-button-full " + downloadButtonClasses, icon: downloadIcon, title: compileTooltip, onClick: function () { return _this.compile('tablet'); }}) : undefined)) :
+                React.createElement("div", {className: "left aligned six wide column"}, React.createElement("div", {className: "ui icon buttons"}, React.createElement(sui.Button, {icon: "" + (collapsed ? 'toggle up' : 'toggle down'), class: "collapse-button " + (collapsed ? 'collapsed' : '') + " " + (hideEditorFloats ? 'disabled' : ''), ariaLabel: lf("{0}, {1}", collapseTooltip, hideEditorFloats ? lf("Disabled") : ""), title: collapseTooltip, onClick: function () { return _this.toggleCollapse('tablet'); }}), compileBtn ? React.createElement(sui.Button, {class: "primary download-button download-button-full " + downloadButtonClasses, icon: downloadIcon, text: downloadText, title: compileTooltip, onClick: function () { return _this.compile('tablet'); }}) : undefined)), React.createElement("div", {className: "column four wide"}, readOnly ? undefined :
+                React.createElement(sui.Button, {icon: 'save', class: "small editortools-btn save-editortools-btn " + saveButtonClasses, title: lf("Save"), ariaLabel: lf("Save the project"), onClick: function () { return _this.saveFile('tablet'); }})), React.createElement("div", {className: "column six wide right aligned"}, showUndoRedo ?
+                React.createElement("div", {className: "ui icon small buttons"}, React.createElement(sui.Button, {icon: 'xicon undo', class: "editortools-btn undo-editortools-btn " + (!hasUndo ? 'disabled' : ''), ariaLabel: lf("{0}, {1}", lf("Undo"), !hasUndo ? lf("Disabled") : ""), title: lf("Undo"), onClick: function () { return _this.undo('tablet'); }}), React.createElement(sui.Button, {icon: 'xicon redo', class: "editortools-btn redo-editortools-btn " + (!hasRedo ? 'disabled' : ''), ariaLabel: lf("{0}, {1}", lf("Red"), !hasRedo ? lf("Disabled") : ""), title: lf("Redo"), onClick: function () { return _this.redo('tablet'); }})) : undefined, showZoomControls ?
                 React.createElement("div", {className: "ui icon small buttons"}, React.createElement(sui.Button, {icon: 'plus circle', class: "editortools-btn zoomin-editortools-btn", title: lf("Zoom In"), onClick: function () { return _this.zoomIn('tablet'); }}), React.createElement(sui.Button, {icon: 'minus circle', class: "editortools-btn zoomout-editortools-btn", title: lf("Zoom Out"), onClick: function () { return _this.zoomOut('tablet'); }})) : undefined))
             : React.createElement("div", {className: "ui grid"}, React.createElement("div", {className: "left aligned two wide column"}, React.createElement("div", {className: "ui vertical icon small buttons"}, run ? React.createElement(sui.Button, {role: "menuitem", class: "play-button " + (running ? "stop" : "play"), key: 'runmenubtn', icon: running ? "stop" : "play", title: runTooltip, onClick: function () { return _this.startStopSimulator('tablet'); }}) : undefined, restart ? React.createElement(sui.Button, {key: 'restartbtn', class: "restart-button", icon: "refresh", title: restartTooltip, onClick: function () { return _this.restartSimulator('tablet'); }}) : undefined), showCollapsed ?
-                React.createElement("div", {className: "row", style: { paddingTop: "1rem" }}, React.createElement("div", {className: "ui vertical icon small buttons"}, React.createElement(sui.Button, {icon: "" + (collapsed ? 'toggle up' : 'toggle down'), class: "collapse-button " + (collapsed ? 'collapsed' : ''), title: collapseTooltip, onClick: function () { return _this.toggleCollapse('tablet'); }}))) : undefined), React.createElement("div", {className: "three wide column"}), React.createElement("div", {className: "five wide column"}, React.createElement("div", {className: "ui grid right aligned"}, compileBtn ? React.createElement("div", {className: "row"}, React.createElement("div", {className: "column"}, React.createElement(sui.Button, {role: "menuitem", class: "primary large fluid download-button download-button-full " + downloadButtonClasses, icon: downloadIcon, text: downloadText, title: compileTooltip, onClick: function () { return _this.compile('tablet'); }}))) : undefined, showProjectRename ?
-                React.createElement("div", {className: "row", style: compileBtn ? { paddingTop: 0 } : {}}, React.createElement("div", {className: "column"}, React.createElement("div", {className: "ui item large right labeled fluid input projectname-input projectname-tablet", title: lf("Pick a name for your project")}, React.createElement("input", {id: "fileNameInput", type: "text", placeholder: lf("Pick a name..."), value: projectName || '', onChange: function (e) { return _this.saveProjectName(e.target.value, 'tablet'); }}), React.createElement(sui.Button, {icon: 'save', class: "large right attached editortools-btn save-editortools-btn " + saveButtonClasses, title: lf("Save"), onClick: function () { return _this.saveFile('tablet'); }})))) : undefined)), React.createElement("div", {className: "six wide column right aligned"}, React.createElement("div", {className: "ui grid right aligned"}, showUndoRedo || showZoomControls ?
+                React.createElement("div", {className: "row", style: { paddingTop: "1rem" }}, React.createElement("div", {className: "ui vertical icon small buttons"}, React.createElement(sui.Button, {icon: "" + (collapsed ? 'toggle up' : 'toggle down'), class: "collapse-button " + (collapsed ? 'collapsed' : ''), title: collapseTooltip, ariaLabel: lf("{0}, {1}", collapseTooltip, collapsed ? lf("Collapsed") : "Expanded"), onClick: function () { return _this.toggleCollapse('tablet'); }}))) : undefined), React.createElement("div", {className: "three wide column"}), React.createElement("div", {className: "five wide column"}, React.createElement("div", {className: "ui grid right aligned"}, compileBtn ? React.createElement("div", {className: "row"}, React.createElement("div", {className: "column"}, React.createElement(sui.Button, {role: "menuitem", class: "primary large fluid download-button download-button-full " + downloadButtonClasses, icon: downloadIcon, text: downloadText, title: compileTooltip, onClick: function () { return _this.compile('tablet'); }}))) : undefined, showProjectRename ?
+                React.createElement("div", {className: "row", style: compileBtn ? { paddingTop: 0 } : {}}, React.createElement("div", {className: "column"}, React.createElement("div", {className: "ui item large right labeled fluid input projectname-input projectname-tablet", title: lf("Pick a name for your project")}, React.createElement("label", {htmlFor: "fileNameInput1", id: "fileNameInputLabel1", className: "accessible-hidden"}, lf("Type a name for your project")), React.createElement("input", {id: "fileNameInput1", type: "text", "aria-labelledby": "fileNameInputLabel1", placeholder: lf("Pick a name..."), value: projectName || '', onChange: function (e) { return _this.saveProjectName(e.target.value, 'tablet'); }}), React.createElement(sui.Button, {icon: 'save', class: "large right attached editortools-btn save-editortools-btn " + saveButtonClasses, title: lf("Save"), ariaLabel: lf("Save the project"), onClick: function () { return _this.saveFile('tablet'); }})))) : undefined)), React.createElement("div", {className: "six wide column right aligned"}, React.createElement("div", {className: "ui grid right aligned"}, showUndoRedo || showZoomControls ?
                 React.createElement("div", {className: "row"}, React.createElement("div", {className: "column"}, showUndoRedo ?
-                    React.createElement("div", {className: "ui icon large buttons"}, React.createElement(sui.Button, {icon: 'xicon undo', class: "editortools-btn undo-editortools-btn} " + (!hasUndo ? 'disabled' : ''), title: lf("Undo"), onClick: function () { return _this.undo(); }}), React.createElement(sui.Button, {icon: 'xicon redo', class: "editortools-btn redo-editortools-btn} " + (!hasRedo ? 'disabled' : ''), title: lf("Redo"), onClick: function () { return _this.redo(); }})) : undefined, showZoomControls ?
+                    React.createElement("div", {className: "ui icon large buttons"}, React.createElement(sui.Button, {icon: 'xicon undo', class: "editortools-btn undo-editortools-btn} " + (!hasUndo ? 'disabled' : ''), title: lf("Undo"), ariaLabel: lf("{0}, {1}", lf("Undo"), !hasUndo ? lf("Disabled") : ""), onClick: function () { return _this.undo(); }}), React.createElement(sui.Button, {icon: 'xicon redo', class: "editortools-btn redo-editortools-btn} " + (!hasRedo ? 'disabled' : ''), title: lf("Redo"), ariaLabel: lf("{0}, {1}", lf("Redo"), !hasRedo ? lf("Disabled") : ""), onClick: function () { return _this.redo(); }})) : undefined, showZoomControls ?
                     React.createElement("div", {className: "ui icon large buttons"}, React.createElement(sui.Button, {icon: 'plus circle', class: "editortools-btn zoomin-editortools-btn", title: lf("Zoom In"), onClick: function () { return _this.zoomIn(); }}), React.createElement(sui.Button, {icon: 'minus circle', class: "editortools-btn zoomout-editortools-btn", title: lf("Zoom Out"), onClick: function () { return _this.zoomOut(); }})) : undefined)) : undefined, trace ?
                 React.createElement("div", {className: "row", style: showUndoRedo || showZoomControls ? { paddingTop: 0 } : {}}, React.createElement("div", {className: "column"}, React.createElement(sui.Button, {key: 'tracebtn', class: "large trace-button " + (tracing ? 'orange' : ''), icon: "xicon turtle", title: traceTooltip, onClick: function () { return _this.toggleTrace('tablet'); }}))) : undefined)))), React.createElement("div", {className: "column computer only"}, React.createElement("div", {className: "ui grid equal width"}, React.createElement("div", {id: "downloadArea", className: "ui column items"}, headless ?
             React.createElement("div", {className: "ui item"}, React.createElement("div", {className: "ui icon large buttons"}, showCollapsed ? React.createElement(sui.Button, {icon: "" + (collapseEditorTools ? 'toggle right' : 'toggle left'), class: "large collapse-button " + (collapsed ? 'collapsed' : ''), title: collapseTooltip, onClick: function () { return _this.toggleCollapse('computer'); }}) : undefined, run ? React.createElement(sui.Button, {role: "menuitem", class: "large play-button " + (running ? "stop" : "play"), key: 'runmenubtn', icon: running ? "stop" : "play", title: runTooltip, onClick: function () { return _this.startStopSimulator('computer'); }}) : undefined, restart ? React.createElement(sui.Button, {key: 'restartbtn', class: "large restart-button", icon: "refresh", title: restartTooltip, onClick: function () { return _this.restartSimulator('computer'); }}) : undefined, trace ? React.createElement(sui.Button, {key: 'tracebtn', class: "large trace-button " + (tracing ? 'orange' : ''), icon: "xicon turtle", title: traceTooltip, onClick: function () { return _this.toggleTrace('computer'); }}) : undefined, compileBtn ? React.createElement(sui.Button, {icon: downloadIcon, class: "primary large download-button " + downloadButtonClasses, title: compileTooltip, onClick: function () { return _this.compile('computer'); }}) : undefined)) :
             React.createElement("div", {className: "ui item"}, showCollapsed ? React.createElement(sui.Button, {icon: "" + (collapseEditorTools ? 'toggle right' : 'toggle left'), class: "large collapse-button " + (collapsed ? 'collapsed' : ''), title: collapseTooltip, onClick: function () { return _this.toggleCollapse('computer'); }}) : undefined, compileBtn ? React.createElement(sui.Button, {icon: downloadIcon, class: "primary huge fluid download-button " + downloadButtonClasses, text: downloadText, title: compileTooltip, onClick: function () { return _this.compile('computer'); }}) : undefined)), showProjectRename ?
-            React.createElement("div", {className: "column left aligned"}, React.createElement("div", {className: "ui right labeled input projectname-input projectname-computer", title: lf("Pick a name for your project")}, React.createElement("input", {id: "fileNameInput", type: "text", placeholder: lf("Pick a name..."), value: projectName || '', onChange: function (e) { return _this.saveProjectName(e.target.value, 'computer'); }}), React.createElement(sui.Button, {icon: 'save', class: "small right attached editortools-btn save-editortools-btn " + saveButtonClasses, title: lf("Save"), onClick: function () { return _this.saveFile('computer'); }}))) : undefined, React.createElement("div", {className: "column right aligned"}, showUndoRedo ?
-            React.createElement("div", {className: "ui icon small buttons"}, React.createElement(sui.Button, {icon: 'xicon undo', class: "editortools-btn undo-editortools-btn} " + (!hasUndo ? 'disabled' : ''), title: lf("Undo"), onClick: function () { return _this.undo('computer'); }}), React.createElement(sui.Button, {icon: 'xicon redo', class: "editortools-btn redo-editortools-btn} " + (!hasRedo ? 'disabled' : ''), title: lf("Redo"), onClick: function () { return _this.redo('computer'); }})) : undefined, showZoomControls ?
+            React.createElement("div", {className: "column left aligned"}, React.createElement("div", {className: "ui right labeled input projectname-input projectname-computer", title: lf("Pick a name for your project")}, React.createElement("label", {htmlFor: "fileNameInput2", id: "fileNameInputLabel2", className: "accessible-hidden"}, lf("Type a name for your project")), React.createElement("input", {id: "fileNameInput2", type: "text", "aria-labelledby": "fileNameInputLabel2", placeholder: lf("Pick a name..."), value: projectName || '', onChange: function (e) { return _this.saveProjectName(e.target.value, 'computer'); }}), React.createElement(sui.Button, {icon: 'save', class: "small right attached editortools-btn save-editortools-btn " + saveButtonClasses, title: lf("Save"), ariaLabel: lf("Save the project"), onClick: function () { return _this.saveFile('computer'); }}))) : undefined, React.createElement("div", {className: "column right aligned"}, showUndoRedo ?
+            React.createElement("div", {className: "ui icon small buttons"}, React.createElement(sui.Button, {icon: 'xicon undo', class: "editortools-btn undo-editortools-btn " + (!hasUndo ? 'disabled' : ''), ariaLabel: lf("{0}, {1}", lf("Undo"), !hasUndo ? lf("Disabled") : ""), title: lf("Undo"), onClick: function () { return _this.undo('computer'); }}), React.createElement(sui.Button, {icon: 'xicon redo', class: "editortools-btn redo-editortools-btn " + (!hasRedo ? 'disabled' : ''), ariaLabel: lf("{0}, {1}", lf("Redo"), !hasRedo ? lf("Disabled") : ""), title: lf("Redo"), onClick: function () { return _this.redo('computer'); }})) : undefined, showZoomControls ?
             React.createElement("div", {className: "ui icon small buttons"}, React.createElement(sui.Button, {icon: 'plus circle', class: "editortools-btn zoomin-editortools-btn", title: lf("Zoom In"), onClick: function () { return _this.zoomIn('computer'); }}), React.createElement(sui.Button, {icon: 'minus circle', class: "editortools-btn zoomout-editortools-btn", title: lf("Zoom Out"), onClick: function () { return _this.zoomOut('computer'); }})) : undefined))));
     };
     return EditorToolbar;
 }(data.Component));
 exports.EditorToolbar = EditorToolbar;
 
-},{"./data":12,"./sui":37,"react":267}],16:[function(require,module,exports){
+},{"./data":13,"./sui":41,"react":274}],17:[function(require,module,exports){
 "use strict";
 var core = require("./core");
 var Cloud = pxt.Cloud;
@@ -4696,7 +5274,9 @@ var UpdateEventType;
     UpdateEventType[UpdateEventType["Prompt"] = 3] = "Prompt";
 })(UpdateEventType || (UpdateEventType = {}));
 var electronSocket = null;
-exports.isElectron = /[?&]electron=1/.test(window.location.href);
+exports.isPxtElectron = /[?&]electron=1/.test(window.location.href);
+exports.isIpcRenderer = !!window.ipcRenderer;
+exports.isElectron = exports.isPxtElectron || exports.isIpcRenderer;
 function init() {
     if (!exports.isElectron || !Cloud.isLocalHost() || !Cloud.localToken) {
         return;
@@ -4723,7 +5303,7 @@ function init() {
             }
             else {
                 pxt.tickEvent("update.acceptedCritical");
-                core.showLoading(lf("Downloading update..."));
+                core.showLoading("downloadingupdate", lf("Downloading update..."));
                 sendMessage("update", {
                     targetVersion: args.targetVersion,
                     type: args.type
@@ -4768,7 +5348,7 @@ function init() {
                         pxt.tickEvent("update.accepted");
                     }
                     if (!isUrl) {
-                        core.showLoading(lf("Downloading update..."));
+                        core.showLoading("downloadingupdate", lf("Downloading update..."));
                     }
                     sendMessage("update", {
                         targetVersion: args.targetVersion,
@@ -4791,7 +5371,7 @@ function init() {
     }
     function onUpdateDownloadError(args) {
         var isCritical = args && args.type === UpdateEventType.Critical;
-        core.hideLoading();
+        core.hideLoading("downloadingupdate");
         displayUpdateError(lf("There was an error downloading the update"), isCritical ? lf("Quit") : lf("Ok"))
             .finally(function () {
             if (isCritical) {
@@ -4876,7 +5456,472 @@ function checkForUpdate() {
 }
 exports.checkForUpdate = checkForUpdate;
 
-},{"./core":11}],17:[function(require,module,exports){
+},{"./core":12}],18:[function(require,module,exports){
+"use strict";
+var e = pxt.editor;
+var pkg = require("./package");
+(function (Permissions) {
+    Permissions[Permissions["Serial"] = 0] = "Serial";
+    Permissions[Permissions["ReadUserCode"] = 1] = "ReadUserCode";
+})(exports.Permissions || (exports.Permissions = {}));
+var Permissions = exports.Permissions;
+(function (PermissionStatus) {
+    PermissionStatus[PermissionStatus["Granted"] = 0] = "Granted";
+    PermissionStatus[PermissionStatus["Denied"] = 1] = "Denied";
+    PermissionStatus[PermissionStatus["NotAvailable"] = 2] = "NotAvailable";
+    PermissionStatus[PermissionStatus["NotYetPrompted"] = 3] = "NotYetPrompted";
+})(exports.PermissionStatus || (exports.PermissionStatus = {}));
+var PermissionStatus = exports.PermissionStatus;
+var ExtensionManager = (function () {
+    function ExtensionManager(host) {
+        this.host = host;
+        this.statuses = {};
+        this.nameToExtId = {};
+        this.extIdToName = {};
+        this.consent = {};
+        this.pendingRequests = [];
+        this.queueLock = false;
+    }
+    ExtensionManager.prototype.handleExtensionMessage = function (message) {
+        this.handleRequestAsync(message)
+            .catch(function (e) { });
+    };
+    ExtensionManager.prototype.sendEvent = function (extId, event) {
+        this.host.send(extId, mkEvent(event));
+    };
+    ExtensionManager.prototype.setConsent = function (extId, allowed) {
+        this.consent[extId] = allowed;
+    };
+    ExtensionManager.prototype.hasConsent = function (extId) {
+        return this.consent[extId];
+    };
+    ExtensionManager.prototype.getExtId = function (name) {
+        if (!this.nameToExtId[name]) {
+            this.nameToExtId[name] = Util.guidGen();
+            this.extIdToName[this.nameToExtId[name]] = name;
+        }
+        return this.nameToExtId[name];
+    };
+    ExtensionManager.prototype.sendResponse = function (response) {
+        this.host.send(this.extIdToName[response.extId], response);
+    };
+    ExtensionManager.prototype.handleRequestAsync = function (request) {
+        var _this = this;
+        var resp = mkResponse(request);
+        if (!this.hasConsent(request.extId)) {
+            resp.success = false;
+            resp.error = "";
+            this.sendResponse(resp);
+            return Promise.reject("No consent");
+        }
+        switch (request.action) {
+            case "extinit":
+                this.sendResponse(resp);
+                break;
+            case "extdatastream":
+                return this.permissionOperation(request.extId, Permissions.Serial, resp, handleDataStreamRequest);
+            case "extquerypermission":
+                var perm = this.getPermissions(request.extId);
+                var r = resp;
+                r.resp = statusesToResponses(perm);
+                this.sendResponse(r);
+                break;
+            case "extrequestpermission":
+                return this.requestPermissionsAsync(request.extId, resp, request.body);
+            case "extusercode":
+                return this.permissionOperation(request.extId, Permissions.ReadUserCode, resp, handleUserCodeRequest);
+            case "extreadcode":
+                handleReadCodeRequest(this.extIdToName[request.extId], resp);
+                this.sendResponse(resp);
+                break;
+            case "extwritecode":
+                handleWriteCodeRequestAsync(this.extIdToName[request.extId], resp, request.body)
+                    .done(function () { return _this.sendResponse(resp); });
+                break;
+        }
+        return Promise.resolve();
+    };
+    ExtensionManager.prototype.permissionOperation = function (id, permission, resp, cb) {
+        var _this = this;
+        return this.checkPermissionAsync(id, permission)
+            .then(function (hasPermission) {
+            if (hasPermission) {
+                cb(_this.extIdToName[id], resp);
+                _this.sendResponse(resp);
+            }
+            else {
+                resp.success = false;
+                resp.error = "permission denied";
+                _this.sendResponse(resp);
+            }
+        })
+            .catch(function (e) {
+            resp.success = false;
+            resp.error = e;
+            _this.sendResponse(resp);
+        });
+    };
+    ExtensionManager.prototype.getPermissions = function (id) {
+        if (!this.statuses[id]) {
+            this.statuses[id] = {
+                serial: PermissionStatus.NotYetPrompted,
+                readUserCode: PermissionStatus.NotYetPrompted
+            };
+        }
+        return this.statuses[id];
+    };
+    ExtensionManager.prototype.queuePermissionRequest = function (extId, permission) {
+        var _this = this;
+        return new Promise(function (resolve, reject) {
+            var req = {
+                extId: extId,
+                permissions: [permission],
+                resolver: resolve
+            };
+            _this.pendingRequests.push(req);
+            if (!_this.queueLock && _this.pendingRequests.length === 1) {
+                _this.queueLock = true;
+                _this.nextPermissionRequest();
+            }
+        });
+    };
+    ExtensionManager.prototype.nextPermissionRequest = function () {
+        var _this = this;
+        if (this.pendingRequests.length) {
+            var current_1 = this.pendingRequests.shift();
+            // Don't allow duplicate requests to prevent spamming
+            current_1.permissions = current_1.permissions.filter(function (p) { return _this.hasNotBeenPrompted(current_1.extId, p); });
+            if (current_1.permissions.length) {
+                this.host.promptForPermissionAsync(this.extIdToName[current_1.extId], current_1.permissions)
+                    .done(function (approved) {
+                    current_1.resolver(approved);
+                    _this.nextPermissionRequest();
+                });
+            }
+            else {
+                this.nextPermissionRequest();
+            }
+        }
+        else {
+            this.queueLock = false;
+        }
+    };
+    ExtensionManager.prototype.checkPermissionAsync = function (id, permission) {
+        var _this = this;
+        var perm = this.getPermissions(id);
+        var status;
+        switch (permission) {
+            case Permissions.Serial:
+                status = perm.serial;
+                break;
+            case Permissions.ReadUserCode:
+                status = perm.readUserCode;
+                break;
+        }
+        if (status === PermissionStatus.NotYetPrompted) {
+            return this.queuePermissionRequest(id, permission)
+                .then(function (approved) {
+                var newStatus = approved ? PermissionStatus.Granted : PermissionStatus.Denied;
+                switch (permission) {
+                    case Permissions.Serial:
+                        _this.statuses[id].serial = newStatus;
+                        break;
+                    case Permissions.ReadUserCode:
+                        _this.statuses[id].readUserCode = newStatus;
+                        break;
+                }
+                return approved;
+            });
+        }
+        return Promise.resolve(status === PermissionStatus.Granted);
+    };
+    ExtensionManager.prototype.requestPermissionsAsync = function (id, resp, p) {
+        var _this = this;
+        var promises = [];
+        if (p.readUserCode) {
+            promises.push(this.checkPermissionAsync(id, Permissions.ReadUserCode));
+        }
+        if (p.serial) {
+            promises.push(this.checkPermissionAsync(id, Permissions.Serial));
+        }
+        return Promise.all(promises)
+            .then(function () { return statusesToResponses(_this.getPermissions(id)); })
+            .then(function (responses) { resp.resp = responses; });
+    };
+    ExtensionManager.prototype.hasNotBeenPrompted = function (extId, permission) {
+        var perm = this.getPermissions(extId);
+        var status;
+        switch (permission) {
+            case Permissions.Serial:
+                status = perm.serial;
+                break;
+            case Permissions.ReadUserCode:
+                status = perm.readUserCode;
+                break;
+        }
+        return status === PermissionStatus.NotYetPrompted;
+    };
+    return ExtensionManager;
+}());
+exports.ExtensionManager = ExtensionManager;
+function handleUserCodeRequest(name, resp) {
+    var mainPackage = pkg.mainEditorPkg();
+    resp.resp = mainPackage.getAllFiles();
+}
+function handleDataStreamRequest(name, resp) {
+    // TODO
+}
+function handleReadCodeRequest(name, resp) {
+    var mainPackage = pkg.mainEditorPkg();
+    var fn = ts.pxtc.escapeIdentifier(name);
+    var files = mainPackage.getAllFiles();
+    resp.resp = {
+        json: files[fn + ".json"],
+        code: files[fn + ".ts"]
+    };
+}
+function handleWriteCodeRequestAsync(name, resp, files) {
+    var mainPackage = pkg.mainEditorPkg();
+    var fn = ts.pxtc.escapeIdentifier(name);
+    var needsUpdate = false;
+    if (files.json !== undefined) {
+        needsUpdate = true;
+        mainPackage.setFile(fn + ".json", files.json);
+    }
+    if (files.code !== undefined) {
+        needsUpdate = true;
+        mainPackage.setFile(fn + ".ts", files.code);
+    }
+    return !needsUpdate ? Promise.resolve() : mainPackage.updateConfigAsync(function (cfg) {
+        if (files.json !== undefined && cfg.files.indexOf(fn + ".json") < 0) {
+            cfg.files.push(fn + ".json");
+        }
+        if (files.code !== undefined && cfg.files.indexOf(fn + ".ts") < 0) {
+            cfg.files.push(fn + ".ts");
+        }
+        return mainPackage.savePkgAsync();
+    });
+}
+function mkEvent(event) {
+    return {
+        type: "pxtpkgext",
+        event: event
+    };
+}
+function mkResponse(request, success) {
+    if (success === void 0) { success = true; }
+    return {
+        type: "pxtpkgext",
+        id: request.id,
+        extId: request.extId,
+        success: success
+    };
+}
+function statusesToResponses(perm) {
+    return {
+        readUserCode: statusToResponse(perm.readUserCode),
+        serial: statusToResponse(perm.serial)
+    };
+}
+function statusToResponse(p) {
+    switch (p) {
+        case PermissionStatus.NotYetPrompted:
+        case PermissionStatus.Denied:
+            return e.PermissionResponses.Denied;
+        case PermissionStatus.Granted:
+            return e.PermissionResponses.Granted;
+        case PermissionStatus.NotAvailable:
+        default:
+            return e.PermissionResponses.NotAvailable;
+    }
+}
+
+},{"./package":30}],19:[function(require,module,exports){
+/// <reference path="../../typings/globals/react/index.d.ts" />
+/// <reference path="../../typings/globals/react-dom/index.d.ts" />
+/// <reference path="../../built/pxtlib.d.ts" />
+"use strict";
+var __extends = (this && this.__extends) || function (d, b) {
+    for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
+    function __() { this.constructor = d; }
+    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+};
+var React = require("react");
+var data = require("./data");
+var sui = require("./sui");
+var ext = require("./extensionManager");
+var CUSTOM_CONTENT_DIV = 'custom-content';
+var Extensions = (function (_super) {
+    __extends(Extensions, _super);
+    function Extensions(props) {
+        _super.call(this, props);
+        this.state = {
+            visible: false,
+            consent: false
+        };
+        this.manager = new ext.ExtensionManager(this);
+    }
+    Extensions.prototype.hide = function () {
+        this.setState({ visible: false });
+        var frame = Extensions.getFrame(this.state.extension);
+        frame.style.display = 'none';
+        // reload project to update changes from the editor
+        this.props.parent.reloadHeaderAsync().done();
+    };
+    Extensions.prototype.showExtension = function (extension, url, consentRequired) {
+        var consent = consentRequired ? this.manager.hasConsent(this.manager.getExtId(extension)) : true;
+        this.setState({ visible: true, extension: extension, url: url, consent: consent });
+    };
+    Extensions.prototype.submitConsent = function () {
+        this.manager.setConsent(this.manager.getExtId(this.state.extension), true);
+        this.setState({ consent: true });
+    };
+    Extensions.prototype.initializeFrame = function () {
+        this.manager.setConsent(this.manager.getExtId(this.state.extension), true);
+        var frame = Extensions.getFrame(this.state.extension);
+        frame.style.display = 'block';
+        if (!frame.src) {
+            frame.src = this.state.url + "#" + this.manager.getExtId(this.state.extension);
+        }
+    };
+    Extensions.prototype.shouldComponentUpdate = function (nextProps, nextState, nextContext) {
+        return this.state.visible != nextState.visible
+            || this.state.extension != nextState.extension
+            || this.state.permissionRequest != nextState.permissionRequest
+            || this.state.consent != nextState.consent;
+    };
+    Extensions.prototype.updateDimensions = function () {
+        if (this.extensionWrapper) {
+            // Resize current frame
+            var extension = this.extensionWrapper.getAttribute('data-frame');
+            if (extension) {
+                var frame = Extensions.getFrame(extension);
+                var extensionDialog = document.getElementsByClassName('extensiondialog')[0];
+                if (extensionDialog && frame) {
+                    var bb = extensionDialog.getBoundingClientRect();
+                    frame.width = this.extensionWrapper.clientWidth + "px";
+                    frame.height = this.extensionWrapper.clientHeight + "px";
+                    frame.style.top = (bb.top + this.extensionWrapper.offsetTop) + "px";
+                    frame.style.left = (bb.left + this.extensionWrapper.offsetLeft) + "px";
+                }
+            }
+        }
+    };
+    Extensions.prototype.componentDidMount = function () {
+        window.addEventListener("resize", this.updateDimensions);
+    };
+    Extensions.prototype.componentWillUnmount = function () {
+        window.removeEventListener("resize", this.updateDimensions);
+    };
+    Extensions.prototype.componentDidUpdate = function () {
+        this.updateDimensions();
+    };
+    Extensions.prototype.handleExtensionRequest = function (request) {
+        this.manager.handleExtensionMessage(request);
+    };
+    Extensions.prototype.send = function (name, editorMessage) {
+        var frame = Extensions.getFrame(name);
+        if (frame) {
+            frame.contentWindow.postMessage(editorMessage, "*");
+        }
+        else {
+            console.warn("Attempting to post message to unloaded extesnion " + name);
+        }
+    };
+    Extensions.prototype.promptForPermissionAsync = function (id, permissions) {
+        var _this = this;
+        return new Promise(function (resolve, reject) {
+            _this.permissionCb = resolve;
+            _this.setState({
+                permissionRequest: permissions,
+                permissionExtName: id
+            });
+        });
+    };
+    Extensions.prototype.onPermissionDecision = function (approved) {
+        this.permissionCb(approved);
+        this.permissionCb = undefined;
+        this.setState({
+            permissionRequest: null,
+            permissionExtName: null
+        });
+    };
+    Extensions.getCustomContent = function () {
+        return document.getElementById(CUSTOM_CONTENT_DIV);
+    };
+    Extensions.getFrame = function (name) {
+        var customContent = this.getCustomContent();
+        var frame = customContent.getElementsByClassName("extension-frame-" + name)[0];
+        if (!frame) {
+            frame = this.createFrame(name);
+        }
+        return frame;
+    };
+    Extensions.createFrame = function (name) {
+        var wrapper = this.getCustomContent();
+        var frame = document.createElement('iframe');
+        frame.className = "extension-frame extension-frame-" + name;
+        frame.allowFullscreen = true;
+        frame.setAttribute('sandbox', 'allow-same-origin allow-scripts');
+        frame.sandbox.value = "allow-scripts allow-same-origin";
+        var frameUrl = '';
+        frame.frameBorder = "0";
+        frame.style.display = "none";
+        wrapper.appendChild(frame);
+        return frame;
+    };
+    Extensions.prototype.getIconForPermission = function (permission) {
+        switch (permission) {
+            case ext.Permissions.Serial:
+                return "usb";
+            case ext.Permissions.ReadUserCode:
+                return "code";
+        }
+        return "";
+    };
+    Extensions.prototype.getDisplayNameForPermission = function (permission) {
+        switch (permission) {
+            case ext.Permissions.Serial:
+                return lf("Serial");
+            case ext.Permissions.ReadUserCode:
+                return lf("Read your code");
+        }
+        return "";
+    };
+    Extensions.prototype.getDescriptionForPermission = function (permission) {
+        switch (permission) {
+            case ext.Permissions.Serial:
+                return lf("The extension will be able to read any serial data streamed to the editor");
+            case ext.Permissions.ReadUserCode:
+                return lf("The extension will be able to read the code in the current project");
+        }
+        return "";
+    };
+    Extensions.prototype.renderCore = function () {
+        var _this = this;
+        var _a = this.state, visible = _a.visible, extension = _a.extension, url = _a.url, consent = _a.consent, permissionRequest = _a.permissionRequest, permissionExtName = _a.permissionExtName;
+        var needsConsent = !consent;
+        var theme = pxt.appTarget.appTheme;
+        var action = needsConsent ? lf("Agree") : undefined;
+        var actionClick = function () {
+            _this.submitConsent();
+        };
+        var actions = action ? [{ label: action, onClick: actionClick }] : undefined;
+        if (!needsConsent && visible)
+            this.initializeFrame();
+        return (React.createElement(sui.Modal, {open: visible, className: "" + (needsConsent ? 'extensionconsentdialog' : 'extensiondialog'), size: "fullscreen", closeIcon: false, onClose: function () { return _this.hide(); }, dimmer: true, actions: actions, onPositionChanged: function () { return _this.updateDimensions(); }, closeOnDimmerClick: true}, consent ?
+            React.createElement("div", {id: "extensionWrapper", "data-frame": extension, ref: function (v) { return _this.extensionWrapper = v; }}, permissionRequest ?
+                React.createElement(sui.Modal, {className: "extensionpermissiondialog basic", size: "fullscreen", closeIcon: false, dimmer: true, open: true, dimmerClassName: "permissiondimmer"}, React.createElement("div", {className: "permissiondialoginner"}, React.createElement("div", {className: "permissiondialogheader"}, lf("Permission Request")), React.createElement("div", {className: "permissiondialogbody"}, lf("Extension {0} is requesting the following permission(s):", permissionExtName)), React.createElement("div", {className: "ui inverted list"}, permissionRequest.map(function (permission) {
+                    return React.createElement("div", {className: "item"}, React.createElement(sui.Icon, {icon: _this.getIconForPermission(permission) + " icon"}), React.createElement("div", {className: "content"}, React.createElement("div", {className: "header"}, _this.getDisplayNameForPermission(permission)), React.createElement("div", {className: "description"}, _this.getDescriptionForPermission(permission))));
+                }))), React.createElement("div", {className: "actions"}, React.createElement(sui.Button, {text: lf("Deny"), class: "deny inverted", onClick: function () { return _this.onPermissionDecision(false); }}), React.createElement(sui.Button, {text: lf("Approve"), class: "approve inverted green", onClick: function () { return _this.onPermissionDecision(true); }})))
+                : undefined)
+            : React.createElement("div", null, React.createElement("div", {className: "ui form"}, React.createElement("div", {className: "ui icon violet message"}, React.createElement(sui.Icon, {icon: "user"}), React.createElement("div", {className: "content"}, React.createElement("h3", {className: "header"}, "User-provided content"), React.createElement("p", null, lf("This content is provided by a user, and is not endorsed by Microsoft."), React.createElement("br", null), lf("If you think it's not appropriate, please report abuse through Settings -> Report Abuse."))))))));
+    };
+    return Extensions;
+}(data.Component));
+exports.Extensions = Extensions;
+
+},{"./data":13,"./extensionManager":18,"./sui":41,"react":274}],20:[function(require,module,exports){
 /// <reference path="../../typings/globals/react/index.d.ts" />
 /// <reference path="../../typings/globals/react-dom/index.d.ts" />
 /// <reference path="../../built/pxtlib.d.ts" />
@@ -4934,7 +5979,7 @@ var FileList = (function (_super) {
         var parent = this.props.parent;
         return pkg.sortedFiles().map(function (file) {
             var meta = _this.getData("open-meta:" + file.getName());
-            return (React.createElement("a", {key: file.getName(), onClick: function () { return parent.setSideFile(file); }, className: (parent.state.currFile == file ? "active " : "") + (pkg.isTopLevel() ? "" : "nested ") + "item"}, file.name, " ", meta.isSaved ? "" : "*", /\.ts$/.test(file.name) ? React.createElement("i", {className: "align left icon"}) : /\.blocks$/.test(file.name) ? React.createElement("i", {className: "puzzle icon"}) : undefined, meta.isReadonly ? React.createElement("i", {className: "lock icon"}) : null, !meta.numErrors ? null : React.createElement("span", {className: 'ui label red'}, meta.numErrors), deleteFiles && /\.blocks$/i.test(file.getName()) ? React.createElement(sui.Button, {class: "primary label", icon: "trash", onClick: function (e) { return _this.removeFile(e, file); }}) : ''));
+            return (React.createElement("a", {key: file.getName(), onClick: function () { return parent.setSideFile(file); }, tabIndex: 0, role: "treeitem", "aria-label": parent.state.currFile == file ? lf("{0}, it is the current opened file in the JavaScript editor", file.name) : file.name, onKeyDown: sui.fireClickOnEnter, className: (parent.state.currFile == file ? "active " : "") + (pkg.isTopLevel() ? "" : "nested ") + "item"}, file.name, " ", meta.isSaved ? "" : "*", /\.ts$/.test(file.name) ? React.createElement(sui.Icon, {icon: "align left"}) : /\.blocks$/.test(file.name) ? React.createElement(sui.Icon, {icon: "puzzle"}) : undefined, meta.isReadonly ? React.createElement(sui.Icon, {icon: "lock"}) : null, !meta.numErrors ? null : React.createElement("span", {className: 'ui label red'}, meta.numErrors), deleteFiles && /\.blocks$/i.test(file.getName()) ? React.createElement(sui.Button, {class: "primary label", icon: "trash", title: lf("Delete file {0}", file.name), onClick: function (e) { return _this.removeFile(e, file); }, onKeyDown: function (e) { return e.stopPropagation(); }}) : ''));
         });
     };
     FileList.prototype.packageOf = function (p) {
@@ -4944,7 +5989,7 @@ var FileList = (function (_super) {
             && p.getPkgId() != "built"
             && p.getPkgId() != pxt.appTarget.corepkg;
         var upd = p.getKsPkg() && p.getKsPkg().verProtocol() == "github";
-        return [React.createElement("div", {key: "hd-" + p.getPkgId(), className: "header link item", onClick: function () { return _this.togglePkg(p); }}, React.createElement("i", {className: "chevron " + (expands[p.getPkgId()] ? "down" : "right") + " icon"}), upd ? React.createElement(sui.Button, {class: "primary label", icon: "refresh", onClick: function (e) { return _this.updatePkg(e, p); }}) : '', del ? React.createElement(sui.Button, {class: "primary label", icon: "trash", onClick: function (e) { return _this.removePkg(e, p); }}) : '', p.getPkgId())
+        return [React.createElement("div", {key: "hd-" + p.getPkgId(), className: "header link item", role: "treeitem", "aria-expanded": expands[p.getPkgId()], "aria-label": lf("{0}, {1}", p.getPkgId(), expands[p.getPkgId()] ? lf("expanded") : lf("collapsed")), onClick: function () { return _this.togglePkg(p); }, tabIndex: 0, onKeyDown: sui.fireClickOnEnter}, React.createElement(sui.Icon, {icon: "chevron " + (expands[p.getPkgId()] ? "down" : "right") + " icon"}), upd ? React.createElement(sui.Button, {class: "primary label", icon: "refresh", title: lf("Refresh package {0}", p.getPkgId()), onClick: function (e) { return _this.updatePkg(e, p); }, onKeyDown: function (e) { return e.stopPropagation(); }}) : '', del ? React.createElement(sui.Button, {class: "primary label", icon: "trash", title: lf("Delete package {0}", p.getPkgId()), onClick: function (e) { return _this.removePkg(e, p); }, onKeyDown: function (e) { return e.stopPropagation(); }}) : '', p.getPkgId())
         ].concat(expands[p.getPkgId()] ? this.filesOf(p) : []);
     };
     FileList.prototype.togglePkg = function (p) {
@@ -4974,13 +6019,13 @@ var FileList = (function (_super) {
         var show = !!this.props.parent.state.showFiles;
         var targetTheme = pxt.appTarget.appTheme;
         var plus = show && !pkg.mainEditorPkg().files[customFile];
-        return React.createElement("div", {className: "ui tiny vertical " + (targetTheme.invertedMenu ? "inverted" : '') + " menu filemenu landscape only"}, React.createElement("div", {key: "projectheader", className: "link item", onClick: function () { return _this.toggleVisibility(); }}, lf("Explorer"), React.createElement("i", {className: "chevron " + (show ? "down" : "right") + " icon"}), plus ? React.createElement(sui.Button, {class: "primary label", icon: "plus", onClick: function (e) { return _this.addCustomBlocksFile(); }}) : undefined), show ? Util.concat(pkg.allEditorPkgs().map(function (p) { return _this.filesWithHeader(p); })) : undefined);
+        return React.createElement("div", {role: "tree", className: "ui tiny vertical " + (targetTheme.invertedMenu ? "inverted" : '') + " menu filemenu landscape only"}, React.createElement("div", {role: "treeitem", "aria-expanded": show, "aria-label": lf("File explorer toolbar"), key: "projectheader", className: "link item", onClick: function () { return _this.toggleVisibility(); }, tabIndex: 0, onKeyDown: sui.fireClickOnEnter}, lf("Explorer"), React.createElement(sui.Icon, {icon: "chevron " + (show ? "down" : "right") + " icon"}), plus ? React.createElement(sui.Button, {class: "primary label", icon: "plus", title: lf("Add custom blocks?"), onClick: function (e) { _this.addCustomBlocksFile(); e.stopPropagation(); }, onKeyDown: function (e) { return e.stopPropagation(); }}) : undefined), show ? Util.concat(pkg.allEditorPkgs().map(function (p) { return _this.filesWithHeader(p); })) : undefined);
     };
     return FileList;
 }(data.Component));
 exports.FileList = FileList;
 
-},{"./core":11,"./data":12,"./package":28,"./sui":37,"react":267}],18:[function(require,module,exports){
+},{"./core":12,"./data":13,"./package":30,"./sui":41,"react":274}],21:[function(require,module,exports){
 "use strict";
 var db = require("./db");
 var core = require("./core");
@@ -5190,7 +6235,7 @@ exports.provider = {
     saveScreenshotAsync: saveScreenshotAsync
 };
 
-},{"./core":11,"./data":12,"./db":13}],19:[function(require,module,exports){
+},{"./core":12,"./data":13,"./db":14}],22:[function(require,module,exports){
 "use strict";
 function parseExampleMarkdown(name, md) {
     if (!md)
@@ -5255,7 +6300,7 @@ function loadExampleAsync(name, path) {
 }
 exports.loadExampleAsync = loadExampleAsync;
 
-},{}],20:[function(require,module,exports){
+},{}],23:[function(require,module,exports){
 "use strict";
 var __extends = (this && this.__extends) || function (d, b) {
     for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
@@ -5397,7 +6442,8 @@ function hf2Async() {
     });
 }
 var initPromise;
-function initAsync() {
+function initAsync(force) {
+    if (force === void 0) { force = false; }
     var isFirstInit = false;
     if (!initPromise) {
         isFirstInit = true;
@@ -5411,7 +6457,7 @@ function initAsync() {
     return initPromise
         .then(function (w) {
         wrapper = w;
-        if (pxt.winrt.isWinRT() && !isFirstInit) {
+        if (force || pxt.winrt.isWinRT() && !isFirstInit) {
             // For WinRT, disconnecting the device after flashing once puts the wrapper in a bad state.
             // To workaround this, reconnect every time.
             return wrapper.reconnectAsync();
@@ -5422,7 +6468,7 @@ function initAsync() {
 }
 exports.initAsync = initAsync;
 
-},{}],21:[function(require,module,exports){
+},{}],24:[function(require,module,exports){
 "use strict";
 var data = require("./data");
 var mem = require("./memoryworkspace");
@@ -5485,7 +6531,7 @@ exports.provider = {
     resetAsync: resetAsync
 };
 
-},{"./data":12,"./memoryworkspace":25}],22:[function(require,module,exports){
+},{"./data":13,"./memoryworkspace":27}],25:[function(require,module,exports){
 "use strict";
 var __extends = (this && this.__extends) || function (d, b) {
     for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
@@ -5572,7 +6618,8 @@ var LanguagePicker = (function (_super) {
         setCookieLang(langId);
         if (langId !== exports.initialLang) {
             pxt.tickEvent("menu.lang.changelang." + langId);
-            window.location.reload();
+            location.hash = "#reload";
+            location.reload();
         }
         else {
             pxt.tickEvent("menu.lang.samelang." + langId);
@@ -5593,172 +6640,16 @@ var LanguagePicker = (function (_super) {
         var fetchedLangs = this.fetchLanguages();
         var languagesToShow = fetchedLangs && fetchedLangs.length ? fetchedLangs : defaultLanguages;
         var modalSize = languagesToShow.length > 4 ? "large" : "small";
-        return (React.createElement(sui.Modal, {open: this.state.visible, header: lf("Select Language"), size: modalSize, onClose: function () { return _this.hide(); }, dimmer: true, closeIcon: true, closeOnDimmerClick: true, closeOnDocumentClick: true}, !fetchedLangs ?
-            React.createElement("div", {className: "ui message info"}, lf("loading...")) : undefined, fetchedLangs ? React.createElement("div", {className: "group"}, React.createElement("div", {className: "ui cards centered"}, languagesToShow.map(function (langId) {
-            return React.createElement(codecard.CodeCardView, {className: "card-selected", key: langId, name: allLanguages[langId].localizedName, description: allLanguages[langId].englishName, onClick: function () { return _this.changeLanguage(langId); }});
-        }))) : undefined, React.createElement("p", null, React.createElement("br", null), React.createElement("br", null), React.createElement("a", {href: "https://crowdin.com/project/" + targetTheme.crowdinProject, target: "_blank"}, lf("Help us translate")))));
+        return (React.createElement(sui.Modal, {open: this.state.visible, header: lf("Select Language"), size: modalSize, onClose: function () { return _this.hide(); }, dimmer: true, closeIcon: true, allowResetFocus: true, closeOnDimmerClick: true, closeOnDocumentClick: true, closeOnEscape: true}, !fetchedLangs ?
+            React.createElement("div", {className: "ui message info"}, lf("loading...")) : undefined, fetchedLangs ? React.createElement("div", {className: "group"}, React.createElement("div", {className: "ui cards centered", role: "listbox"}, languagesToShow.map(function (langId) {
+            return React.createElement(codecard.CodeCardView, {className: "card-selected focused", key: langId, name: allLanguages[langId].localizedName, ariaLabel: allLanguages[langId].englishName, role: "option", description: allLanguages[langId].englishName, onClick: function () { return _this.changeLanguage(langId); }});
+        }))) : undefined, React.createElement("p", null, React.createElement("br", null), React.createElement("br", null), React.createElement("a", {href: "https://crowdin.com/project/" + targetTheme.crowdinProject, target: "_blank", "aria-label": lf("Help us translate")}, lf("Help us translate")))));
     };
     return LanguagePicker;
 }(data.Component));
 exports.LanguagePicker = LanguagePicker;
 
-},{"./codecard":8,"./data":12,"./sui":37,"react":267}],23:[function(require,module,exports){
-/// <reference path="../../built/pxtsim.d.ts" />
-"use strict";
-var __extends = (this && this.__extends) || function (d, b) {
-    for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
-    function __() { this.constructor = d; }
-    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
-};
-var React = require("react");
-var ReactDOM = require("react-dom");
-var core = require("./core");
-var STREAM_INTERVAL = 30000;
-var LogView = (function (_super) {
-    __extends(LogView, _super);
-    function LogView(props) {
-        var _this = this;
-        _super.call(this, props);
-        this.lastStreamUploadTime = 0;
-        this.streamUploadTimeout = 0;
-        // resolve chrome extension info
-        var serial = pxt.appTarget.serial || {};
-        var chromeExtension = serial.chromeExtension;
-        var m = /chromeserial=([a-z]+)/i.exec(window.location.href);
-        if (m)
-            chromeExtension = m[1];
-        // init view
-        this.view = new pxsim.logs.LogViewElement({
-            maxEntries: 80,
-            maxAccValues: 500,
-            onClick: function (es) { return _this.onClick(es); },
-            onTrendChartChanged: function () { return _this.setState({ trends: _this.view.hasTrends() }); },
-            chromeExtension: chromeExtension,
-            useHF2: serial.useHF2,
-            productId: serial.productId,
-            vendorId: serial.vendorId,
-            nameFilter: serial.nameFilter
-        });
-        this.state = {};
-    }
-    LogView.prototype.componentDidMount = function () {
-        var node = ReactDOM.findDOMNode(this);
-        node.appendChild(this.view.element);
-    };
-    LogView.prototype.clear = function () {
-        this.view.clear();
-    };
-    LogView.prototype.render = function () {
-        return React.createElement("div", null);
-    };
-    LogView.prototype.componentDidUpdate = function () {
-        var streams = pxt.appTarget.simulator && !!pxt.appTarget.simulator.streams;
-        if (streams && this.state.stream)
-            this.view.setLabel(lf("streaming to cloud"), "green cloudflash");
-        else if (streams && this.state.trends)
-            this.view.setLabel(lf("streaming off"), "gray");
-        else
-            this.view.setLabel(undefined);
-        if (this.state.stream)
-            this.scheduleStreamData();
-    };
-    LogView.prototype.cancelStreamData = function () {
-        if (this.streamUploadTimeout) {
-            clearTimeout(this.streamUploadTimeout);
-            this.streamUploadTimeout = 0;
-        }
-    };
-    LogView.prototype.scheduleStreamData = function () {
-        var _this = this;
-        this.cancelStreamData();
-        var towait = Math.max(100, STREAM_INTERVAL - (Util.now() - this.lastStreamUploadTime));
-        this.streamUploadTimeout = setTimeout(function () { return _this.streamData(); }, towait);
-    };
-    LogView.prototype.streamData = function () {
-        var _this = this;
-        var stream = this.state.stream;
-        if (!stream) {
-            if (this.streamUploadTimeout) {
-                clearTimeout(this.streamUploadTimeout);
-                this.streamUploadTimeout = 0;
-            }
-            return;
-        }
-        if (!pxt.Cloud.isOnline()) {
-            this.scheduleStreamData();
-            return;
-        }
-        pxt.debug('streaming payload...');
-        var data = this.view.streamPayload(this.lastStreamUploadTime);
-        this.lastStreamUploadTime = Util.now();
-        if (!data) {
-            this.scheduleStreamData();
-            return;
-        }
-        pxt.streams.postPayloadAsync(stream, data)
-            .catch(function (e) {
-            core.warningNotification(lf("Oops, we could not upload your data..."));
-            _this.scheduleStreamData();
-        }).done(function () { return _this.scheduleStreamData(); });
-    };
-    LogView.prototype.setStream = function (stream) {
-        this.setState({ stream: stream });
-    };
-    LogView.prototype.onClick = function (entries) {
-        this.showStreamDialog(entries);
-    };
-    LogView.prototype.showStreamDialog = function (entries) {
-        var _this = this;
-        var targetTheme = pxt.appTarget.appTheme;
-        var streaming = pxt.appTarget.simulator && !!pxt.appTarget.simulator.streams;
-        var rootUrl = targetTheme.embedUrl;
-        if (!rootUrl) {
-            pxt.commands.browserDownloadAsync(pxsim.logs.entriesToCSV(entries), "data.csv", 'text/csv');
-            return;
-        }
-        if (!/\/$/.test(rootUrl))
-            rootUrl += '/';
-        var streamUrl = this.state.stream ? rootUrl + this.state.stream.id : undefined;
-        core.confirmAsync({
-            logos: streaming ? ["https://az851932.vo.msecnd.net/pub/hjlxsmaf"] : undefined,
-            header: lf("Analyze Data"),
-            hideAgree: true,
-            disagreeLbl: lf("Close"),
-            onLoaded: function (_) {
-                _.find('#datasavelocalfile').click(function () {
-                    _.modal('hide');
-                    pxt.commands.browserDownloadAsync(pxsim.logs.entriesToCSV(entries), "data.csv", 'text/csv');
-                }),
-                    _.find('#datastreamstart').click(function () {
-                        _.modal('hide');
-                        core.showLoading(lf("creating stream in Microsoft Azure..."));
-                        pxt.streams.createStreamAsync(pxt.appTarget.id)
-                            .then(function (stream) {
-                            core.hideLoading();
-                            _this.setStream(stream);
-                        }).catch(function (e) {
-                            pxt.reportException(e, {});
-                            core.hideLoading();
-                            core.warningNotification(lf("Oops, we could not create the stream. Please try again later."));
-                        }).done();
-                    });
-                _.find('#datastreamstop').click(function () {
-                    _.modal('hide');
-                    _this.setStream(null);
-                });
-            },
-            htmlBody: "\n<div class=\"ui cards\">\n    <div class=\"ui card\">\n        <div class=\"content\">\n            <div class=\"header\">" + lf("Local File") + "</div>\n            <div class=\"description\">\n                " + lf("Save the data to your 'Downloads' folder.") + "\n            </div>\n        </div>\n        <div id=\"datasavelocalfile\" class=\"ui bottom attached button\">\n            <i class=\"download icon\"></i>\n            " + lf("Download data") + "\n        </div>        \n    </div>\n    " + (streaming ?
-                "<div id=\"datastreamcard\" class=\"ui card\">\n        <div class=\"content\">\n            <div class=\"header\">" + lf("Stream to Cloud") + "</div>\n            <div class=\"description\">\n                " + (streamUrl ? lf("We are uploading your data to Microsoft Azure every minute.")
-                    : lf("Upload your data to Microsoft Azure to analyze it.")) + "\n            </div>\n        </div>\n        " + (streamUrl ?
-                    "<div id=\"datastream\" class=\"ui bottom attached two buttons\">\n        <a target=\"_blank\" href=\"" + streamUrl + "\" class=\"ui green button\">Open</a>\n        <div id=\"datastreamstop\" class=\"ui button\">Stop</div>\n            </div>" :
-                    "<div id=\"datastreamstart\" class=\"ui bottom attached green button\">\n                <i class=\"play icon\"></i>\n                " + lf("Start") + "\n                </div>") + "\n  </div>" : "") + "\n</div>"
-        }).done();
-    };
-    return LogView;
-}(React.Component));
-exports.LogView = LogView;
-
-},{"./core":11,"react":267,"react-dom":138}],24:[function(require,module,exports){
+},{"./codecard":9,"./data":13,"./sui":41,"react":274}],26:[function(require,module,exports){
 "use strict";
 var pkg = require("./package");
 var core = require("./core");
@@ -5800,7 +6691,7 @@ function makeAsync() {
 }
 exports.makeAsync = makeAsync;
 
-},{"./compiler":9,"./core":11,"./package":28}],25:[function(require,module,exports){
+},{"./compiler":10,"./core":12,"./package":30}],27:[function(require,module,exports){
 "use strict";
 var U = pxt.Util;
 exports.projects = {};
@@ -5880,7 +6771,7 @@ exports.provider = {
     resetAsync: resetAsync
 };
 
-},{}],26:[function(require,module,exports){
+},{}],28:[function(require,module,exports){
 /// <reference path="../../localtypings/monaco.d.ts" />
 /// <reference path="../../built/pxteditor.d.ts" />
 "use strict";
@@ -5910,6 +6801,7 @@ var Editor = (function (_super) {
     function Editor() {
         _super.apply(this, arguments);
         this.fileType = FileType.Unknown;
+        this.giveFocusOnLoading = false;
         this.highlightDecorations = [];
     }
     Editor.prototype.hasBlocks = function () {
@@ -5941,10 +6833,11 @@ var Editor = (function (_super) {
                 _this.currFile = mainPkg_1.files["main.ts"];
                 blockFile = _this.currFile.getVirtualFileName();
             }
-            var failedAsync = function (file) {
-                core.cancelAsyncLoading();
+            var failedAsync = function (file, programTooLarge) {
+                if (programTooLarge === void 0) { programTooLarge = false; }
+                core.cancelAsyncLoading("switchtoblocks");
                 _this.forceDiagnosticsUpdate();
-                return _this.showConversionFailedDialog(file);
+                return _this.showConversionFailedDialog(file, programTooLarge);
             };
             // might be undefined
             var mainPkg = pkg.mainEditorPkg();
@@ -5990,7 +6883,9 @@ var Editor = (function (_super) {
                     .then(function (resp) {
                     if (!resp.success) {
                         _this.currFile.diagnostics = resp.diagnostics;
-                        return failedAsync(blockFile);
+                        var tooLarge_1 = false;
+                        resp.diagnostics.forEach(function (d) { return tooLarge_1 = (tooLarge_1 || d.code === 9266 /* error code when script is too large */); });
+                        return failedAsync(blockFile, tooLarge_1);
                     }
                     xml = resp.outfiles[blockFile];
                     Util.assert(!!xml);
@@ -6002,14 +6897,19 @@ var Editor = (function (_super) {
                 core.errorNotification(lf("Oops, something went wrong trying to convert your code."));
             });
         });
-        core.showLoadingAsync(lf("switching to blocks..."), promise).done();
+        core.showLoadingAsync("switchtoblocks", lf("switching to blocks..."), promise).done();
     };
-    Editor.prototype.showConversionFailedDialog = function (blockFile) {
+    Editor.prototype.showConversionFailedDialog = function (blockFile, programTooLarge) {
         var _this = this;
         var bf = pkg.mainEditorPkg().files[blockFile];
+        if (programTooLarge) {
+            pxt.tickEvent("typescript.programTooLarge");
+        }
         return core.confirmAsync({
-            header: lf("Oops, there is a problem converting your code."),
-            body: lf("We are unable to convert your JavaScript code back to blocks. You can keep working in JavaScript or discard your changes and go back to the previous Blocks version."),
+            header: programTooLarge ? lf("Program too large") : lf("Oops, there is a problem converting your code."),
+            body: programTooLarge ?
+                lf("Your program is too large to convert into blocks. You can keep working in JavaScript or discard your changes and go back to the previous Blocks version.") :
+                lf("We are unable to convert your JavaScript code back to blocks. You can keep working in JavaScript or discard your changes and go back to the previous Blocks version."),
             agreeLbl: lf("Discard and go to Blocks"),
             agreeClass: "cancel",
             agreeIcon: "cancel",
@@ -6033,8 +6933,7 @@ var Editor = (function (_super) {
         });
     };
     Editor.prototype.decompileAsync = function (blockFile) {
-        return compiler.decompileAsync(blockFile)
-            .then(function (resp) { return resp.success; });
+        return compiler.decompileAsync(blockFile);
     };
     Editor.prototype.display = function () {
         return (React.createElement("div", {className: 'full-abs', id: "monacoEditorArea"}, React.createElement("div", {id: 'monacoEditorToolbox', className: 'injectionDiv'}), React.createElement("div", {id: 'monacoEditorInner'})));
@@ -6103,6 +7002,8 @@ var Editor = (function (_super) {
         var monacoToolbox = document.getElementById('monacoEditorToolbox');
         if (monacoArea && monacoToolbox && this.editor) {
             this.editor.layout({ width: monacoArea.offsetWidth - monacoToolbox.clientWidth, height: monacoArea.offsetHeight });
+            var rgba = this.editor._themeService._theme.colors['editor.background'].rgba;
+            this.parent.updateEditorLogo(monacoToolbox.clientWidth, "rgba(" + rgba.r + "," + rgba.g + "," + rgba.b + "," + rgba.a + ")");
         }
     };
     Editor.prototype.prepare = function () {
@@ -6323,7 +7224,7 @@ var Editor = (function (_super) {
                     this.domNode.className = 'monacoFlyout';
                     // Hide by default
                     this.domNode.style.display = 'none';
-                    this.domNode.innerText = 'Flyout';
+                    this.domNode.textContent = 'Flyout';
                 }
                 return this.domNode;
             },
@@ -6368,7 +7269,7 @@ var Editor = (function (_super) {
         root.className = 'blocklyTreeRoot';
         toolbox.appendChild(root);
         var group = document.createElement('div');
-        group.setAttribute('role', 'group');
+        group.setAttribute('role', 'tree');
         root.appendChild(group);
         var namespaces = this.getNamespaces().map(function (ns) { return [ns, _this.getNamespaceAttrs(ns)]; });
         var hasAdvanced = namespaces.some(function (_a) {
@@ -6492,7 +7393,7 @@ var Editor = (function (_super) {
         var _this = this;
         if (injectIconClass === void 0) { injectIconClass = true; }
         // Filter the toolbox
-        var filters = this.parent.state.filters;
+        var filters = this.parent.state.editorState ? this.parent.state.editorState.filters : undefined;
         var categoryState = filters ? (filters.namespaces && filters.namespaces[ns] != undefined ? filters.namespaces[ns] : filters.defaultState) : undefined;
         var hasChild = false;
         if (filters && categoryState !== undefined && fns) {
@@ -6540,7 +7441,7 @@ var Editor = (function (_super) {
                 }
                 else {
                     monacoEditor.selectedCategoryColor = color;
-                    monacoEditor.selectedCategoryBackgroundColor = 'none';
+                    monacoEditor.selectedCategoryBackgroundColor = '';
                 }
             }
             monacoFlyout.style.left = monacoEditor.editor.getLayoutInfo().lineNumbersLeft + "px";
@@ -6555,7 +7456,7 @@ var Editor = (function (_super) {
             else {
                 // Create a flyout and add the category methods in there
                 // Add the heading label
-                if (!pxt.appTarget.appTheme.hideFlyoutHeadings && pxt.BrowserUtils.isMobile()) {
+                if (!pxt.appTarget.appTheme.hideFlyoutHeadings) {
                     var monacoHeadingLabel = document.createElement('div');
                     monacoHeadingLabel.className = 'monacoFlyoutLabel monacoFlyoutHeading';
                     var monacoHeadingIcon = document.createElement('span');
@@ -6660,7 +7561,7 @@ var Editor = (function (_super) {
             pxt.blocks.appendToolboxIconCss(iconClass, icon);
         }
         treerow.style.paddingLeft = '0px';
-        label.innerText = category ? category : "" + Util.capitalize(ns);
+        label.textContent = category ? category : "" + Util.capitalize(ns);
         return treeitem;
     };
     Editor.prototype.createMonacoBlocks = function (monacoEditor, monacoFlyout, ns, fns, color, filters, categoryState) {
@@ -6717,7 +7618,7 @@ var Editor = (function (_super) {
                 sigToken.className = 'sig';
             }
             // completion is a bit busted but looks better
-            sigToken.innerText = snippet
+            sigToken.textContent = snippet
                 .replace(/^[^(]*\(/, '(')
                 .replace(/^\s*\{\{\}\}\n/gm, '')
                 .replace(/\{\n\}/g, '{}')
@@ -6774,7 +7675,7 @@ var Editor = (function (_super) {
             }
             if (!fn.snippetOnly) {
                 var methodToken = document.createElement('span');
-                methodToken.innerText = fn.name;
+                methodToken.textContent = fn.name;
                 monacoBlock.appendChild(methodToken);
             }
             monacoBlock.appendChild(sigToken);
@@ -6881,6 +7782,9 @@ var Editor = (function (_super) {
             }
             _this.resize();
             _this.resetFlyout(true);
+            if (_this.giveFocusOnLoading) {
+                _this.editor.focus();
+            }
         }).finally(function () {
             editorArea.removeChild(loading);
         });
@@ -6960,8 +7864,8 @@ var Editor = (function (_super) {
                         message: message,
                         startLineNumber: d.line + 1,
                         startColumn: d.column,
-                        endLineNumber: (d.endLine || endPos.lineNumber) + 1,
-                        endColumn: d.endColumn || endPos.column
+                        endLineNumber: d.endLine == undefined ? endPos.lineNumber : d.endLine + 1,
+                        endColumn: d.endColumn == undefined ? endPos.column : d.endColumn
                     });
                 }
             };
@@ -7005,7 +7909,7 @@ var Editor = (function (_super) {
 }(srceditor.Editor));
 exports.Editor = Editor;
 
-},{"./compiler":9,"./core":11,"./monacoSnippets":27,"./package":28,"./srceditor":36,"react":267}],27:[function(require,module,exports){
+},{"./compiler":10,"./core":12,"./monacoSnippets":29,"./package":30,"./srceditor":40,"react":274}],29:[function(require,module,exports){
 "use strict";
 exports.loops = {
     name: lf("{id:category}Loops"),
@@ -7496,7 +8400,7 @@ function overrideToolbox(def) {
 }
 exports.overrideToolbox = overrideToolbox;
 
-},{}],28:[function(require,module,exports){
+},{}],30:[function(require,module,exports){
 "use strict";
 var workspace = require("./workspace");
 var data = require("./data");
@@ -7906,7 +8810,7 @@ data.mountVirtualApi("pkg-status", {
     },
 });
 
-},{"./core":11,"./data":12,"./db":13,"./workspace":41}],29:[function(require,module,exports){
+},{"./core":12,"./data":13,"./db":14,"./workspace":45}],31:[function(require,module,exports){
 /// <reference path="../../typings/globals/react/index.d.ts" />
 /// <reference path="../../typings/globals/react-dom/index.d.ts" />
 /// <reference path="../../built/pxtlib.d.ts" />
@@ -7917,28 +8821,24 @@ var __extends = (this && this.__extends) || function (d, b) {
     d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
 };
 var React = require("react");
-var ReactDOM = require("react-dom");
-var workspace = require("./workspace");
 var data = require("./data");
 var sui = require("./sui");
-var pkg = require("./package");
 var core = require("./core");
 var compiler = require("./compiler");
 var codecard = require("./codecard");
 var gallery = require("./gallery");
-var WELCOME = "__welcome";
-var MYSTUFF = "__mystuff";
+var carousel = require("./carousel");
+var HOME = "__welcome";
 var Projects = (function (_super) {
     __extends(Projects, _super);
     function Projects(props) {
         _super.call(this, props);
-        this.prevGhData = [];
         this.prevUrlData = [];
         this.prevGalleries = {};
         this.galleryFetchErrors = {};
         this.state = {
             visible: false,
-            tab: MYSTUFF
+            tab: HOME
         };
     }
     Projects.prototype.hide = function (closeOnly) {
@@ -7947,31 +8847,18 @@ var Projects = (function (_super) {
             // If this was the initial start page and the dialog was close without a selection being made, load the
             // previous project if available or create a new one
             pxt.tickEvent("projects.welcome.hide");
-            if (this.state.resumeProject) {
-                this.props.parent.loadHeaderAsync(this.state.resumeProject);
-            }
-            else {
-                this.props.parent.newProject();
-            }
+            this.props.parent.newProject();
         }
         this.setState({ visible: false, isInitialStartPage: false });
     };
-    Projects.prototype.showInitialStartPage = function (resumeProject) {
+    Projects.prototype.showHome = function () {
+        pxt.tickEvent("projects.show");
+        this.props.parent.stopSimulator();
         this.setState({
             visible: true,
-            tab: WELCOME,
-            isInitialStartPage: true,
-            resumeProject: resumeProject
+            tab: HOME,
+            isInitialStartPage: true
         });
-    };
-    Projects.prototype.showOpenProject = function (tab) {
-        var gals = pxt.appTarget.appTheme.galleries || {};
-        tab = (!tab || !gals[tab]) ? MYSTUFF : tab;
-        this.setState({ visible: true, tab: tab || MYSTUFF });
-    };
-    Projects.prototype.showOpenTutorials = function () {
-        var gals = Object.keys(pxt.appTarget.appTheme.galleries || {});
-        this.setState({ visible: true, tab: gals[0] || MYSTUFF });
     };
     Projects.prototype.fetchGallery = function (tab, path) {
         if (this.state.tab != tab)
@@ -8004,7 +8891,7 @@ var Projects = (function (_super) {
     };
     Projects.prototype.fetchLocalData = function () {
         var _this = this;
-        if (this.state.tab != MYSTUFF)
+        if (this.state.tab != HOME)
             return [];
         var headers = this.getData("header:*");
         if (this.state.searchFor)
@@ -8024,10 +8911,9 @@ var Projects = (function (_super) {
     Projects.prototype.renderCore = function () {
         var _this = this;
         var _a = this.state, visible = _a.visible, tab = _a.tab;
-        var theme = pxt.appTarget.appTheme;
-        var galleries = theme.galleries || {};
-        var galleryNames = Object.keys(galleries);
-        var tabs = (pxt.appTarget.appTheme.useStartPage ? [WELCOME, MYSTUFF] : [MYSTUFF]).concat(Object.keys(galleries));
+        var targetTheme = pxt.appTarget.appTheme;
+        var targetConfig = this.getData("target-config:");
+        var galleries = (targetConfig ? targetConfig.galleries : undefined) || {};
         // lf("Make")
         // lf("Code")
         // lf("Projects")
@@ -8038,13 +8924,18 @@ var Projects = (function (_super) {
         this.galleryFetchErrors = {};
         var gals = Util.mapMap(galleries, function (k) { return _this.fetchGallery(k, galleries[k]); });
         var chgHeader = function (hdr) {
-            pxt.tickEvent(tab == WELCOME ? "projects.welcome.resume" : "projects.header");
+            pxt.tickEvent("projects.header");
+            core.showLoading("changeheader", lf("Loading..."));
             _this.hide();
-            _this.props.parent.loadHeaderAsync(hdr);
+            _this.props.parent.loadHeaderAsync(hdr)
+                .done(function () {
+                core.hideLoading("changeheader");
+            });
         };
         var chgGallery = function (scr) {
             pxt.tickEvent("projects.gallery", { name: scr.name });
-            _this.hide();
+            if (!scr.youTubeId || scr.url)
+                _this.hide();
             switch (scr.cardType) {
                 case "example":
                     chgCode(scr, true);
@@ -8053,7 +8944,7 @@ var Projects = (function (_super) {
                     chgCode(scr, false);
                     break;
                 case "tutorial":
-                    _this.props.parent.startTutorial(scr.url);
+                    _this.props.parent.startTutorial(scr.url, scr.name);
                     break;
                 default:
                     var m = /^\/#tutorial:([a-z0A-Z0-9\-\/]+)$/.exec(scr.url);
@@ -8068,40 +8959,170 @@ var Projects = (function (_super) {
             }
         };
         var chgCode = function (scr, loadBlocks) {
-            core.showLoading(lf("Loading..."));
+            core.showLoading("changingcode", lf("Loading..."));
             gallery.loadExampleAsync(scr.name.toLowerCase(), scr.url)
                 .done(function (opts) {
                 if (opts) {
                     if (loadBlocks) {
-                        var ts_1 = opts.filesOverride["main.ts"];
-                        compiler.getBlocksAsync()
-                            .then(function (blocksInfo) { return compiler.decompileSnippetAsync(ts_1, blocksInfo); })
-                            .then(function (resp) {
-                            opts.filesOverride["main.blocks"] = resp;
-                            _this.props.parent.newProject(opts);
+                        return _this.props.parent.createProjectAsync(opts)
+                            .then(function () {
+                            return compiler.getBlocksAsync()
+                                .then(function (blocksInfo) { return compiler.decompileAsync("main.ts", blocksInfo); })
+                                .then(function (resp) {
+                                if (resp.success) {
+                                    return _this.props.parent.updateFileAsync("main.blocks", resp.outfiles["main.blocks"], true);
+                                }
+                                return Promise.resolve();
+                            });
+                        })
+                            .done(function () {
+                            core.hideLoading("changingcode");
                         });
                     }
                     else {
-                        _this.props.parent.newProject(opts);
+                        return _this.props.parent.createProjectAsync(opts)
+                            .then(function () { return Promise.delay(500); })
+                            .done(function () { return core.hideLoading("changingcode"); });
                     }
                 }
+                core.hideLoading("changingcode");
             });
         };
-        var upd = function (v) {
-            var str = ReactDOM.findDOMNode(_this.refs["searchInput"]).value;
-            _this.setState({ searchFor: str });
-        };
-        var kupd = function (ev) {
-            if (ev.keyCode == 13)
-                upd(ev);
-        };
-        var installScript = function (scr) {
+        var importProject = function () {
+            pxt.tickEvent("projects.importdialog");
             _this.hide();
-            core.showLoading(lf("loading project..."));
-            workspace.installByIdAsync(scr.id)
-                .then(function (r) { return _this.props.parent.loadHeaderAsync(r); })
-                .done(function () { return core.hideLoading(); });
+            _this.props.parent.importProjectDialog();
         };
+        var gettingStarted = function () {
+            pxt.tickEvent("projects.gettingstarted");
+            _this.hide();
+            _this.props.parent.gettingStarted();
+        };
+        var hadFetchError = this.galleryFetchErrors[tab];
+        var isLoading = tab != HOME && !hadFetchError && !gals[tab].length;
+        var showHeroBanner = !!targetTheme.homeScreenHero;
+        var betaUrl = targetTheme.betaUrl;
+        var tabClasses = sui.cx([
+            isLoading ? 'loading' : '',
+            'ui segment bottom attached tab active tabsegment'
+        ]);
+        var tabName = tab == HOME ? lf("Home") : Util.rlf(tab);
+        var tabIcon = tab == HOME ? "home large" : undefined;
+        return (React.createElement(sui.Modal, {open: visible, className: "projectsdialog", size: "home", onClose: function () { return _this.hide(/* closeOnly */ true); }, dimmer: true, closeOnDimmerClick: true}, React.createElement("div", {id: "menubar", role: "banner"}, React.createElement("div", {className: "ui borderless fixed " + (targetTheme.invertedMenu ? "inverted" : '') + " menu", role: "menubar"}, React.createElement("div", {className: "left menu"}, React.createElement("a", {href: targetTheme.logoUrl, "aria-label": lf("{0} Logo", targetTheme.boardName), role: "menuitem", target: "blank", rel: "noopener", className: "ui item logo brand", onClick: function () { return pxt.tickEvent("projects.brand"); }}, targetTheme.logo || targetTheme.portraitLogo
+            ? React.createElement("img", {className: "ui logo " + (targetTheme.logo ? " portrait hide" : ''), src: Util.toDataUri(targetTheme.logo || targetTheme.portraitLogo), alt: lf("{0} Logo", targetTheme.boardName)})
+            : React.createElement("span", {className: "name"}, targetTheme.boardName), targetTheme.portraitLogo ? (React.createElement("img", {className: 'ui mini image portrait only', src: Util.toDataUri(targetTheme.portraitLogo), alt: lf("{0} Logo", targetTheme.boardName)})) : null)), React.createElement("div", {className: "ui item"}, tabIcon ? React.createElement(sui.Icon, {icon: "icon " + tabIcon}) : undefined, " ", tabName), React.createElement("div", {className: "right menu"}, React.createElement("a", {href: targetTheme.organizationUrl, target: "blank", rel: "noopener", className: "ui item logo organization", onClick: function () { return pxt.tickEvent("projects.org"); }}, targetTheme.organizationWideLogo || targetTheme.organizationLogo
+            ? React.createElement("img", {className: "ui logo " + (targetTheme.organizationWideLogo ? " portrait hide" : ''), src: Util.toDataUri(targetTheme.organizationWideLogo || targetTheme.organizationLogo), alt: lf("{0} Logo", targetTheme.organization)})
+            : React.createElement("span", {className: "name"}, targetTheme.organization), targetTheme.organizationLogo ? (React.createElement("img", {className: 'ui mini image portrait only', src: Util.toDataUri(targetTheme.organizationLogo), alt: lf("{0} Logo", targetTheme.organization)})) : null)), betaUrl ? React.createElement("a", {href: "" + betaUrl, className: "ui red mini corner top left attached label betalabel", role: "menuitem"}, lf("Beta")) : undefined)), tab == HOME ? React.createElement("div", {className: tabClasses}, showHeroBanner ?
+            React.createElement("div", {className: "ui segment getting-started-segment", style: { backgroundImage: "url(" + encodeURI(targetTheme.homeScreenHero) + ")" }}) : undefined, React.createElement("div", {key: "mystuff_gallerysegment", className: "ui segment gallerysegment mystuff-segment"}, React.createElement("div", {className: "ui grid equal width padded"}, React.createElement("div", {className: "column"}, React.createElement("h2", {className: "ui header"}, lf("My Projects"), " ")), React.createElement("div", {className: "column right aligned"}, pxt.appTarget.compile || (pxt.appTarget.cloud && pxt.appTarget.cloud.sharing && pxt.appTarget.cloud.publishing && pxt.appTarget.cloud.importing) ?
+            React.createElement(sui.Link, {key: "import", icon: "upload", class: "basic import-dialog-btn", textClass: "landscape only", text: lf("Import"), title: lf("Import a project"), onClick: function () { return importProject(); }}) : undefined)), React.createElement("div", {className: "content"}, React.createElement(ProjectsCarousel, {key: "mystuff_carousel", parent: this.props.parent, name: 'recent', hide: function () { return _this.hide(); }, onClick: function (scr) { return chgHeader(scr); }}))), Object.keys(galleries).map(function (galleryName) {
+            return React.createElement("div", {key: galleryName + "_gallerysegment", className: "ui segment gallerysegment"}, React.createElement("h2", {className: "ui header"}, Util.rlf(galleryName), " "), React.createElement("div", {className: "content"}, React.createElement(ProjectsCarousel, {key: galleryName + "_carousel", parent: _this.props.parent, name: galleryName, path: galleries[galleryName], hide: function () { return _this.hide(); }, onClick: function (scr) { return chgGallery(scr); }})));
+        }), targetTheme.organizationUrl || targetTheme.organizationUrl || targetTheme.privacyUrl ? React.createElement("div", {className: "ui horizontal small divided link list homefooter"}, targetTheme.organizationUrl && targetTheme.organization ? React.createElement("a", {className: "item focused", target: "_blank", rel: "noopener", href: targetTheme.organizationUrl}, targetTheme.organization) : undefined, targetTheme.termsOfUseUrl ? React.createElement("a", {target: "_blank", className: "item focused", href: targetTheme.termsOfUseUrl, rel: "noopener"}, lf("Terms of Use")) : undefined, targetTheme.privacyUrl ? React.createElement("a", {target: "_blank", className: "item focused", href: targetTheme.privacyUrl, rel: "noopener"}, lf("Privacy")) : undefined) : undefined) : undefined));
+    };
+    return Projects;
+}(data.Component));
+exports.Projects = Projects;
+var ProjectsCarousel = (function (_super) {
+    __extends(ProjectsCarousel, _super);
+    function ProjectsCarousel(props) {
+        _super.call(this, props);
+        this.prevGalleries = [];
+        this.prevHeaders = [];
+        this.hasFetchErrors = false;
+        this.state = {};
+    }
+    ProjectsCarousel.prototype.componentDidMount = function () {
+        if (this.props.parent.state.header) {
+            if (this.latestProject && this.latestProject.element) {
+                this.latestProject.element.focus();
+            }
+        }
+    };
+    ProjectsCarousel.prototype.fetchGallery = function (path) {
+        var res = this.getData("gallery:" + encodeURIComponent(path));
+        if (res) {
+            if (res instanceof Error) {
+                this.hasFetchErrors = true;
+            }
+            else {
+                this.prevGalleries = Util.concat(res.map(function (g) { return g.cards; }));
+            }
+        }
+        return this.prevGalleries || [];
+    };
+    ProjectsCarousel.prototype.fetchLocalData = function () {
+        var headers = this.getData("header:*");
+        this.prevHeaders = headers || [];
+        return headers;
+    };
+    ProjectsCarousel.prototype.newProject = function () {
+        pxt.tickEvent("projects.new");
+        this.props.hide();
+        this.props.parent.newProject();
+    };
+    ProjectsCarousel.prototype.renderCore = function () {
+        var _this = this;
+        var _a = this.props, name = _a.name, path = _a.path;
+        var theme = pxt.appTarget.appTheme;
+        var onClick = function (scr) {
+            _this.props.onClick(scr);
+        };
+        if (path) {
+            // Fetch the gallery
+            this.hasFetchErrors = false;
+            var cards = this.fetchGallery(path);
+            if (this.hasFetchErrors) {
+                return React.createElement("div", {className: "ui carouselouter"}, React.createElement("div", {className: "carouselcontainer", tabIndex: 0, onClick: function () { return _this.setState({}); }}, React.createElement("p", {className: "ui grey inverted segment"}, lf("Oops, please connect to the Internet and try again."))));
+            }
+            else {
+                return React.createElement(carousel.Carousel, {bleedPercent: 20}, cards.map(function (scr, index) {
+                    return React.createElement("div", {key: path + scr.name}, React.createElement(codecard.CodeCardView, {className: "example", key: 'gallery' + scr.name, name: scr.name, url: scr.url, imageUrl: scr.imageUrl, youTubeId: scr.youTubeId, label: scr.label, labelClass: scr.labelClass, onClick: function () { return onClick(scr); }}));
+                }));
+            }
+        }
+        else {
+            var headers = this.fetchLocalData();
+            headers.unshift({
+                id: 'new',
+                name: lf("New Project")
+            });
+            if (headers.length == 0) {
+                return React.createElement("div", {className: "ui carouselouter"}, React.createElement("div", {className: "carouselcontainer"}, React.createElement("p", null, lf("This is where you will you find your code."))));
+            }
+            else {
+                return React.createElement(carousel.Carousel, {bleedPercent: 20}, headers.map(function (scr, index) {
+                    return React.createElement("div", {key: 'local' + scr.id + scr.recentUse}, scr.id == 'new' ?
+                        React.createElement("div", {className: "ui card link newprojectcard focused", tabIndex: 0, title: lf("Creates a new empty project"), onClick: function () { return _this.newProject(); }, onKeyDown: sui.fireClickOnEnter}, React.createElement("div", {className: "content"}, React.createElement(sui.Icon, {icon: "huge add circle"}), React.createElement("span", {className: "header"}, scr.name)))
+                        :
+                            React.createElement(codecard.CodeCardView, {ref: function (view) { if (index === 1)
+                                _this.latestProject = view; }, cardType: "file", className: "file", name: scr.name, time: scr.recentUse, url: scr.pubId && scr.pubCurrent ? "/" + scr.pubId : "", onClick: function () { return onClick(scr); }}));
+                }));
+            }
+        }
+    };
+    return ProjectsCarousel;
+}(data.Component));
+exports.ProjectsCarousel = ProjectsCarousel;
+var ImportDialog = (function (_super) {
+    __extends(ImportDialog, _super);
+    function ImportDialog(props) {
+        _super.call(this, props);
+        this.state = {
+            visible: false
+        };
+    }
+    ImportDialog.prototype.hide = function () {
+        this.setState({ visible: false });
+    };
+    ImportDialog.prototype.close = function () {
+        this.setState({ visible: false });
+        this.props.parent.openHome();
+    };
+    ImportDialog.prototype.show = function () {
+        this.setState({ visible: true });
+    };
+    ImportDialog.prototype.renderCore = function () {
+        var _this = this;
+        var visible = this.state.visible;
         var importHex = function () {
             pxt.tickEvent("projects.import");
             _this.hide();
@@ -8112,96 +9133,81 @@ var Projects = (function (_super) {
             _this.hide();
             _this.props.parent.importUrlDialog();
         };
-        var newProject = function () {
-            pxt.tickEvent(tab == WELCOME ? "projects.welcome.new" : "projects.new");
-            _this.hide();
-            _this.props.parent.newProject();
-        };
-        var renameProject = function () {
-            pxt.tickEvent("projects.rename");
-            _this.hide();
-            _this.props.parent.setFile(pkg.mainEditorPkg().files[pxt.CONFIG_NAME]);
-        };
-        var resume = function () {
-            if (_this.state.isInitialStartPage) {
-                chgHeader(_this.state.resumeProject);
-            }
-            else {
-                // The msot recent project is already loaded in the editor, so this is a no-op
-                _this.hide();
-            }
-        };
-        var gettingStarted = function () {
-            pxt.tickEvent("projects.welcome.gettingstarted");
-            _this.hide();
-            _this.props.parent.gettingStarted();
-        };
-        var loadProject = function () {
-            pxt.tickEvent("projects.welcome.loadproject");
-            _this.setState({ tab: MYSTUFF });
-        };
-        var projectGalleries = function () {
-            pxt.tickEvent("projects.welcome.galleries");
-            _this.setState({ tab: galleryNames[0] });
-        };
-        var isEmpty = function () {
-            if (_this.state.searchFor) {
-                if (headers.length > 0
-                    || urldata.length > 0)
-                    return false;
-                return true;
-            }
-            return false;
-        };
-        var targetTheme = pxt.appTarget.appTheme;
-        var headersToday = headers.filter(function (h) { var days = _this.numDaysOld(h.modificationTime); return days == 0; });
-        var headersYesterday = headers.filter(function (h) { var days = _this.numDaysOld(h.modificationTime); return days == 1; });
-        var headersThisWeek = headers.filter(function (h) { var days = _this.numDaysOld(h.modificationTime); return days > 1 && days <= 7; });
-        var headersLastWeek = headers.filter(function (h) { var days = _this.numDaysOld(h.modificationTime); return days > 7 && days <= 14; });
-        var headersThisMonth = headers.filter(function (h) { var days = _this.numDaysOld(h.modificationTime); return days > 14 && days <= 30; });
-        var headersOlder = headers.filter(function (h) { var days = _this.numDaysOld(h.modificationTime); return days > 30; });
-        var headersGrouped = [
-            { name: lf("Today"), headers: headersToday },
-            { name: lf("Yesterday"), headers: headersYesterday },
-            { name: lf("This Week"), headers: headersThisWeek },
-            { name: lf("Last Week"), headers: headersLastWeek },
-            { name: lf("This Month"), headers: headersThisMonth },
-            { name: lf("Older"), headers: headersOlder },
-        ];
-        var hadFetchError = this.galleryFetchErrors[tab];
-        var isLoading = tab != WELCOME && tab != MYSTUFF && !hadFetchError && !gals[tab].length;
-        var tabClasses = sui.cx([
-            isLoading ? 'loading' : '',
-            'ui segment bottom attached tab active tabsegment'
-        ]);
-        return (React.createElement(sui.Modal, {open: visible, className: "projectsdialog", size: "fullscreen", closeIcon: false, onClose: function () { return _this.hide(/* closeOnly */ true); }, dimmer: true, closeOnDimmerClick: true}, React.createElement(sui.Segment, {inverted: targetTheme.invertedMenu, attached: "top"}, React.createElement(sui.Menu, {inverted: targetTheme.invertedMenu, secondary: true}, tabs.map(function (t) {
-            var name;
-            if (t == MYSTUFF)
-                name = lf("My Stuff");
-            else if (t == WELCOME)
-                name = lf("Welcome!");
-            else
-                name = Util.rlf(t);
-            return (React.createElement(sui.MenuItem, {key: "tab" + t, active: tab == t, name: name, onClick: function () { return _this.setState({ tab: t }); }}));
-        }), React.createElement("div", {className: "right menu"}, React.createElement(sui.Button, {icon: 'close', class: "huge clear " + (targetTheme.invertedMenu ? 'inverted' : ''), onClick: function () { return _this.hide(/* closeOnly */ true); }})))), tab == WELCOME ? React.createElement("div", {className: tabClasses}, React.createElement("div", {className: "ui stackable two column grid welcomegrid"}, React.createElement("div", {className: "six wide column labelsgroup"}, React.createElement("h2", {className: "editorname"}, pxt.appTarget.name), React.createElement("div", {className: "large ui loader editoravatar"})), React.createElement("div", {className: "group ten wide column"}, React.createElement("div", {className: "ui cards centered"}, this.state.resumeProject ? React.createElement(codecard.CodeCardView, {key: 'resume', iconColor: "teal", iconContent: lf("Resume"), description: lf("Load the last project you worked on"), onClick: function () { return resume(); }}) : undefined, pxt.appTarget.appTheme.sideDoc ? React.createElement(codecard.CodeCardView, {key: 'gettingstarted', iconColor: "green", iconContent: lf("Getting started"), description: lf("Create a fun, beginner project in a guided tutorial"), onClick: function () { return gettingStarted(); }}) : undefined, React.createElement(codecard.CodeCardView, {key: 'newproject', iconColor: "brown", iconContent: lf("New project"), description: lf("Start a new, empty project"), onClick: function () { return newProject(); }}), React.createElement(codecard.CodeCardView, {key: 'loadproject', iconColor: "grey", iconContent: lf("Load project"), description: lf("Load a previous project"), onClick: function () { return loadProject(); }}), galleryNames.length > 0 ? React.createElement(codecard.CodeCardView, {key: 'projectgalleries', iconColor: "orange", iconContent: lf("Project galleries"), description: lf("Browse guided tutorials, project samples and awesome activities"), onClick: function () { return projectGalleries(); }}) : undefined)))) : undefined, tab == MYSTUFF ? React.createElement("div", {className: tabClasses}, React.createElement("div", {className: "group"}, React.createElement("div", {className: "ui cards"}, React.createElement(codecard.CodeCardView, {key: 'newproject', icon: "file outline", iconColor: "primary", name: lf("New Project..."), description: lf("Creates a new empty project"), onClick: function () { return newProject(); }}), pxt.appTarget.compile ?
-            React.createElement(codecard.CodeCardView, {key: 'import', icon: "upload", iconColor: "secondary", name: lf("Import File..."), description: lf("Open files from your computer"), onClick: function () { return importHex(); }}) : undefined, pxt.appTarget.cloud && pxt.appTarget.cloud.sharing && pxt.appTarget.cloud.publishing && pxt.appTarget.cloud.importing ?
-            React.createElement(codecard.CodeCardView, {key: 'importurl', icon: "cloud download", iconColor: "secondary", name: lf("Import URL..."), description: lf("Open a shared project URL"), onClick: function () { return importUrl(); }}) : undefined)), headersGrouped.filter(function (g) { return g.headers.length != 0; }).map(function (headerGroup) {
-            return React.createElement("div", {key: 'localgroup' + headerGroup.name, className: "group"}, React.createElement("h3", {className: "ui dividing header disabled"}, headerGroup.name), React.createElement("div", {className: "ui cards"}, headerGroup.headers.map(function (scr) {
-                return React.createElement(codecard.CodeCardView, {key: 'local' + scr.id, name: scr.name, time: scr.recentUse, imageUrl: scr.icon, url: scr.pubId && scr.pubCurrent ? "/" + scr.pubId : "", onClick: function () { return chgHeader(scr); }});
-            })));
-        }), React.createElement("div", {className: "group"}, React.createElement("div", {className: "ui cards"}, urldata.map(function (scr) {
-            return React.createElement(codecard.CodeCardView, {name: scr.name, time: scr.time, header: '/' + scr.id, description: scr.description, key: 'cloud' + scr.id, onClick: function () { return installScript(scr); }, url: '/' + scr.id, color: "blue"});
-        })))) : undefined, tab != MYSTUFF && tab != WELCOME ? React.createElement("div", {className: tabClasses}, hadFetchError ?
-            React.createElement("p", {className: "ui red inverted segment"}, lf("Oops! There was an error. Please ensure you are connected to the Internet and try again."))
-            : React.createElement("div", {className: "ui cards centered"}, gals[tab].map(function (scr) { return React.createElement(codecard.CodeCardView, {key: tab + scr.name, name: scr.name, description: scr.description, url: scr.url, imageUrl: scr.imageUrl, youTubeId: scr.youTubeId, onClick: function () { return chgGallery(scr); }}); }))) : undefined, isEmpty() ?
-            React.createElement("div", {className: "ui items"}, React.createElement("div", {className: "ui item"}, lf("We couldn't find any projects matching '{0}'", this.state.searchFor)))
-            : undefined));
+        return (React.createElement(sui.Modal, {open: this.state.visible, className: "importdialog", header: lf("Import"), size: "small", onClose: function () { return _this.close(); }, dimmer: true, closeIcon: true, closeOnDimmerClick: true, closeOnDocumentClick: true}, React.createElement("div", {className: "ui cards"}, pxt.appTarget.compile ?
+            React.createElement(codecard.CodeCardView, {ariaLabel: lf("Open files from your computer"), className: "focused", role: "button", key: 'import', icon: "upload", iconColor: "secondary", name: lf("Import File..."), description: lf("Open files from your computer"), onClick: function () { return importHex(); }}) : undefined, pxt.appTarget.cloud && pxt.appTarget.cloud.sharing && pxt.appTarget.cloud.publishing && pxt.appTarget.cloud.importing ?
+            React.createElement(codecard.CodeCardView, {ariaLabel: lf("Open a shared project URL"), className: "focused", role: "button", key: 'importurl', icon: "cloud download", iconColor: "secondary", name: lf("Import URL..."), description: lf("Open a shared project URL"), onClick: function () { return importUrl(); }}) : undefined)));
     };
-    return Projects;
+    return ImportDialog;
 }(data.Component));
-exports.Projects = Projects;
+exports.ImportDialog = ImportDialog;
+var ExitAndSaveDialog = (function (_super) {
+    __extends(ExitAndSaveDialog, _super);
+    function ExitAndSaveDialog(props) {
+        _super.call(this, props);
+        this.state = {
+            visible: false
+        };
+    }
+    ExitAndSaveDialog.prototype.hide = function () {
+        this.setState({ visible: false });
+    };
+    ExitAndSaveDialog.prototype.show = function () {
+        this.setState({ visible: true });
+    };
+    ExitAndSaveDialog.prototype.componentDidUpdate = function () {
+        if (!this.state.visible)
+            return;
+        // Save on enter typed
+        var dialogInput = document.getElementById('projectNameInput');
+        if (dialogInput) {
+            dialogInput.setSelectionRange(0, 9999);
+            dialogInput.onkeyup = function (e) {
+                var charCode = (typeof e.which == "number") ? e.which : e.keyCode;
+                if (charCode === core.ENTER_KEY) {
+                    e.preventDefault();
+                    document.getElementsByClassName("approve positive").item(0).click();
+                }
+            };
+        }
+    };
+    ExitAndSaveDialog.prototype.renderCore = function () {
+        var _this = this;
+        var visible = this.state.visible;
+        var projectName = this.props.parent.state.projectName;
+        var newName = projectName;
+        var save = function () {
+            _this.hide();
+            if (_this.props.parent.state.projectName != newName)
+                pxt.tickEvent("exitandsave.projectrename");
+            _this.props.parent.updateHeaderNameAsync(newName)
+                .done(function () {
+                _this.props.parent.openHome();
+            });
+        };
+        var cancel = function () {
+            pxt.tickEvent("exitandsave.cancel");
+            _this.hide();
+        };
+        var onChange = function (name) {
+            newName = name;
+        };
+        var actions = [{
+                label: lf("Done"),
+                onClick: save,
+                icon: 'check',
+                className: 'positive'
+            }, {
+                label: lf("Cancel"),
+                icon: 'cancel',
+                onClick: cancel
+            }];
+        return (React.createElement(sui.Modal, {open: visible, className: "exitandsave", header: lf("Exit Project"), size: "small", onClose: function () { return _this.hide(); }, dimmer: true, actions: actions, closeIcon: true, closeOnDimmerClick: true, closeOnDocumentClick: true, closeOnEscape: true}, React.createElement("div", {className: "ui form"}, React.createElement(sui.Input, {id: "projectNameInput", class: "focused", label: lf("Project Name"), ariaLabel: lf("Type a name for your project"), value: projectName, onChange: onChange}))));
+    };
+    return ExitAndSaveDialog;
+}(data.Component));
+exports.ExitAndSaveDialog = ExitAndSaveDialog;
 
-},{"./codecard":8,"./compiler":9,"./core":11,"./data":12,"./gallery":19,"./package":28,"./sui":37,"./workspace":41,"react":267,"react-dom":138}],30:[function(require,module,exports){
+},{"./carousel":6,"./codecard":9,"./compiler":10,"./core":12,"./data":13,"./gallery":22,"./sui":41,"react":274}],32:[function(require,module,exports){
 "use strict";
 var __extends = (this && this.__extends) || function (d, b) {
     for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
@@ -8212,6 +9218,7 @@ var React = require("react");
 var pkg = require("./package");
 var srceditor = require("./srceditor");
 var sui = require("./sui");
+var core = require("./core");
 var Util = pxt.Util;
 var lf = Util.lf;
 var Editor = (function (_super) {
@@ -8226,6 +9233,9 @@ var Editor = (function (_super) {
     };
     Editor.prototype.getId = function () {
         return "pxtJsonEditor";
+    };
+    Editor.prototype.hasEditorToolbar = function () {
+        return false;
     };
     Editor.prototype.display = function () {
         var _this = this;
@@ -8242,6 +9252,7 @@ var Editor = (function (_super) {
                 _this.changeMade = true;
                 // switch to previous coding experience
                 _this.parent.openPreviousEditor();
+                core.resetFocus();
             });
         };
         var setFileName = function (v) {
@@ -8291,7 +9302,7 @@ var Editor = (function (_super) {
             // trigger update            
             save();
         };
-        return (React.createElement("div", {className: "ui content"}, React.createElement("div", {className: "ui segment form text", style: { backgroundColor: "white" }}, React.createElement(sui.Input, {label: lf("Name"), value: c.name, onChange: setFileName}), userConfigs.map(function (uc) {
+        return (React.createElement("div", {className: "ui content"}, React.createElement("div", {className: "ui segment form text", style: { backgroundColor: "white" }}, React.createElement(sui.Input, {id: "fileNameInput", label: lf("Name"), ariaLabel: lf("Type a name for your project"), value: c.name, onChange: setFileName}), userConfigs.map(function (uc) {
             return React.createElement(sui.Checkbox, {key: "userconfig-" + uc.description, inputLabel: uc.description, checked: isUserConfigActive(uc), onChange: function () { return applyUserConfig(uc); }});
         }), React.createElement(sui.Field, null, React.createElement(sui.Button, {text: lf("Save"), class: "green " + (this.isSaving ? 'disabled' : ''), onClick: function () { return save(); }}), React.createElement(sui.Button, {text: lf("Edit Settings As text"), onClick: function () { return _this.editSettingsText(); }})))));
     };
@@ -8334,7 +9345,7 @@ var Editor = (function (_super) {
 }(srceditor.Editor));
 exports.Editor = Editor;
 
-},{"./package":28,"./srceditor":36,"./sui":37,"react":267}],31:[function(require,module,exports){
+},{"./core":12,"./package":30,"./srceditor":40,"./sui":41,"react":274}],33:[function(require,module,exports){
 "use strict";
 var workspace = require("./workspace");
 var data = require("./data");
@@ -8379,7 +9390,7 @@ function saveAsync(header, screenshot) {
 }
 exports.saveAsync = saveAsync;
 
-},{"./data":12,"./workspace":41}],32:[function(require,module,exports){
+},{"./data":13,"./workspace":45}],34:[function(require,module,exports){
 /// <reference path="../../typings/globals/react/index.d.ts" />
 /// <reference path="../../typings/globals/react-dom/index.d.ts" />
 /// <reference path="../../built/pxtlib.d.ts" />
@@ -8463,6 +9474,12 @@ var ScriptSearch = (function (_super) {
         return this.state.visible != nextState.visible
             || this.state.searchFor != nextState.searchFor;
     };
+    ScriptSearch.prototype.componentDidUpdate = function () {
+        var searchInput = ReactDOM.findDOMNode(this.refs["searchInput"]);
+        if (searchInput) {
+            searchInput.focus();
+        }
+    };
     ScriptSearch.prototype.renderCore = function () {
         var _this = this;
         if (!this.state.visible)
@@ -8486,8 +9503,8 @@ var ScriptSearch = (function (_super) {
         var upd = function (v) {
             var str = ReactDOM.findDOMNode(_this.refs["searchInput"]).value;
             // Hidden navigation, used to test /beta or other versions inside released Electron and UWP apps
-            // Secret prefix is $@@@, e.g.: $@@@beta
-            var urlPathExec = /^\$@@@(.*)$/.exec(str);
+            // Secret prefix is /@, e.g.: /@beta
+            var urlPathExec = /^\/@(.*)$/.exec(str);
             var urlPath = urlPathExec && urlPathExec[1];
             if (urlPath) {
                 var homeUrl = pxt.appTarget.appTheme.homeUrl;
@@ -8509,13 +9526,17 @@ var ScriptSearch = (function (_super) {
             pxt.tickEvent("packages.github");
             _this.hide();
             var p = pkg.mainEditorPkg();
-            core.showLoading(lf("downloading package..."));
+            core.showLoading("downloadingpackage", lf("downloading package..."));
             pxt.packagesConfigAsync()
                 .then(function (config) { return pxt.github.latestVersionAsync(scr.fullName, config); })
                 .then(function (tag) { return pxt.github.pkgConfigAsync(scr.fullName, tag)
+                .then(function (cfg) {
+                core.hideLoading("downloadingpackage");
+                return cfg;
+            })
                 .then(function (cfg) { return addDepIfNoConflict(cfg, "github:" + scr.fullName + "#" + tag); }); })
                 .catch(core.handleNetworkError)
-                .finally(function () { return core.hideLoading(); });
+                .finally(function () { return core.hideLoading("downloadingpackage"); });
         };
         var addDepIfNoConflict = function (config, version) {
             return pkg.mainPkg.findConflictsAsync(config, version)
@@ -8544,7 +9565,7 @@ var ScriptSearch = (function (_super) {
                         .then(function () { return core.confirmAsync({
                         header: lf("Some packages will be removed"),
                         agreeLbl: lf("Remove package(s) and add {0}", config.name),
-                        agreeClass: "pink",
+                        agreeClass: "pink focused",
                         body: body_1
                     }); })
                         .then(function (buttonPressed) {
@@ -8578,14 +9599,14 @@ var ScriptSearch = (function (_super) {
             return false;
         };
         var headerText = lf("Add Package...");
-        return (React.createElement(sui.Modal, {open: this.state.visible, dimmer: true, header: headerText, className: "searchdialog", size: "large", onClose: function () { return _this.setState({ visible: false }); }, closeIcon: true, helpUrl: "/packages", closeOnDimmerClick: true}, React.createElement("div", {className: "ui vertical segment"}, React.createElement("div", {className: "ui search"}, React.createElement("div", {className: "ui fluid action input", role: "search"}, React.createElement("input", {ref: "searchInput", type: "text", placeholder: lf("Search or enter project URL..."), onKeyUp: kupd}), React.createElement("button", {title: lf("Search"), className: "ui right icon button", onClick: upd}, React.createElement("i", {className: "search icon"})))), React.createElement("div", {className: "ui cards"}, urldata.map(function (scr) {
-            return React.createElement(codecard.CodeCardView, {key: 'url' + scr.id, name: scr.name, description: scr.description, url: "/" + scr.id, onClick: function () { return addUrl(scr); }, color: "red"});
+        return (React.createElement(sui.Modal, {open: this.state.visible, dimmer: true, header: headerText, className: "searchdialog", size: "large", onClose: function () { return _this.setState({ visible: false }); }, closeIcon: true, helpUrl: "/packages", closeOnDimmerClick: true, closeOnEscape: true, description: lf("Add a package to the project")}, React.createElement("div", {className: "ui vertical segment"}, React.createElement("div", {className: "ui search"}, React.createElement("div", {className: "ui fluid action input", role: "search"}, React.createElement("div", {"aria-live": "polite", className: "accessible-hidden"}, lf("{0} result matching '{1}'", bundles.length + ghdata.length + urldata.length, this.state.searchFor)), React.createElement("input", {ref: "searchInput", className: "focused", type: "text", placeholder: lf("Search or enter project URL..."), onKeyUp: kupd}), React.createElement("button", {title: lf("Search"), className: "ui right icon button", onClick: upd}, React.createElement(sui.Icon, {icon: "search"})))), React.createElement("div", {className: "ui cards", role: "listbox"}, urldata.map(function (scr) {
+            return React.createElement(codecard.CodeCardView, {key: 'url' + scr.id, name: scr.name, description: scr.description, url: "/" + scr.id, onClick: function () { return addUrl(scr); }, color: "red", role: "option"});
         }), bundles.map(function (scr) {
-            return React.createElement(codecard.CodeCardView, {key: 'bundled' + scr.name, name: scr.name, description: scr.description, url: "/" + scr.installedVersion, imageUrl: scr.icon, onClick: function () { return addBundle(scr); }});
+            return React.createElement(codecard.CodeCardView, {key: 'bundled' + scr.name, name: scr.name, description: scr.description, url: "/" + scr.installedVersion, imageUrl: scr.icon, onClick: function () { return addBundle(scr); }, role: "option"});
         }), ghdata.filter(function (repo) { return repo.status == pxt.github.GitRepoStatus.Approved; }).map(function (scr) {
-            return React.createElement(codecard.CodeCardView, {name: scr.name.replace(/^pxt-/, ""), description: scr.description, key: 'gha' + scr.fullName, onClick: function () { return installGh(scr); }, url: 'github:' + scr.fullName, color: "blue", imageUrl: pxt.github.repoIconUrl(scr), label: /\bbeta\b/i.test(scr.description) ? lf("Beta") : undefined});
+            return React.createElement(codecard.CodeCardView, {name: scr.name.replace(/^pxt-/, ""), description: scr.description, key: 'gha' + scr.fullName, onClick: function () { return installGh(scr); }, url: 'github:' + scr.fullName, color: "blue", imageUrl: pxt.github.repoIconUrl(scr), label: /\bbeta\b/i.test(scr.description) ? lf("Beta") : undefined, role: "option"});
         }), ghdata.filter(function (repo) { return repo.status != pxt.github.GitRepoStatus.Approved; }).map(function (scr) {
-            return React.createElement(codecard.CodeCardView, {name: scr.name.replace(/^pxt-/, ""), description: lf("User provided package, not endorsed by Microsoft.") + (scr.description || ""), key: 'ghd' + scr.fullName, onClick: function () { return installGh(scr); }, url: 'github:' + scr.fullName, color: "red"});
+            return React.createElement(codecard.CodeCardView, {name: scr.name.replace(/^pxt-/, ""), description: lf("User provided package, not endorsed by Microsoft.") + (scr.description || ""), key: 'ghd' + scr.fullName, onClick: function () { return installGh(scr); }, url: 'github:' + scr.fullName, color: "red", role: "option"});
         })), isEmpty() ?
             React.createElement("div", {className: "ui items"}, React.createElement("div", {className: "ui item"}, lf("We couldn't find any packages matching '{0}'", this.state.searchFor)))
             : undefined)));
@@ -8594,7 +9615,397 @@ var ScriptSearch = (function (_super) {
 }(data.Component));
 exports.ScriptSearch = ScriptSearch;
 
-},{"./codecard":8,"./core":11,"./data":12,"./package":28,"./sui":37,"react":267,"react-dom":138}],33:[function(require,module,exports){
+},{"./codecard":9,"./core":12,"./data":13,"./package":30,"./sui":41,"react":274,"react-dom":145}],35:[function(require,module,exports){
+/// <reference path="../../localtypings/smoothie.d.ts" />
+"use strict";
+var __extends = (this && this.__extends) || function (d, b) {
+    for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
+    function __() { this.constructor = d; }
+    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+};
+var React = require("react");
+var core = require("./core");
+var srceditor = require("./srceditor");
+var sui = require("./sui");
+var data = require("./data");
+var Util = pxt.Util;
+var lf = Util.lf;
+var Editor = (function (_super) {
+    __extends(Editor, _super);
+    function Editor(parent) {
+        _super.call(this, parent);
+        this.parent = parent;
+        this.charts = [];
+        this.chartIdx = 0;
+        this.consoleBuffer = "";
+        this.isSim = true;
+        this.maxConsoleLineLength = 500;
+        this.maxConsoleEntries = 100;
+        this.active = true;
+        this.rawDataBuffer = "";
+        this.maxBufferLength = 5000;
+        this.maxChartTime = 18000;
+        window.addEventListener("message", this.processMessage.bind(this), false);
+    }
+    Editor.prototype.getId = function () {
+        return "serialEditor";
+    };
+    Editor.prototype.hasEditorToolbar = function () {
+        return false;
+    };
+    Editor.prototype.setVisible = function (b) {
+        this.isVisible = b;
+        if (this.isVisible) {
+            this.startRecording();
+            this.chartDropper = setInterval(this.dropStaleCharts.bind(this), 5000);
+        }
+        else {
+            this.pauseRecording();
+            clearInterval(this.chartDropper);
+        }
+    };
+    Editor.prototype.acceptsFile = function (file) {
+        return file.name === pxt.SERIAL_EDITOR_FILE;
+    };
+    Editor.prototype.setSim = function (b) {
+        this.isSim = b;
+        this.clear();
+    };
+    Editor.prototype.processMessage = function (ev) {
+        var msg = ev.data;
+        if (!this.active || msg.type !== "serial")
+            return;
+        var smsg = msg;
+        var sim = !!smsg.sim;
+        if (sim != this.isSim)
+            return;
+        var data = smsg.data || "";
+        var source = smsg.id || "?";
+        var theme = source.split("-")[0] || "black";
+        this.appendRawData(data);
+        var m = /^\s*(([^:]+):)?\s*(-?\d+(\.\d*)?)/i.exec(data);
+        if (m) {
+            var variable = m[2] || '';
+            var nvalue = parseFloat(m[3]);
+            if (!isNaN(nvalue)) {
+                this.appendGraphEntry(source, theme, sim, variable, nvalue);
+                return;
+            }
+        }
+        this.appendConsoleEntry(data);
+    };
+    Editor.prototype.appendRawData = function (data) {
+        this.rawDataBuffer += data;
+        var excessChars = this.rawDataBuffer.length - this.maxBufferLength;
+        if (excessChars > 0) {
+            this.rawDataBuffer = this.rawDataBuffer.slice(excessChars);
+        }
+    };
+    Editor.prototype.appendGraphEntry = function (source, theme, sim, variable, nvalue) {
+        //See if there is a "home chart" that this point belongs to -
+        //if not, create a new chart
+        var homeChart = undefined;
+        for (var i = 0; i < this.charts.length; ++i) {
+            var chart = this.charts[i];
+            if (chart.shouldContain(source, variable)) {
+                homeChart = chart;
+                break;
+            }
+        }
+        if (homeChart) {
+            homeChart.addPoint(nvalue);
+        }
+        else {
+            var newChart = new Chart(source, variable, nvalue, this.chartIdx);
+            this.chartIdx++;
+            this.charts.push(newChart);
+            this.chartRoot.appendChild(newChart.getElement());
+        }
+    };
+    Editor.prototype.appendConsoleEntry = function (data) {
+        for (var i = 0; i < data.length; ++i) {
+            var ch = data[i];
+            this.consoleBuffer += ch;
+            if (ch === "\n" || this.consoleBuffer.length > this.maxConsoleLineLength) {
+                var lastEntry = this.consoleRoot.lastChild;
+                var newEntry = document.createElement("div");
+                if (lastEntry && lastEntry.lastChild.textContent == this.consoleBuffer) {
+                    if (lastEntry.childNodes.length == 2) {
+                        //matches already-collapsed entry
+                        var count = parseInt(lastEntry.firstChild.textContent);
+                        lastEntry.firstChild.textContent = (count + 1).toString();
+                    }
+                    else {
+                        //make a new collapsed entry with count = 2
+                        var newLabel = document.createElement("a");
+                        newLabel.className = "ui horizontal label";
+                        newLabel.textContent = "2";
+                        lastEntry.insertBefore(newLabel, lastEntry.lastChild);
+                    }
+                }
+                else {
+                    //make a new non-collapsed entry
+                    newEntry.appendChild(document.createTextNode(this.consoleBuffer));
+                    this.consoleRoot.appendChild(newEntry);
+                    this.consoleRoot.scrollTop = this.consoleRoot.scrollHeight;
+                }
+                if (this.consoleRoot.childElementCount > this.maxConsoleEntries) {
+                    this.consoleRoot.removeChild(this.consoleRoot.firstChild);
+                }
+                this.consoleBuffer = "";
+            }
+        }
+    };
+    Editor.prototype.dropStaleCharts = function () {
+        var _this = this;
+        var now = Util.now();
+        this.charts.forEach(function (chart) {
+            if (now - chart.lastUpdatedTime > _this.maxChartTime) {
+                _this.chartRoot.removeChild(chart.rootElement);
+                chart.isStale = true;
+            }
+        });
+        this.charts = this.charts.filter(function (c) { return !c.isStale; });
+    };
+    Editor.prototype.pauseRecording = function () {
+        this.active = false;
+        if (this.startPauseButton)
+            this.startPauseButton.setState({ active: this.active });
+        this.charts.forEach(function (s) { return s.stop(); });
+    };
+    Editor.prototype.startRecording = function () {
+        this.active = true;
+        if (this.startPauseButton)
+            this.startPauseButton.setState({ active: this.active });
+        this.charts.forEach(function (s) { return s.start(); });
+    };
+    Editor.prototype.toggleRecording = function () {
+        pxt.tickEvent("serial.toggleRecording");
+        if (this.active)
+            this.pauseRecording();
+        else
+            this.startRecording();
+    };
+    Editor.prototype.clearNode = function (e) {
+        while (e.hasChildNodes()) {
+            e.removeChild(e.firstChild);
+        }
+    };
+    Editor.prototype.clear = function () {
+        if (this.chartRoot)
+            this.clearNode(this.chartRoot);
+        if (this.clearNode)
+            this.clearNode(this.consoleRoot);
+        this.charts = [];
+        this.consoleBuffer = "";
+    };
+    Editor.prototype.entriesToPlaintext = function () {
+        return this.rawDataBuffer;
+    };
+    Editor.prototype.entriesToCSV = function () {
+        var csv = this.charts.map(function (chart) { return ("time (s), " + chart.variable + " (" + chart.source + ")"); }).join(', ') + '\r\n';
+        var datas = this.charts.map(function (chart) { return chart.line.data; });
+        var nl = datas.map(function (data) { return data.length; }).reduce(function (l, c) { return Math.max(l, c); });
+        var nc = this.charts.length;
+        var _loop_1 = function(i) {
+            csv += datas.map(function (data) { return i < data.length ? (data[i][0] - data[0][0]) / 1000 + ", " + data[i][1] : ' , '; }).join(', ');
+            csv += '\r\n';
+        };
+        for (var i = 0; i < nl; ++i) {
+            _loop_1(i);
+        }
+        return csv;
+    };
+    Editor.prototype.showExportDialog = function () {
+        var _this = this;
+        pxt.tickEvent("serial.showExportDialog");
+        var targetTheme = pxt.appTarget.appTheme;
+        var rootUrl = targetTheme.embedUrl;
+        if (!rootUrl) {
+            pxt.commands.browserDownloadAsync(this.entriesToPlaintext(), "data.txt", "text/plain");
+            return;
+        }
+        if (!/\/$/.test(rootUrl))
+            rootUrl += '/';
+        core.confirmAsync({
+            logos: undefined,
+            header: lf("Analyze Data"),
+            hideAgree: true,
+            disagreeLbl: lf("Close"),
+            onLoaded: function (_) {
+                _.find('#datasavecsvfile').click(function () {
+                    pxt.tickEvent("serial.dataExported.csv");
+                    _.modal('hide');
+                    pxt.commands.browserDownloadAsync(_this.entriesToCSV(), "data.csv", "text/csv");
+                });
+                _.find('#datasavetxtfile').click(function () {
+                    pxt.tickEvent("serial.dataExported.txt");
+                    _.modal('hide');
+                    pxt.commands.browserDownloadAsync(_this.entriesToPlaintext(), "data.txt", "text/plain");
+                });
+            },
+            htmlBody: "<div></div>\n                <div class=\"ui cards\" role=\"listbox\">\n                    <div  id=\"datasavecsvfile\" class=\"ui link card\">\n                        <div class=\"content\">\n                            <div class=\"header\">" + lf("CSV File") + "</div>\n                            <div class=\"description\">\n                                " + lf("Save the chart data streams.") + "\n                            </div>\n                        </div>\n                        <div class=\"ui bottom attached button\">\n                            <i class=\"download icon\"></i>\n                            " + lf("Download") + "\n                        </div>\n                    </div>\n                    <div id=\"datasavetxtfile\" class=\"ui link card\">\n                        <div class=\"content\">\n                            <div class=\"header\">" + lf("Text File") + "</div>\n                            <div class=\"description\">\n                                " + lf("Save the text output.") + "\n                            </div>\n                        </div>\n                        <div class=\"ui bottom attached button\">\n                            <i class=\"download icon\"></i>\n                            " + lf("Download") + "\n                        </div>\n                    </div>\n                </div>"
+        }).done();
+    };
+    Editor.prototype.goBack = function () {
+        pxt.tickEvent("serial.backButton");
+        this.parent.openPreviousEditor();
+    };
+    Editor.prototype.display = function () {
+        var _this = this;
+        return (React.createElement("div", {id: "serialArea"}, React.createElement("div", {id: "serialHeader", className: "ui"}, React.createElement("div", {className: "leftHeaderWrapper"}, React.createElement("div", {className: "leftHeader"}, React.createElement(StartPauseButton, {ref: function (e) { return _this.startPauseButton = e; }, active: this.active, toggle: this.toggleRecording.bind(this)}), React.createElement("span", {className: "ui small header"}, this.isSim ? lf("Simulator") : lf("Device")))), React.createElement("div", {className: "rightHeader"}, React.createElement(sui.Button, {class: "ui icon circular small inverted button", onClick: this.goBack.bind(this)}, React.createElement(sui.Icon, {icon: "close"})))), React.createElement("div", {id: "serialCharts", ref: function (e) { return _this.chartRoot = e; }}), React.createElement("div", {className: "ui fitted divider"}), React.createElement("div", {id: "serialConsole", ref: function (e) { return _this.consoleRoot = e; }}), React.createElement("div", {id: "serialToolbox"}, React.createElement("div", {className: "ui grid right aligned padded"}, React.createElement("div", {className: "column"}, React.createElement(sui.Button, {class: "ui small basic blue button", onClick: this.showExportDialog.bind(this)}, React.createElement(sui.Icon, {icon: "download"}), " ", lf("Export data")))))));
+    };
+    Editor.prototype.domUpdate = function () {
+    };
+    return Editor;
+}(srceditor.Editor));
+exports.Editor = Editor;
+var StartPauseButton = (function (_super) {
+    __extends(StartPauseButton, _super);
+    function StartPauseButton(props) {
+        _super.call(this, props);
+        this.state = {
+            active: this.props.active
+        };
+    }
+    StartPauseButton.prototype.renderCore = function () {
+        var toggle = this.props.toggle;
+        var active = this.state.active;
+        return React.createElement(sui.Button, {class: "ui left floated icon button " + (active ? "green" : "red circular") + " toggleRecord", onClick: toggle}, React.createElement(sui.Icon, {icon: active ? "pause icon" : "circle icon"}));
+    };
+    return StartPauseButton;
+}(data.Component));
+exports.StartPauseButton = StartPauseButton;
+var Chart = (function () {
+    function Chart(source, variable, value, chartIdx) {
+        this.rootElement = document.createElement("div");
+        this.canvas = undefined;
+        this.line = new TimeSeries();
+        this.isStale = false;
+        this.lastUpdatedTime = 0;
+        var serialTheme = pxt.appTarget.serial && pxt.appTarget.serial.editorTheme;
+        // Initialize chart
+        var chartConfig = {
+            interpolation: 'bezier',
+            responsive: true,
+            millisPerPixel: 20,
+            grid: {
+                verticalSections: 0,
+                borderVisible: false,
+                fillStyle: serialTheme && serialTheme.graphBackground || '#fff',
+                strokeStyle: serialTheme && serialTheme.graphBackground || '#fff'
+            }
+        };
+        this.chart = new SmoothieChart(chartConfig);
+        var lineColors = serialTheme && serialTheme.lineColors || ["#f00", "#00f", "#0f0", "#ff0"];
+        var lineColor = lineColors[chartIdx % (lineColors.length)];
+        this.rootElement.className = "ui segment";
+        this.source = source;
+        this.variable = variable;
+        this.chart.addTimeSeries(this.line, { strokeStyle: lineColor, fillStyle: this.hexToHalfOpacityRgba(lineColor), lineWidth: 3 });
+        if (this.variable)
+            this.rootElement.appendChild(this.makeLabel());
+        this.rootElement.appendChild(this.makeCanvas());
+        this.addPoint(value);
+    }
+    Chart.prototype.hexToHalfOpacityRgba = function (hex) {
+        var shorthandRegex = /^#?([a-f\d])([a-f\d])([a-f\d])$/i;
+        hex = hex.replace(shorthandRegex, function (m, r, g, b) {
+            return r + r + g + g + b + b;
+        });
+        var m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+        if (!m) {
+            return hex;
+        }
+        var nums = m.slice(1, 4).map(function (n) { return parseInt(n, 16); });
+        nums.push(0.7);
+        return "rgba(" + nums.join(",") + ")";
+    };
+    Chart.prototype.makeLabel = function () {
+        var label = document.createElement("div");
+        label.className = "ui orange bottom left attached label seriallabel";
+        label.innerText = this.variable;
+        return label;
+    };
+    Chart.prototype.makeCanvas = function () {
+        var _this = this;
+        var canvas = document.createElement("canvas");
+        this.chart.streamTo(canvas);
+        this.canvas = canvas;
+        this.canvas.addEventListener("click", function (ev) {
+            pxt.commands.browserDownloadAsync(_this.toCSV(), "data.csv", "text/csv");
+        }, false);
+        return canvas;
+    };
+    Chart.prototype.getCanvas = function () {
+        return this.canvas;
+    };
+    Chart.prototype.getElement = function () {
+        return this.rootElement;
+    };
+    Chart.prototype.shouldContain = function (source, variable) {
+        return this.source == source && this.variable == variable;
+    };
+    Chart.prototype.addPoint = function (value) {
+        this.line.append(Util.now(), value);
+        this.lastUpdatedTime = Util.now();
+    };
+    Chart.prototype.start = function () {
+        this.chart.start();
+    };
+    Chart.prototype.stop = function () {
+        this.chart.stop();
+    };
+    Chart.prototype.toCSV = function () {
+        var data = this.line.data;
+        if (data.length == 0)
+            return '';
+        var t0 = data[0][0];
+        return ("time (s), " + this.variable + ", " + lf("Tip: Insert a Scatter Chart to visualize this data.") + "\r\n") +
+            data.map(function (row) { return ((row[0] - t0) / 1000) + ", " + row[1]; }).join('\r\n');
+    };
+    return Chart;
+}());
+
+},{"./core":12,"./data":13,"./srceditor":40,"./sui":41,"react":274}],36:[function(require,module,exports){
+/// <reference path="../../built/pxtsim.d.ts" />
+"use strict";
+var __extends = (this && this.__extends) || function (d, b) {
+    for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
+    function __() { this.constructor = d; }
+    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+};
+var React = require("react");
+var sui = require("./sui");
+var SerialIndicator = (function (_super) {
+    __extends(SerialIndicator, _super);
+    function SerialIndicator(props) {
+        _super.call(this, props);
+        this.state = { active: false };
+        window.addEventListener("message", this.setActive.bind(this));
+    }
+    SerialIndicator.prototype.setActive = function (ev) {
+        var msg = ev.data;
+        if (!this.state.active && msg.type === "serial") {
+            var sim = !!msg.sim;
+            if (sim === this.props.isSim) {
+                this.setState({ active: true });
+            }
+        }
+    };
+    SerialIndicator.prototype.clear = function () {
+        this.setState({ active: false });
+    };
+    SerialIndicator.prototype.render = function () {
+        if (!this.state.active)
+            return React.createElement("div", null);
+        return React.createElement("div", {className: "ui segment inverted serialindicator", tabIndex: 0, onClick: this.props.onClick, onKeyDown: sui.fireClickOnEnter}, React.createElement("div", {className: "ui label circular"}, React.createElement("div", {className: "detail indicator"}, React.createElement("span", {className: "ui green empty circular label"})), React.createElement("div", {className: "detail"}, React.createElement(sui.Icon, {icon: "bar graph"})), lf("Data Viewer"), React.createElement("div", {className: "detail"}, this.props.isSim ? lf("Simulator") : lf("Device"))));
+    };
+    return SerialIndicator;
+}(React.Component));
+exports.SerialIndicator = SerialIndicator;
+
+},{"./sui":41,"react":274}],37:[function(require,module,exports){
 "use strict";
 var __extends = (this && this.__extends) || function (d, b) {
     for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
@@ -8647,7 +10058,8 @@ var ShareEditor = (function (_super) {
         var embedding = !!cloud.embedding;
         var header = this.props.parent.state.header;
         var advancedMenu = !!this.state.advancedMenu;
-        var showSocialIcons = !!pxt.appTarget.appTheme.socialOptions;
+        var hideEmbed = !!targetTheme.hideShareEmbed;
+        var showSocialIcons = !!targetTheme.socialOptions;
         var ready = false;
         var mode = this.state.mode;
         var url = '';
@@ -8771,23 +10183,33 @@ var ShareEditor = (function (_super) {
             pxt.tickEvent('share.twitter');
             sui.popupWindow(twitterUrl, lf("Share on Twitter"), 600, 600);
         };
-        return (React.createElement(sui.Modal, {open: this.state.visible, className: "sharedialog", header: lf("Share Project"), size: "small", onClose: function () { return _this.setState({ visible: false }); }, dimmer: true, action: action, actionClick: publish, actionLoading: actionLoading, closeIcon: true, closeOnDimmerClick: true, closeOnDocumentClick: true}, React.createElement("div", {className: "ui form"}, action ?
+        var actions = [];
+        if (action) {
+            actions.push({
+                label: action,
+                onClick: publish,
+                icon: 'share alternate',
+                loading: actionLoading,
+                className: 'primary'
+            });
+        }
+        return (React.createElement(sui.Modal, {open: this.state.visible, className: "sharedialog", header: lf("Share Project"), size: "small", onClose: function () { return _this.setState({ visible: false }); }, dimmer: true, actions: actions, closeIcon: true, closeOnDimmerClick: true, closeOnDocumentClick: true, closeOnEscape: true}, React.createElement("div", {className: "ui form"}, action ?
             React.createElement("div", null, React.createElement("p", null, lf("You need to publish your project to share it or embed it in other web pages.") + " " +
                 lf("You acknowledge having consent to publish this project.")), this.state.sharingError ?
                 React.createElement("p", {className: "ui red inverted segment"}, lf("Oops! There was an error. Please ensure you are connected to the Internet and try again."))
                 : undefined)
-            : undefined, url && ready ? React.createElement("div", null, React.createElement("p", null, lf("Your project is ready! Use the address below to share your projects.")), React.createElement(sui.Input, {class: "mini", readOnly: true, lines: 1, value: url, copy: true, selectOnClick: true}), showSocialIcons ? React.createElement("div", {className: "social-icons"}, React.createElement("a", {className: "ui button large icon facebook", onClick: function (e) { showFbPopup(); e.preventDefault(); return false; }}, React.createElement("i", {className: "icon facebook"})), React.createElement("a", {className: "ui button large icon twitter", onClick: function (e) { showTwtPopup(); e.preventDefault(); return false; }}, React.createElement("i", {className: "icon twitter"}))) : undefined)
-            : undefined, ready ? React.createElement("div", null, React.createElement("div", {className: "ui divider"}), React.createElement(sui.Button, {class: "labeled", icon: "chevron " + (advancedMenu ? "down" : "right"), text: lf("Embed"), onClick: function () { return _this.setState({ advancedMenu: !advancedMenu }); }}), advancedMenu ?
+            : undefined, url && ready ? React.createElement("div", null, React.createElement("p", null, lf("Your project is ready! Use the address below to share your projects.")), React.createElement(sui.Input, {id: "projectUri", class: "focused mini", readOnly: true, lines: 1, value: url, copy: true, selectOnClick: true, "aria-describedby": "projectUriLabel"}), React.createElement("label", {htmlFor: "projectUri", id: "projectUriLabel", className: "accessible-hidden"}, lf("This is the read-only internet address of your project.")), showSocialIcons ? React.createElement("div", {className: "social-icons"}, React.createElement("a", {className: "ui button large icon facebook", tabIndex: 0, "aria-label": "Facebook", onClick: function (e) { showFbPopup(); e.preventDefault(); return false; }}, React.createElement(sui.Icon, {icon: "facebook"})), React.createElement("a", {className: "ui button large icon twitter", tabIndex: 0, "aria-label": "Twitter", onClick: function (e) { showTwtPopup(); e.preventDefault(); return false; }}, React.createElement(sui.Icon, {icon: "twitter"}))) : undefined)
+            : undefined, ready && !hideEmbed ? React.createElement("div", null, React.createElement("div", {className: "ui divider"}), React.createElement(sui.Button, {class: "labeled focused", icon: "chevron " + (advancedMenu ? "down" : "right"), text: lf("Embed"), ariaExpanded: advancedMenu, onClick: function () { return _this.setState({ advancedMenu: !advancedMenu }); }}), advancedMenu ?
             React.createElement(sui.Menu, {pointing: true, secondary: true}, formats.map(function (f) {
-                return React.createElement(sui.MenuItem, {key: "tab" + f.label, active: mode == f.mode, name: f.label, onClick: function () { return _this.setState({ mode: f.mode }); }});
+                return React.createElement(sui.MenuItem, {key: "tab" + f.label, id: "tab" + f.mode, active: mode == f.mode, name: f.label, onClick: function () { return _this.setState({ mode: f.mode }); }});
             })) : undefined, advancedMenu ?
-            React.createElement(sui.Field, null, React.createElement(sui.Input, {class: "mini", readOnly: true, lines: 4, value: embed, copy: ready, disabled: !ready, selectOnClick: true})) : null) : undefined)));
+            React.createElement(sui.Field, null, React.createElement(sui.Input, {id: "embedCode", class: "mini", readOnly: true, lines: 4, value: embed, copy: ready, disabled: !ready, selectOnClick: true}), React.createElement("label", {htmlFor: "embedCode", id: "embedCodeLabel", className: "accessible-hidden"}, lf("This is the read-only code for the selected tab."))) : null) : undefined)));
     };
     return ShareEditor;
 }(data.Component));
 exports.ShareEditor = ShareEditor;
 
-},{"./data":12,"./package":28,"./sui":37,"react":267}],34:[function(require,module,exports){
+},{"./data":13,"./package":30,"./sui":41,"react":274}],38:[function(require,module,exports){
 /// <reference path="../../built/pxtsim.d.ts" />
 /// <reference path="../../localtypings/pxtparts.d.ts" />
 "use strict";
@@ -8800,6 +10222,7 @@ var themes = ["blue", "red", "green", "yellow"];
 var config;
 var lastCompileResult;
 var tutorialMode;
+var displayedModals = {};
 var $debugger;
 function init(root, cfg) {
     $(root).html("\n        <div id=\"simulators\" class='simulator'>\n        </div>\n        <div id=\"debugger\" class=\"ui item landscape only\">\n        </div>\n        ");
@@ -8883,13 +10306,14 @@ function init(root, cfg) {
                     break;
                 case "modal":
                     stop();
-                    if (!tutorialMode && !pxt.shell.isSandboxMode()) {
+                    if (!pxt.shell.isSandboxMode() && (!msg.displayOnceId || !displayedModals[msg.displayOnceId])) {
                         var modalOpts = {
                             header: msg.header,
                             body: msg.body,
                             size: "large",
                             copyable: msg.copyable,
-                            disagreeLbl: lf("Close")
+                            disagreeLbl: lf("Close"),
+                            modalContext: msg.modalContext
                         };
                         var trustedSimUrls = pxt.appTarget.simulator.trustedUrls;
                         var hasTrustedLink_1 = msg.linkButtonHref && trustedSimUrls && trustedSimUrls.indexOf(msg.linkButtonHref) !== -1;
@@ -8899,6 +10323,7 @@ function init(root, cfg) {
                         else {
                             modalOpts.hideAgree = true;
                         }
+                        displayedModals[msg.displayOnceId] = true;
                         core.confirmAsync(modalOpts)
                             .then(function (selection) {
                             if (hasTrustedLink_1 && selection == 1) {
@@ -8962,7 +10387,8 @@ function run(pkg, debug, res, mute, highContrast) {
         highContrast: highContrast,
         aspectRatio: parts.length ? pxt.appTarget.simulator.partsAspectRatio : pxt.appTarget.simulator.aspectRatio,
         partDefinitions: pkg.computePartDefinitions(parts),
-        cdnUrl: pxt.webConfig.commitCdnUrl
+        cdnUrl: pxt.webConfig.commitCdnUrl,
+        localizedStrings: exports.simTranslations
     };
     postSimEditorEvent("started");
     exports.driver.run(js, opts);
@@ -9071,7 +10497,7 @@ function updateDebuggerButtons(brk) {
     $('#debugger').append(dbgView);
 }
 
-},{"./core":11}],35:[function(require,module,exports){
+},{"./core":12}],39:[function(require,module,exports){
 "use strict";
 var audio = require("./audio");
 var sounds = {};
@@ -9116,7 +10542,7 @@ function initTutorial() {
 }
 exports.initTutorial = initTutorial;
 
-},{"./audio":3}],36:[function(require,module,exports){
+},{"./audio":3}],40:[function(require,module,exports){
 "use strict";
 var React = require("react");
 var Editor = (function () {
@@ -9196,11 +10622,14 @@ var Editor = (function () {
         return null;
     };
     Editor.prototype.setHighContrast = function (hc) { };
+    Editor.prototype.hasEditorToolbar = function () {
+        return true;
+    };
     return Editor;
 }());
 exports.Editor = Editor;
 
-},{"react":267}],37:[function(require,module,exports){
+},{"react":274}],41:[function(require,module,exports){
 "use strict";
 var __extends = (this && this.__extends) || function (d, b) {
     for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
@@ -9210,25 +10639,43 @@ var __extends = (this && this.__extends) || function (d, b) {
 var React = require("react");
 var ReactDOM = require("react-dom");
 var data = require("./data");
+var core = require("./core");
 function cx(classes) {
     return classes.filter(function (c) { return c && c.length !== 0 && c.trim() != ''; }).join(' ');
 }
 exports.cx = cx;
 function genericClassName(cls, props, ignoreIcon) {
     if (ignoreIcon === void 0) { ignoreIcon = false; }
-    return cls + " " + (ignoreIcon ? '' : props.icon && props.text ? 'icon-and-text' : props.icon ? 'icon' : "") + " " + (props.class || "");
+    return cls + " " + (ignoreIcon ? '' : props.icon && props.text ? 'icon icon-and-text' : props.icon ? 'icon' : "") + " " + (props.class || "");
 }
 function genericContent(props) {
-    return [
-        props.icon ? (React.createElement("i", {key: 'iconkey', className: props.icon + " icon " + (props.text ? " icon-and-text " : "") + (props.iconClass ? " " + props.iconClass : '')})) : null,
+    var retVal = [
+        props.icon ? (React.createElement(Icon, {key: 'iconkey', icon: props.icon + (props.text ? " icon-and-text " : "") + (props.iconClass ? " " + props.iconClass : '')})) : null,
         props.text ? (React.createElement("span", {key: 'textkey', className: 'ui text' + (props.textClass ? ' ' + props.textClass : '')}, props.text)) : null,
     ];
+    if (props.icon && props.rightIcon)
+        retVal = retVal.reverse();
+    return retVal;
 }
 function popupWindow(url, title, width, height) {
     return window.open(url, title, "resizable=no, copyhistory=no, " +
         ("width=" + width + ", height=" + height + ", top=" + ((screen.height / 2) - (height / 2)) + ", left=" + ((screen.width / 2) - (width / 2))));
 }
 exports.popupWindow = popupWindow;
+function removeClass(el, cls) {
+    if (el.classList)
+        el.classList.remove(cls);
+    else if (el.className.indexOf(cls) >= 0)
+        el.className.replace(new RegExp("(?:^|\\s)" + cls + "(?:\\s|$)"), ' ');
+}
+function fireClickOnEnter(e) {
+    var charCode = (typeof e.which == "number") ? e.which : e.keyCode;
+    if (charCode === core.ENTER_KEY || charCode === core.SPACE_KEY) {
+        e.preventDefault();
+        e.currentTarget.click();
+    }
+}
+exports.fireClickOnEnter = fireClickOnEnter;
 var UiElement = (function (_super) {
     __extends(UiElement, _super);
     function UiElement() {
@@ -9260,18 +10707,76 @@ exports.UiElement = UiElement;
 var DropdownMenuItem = (function (_super) {
     __extends(DropdownMenuItem, _super);
     function DropdownMenuItem() {
+        var _this = this;
         _super.apply(this, arguments);
+        this.isOpened = false;
+        this.preventHide = false;
+        this.menuItemKeyDown = function (e) {
+            var charCode = (typeof e.which == "number") ? e.which : e.keyCode;
+            if (charCode === core.TAB_KEY) {
+                _this.close();
+            }
+            else if (charCode === core.ENTER_KEY || charCode === core.SPACE_KEY) {
+                /* give the focus back to the dropdown menu, so if the menuitem opens a modal,
+                   the focus will not be reset once the modal is closed. */
+                _this.child("").focus();
+            }
+        };
+        this.dropDownKeyDown = function (e) {
+            var charCode = (typeof e.which == "number") ? e.which : e.keyCode;
+            if (charCode === core.ENTER_KEY || charCode === core.SPACE_KEY) {
+                if (_this.isOpened) {
+                    _this.child("").dropdown("hide");
+                }
+                else {
+                    _this.child("").dropdown("show");
+                }
+            }
+        };
     }
+    DropdownMenuItem.prototype.close = function () {
+        this.preventHide = false;
+        this.child("").dropdown("hide");
+    };
     DropdownMenuItem.prototype.componentDidMount = function () {
         var _this = this;
         this.popup();
-        this.child("").dropdown({
-            action: "hide",
+        var dropdowmtag = this.child("");
+        dropdowmtag.on("keydown", this.dropDownKeyDown);
+        dropdowmtag.dropdown({
+            action: function (text, value, element) {
+                _this.close();
+                // When we use the keyboard, it is not an HTMLElement that we receive, but a JQuery.
+                if (typeof element.get === "function") {
+                    if (element.get(0).tagName.toLowerCase() === 'a') {
+                        window.open(element.get(0).href, '_blank');
+                    }
+                }
+            },
             fullTextSearch: true,
-            onChange: function (v) {
+            onChange: function (v, text, item) {
+                _this.preventHide = true;
+                item.get(0).focus();
                 if (_this.props.onChange && v != _this.props.value) {
                     _this.props.onChange(v);
                 }
+            },
+            onShow: function () {
+                _this.isOpened = true;
+                _this.forceUpdate();
+                var menuItems = _this.child(".item");
+                menuItems.each(function (index, elem) {
+                    elem.onkeydown = _this.menuItemKeyDown;
+                });
+            },
+            onHide: function () {
+                if (_this.preventHide) {
+                    _this.preventHide = false;
+                    return false;
+                }
+                _this.isOpened = false;
+                _this.forceUpdate();
+                return true;
             }
         });
     };
@@ -9280,18 +10785,30 @@ var DropdownMenuItem = (function (_super) {
         this.popup();
     };
     DropdownMenuItem.prototype.renderCore = function () {
-        return (React.createElement("div", {className: genericClassName("ui dropdown item", this.props), role: this.props.role, title: this.props.title}, genericContent(this.props), React.createElement("div", {className: "menu"}, this.props.children)));
+        return (React.createElement("div", {className: genericClassName("ui dropdown item", this.props), role: "menuitem", title: this.props.title, tabIndex: this.props.tabIndex, "aria-haspopup": "true"}, genericContent(this.props), React.createElement("div", {className: "menu", role: "menu", "aria-expanded": this.isOpened, "aria-label": lf("Dropdown menu {0}", this.props.title), "aria-hidden": !this.isOpened}, this.props.children)));
     };
     return DropdownMenuItem;
 }(UiElement));
 exports.DropdownMenuItem = DropdownMenuItem;
+var Icon = (function (_super) {
+    __extends(Icon, _super);
+    function Icon() {
+        _super.apply(this, arguments);
+    }
+    Icon.prototype.renderCore = function () {
+        return React.createElement("i", {className: "icon " + this.props.icon, onClick: this.props.onClick, "aria-hidden": true, role: "presentation"}, this.props.children);
+    };
+    return Icon;
+}(data.Component));
+exports.Icon = Icon;
 var Item = (function (_super) {
     __extends(Item, _super);
     function Item() {
         _super.apply(this, arguments);
     }
     Item.prototype.renderCore = function () {
-        return (React.createElement("div", {className: genericClassName("ui item link", this.props, true) + (" " + (this.props.active ? 'active' : '')), role: this.props.role, title: this.props.title || this.props.text, key: this.props.value, "data-value": this.props.value, onClick: this.props.onClick}, genericContent(this.props), this.props.children));
+        var _a = this.props, text = _a.text, title = _a.title, ariaLabel = _a.ariaLabel;
+        return (React.createElement("div", {className: genericClassName("ui item link", this.props, true) + (" " + (this.props.active ? 'active' : '')), role: this.props.role, "aria-label": ariaLabel || title || text, title: title || text, tabIndex: this.props.tabIndex || 0, key: this.props.value, "data-value": this.props.value, onClick: this.props.onClick, onKeyDown: this.props.onKeyDown || fireClickOnEnter}, genericContent(this.props), this.props.children));
     };
     return Item;
 }(data.Component));
@@ -9302,7 +10819,7 @@ var ButtonMenuItem = (function (_super) {
         _super.apply(this, arguments);
     }
     ButtonMenuItem.prototype.renderCore = function () {
-        return (React.createElement("div", {className: genericClassName("ui item link", this.props, true) + (" " + (this.props.active ? 'active' : '')), role: this.props.role, title: this.props.title || this.props.text, key: this.props.value, "data-value": this.props.value, onClick: this.props.onClick}, React.createElement("div", {className: genericClassName("ui button", this.props)}, genericContent(this.props), this.props.children)));
+        return (React.createElement("div", {className: genericClassName("ui item link", this.props, true) + (" " + (this.props.active ? 'active' : '')), role: this.props.role, title: this.props.title || this.props.text, tabIndex: this.props.tabIndex || 0, key: this.props.value, "data-value": this.props.value, onClick: this.props.onClick, onKeyDown: this.props.onKeyDown || fireClickOnEnter}, React.createElement("div", {className: genericClassName("ui button", this.props)}, genericContent(this.props), this.props.children)));
     };
     return ButtonMenuItem;
 }(UiElement));
@@ -9313,11 +10830,22 @@ var Button = (function (_super) {
         _super.apply(this, arguments);
     }
     Button.prototype.renderCore = function () {
-        return (React.createElement("button", {className: genericClassName("ui button", this.props) + " " + (this.props.disabled ? "disabled" : ""), role: this.props.role, title: this.props.title, "aria-label": this.props.title || this.props.text, onClick: this.props.onClick}, genericContent(this.props), this.props.children));
+        return (React.createElement("button", {className: genericClassName("ui button", this.props) + " " + (this.props.disabled ? "disabled" : ""), id: this.props.id, role: this.props.role, title: this.props.title, tabIndex: this.props.tabIndex || 0, "aria-label": this.props.ariaLabel, "aria-expanded": this.props.ariaExpanded, onClick: this.props.onClick, onKeyDown: this.props.onKeyDown}, genericContent(this.props), this.props.children));
     };
     return Button;
 }(UiElement));
 exports.Button = Button;
+var Link = (function (_super) {
+    __extends(Link, _super);
+    function Link() {
+        _super.apply(this, arguments);
+    }
+    Link.prototype.renderCore = function () {
+        return (React.createElement("a", {className: genericClassName("ui label", this.props) + " " + (this.props.disabled ? "disabled" : ""), id: this.props.id, href: this.props.href, role: this.props.role, title: this.props.title, tabIndex: this.props.tabIndex || 0, "aria-label": this.props.ariaLabel, "aria-expanded": this.props.ariaExpanded, onClick: this.props.onClick, onKeyDown: this.props.onKeyDown}, genericContent(this.props), this.props.children));
+    };
+    return Link;
+}(UiElement));
+exports.Link = Link;
 var Popup = (function (_super) {
     __extends(Popup, _super);
     function Popup() {
@@ -9349,7 +10877,7 @@ var Field = (function (_super) {
         _super.apply(this, arguments);
     }
     Field.prototype.renderCore = function () {
-        return (React.createElement("div", {className: "field"}, this.props.label ? React.createElement("label", null, this.props.label) : null, this.props.children));
+        return (React.createElement("div", {className: "field"}, this.props.label ? React.createElement("label", {htmlFor: !this.props.ariaLabel ? this.props.htmlFor : undefined}, this.props.label) : null, this.props.ariaLabel && this.props.htmlFor ? (React.createElement("label", {htmlFor: this.props.htmlFor, className: "accessible-hidden"}, this.props.ariaLabel)) : "", this.props.children));
     };
     return Field;
 }(data.Component));
@@ -9385,8 +10913,17 @@ var Input = (function (_super) {
         var copyBtn = p.copy && document.queryCommandSupported('copy')
             ? React.createElement(Button, {class: "ui right labeled primary icon button", text: lf("Copy"), icon: "copy", onClick: function () { return _this.copy(); }})
             : null;
-        return (React.createElement(Field, {label: p.label}, React.createElement("div", {className: "ui input" + (p.inputLabel ? " labelled" : "") + (p.copy ? " action fluid" : "") + (p.disabled ? " disabled" : "")}, p.inputLabel ? (React.createElement("div", {className: "ui label"}, p.inputLabel)) : "", !p.lines || p.lines == 1 ? React.createElement("input", {className: p.class || "", type: p.type || "text", placeholder: p.placeholder, value: p.value, readOnly: !!p.readOnly, onClick: function (e) { return p.selectOnClick ? e.target.setSelectionRange(0, 9999) : undefined; }, onChange: function (v) { return p.onChange(v.target.value); }})
-            : React.createElement("textarea", {className: "ui input " + (p.class || "") + (p.inputLabel ? " labelled" : ""), rows: p.lines, placeholder: p.placeholder, value: p.value, readOnly: !!p.readOnly, onClick: function (e) { return p.selectOnClick ? e.target.setSelectionRange(0, 9999) : undefined; }, onChange: function (v) { return p.onChange(v.target.value); }}), copyBtn)));
+        var value = (this.state && this.state.value !== undefined) ? this.state.value : p.value;
+        var onChange = function (newValue) {
+            if (!p.readOnly && (!_this.state || _this.state.value !== newValue)) {
+                _this.setState({ value: newValue });
+            }
+            if (p.onChange) {
+                p.onChange(newValue);
+            }
+        };
+        return (React.createElement(Field, {ariaLabel: p.ariaLabel, htmlFor: p.id, label: p.label}, React.createElement("div", {className: "ui input" + (p.inputLabel ? " labelled" : "") + (p.copy ? " action fluid" : "") + (p.disabled ? " disabled" : "")}, p.inputLabel ? (React.createElement("div", {className: "ui label"}, p.inputLabel)) : "", !p.lines || p.lines == 1 ? React.createElement("input", {id: p.id, className: p.class || "", type: p.type || "text", placeholder: p.placeholder, value: value, readOnly: !!p.readOnly, onClick: function (e) { return p.selectOnClick ? e.target.setSelectionRange(0, 9999) : undefined; }, onChange: function (v) { return onChange(v.target.value); }})
+            : React.createElement("textarea", {id: p.id, className: "ui input " + (p.class || "") + (p.inputLabel ? " labelled" : ""), rows: p.lines, placeholder: p.placeholder, value: value, readOnly: !!p.readOnly, onClick: function (e) { return p.selectOnClick ? e.target.setSelectionRange(0, 9999) : undefined; }, onChange: function (v) { return onChange(v.target.value); }}), copyBtn)));
     };
     return Input;
 }(data.Component));
@@ -9451,7 +10988,7 @@ var MenuItem = (function (_super) {
         };
     }
     MenuItem.prototype.renderCore = function () {
-        var _a = this.props, active = _a.active, children = _a.children, className = _a.className, color = _a.color, content = _a.content, fitted = _a.fitted, header = _a.header, icon = _a.icon, link = _a.link, name = _a.name, onClick = _a.onClick, position = _a.position;
+        var _a = this.props, active = _a.active, children = _a.children, className = _a.className, color = _a.color, content = _a.content, fitted = _a.fitted, header = _a.header, icon = _a.icon, link = _a.link, name = _a.name, onClick = _a.onClick, position = _a.position, ariaControls = _a.ariaControls, id = _a.id;
         var classes = cx([
             color,
             position,
@@ -9466,7 +11003,7 @@ var MenuItem = (function (_super) {
         if (children) {
             return React.createElement("div", {className: classes, onClick: this.handleClick}, children);
         }
-        return (React.createElement("div", {className: classes, onClick: this.handleClick}, icon ? React.createElement("i", {className: "icon " + icon}) : undefined, content || name));
+        return (React.createElement("div", {id: id, tabIndex: active ? 0 : -1, className: classes, onClick: this.handleClick, role: "tab", "aria-controls": ariaControls, "aria-selected": active, "aria-label": content || name}, icon ? React.createElement(Icon, {icon: icon}) : undefined, content || name));
     };
     return MenuItem;
 }(data.Component));
@@ -9474,8 +11011,57 @@ exports.MenuItem = MenuItem;
 var Menu = (function (_super) {
     __extends(Menu, _super);
     function Menu(props) {
+        var _this = this;
         _super.call(this, props);
+        this.handleKeyboardNavigation = function (e) {
+            var charCode = (typeof e.which == "number") ? e.which : e.keyCode;
+            var leftOrUpKey = charCode === 37 || charCode === 38;
+            var rightorBottomKey = charCode === 39 || charCode === 40;
+            if (!leftOrUpKey && !rightorBottomKey) {
+                return;
+            }
+            var menuItems = _this.child(".link");
+            var activeNodeIndex = -1;
+            var i = 0;
+            while (activeNodeIndex === -1 && i < menuItems.length) {
+                if (menuItems.get(i).classList.contains("active")) {
+                    activeNodeIndex = i;
+                }
+                i++;
+            }
+            if (activeNodeIndex === -1) {
+                return;
+            }
+            var selectedTab;
+            if ((leftOrUpKey && !Util.isUserLanguageRtl()) || (rightorBottomKey && Util.isUserLanguageRtl())) {
+                if (activeNodeIndex === 0) {
+                    selectedTab = menuItems.get(menuItems.length - 1);
+                }
+                else {
+                    selectedTab = menuItems.get(activeNodeIndex - 1);
+                }
+            }
+            else if ((rightorBottomKey && !Util.isUserLanguageRtl()) || (leftOrUpKey && Util.isUserLanguageRtl())) {
+                if (activeNodeIndex === menuItems.length - 1) {
+                    selectedTab = menuItems.get(0);
+                }
+                else {
+                    selectedTab = menuItems.get(activeNodeIndex + 1);
+                }
+            }
+            if (selectedTab !== undefined) {
+                selectedTab.click();
+                selectedTab.focus();
+            }
+        };
     }
+    Menu.prototype.componentDidMount = function () {
+        var _this = this;
+        var menuItems = this.child(".link");
+        menuItems.each(function (index, elem) {
+            elem.onkeydown = _this.handleKeyboardNavigation;
+        });
+    };
     Menu.prototype.renderCore = function () {
         var _a = this.props, attached = _a.attached, borderless = _a.borderless, children = _a.children, className = _a.className, color = _a.color, compact = _a.compact, fixed = _a.fixed, floated = _a.floated, fluid = _a.fluid, icon = _a.icon, inverted = _a.inverted, pagination = _a.pagination, pointing = _a.pointing, secondary = _a.secondary, size = _a.size, stackable = _a.stackable, tabular = _a.tabular, text = _a.text, vertical = _a.vertical;
         var classes = cx([
@@ -9500,7 +11086,7 @@ var Menu = (function (_super) {
             className,
             'menu'
         ]);
-        return (React.createElement("div", {className: classes}, children));
+        return (React.createElement("div", {className: classes, role: "tablist"}, children));
     };
     return Menu;
 }(data.Component));
@@ -9512,21 +11098,22 @@ var Modal = (function (_super) {
         _super.call(this, props);
         this.getMountNode = function () { return _this.props.mountNode || document.body; };
         this.handleClose = function (e) {
+            if (_this.state.open != false)
+                _this.setState({ open: false });
             var onClose = _this.props.onClose;
             if (onClose)
                 onClose(e, _this.props);
-            if (_this.state.open != false)
-                _this.setState({ open: false });
         };
         this.handleOpen = function (e) {
             var onOpen = _this.props.onOpen;
             if (onOpen)
                 onOpen(e, _this.props);
             if (_this.state.open != true)
-                _this.setState({ open: true });
+                _this.setState({ open: true, scrolling: false });
         };
         this.setPosition = function () {
             if (_this.ref) {
+                var dimmer = _this.props.dimmer;
                 var mountNode = _this.getMountNode();
                 var height = void 0;
                 // Check to make sure the ref is actually in the DOM or else IE11 throws an exception
@@ -9536,8 +11123,12 @@ var Modal = (function (_super) {
                 else {
                     height = 0;
                 }
+                if (dimmer) {
+                    mountNode.classList.add('dimmable');
+                    mountNode.classList.add('dimmed');
+                }
                 var marginTop = -Math.round(height / 2);
-                var scrolling = height >= window.innerHeight;
+                var scrolling = _this.props.size == 'home' || height >= window.innerHeight;
                 var newState = {};
                 if (_this.state.marginTop !== marginTop) {
                     newState.marginTop = marginTop;
@@ -9551,8 +11142,11 @@ var Modal = (function (_super) {
                         mountNode.classList.remove('scrolling');
                     }
                 }
-                if (Object.keys(newState).length > 0)
+                if (Object.keys(newState).length > 0) {
                     _this.setState(newState);
+                    if (_this.props.onPositionChanged)
+                        _this.props.onPositionChanged(_this.props);
+                }
             }
             _this.animationId = requestAnimationFrame(_this.setPosition);
         };
@@ -9560,7 +11154,8 @@ var Modal = (function (_super) {
             var dimmer = _this.props.dimmer;
             var mountNode = _this.getMountNode();
             if (dimmer) {
-                mountNode.classList.add('dimmable', 'dimmed');
+                mountNode.classList.add('dimmable');
+                mountNode.classList.add('dimmed');
                 if (dimmer === 'blurring' && !pxt.options.light) {
                     mountNode.classList.add('blurring');
                 }
@@ -9570,13 +11165,17 @@ var Modal = (function (_super) {
         this.handleRef = function (c) { return (_this.ref = c); };
         this.handlePortalUnmount = function () {
             var mountNode = _this.getMountNode();
-            mountNode.classList.remove('blurring', 'dimmable', 'dimmed', 'scrollable');
+            mountNode.classList.remove('blurring');
+            mountNode.classList.remove('dimmable');
+            mountNode.classList.remove('dimmed');
+            mountNode.classList.remove('scrolling');
             if (_this.animationId)
                 cancelAnimationFrame(_this.animationId);
         };
         this.id = Util.guidGen();
         this.state = {
-            open: this.props.open
+            open: this.props.open,
+            scrolling: false
         };
     }
     Modal.prototype.componentWillUnmount = function () {
@@ -9590,6 +11189,7 @@ var Modal = (function (_super) {
         var newState = {};
         if (nextProps.open != undefined) {
             newState.open = nextProps.open;
+            newState.scrolling = false;
         }
         if (Object.keys(newState).length > 0)
             this.setState(newState);
@@ -9597,7 +11197,7 @@ var Modal = (function (_super) {
     Modal.prototype.renderCore = function () {
         var _this = this;
         var open = this.state.open;
-        var _a = this.props, basic = _a.basic, children = _a.children, className = _a.className, closeIcon = _a.closeIcon, closeOnDimmerClick = _a.closeOnDimmerClick, closeOnDocumentClick = _a.closeOnDocumentClick, dimmer = _a.dimmer, dimmerClassName = _a.dimmerClassName, size = _a.size;
+        var _a = this.props, basic = _a.basic, children = _a.children, className = _a.className, closeIcon = _a.closeIcon, closeOnDimmerClick = _a.closeOnDimmerClick, closeOnDocumentClick = _a.closeOnDocumentClick, closeOnEscape = _a.closeOnEscape, dimmer = _a.dimmer, dimmerClassName = _a.dimmerClassName, size = _a.size, allowResetFocus = _a.allowResetFocus;
         var _b = this.state, marginTop = _b.marginTop, scrolling = _b.scrolling;
         var classes = cx([
             'ui',
@@ -9608,23 +11208,27 @@ var Modal = (function (_super) {
             className,
         ]);
         var closeIconName = closeIcon === true ? 'close' : closeIcon;
-        var modalJSX = (React.createElement("div", {className: classes, style: { marginTop: marginTop }, ref: this.handleRef, role: "dialog", "aria-labelledby": this.id + 'title', "aria-describedby": this.id + 'desc'}, this.props.closeIcon ? React.createElement(Button, {icon: closeIconName, class: "huge clear right floated", onClick: function () { return _this.handleClose(null); }}) : undefined, this.props.helpUrl ?
-            React.createElement("a", {className: "ui button huge icon clear right floated", href: this.props.helpUrl, target: "_docs"}, React.createElement("i", {className: "help icon"}))
-            : undefined, this.props.header ? React.createElement("div", {id: this.id + 'title', className: "header " + (this.props.headerClass || "")}, this.props.header) : undefined, React.createElement("div", {id: this.id + 'desc', className: "content"}, children), this.props.action && this.props.actionClick ?
-            React.createElement("div", {className: "actions"}, React.createElement(Button, {text: this.props.action, class: "approve primary " + (this.props.actionLoading ? "loading disabled" : ""), onClick: function () {
-                _this.props.actionClick();
-            }})) : undefined));
+        var modalJSX = (React.createElement("div", {className: classes, style: { marginTop: marginTop }, ref: this.handleRef, role: "dialog", "aria-labelledby": this.props.header ? this.id + 'title' : undefined, "aria-describedby": this.props.description ? this.id + 'description' : this.id + 'desc'}, this.props.header ? React.createElement("div", {id: this.id + 'title', className: "header " + (this.props.headerClass || "")}, this.props.header, this.props.helpUrl ?
+            React.createElement("a", {className: "ui huge icon clear focused", href: this.props.helpUrl, target: "_docs", role: "button", "aria-label": lf("Help on {0} dialog", this.props.header)}, React.createElement(Icon, {icon: "help"}))
+            : undefined) : undefined, this.props.description ? React.createElement("label", {id: this.id + 'description', className: "accessible-hidden"}, this.props.description) : undefined, React.createElement("div", {id: this.id + 'desc', className: "content"}, children), this.props.actions ?
+            React.createElement("div", {className: "actions"}, this.props.actions.map(function (action) {
+                return React.createElement(Button, {key: "action_" + action.label, icon: action.icon, text: action.label, class: "approve " + (action.icon ? 'icon right labeled' : '') + " " + (action.className || '') + " " + (action.loading ? "loading disabled" : "") + " focused", onClick: function () {
+                    action.onClick();
+                }, onKeyDown: fireClickOnEnter});
+            })) : undefined, closeIcon ? React.createElement(Button, {icon: closeIconName, class: "huge clear right floated closeIcon focused", onClick: function () { return _this.handleClose(null); }, tabIndex: 0, ariaLabel: lf("Close dialog")}) : undefined));
         var dimmerClasses = !dimmer
             ? null
             : cx([
+                core.highContrast ? 'hc' : '',
                 'ui',
+                size,
                 dimmer === 'inverted' ? 'inverted' : '',
                 pxt.options.light ? '' : "transition",
                 'page modals dimmer visible active',
                 dimmerClassName
             ]);
         var blurring = dimmer === 'blurring';
-        return (React.createElement(Portal, {closeOnRootNodeClick: closeOnDimmerClick, closeOnDocumentClick: closeOnDocumentClick, className: dimmerClasses, mountNode: this.getMountNode(), onMount: this.handlePortalMount, onUnmount: this.handlePortalUnmount, onClose: this.handleClose, onOpen: this.handleOpen, open: open}, modalJSX));
+        return (React.createElement(Portal, {closeOnRootNodeClick: closeOnDimmerClick, closeOnDocumentClick: closeOnDocumentClick, closeOnEscape: closeOnEscape, className: dimmerClasses, mountNode: this.getMountNode(), onMount: this.handlePortalMount, onUnmount: this.handlePortalUnmount, onClose: this.handleClose, onOpen: this.handleOpen, open: open, allowResetFocus: allowResetFocus}, modalJSX));
     };
     return Modal;
 }(data.Component));
@@ -9643,12 +11247,23 @@ var Portal = (function (_super) {
                 _this.close(e);
             }
         };
+        this.handleEscape = function (e) {
+            var charCode = (typeof e.which == "number") ? e.which : e.keyCode;
+            if (charCode !== 27) {
+                return;
+            }
+            var closeOnEscape = _this.props.closeOnEscape;
+            if (closeOnEscape) {
+                e.preventDefault();
+                _this.close(e);
+            }
+        };
         this.close = function (e) {
+            if (_this.state.open != false)
+                _this.setState({ open: false });
             var onClose = _this.props.onClose;
             if (onClose)
                 onClose(e);
-            if (_this.state.open != false)
-                _this.setState({ open: false });
         };
         this.open = function (e) {
             var onOpen = _this.props.onOpen;
@@ -9664,6 +11279,7 @@ var Portal = (function (_super) {
             _this.rootNode = document.createElement('div');
             mountNode.appendChild(_this.rootNode);
             document.addEventListener('click', _this.handleDocumentClick);
+            document.addEventListener('keydown', _this.handleEscape, true);
             var onMount = _this.props.onMount;
             if (onMount)
                 onMount();
@@ -9676,10 +11292,16 @@ var Portal = (function (_super) {
             _this.rootNode = null;
             _this.portalNode = null;
             document.removeEventListener('click', _this.handleDocumentClick);
+            document.removeEventListener('keydown', _this.handleEscape, true);
             var onUnmount = _this.props.onUnmount;
             if (onUnmount)
                 onUnmount();
+            if (_this.focusedNodeBeforeOpening !== null) {
+                _this.focusedNodeBeforeOpening.focus();
+                _this.focusedNodeBeforeOpening = null;
+            }
         };
+        this.focusedNodeBeforeOpening = null;
     }
     Portal.prototype.componentDidMount = function () {
         if (this.state.open) {
@@ -9710,11 +11332,15 @@ var Portal = (function (_super) {
             this.setState(newState);
     };
     Portal.prototype.renderPortal = function () {
-        var _a = this.props, children = _a.children, className = _a.className, open = _a.open;
+        var _a = this.props, children = _a.children, className = _a.className, open = _a.open, allowResetFocus = _a.allowResetFocus;
         this.mountPortal();
         this.rootNode.className = className || '';
         ReactDOM.unstable_renderSubtreeIntoContainer(this, React.Children.only(children), this.rootNode);
+        if (this.focusedNodeBeforeOpening === null) {
+            this.focusedNodeBeforeOpening = document.activeElement;
+        }
         this.portalNode = this.rootNode.firstElementChild;
+        core.initializeFocusTabIndex(this.portalNode, allowResetFocus);
     };
     Portal.prototype.renderCore = function () {
         return React.createElement("div", null);
@@ -9723,7 +11349,7 @@ var Portal = (function (_super) {
 }(data.Component));
 exports.Portal = Portal;
 
-},{"./data":12,"react":267,"react-dom":138}],38:[function(require,module,exports){
+},{"./core":12,"./data":13,"react":274,"react-dom":145}],42:[function(require,module,exports){
 "use strict";
 var pkg = require("./package");
 var compiler = require("./compiler");
@@ -9751,9 +11377,9 @@ function td2tsAsync(td) {
 }
 exports.td2tsAsync = td2tsAsync;
 
-},{"./compiler":9,"./package":28}],39:[function(require,module,exports){
+},{"./compiler":10,"./package":30}],43:[function(require,module,exports){
 "use strict";
-var defaultToolboxString = "<xml id=\"blocklyToolboxDefinition\" style=\"display: none\">\n    <category name=\"Loops\" nameid=\"loops\" colour=\"#107c10\" category=\"50\" web-icon=\"\uF01E\" iconclass=\"blocklyTreeIconloops\" expandedclass=\"blocklyTreeIconloops\">    \n        <label text=\"Control, Loops, Pause\" web-class=\"blocklyFlyoutGroup\" web-line=\"1.5\"/>\n        <block type=\"controls_repeat_ext\">\n            <value name=\"TIMES\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">4</field>\n                </shadow>\n            </value>\n        </block>\n        <block type=\"device_while\">\n            <value name=\"COND\">\n                <shadow type=\"logic_boolean\"></shadow>\n            </value>\n        </block>\n        <block type=\"controls_simple_for\">\n            <value name=\"TO\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">4</field>\n                </shadow>\n            </value>\n        </block>\n        <block type=\"controls_for_of\">\n            <value name=\"LIST\">\n                <shadow type=\"variables_get\">\n                    <field name=\"VAR\">list</field>\n                </shadow>\n            </value>\n        </block>\n    </category>\n    <category name=\"Logic\" nameid=\"logic\" colour=\"#006970\" category=\"49\" web-icon=\"\uF074\" iconclass=\"blocklyTreeIconlogic\" expandedclass=\"blocklyTreeIconlogic\">    \n        <label text=\"Conditionals\" web-class=\"blocklyFlyoutGroup\" web-line=\"1.5\"/>\n        <block type=\"controls_if\" gap=\"8\">\n            <value name=\"IF0\">\n                <shadow type=\"logic_boolean\">\n                    <field name=\"BOOL\">TRUE</field>\n                </shadow>\n            </value>\n        </block>\n        <block type=\"controls_if\" gap=\"8\">\n            <mutation else=\"1\"></mutation>\n            <value name=\"IF0\">\n                <shadow type=\"logic_boolean\">\n                    <field name=\"BOOL\">TRUE</field>\n                </shadow>\n            </value>\n        </block>\n        <label text=\"Comparison\" web-class=\"blocklyFlyoutGroup\" web-line=\"1.5\"/>\n        <block type=\"logic_compare\" gap=\"8\">\n            <value name=\"A\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n            <value name=\"B\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n        </block>\n        <block type=\"logic_compare\">\n            <field name=\"OP\">LT</field>\n            <value name=\"A\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n            <value name=\"B\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n        </block>\n        <label text=\"Boolean\" web-class=\"blocklyFlyoutGroup\" web-line=\"1.5\"/>\n        <block type=\"logic_operation\" gap=\"8\"></block>\n        <block type=\"logic_operation\" gap=\"8\">\n            <field name=\"OP\">OR</field>\n        </block>\n        <block type=\"logic_negate\"></block>\n        <block type=\"logic_boolean\" gap=\"8\"></block>\n        <block type=\"logic_boolean\">\n            <field name=\"BOOL\">FALSE</field>\n        </block>\n    </category>\n    <category name=\"Variables\" nameid=\"variables\" colour=\"#A80000\" custom=\"VARIABLE\" category=\"48\" iconclass=\"blocklyTreeIconvariables\" expandedclass=\"blocklyTreeIconvariables\">\n    </category>\n    <category name=\"Math\" nameid=\"math\" colour=\"#712672\" category=\"47\" web-icon=\"\uF1EC\" iconclass=\"blocklyTreeIconmath\" expandedclass=\"blocklyTreeIconmath\">    \n        <label text=\"Arithmetic\" web-class=\"blocklyFlyoutGroup\" web-line=\"1.5\"/>\n        <block type=\"math_arithmetic\" gap=\"8\">\n            <value name=\"A\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n            <value name=\"B\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n        </block>\n        <block type=\"math_arithmetic\" gap=\"8\">\n            <value name=\"A\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n            <value name=\"B\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n            <field name=\"OP\">MINUS</field>\n        </block>\n        <block type=\"math_arithmetic\" gap=\"8\">\n            <value name=\"A\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n            <value name=\"B\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n            <field name=\"OP\">MULTIPLY</field>\n        </block>\n        <block type=\"math_arithmetic\" gap=\"8\">\n            <value name=\"A\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n            <value name=\"B\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n            <field name=\"OP\">DIVIDE</field>\n        </block>\n        <block type=\"math_number\" gap=\"8\">\n            <field name=\"NUM\">0</field>\n        </block>\n        <label text=\"Operations\" web-class=\"blocklyFlyoutGroup\" web-line=\"1.5\"/>\n        <block type=\"math_modulo\">\n            <value name=\"DIVIDEND\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n            <value name=\"DIVISOR\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">1</field>\n                </shadow>\n            </value>\n        </block>\n        <block type=\"math_op2\" gap=\"8\">\n            <value name=\"x\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n            <value name=\"y\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n        </block>\n        <block type=\"math_op2\" gap=\"8\">\n            <value name=\"x\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n            <value name=\"y\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n            <field name=\"op\">max</field>\n        </block>\n        <block type=\"math_op3\">\n            <value name=\"x\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n        </block>\n    </category>\n    <category name=\"Functions\" nameid=\"functions\" colour=\"#005a9e\" custom=\"PROCEDURE\" category=\"46\" iconclass=\"blocklyTreeIconfunctions\" expandedclass=\"blocklyTreeIconfunctions\" advanced=\"true\">\n    </category>\n    <category colour=\"#66672C\" name=\"Arrays\" nameid=\"arrays\" category=\"45\" web-icon=\"\uF0CB\" iconclass=\"blocklyTreeIconarrays\" expandedclass=\"blocklyTreeIconarrays\" advanced=\"true\">\n        <block type=\"lists_create_with\">\n            <mutation items=\"1\"></mutation>\n            <value name=\"ADD0\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n        </block>\n        <block type=\"lists_create_with\">\n            <mutation items=\"2\"></mutation>\n            <value name=\"ADD0\">\n                <shadow type=\"text\">\n                    <field name=\"TEXT\"></field>\n                </shadow>\n            </value>\n            <value name=\"ADD1\">\n                <shadow type=\"text\">\n                    <field name=\"TEXT\"></field>\n                </shadow>\n            </value>\n        </block>\n        <block type=\"lists_length\"></block>\n        <block type=\"lists_index_get\">\n            <value name=\"LIST\">\n                <block type=\"variables_get\">\n                    <field name=\"VAR\">list</field>\n                </block>\n            </value>\n            <value name=\"INDEX\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n        </block>\n        <block type=\"lists_index_set\">\n            <value name=\"LIST\">\n                <block type=\"variables_get\">\n                    <field name=\"VAR\">list</field>\n                </block>\n            </value>\n            <value name=\"INDEX\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n        </block>\n    </category>\n    <category colour=\"#996600\" name=\"Text\" nameid=\"text\" category=\"46\" web-icon=\"\uF035\" iconclass=\"blocklyTreeIcontext\" expandedclass=\"blocklyTreeIcontext\" advanced=\"true\">\n        <block type=\"text\"></block>\n        <block type=\"text_length\">\n            <value name=\"VALUE\">\n                <shadow type=\"text\">\n                    <field name=\"TEXT\">abc</field>\n                </shadow>\n            </value>\n        </block>\n        <block type=\"text_join\">\n            <mutation items=\"2\"></mutation>\n            <value name=\"ADD0\">\n                <shadow type=\"text\">\n                    <field name=\"TEXT\"></field>\n                </shadow>\n            </value>\n            <value name=\"ADD1\">\n                <shadow type=\"text\">\n                    <field name=\"TEXT\"></field>\n                </shadow>\n            </value>\n        </block>\n    </category>\n</xml>";
+var defaultToolboxString = "<xml id=\"blocklyToolboxDefinition\" style=\"display: none\">\n    <category name=\"Loops\" nameid=\"loops\" colour=\"#107c10\" category=\"50\" web-icon=\"\uF01E\" iconclass=\"blocklyTreeIconloops\" expandedclass=\"blocklyTreeIconloops\">    \n        <block type=\"controls_repeat_ext\">\n            <value name=\"TIMES\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">4</field>\n                </shadow>\n            </value>\n        </block>\n        <block type=\"device_while\">\n            <value name=\"COND\">\n                <shadow type=\"logic_boolean\"></shadow>\n            </value>\n        </block>\n        <block type=\"controls_simple_for\">\n            <value name=\"TO\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">4</field>\n                </shadow>\n            </value>\n        </block>\n        <block type=\"controls_for_of\">\n            <value name=\"LIST\">\n                <shadow type=\"variables_get\">\n                    <field name=\"VAR\">list</field>\n                </shadow>\n            </value>\n        </block>\n    </category>\n    <category name=\"Logic\" nameid=\"logic\" colour=\"#006970\" category=\"49\" web-icon=\"\uF074\" iconclass=\"blocklyTreeIconlogic\" expandedclass=\"blocklyTreeIconlogic\">    \n        <label text=\"Conditionals\" web-class=\"blocklyFlyoutGroup\" web-line=\"1.5\"/>\n        <block type=\"controls_if\" gap=\"8\">\n            <value name=\"IF0\">\n                <shadow type=\"logic_boolean\">\n                    <field name=\"BOOL\">TRUE</field>\n                </shadow>\n            </value>\n        </block>\n        <block type=\"controls_if\" gap=\"8\">\n            <mutation else=\"1\"></mutation>\n            <value name=\"IF0\">\n                <shadow type=\"logic_boolean\">\n                    <field name=\"BOOL\">TRUE</field>\n                </shadow>\n            </value>\n        </block>\n        <label text=\"Comparison\" web-class=\"blocklyFlyoutGroup\" web-line=\"1.5\"/>\n        <block type=\"logic_compare\" gap=\"8\">\n            <value name=\"A\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n            <value name=\"B\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n        </block>\n        <block type=\"logic_compare\">\n            <field name=\"OP\">LT</field>\n            <value name=\"A\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n            <value name=\"B\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n        </block>\n        <label text=\"Boolean\" web-class=\"blocklyFlyoutGroup\" web-line=\"1.5\"/>\n        <block type=\"logic_operation\" gap=\"8\"></block>\n        <block type=\"logic_operation\" gap=\"8\">\n            <field name=\"OP\">OR</field>\n        </block>\n        <block type=\"logic_negate\"></block>\n        <block type=\"logic_boolean\" gap=\"8\"></block>\n        <block type=\"logic_boolean\">\n            <field name=\"BOOL\">FALSE</field>\n        </block>\n    </category>\n    <category name=\"Variables\" nameid=\"variables\" colour=\"#A80000\" custom=\"VARIABLE\" category=\"48\" iconclass=\"blocklyTreeIconvariables\" expandedclass=\"blocklyTreeIconvariables\">\n    </category>\n    <category name=\"Math\" nameid=\"math\" colour=\"#712672\" category=\"47\" web-icon=\"\uF1EC\" iconclass=\"blocklyTreeIconmath\" expandedclass=\"blocklyTreeIconmath\">    \n        <block type=\"math_arithmetic\" gap=\"8\">\n            <value name=\"A\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n            <value name=\"B\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n        </block>\n        <block type=\"math_arithmetic\" gap=\"8\">\n            <value name=\"A\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n            <value name=\"B\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n            <field name=\"OP\">MINUS</field>\n        </block>\n        <block type=\"math_arithmetic\" gap=\"8\">\n            <value name=\"A\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n            <value name=\"B\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n            <field name=\"OP\">MULTIPLY</field>\n        </block>\n        <block type=\"math_arithmetic\" gap=\"8\">\n            <value name=\"A\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n            <value name=\"B\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n            <field name=\"OP\">DIVIDE</field>\n        </block>\n        <block type=\"math_number\" gap=\"8\">\n            <field name=\"NUM\">0</field>\n        </block>\n        <block type=\"math_modulo\">\n            <value name=\"DIVIDEND\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n            <value name=\"DIVISOR\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">1</field>\n                </shadow>\n            </value>\n        </block>\n        <block type=\"math_op2\" gap=\"8\">\n            <value name=\"x\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n            <value name=\"y\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n        </block>\n        <block type=\"math_op2\" gap=\"8\">\n            <value name=\"x\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n            <value name=\"y\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n            <field name=\"op\">max</field>\n        </block>\n        <block type=\"math_op3\">\n            <value name=\"x\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n        </block>\n    </category>\n    <category name=\"Functions\" nameid=\"functions\" colour=\"#005a9e\" custom=\"PROCEDURE\" category=\"46\" iconclass=\"blocklyTreeIconfunctions\" expandedclass=\"blocklyTreeIconfunctions\" advanced=\"true\">\n    </category>\n    <category colour=\"#66672C\" name=\"Arrays\" nameid=\"arrays\" category=\"45\" web-icon=\"\uF0CB\" iconclass=\"blocklyTreeIconarrays\" expandedclass=\"blocklyTreeIconarrays\" advanced=\"true\">\n        <block type=\"lists_create_with\">\n            <mutation items=\"1\"></mutation>\n            <value name=\"ADD0\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n        </block>\n        <block type=\"lists_create_with\">\n            <mutation items=\"2\"></mutation>\n            <value name=\"ADD0\">\n                <shadow type=\"text\">\n                    <field name=\"TEXT\"></field>\n                </shadow>\n            </value>\n            <value name=\"ADD1\">\n                <shadow type=\"text\">\n                    <field name=\"TEXT\"></field>\n                </shadow>\n            </value>\n        </block>\n        <block type=\"lists_length\"></block>\n        <block type=\"lists_index_get\">\n            <value name=\"LIST\">\n                <block type=\"variables_get\">\n                    <field name=\"VAR\">list</field>\n                </block>\n            </value>\n            <value name=\"INDEX\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n        </block>\n        <block type=\"lists_index_set\">\n            <value name=\"LIST\">\n                <block type=\"variables_get\">\n                    <field name=\"VAR\">list</field>\n                </block>\n            </value>\n            <value name=\"INDEX\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n        </block>\n    </category>\n    <category colour=\"#996600\" name=\"Text\" nameid=\"text\" category=\"46\" web-icon=\"\uF035\" iconclass=\"blocklyTreeIcontext\" expandedclass=\"blocklyTreeIcontext\" advanced=\"true\">\n        <block type=\"text\"></block>\n        <block type=\"text_length\">\n            <value name=\"VALUE\">\n                <shadow type=\"text\">\n                    <field name=\"TEXT\">" + lf("Hello") + "</field>\n                </shadow>\n            </value>\n        </block>\n        <block type=\"text_join\">\n            <mutation items=\"2\"></mutation>\n            <value name=\"ADD0\">\n                <shadow type=\"text\">\n                    <field name=\"TEXT\">" + lf("Hello") + "</field>\n                </shadow>\n            </value>\n            <value name=\"ADD1\">\n                <shadow type=\"text\">\n                    <field name=\"TEXT\">" + lf("World") + "</field>\n                </shadow>\n            </value>\n        </block>\n    </category>\n</xml>";
 var cachedToolboxDom;
 function getBaseToolboxDom() {
     if (!cachedToolboxDom) {
@@ -9767,7 +11393,7 @@ function overrideBaseToolbox(xml) {
 }
 exports.overrideBaseToolbox = overrideBaseToolbox;
 
-},{}],40:[function(require,module,exports){
+},{}],44:[function(require,module,exports){
 /// <reference path="../../typings/globals/react/index.d.ts" />
 /// <reference path="../../typings/globals/react-dom/index.d.ts" />
 /// <reference path="../../built/pxtlib.d.ts" />
@@ -9781,6 +11407,7 @@ var React = require("react");
 var data = require("./data");
 var sui = require("./sui");
 var sounds = require("./sounds");
+var core = require("./core");
 var TutorialMenuItem = (function (_super) {
     __extends(TutorialMenuItem, _super);
     function TutorialMenuItem(props) {
@@ -9794,14 +11421,16 @@ var TutorialMenuItem = (function (_super) {
     };
     TutorialMenuItem.prototype.render = function () {
         var _this = this;
-        var _a = this.props.parent.state.tutorialOptions, tutorialReady = _a.tutorialReady, tutorialSteps = _a.tutorialSteps, tutorialStep = _a.tutorialStep, tutorialName = _a.tutorialName;
+        var _a = this.props.parent.state.tutorialOptions, tutorialReady = _a.tutorialReady, tutorialStepInfo = _a.tutorialStepInfo, tutorialStep = _a.tutorialStep, tutorialName = _a.tutorialName;
         var state = this.props.parent.state;
         var targetTheme = pxt.appTarget.appTheme;
         var currentStep = tutorialStep;
-        return React.createElement("div", {className: "ui item"}, React.createElement("div", {className: "ui item tutorial-menuitem"}, tutorialSteps.map(function (step, index) {
+        if (!tutorialReady)
+            return React.createElement("div", null);
+        return React.createElement("div", {className: "ui item"}, React.createElement("div", {className: "ui item tutorial-menuitem", role: "menubar"}, tutorialStepInfo.map(function (step, index) {
             return (index == currentStep) ?
-                React.createElement("span", {className: "step-label", key: 'tutorialStep' + index}, React.createElement("a", {className: "ui circular label " + (currentStep == index ? 'blue selected' : 'inverted') + " " + (!tutorialReady ? 'disabled' : ''), onClick: function () { return _this.openTutorialStep(index); }}, index + 1)) :
-                React.createElement("span", {className: "step-label", key: 'tutorialStep' + index, "data-tooltip": "" + (index + 1), "data-inverted": "", "data-position": "bottom center"}, React.createElement("a", {className: "ui empty circular label " + (!tutorialReady ? 'disabled' : '') + " clear", onClick: function () { return _this.openTutorialStep(index); }}));
+                React.createElement("span", {className: "step-label", key: 'tutorialStep' + index}, React.createElement("a", {className: "ui circular label " + (currentStep == index ? 'blue selected' : 'inverted') + " " + (!tutorialReady ? 'disabled' : ''), role: "menuitem", "aria-label": lf("Tutorial step {0}. This is the current step", index + 1), tabIndex: 0, onClick: function () { return _this.openTutorialStep(index); }, onKeyDown: sui.fireClickOnEnter}, index + 1)) :
+                React.createElement("span", {className: "step-label", key: 'tutorialStep' + index, "data-tooltip": "" + (index + 1), "data-inverted": "", "data-position": "bottom center"}, React.createElement("a", {className: "ui empty circular label " + (!tutorialReady ? 'disabled' : '') + " clear", role: "menuitem", "aria-label": lf("Tutorial step {0}", index + 1), tabIndex: 0, onClick: function () { return _this.openTutorialStep(index); }, onKeyDown: sui.fireClickOnEnter}));
         })));
     };
     return TutorialMenuItem;
@@ -9837,7 +11466,12 @@ var TutorialContent = (function (_super) {
         // Show light box
         sounds.tutorialStep();
         $('#root')
-            .dimmer({ 'closable': true })
+            .dimmer({
+            'closable': true,
+            onShow: function () {
+                document.getElementById('tutorialOkButton').focus();
+            }
+        })
             .dimmer('show');
     };
     TutorialContent.prototype.renderCore = function () {
@@ -9868,7 +11502,14 @@ var TutorialHint = (function (_super) {
         var tutorialFullscreen = tutorialStepInfo[tutorialStep].fullscreen;
         // TODO: Use step name instead of tutorial Name in full screen mode.
         var header = tutorialFullscreen ? tutorialName : lf("Hint");
-        return React.createElement(sui.Modal, {open: visible, className: "hintdialog", size: "small", header: header, closeIcon: true, onClose: function () { return _this.setState({ visible: false }); }, dimmer: true, closeOnDimmerClick: true, closeOnDocumentClick: true}, React.createElement("div", {className: "content"}, React.createElement("div", {dangerouslySetInnerHTML: { __html: tutorialHint }})), React.createElement("div", {className: "actions", style: { textAlign: "right" }}, React.createElement(sui.Button, {class: "green", icon: "check", text: lf("Ok"), onClick: function () { return _this.setState({ visible: false }); }})));
+        var hide = function () { return _this.setState({ visible: false }); };
+        var actions = [{
+                label: lf("Ok"),
+                onClick: hide,
+                icon: 'check',
+                className: 'green'
+            }];
+        return React.createElement(sui.Modal, {open: visible, className: "hintdialog", size: "small", header: header, closeIcon: true, onClose: function () { return _this.setState({ visible: false }); }, dimmer: true, actions: actions, closeOnDimmerClick: true, closeOnDocumentClick: true, closeOnEscape: true}, React.createElement("div", {dangerouslySetInnerHTML: { __html: tutorialHint }}));
     };
     return TutorialHint;
 }(data.Component));
@@ -9876,7 +11517,14 @@ exports.TutorialHint = TutorialHint;
 var TutorialCard = (function (_super) {
     __extends(TutorialCard, _super);
     function TutorialCard(props) {
+        var _this = this;
         _super.call(this, props);
+        this.closeLightboxOnEscape = function (e) {
+            var charCode = (typeof e.which == "number") ? e.which : e.keyCode;
+            if (charCode === 27) {
+                _this.closeLightbox();
+            }
+        };
     }
     TutorialCard.prototype.previousTutorialStep = function () {
         var options = this.props.parent.state.tutorialOptions;
@@ -9901,6 +11549,12 @@ var TutorialCard = (function (_super) {
     TutorialCard.prototype.closeLightbox = function () {
         // Hide light box
         sounds.tutorialNext();
+        document.documentElement.removeEventListener("keydown", this.closeLightboxOnEscape);
+        core.initializeFocusTabIndex($('#tutorialcard').get(0), true, undefined, true);
+        var tutorialmessage = document.getElementsByClassName("tutorialmessage");
+        if (tutorialmessage.length > 0) {
+            tutorialmessage.item(0).focus();
+        }
         $('#root')
             .dimmer('hide');
     };
@@ -9908,6 +11562,16 @@ var TutorialCard = (function (_super) {
         $('#tutorialhint')
             .modal('attach events', '#tutorialcard .ui.button.hintbutton', 'show');
         ;
+        document.documentElement.addEventListener("keydown", this.closeLightboxOnEscape);
+    };
+    TutorialCard.prototype.componentDidUpdate = function () {
+        if (!this.focusInitialized) {
+            var tutorialCard = document.getElementById('tutorialcard');
+            if (tutorialCard !== null) {
+                this.focusInitialized = true;
+                core.initializeFocusTabIndex(tutorialCard, true, false);
+            }
+        }
     };
     TutorialCard.prototype.showHint = function () {
         this.closeLightbox();
@@ -9916,54 +11580,28 @@ var TutorialCard = (function (_super) {
     TutorialCard.prototype.render = function () {
         var _this = this;
         var options = this.props.parent.state.tutorialOptions;
-        var tutorialReady = options.tutorialReady, tutorialStepInfo = options.tutorialStepInfo, tutorialStep = options.tutorialStep, tutorialSteps = options.tutorialSteps;
+        var tutorialReady = options.tutorialReady, tutorialStepInfo = options.tutorialStepInfo, tutorialStep = options.tutorialStep;
         if (!tutorialReady)
             return React.createElement("div", null);
         var tutorialHeaderContent = tutorialStepInfo[tutorialStep].headerContent;
+        var tutorialAriaLabel = tutorialStepInfo[tutorialStep].ariaLabel;
         var currentStep = tutorialStep;
-        var maxSteps = tutorialSteps.length;
+        var maxSteps = tutorialStepInfo.length;
         var hasPrevious = tutorialReady && currentStep != 0;
         var hasNext = tutorialReady && currentStep != maxSteps - 1;
         var hasFinish = currentStep == maxSteps - 1;
         var hasHint = tutorialStepInfo[tutorialStep].hasHint;
-        return React.createElement("div", {id: "tutorialcard", className: "ui " + (tutorialReady ? 'tutorialReady' : '')}, React.createElement("div", {className: 'ui buttons'}, React.createElement("div", {className: "ui segment attached message"}, React.createElement("div", {className: 'avatar-image', onClick: function () { return _this.showHint(); }}), hasHint ? React.createElement(sui.Button, {class: "mini blue hintbutton hidelightbox", text: lf("Hint"), onClick: function () { return _this.showHint(); }}) : undefined, React.createElement("div", {className: 'tutorialmessage', onClick: function () { return _this.showHint(); }}, React.createElement("div", {className: "content", dangerouslySetInnerHTML: { __html: tutorialHeaderContent }})), React.createElement(sui.Button, {class: "large green okbutton showlightbox", text: lf("Ok"), onClick: function () { return _this.closeLightbox(); }})), hasNext ? React.createElement(sui.Button, {icon: "right chevron", class: "ui right icon button nextbutton right attached green " + (!hasNext ? 'disabled' : ''), text: lf("Next"), onClick: function () { return _this.nextTutorialStep(); }}) : undefined, hasFinish ? React.createElement(sui.Button, {icon: "left checkmark", class: "ui icon orange button " + (!tutorialReady ? 'disabled' : ''), text: lf("Finish"), onClick: function () { return _this.finishTutorial(); }}) : undefined));
+        if (hasHint) {
+            tutorialAriaLabel += lf("Press Space or Enter to show a hint.");
+        }
+        return React.createElement("div", {id: "tutorialcard", className: "ui " + (tutorialReady ? 'tutorialReady' : '')}, React.createElement("div", {className: 'ui buttons'}, React.createElement("div", {className: "ui segment attached message"}, React.createElement("div", {className: 'avatar-image', onClick: function () { return _this.showHint(); }, onKeyDown: sui.fireClickOnEnter}), hasHint ? React.createElement(sui.Button, {class: "mini blue hintbutton hidelightbox", text: lf("Hint"), tabIndex: -1, onClick: function () { return _this.showHint(); }, onKeyDown: sui.fireClickOnEnter}) : undefined, React.createElement("div", {className: "tutorialmessage " + (hasHint ? 'focused' : undefined), role: "alert", "aria-label": tutorialAriaLabel, tabIndex: hasHint ? 0 : -1, onClick: function () { if (hasHint)
+            _this.showHint(); }, onKeyDown: sui.fireClickOnEnter}, React.createElement("div", {className: "content", dangerouslySetInnerHTML: { __html: tutorialHeaderContent }})), React.createElement(sui.Button, {id: "tutorialOkButton", class: "large green okbutton showlightbox focused", text: lf("Ok"), onClick: function () { return _this.closeLightbox(); }, onKeyDown: sui.fireClickOnEnter})), hasNext ? React.createElement(sui.Button, {icon: "right chevron", rightIcon: true, class: "nextbutton right attached green " + (!hasNext ? 'disabled' : ''), text: lf("Next"), ariaLabel: lf("Go to the next step of the tutorial."), onClick: function () { return _this.nextTutorialStep(); }, onKeyDown: sui.fireClickOnEnter}) : undefined, hasFinish ? React.createElement(sui.Button, {icon: "left checkmark", class: "orange right attached " + (!tutorialReady ? 'disabled' : 'focused'), text: lf("Finish"), ariaLabel: lf("Finish the tutorial."), onClick: function () { return _this.finishTutorial(); }, onKeyDown: sui.fireClickOnEnter}) : undefined));
     };
     return TutorialCard;
 }(data.Component));
 exports.TutorialCard = TutorialCard;
-var TutorialComplete = (function (_super) {
-    __extends(TutorialComplete, _super);
-    function TutorialComplete(props) {
-        _super.call(this, props);
-        this.state = {
-            visible: false
-        };
-    }
-    TutorialComplete.prototype.hide = function () {
-        this.setState({ visible: false });
-    };
-    TutorialComplete.prototype.show = function () {
-        this.setState({ visible: true });
-    };
-    TutorialComplete.prototype.moreTutorials = function () {
-        pxt.tickEvent("tutorial.completed.more");
-        this.props.parent.openTutorials();
-    };
-    TutorialComplete.prototype.exitTutorial = function () {
-        pxt.tickEvent("tutorial.completed.exit");
-        this.hide();
-        this.props.parent.exitTutorial(true);
-    };
-    TutorialComplete.prototype.renderCore = function () {
-        var _this = this;
-        var visible = this.state.visible;
-        return (React.createElement(sui.Modal, {open: this.state.visible, className: "sharedialog", header: lf("Congratulations! What's next?"), size: "small", onClose: function () { return _this.setState({ visible: false }); }, dimmer: true, closeIcon: true, closeOnDimmerClick: true, closeOnDocumentClick: true}, React.createElement("div", {className: "ui two stackable cards"}, React.createElement("div", {className: "ui grid centered link card", onClick: function () { return _this.moreTutorials(); }}, React.createElement("div", {className: "content"}, React.createElement("i", {className: "avatar-image icon huge", style: { fontSize: '100px' }})), React.createElement("div", {className: "content"}, React.createElement("div", {className: "header"}, lf("More Tutorials")))), React.createElement("div", {className: "ui grid centered link card", onClick: function () { return _this.exitTutorial(); }}, React.createElement("div", {className: "content"}, React.createElement("i", {className: "external icon huge black", style: { fontSize: '100px' }})), React.createElement("div", {className: "content"}, React.createElement("div", {className: "header"}, lf("Exit Tutorial")))))));
-    };
-    return TutorialComplete;
-}(data.Component));
-exports.TutorialComplete = TutorialComplete;
 
-},{"./data":12,"./sounds":35,"./sui":37,"react":267}],41:[function(require,module,exports){
+},{"./core":12,"./data":13,"./sounds":39,"./sui":41,"react":274}],45:[function(require,module,exports){
 /// <reference path="../../built/pxtlib.d.ts" />
 /// <reference path="../../built/pxteditor.d.ts" />
 /// <reference path="../../built/pxtwinrt.d.ts" />
@@ -10202,7 +11840,7 @@ data.mountVirtualApi("text", {
     },
 });
 
-},{"./cloudworkspace":6,"./core":11,"./data":12,"./db":13,"./fileworkspace":18,"./iframeworkspace":21,"./memoryworkspace":25}],42:[function(require,module,exports){
+},{"./cloudworkspace":7,"./core":12,"./data":13,"./db":14,"./fileworkspace":21,"./iframeworkspace":24,"./memoryworkspace":27}],46:[function(require,module,exports){
 'use strict';
 
 module.exports = argsArray;
@@ -10222,7 +11860,7 @@ function argsArray(fun) {
     }
   };
 }
-},{}],43:[function(require,module,exports){
+},{}],47:[function(require,module,exports){
 'use strict'
 
 exports.byteLength = byteLength
@@ -10338,7 +11976,7 @@ function fromByteArray (uint8) {
   return parts.join('')
 }
 
-},{}],44:[function(require,module,exports){
+},{}],48:[function(require,module,exports){
 (function (process,global){
 /* @preserve
  * The MIT License (MIT)
@@ -15960,9 +17598,631 @@ module.exports = ret;
 },{"./es5":13}]},{},[4])(4)
 });                    ;if (typeof window !== 'undefined' && window !== null) {                               window.P = window.Promise;                                                     } else if (typeof self !== 'undefined' && self !== null) {                             self.P = self.Promise;                                                         }
 }).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"_process":136}],45:[function(require,module,exports){
+},{"_process":143}],49:[function(require,module,exports){
 
-},{}],46:[function(require,module,exports){
+},{}],50:[function(require,module,exports){
+if (typeof Object.create === 'function') {
+  // implementation from standard node.js 'util' module
+  module.exports = function inherits(ctor, superCtor) {
+    ctor.super_ = superCtor
+    ctor.prototype = Object.create(superCtor.prototype, {
+      constructor: {
+        value: ctor,
+        enumerable: false,
+        writable: true,
+        configurable: true
+      }
+    });
+  };
+} else {
+  // old school shim for old browsers
+  module.exports = function inherits(ctor, superCtor) {
+    ctor.super_ = superCtor
+    var TempCtor = function () {}
+    TempCtor.prototype = superCtor.prototype
+    ctor.prototype = new TempCtor()
+    ctor.prototype.constructor = ctor
+  }
+}
+
+},{}],51:[function(require,module,exports){
+module.exports = function isBuffer(arg) {
+  return arg && typeof arg === 'object'
+    && typeof arg.copy === 'function'
+    && typeof arg.fill === 'function'
+    && typeof arg.readUInt8 === 'function';
+}
+},{}],52:[function(require,module,exports){
+(function (process,global){
+// Copyright Joyent, Inc. and other Node contributors.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a
+// copy of this software and associated documentation files (the
+// "Software"), to deal in the Software without restriction, including
+// without limitation the rights to use, copy, modify, merge, publish,
+// distribute, sublicense, and/or sell copies of the Software, and to permit
+// persons to whom the Software is furnished to do so, subject to the
+// following conditions:
+//
+// The above copyright notice and this permission notice shall be included
+// in all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
+// NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+// DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+// OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+// USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+var formatRegExp = /%[sdj%]/g;
+exports.format = function(f) {
+  if (!isString(f)) {
+    var objects = [];
+    for (var i = 0; i < arguments.length; i++) {
+      objects.push(inspect(arguments[i]));
+    }
+    return objects.join(' ');
+  }
+
+  var i = 1;
+  var args = arguments;
+  var len = args.length;
+  var str = String(f).replace(formatRegExp, function(x) {
+    if (x === '%%') return '%';
+    if (i >= len) return x;
+    switch (x) {
+      case '%s': return String(args[i++]);
+      case '%d': return Number(args[i++]);
+      case '%j':
+        try {
+          return JSON.stringify(args[i++]);
+        } catch (_) {
+          return '[Circular]';
+        }
+      default:
+        return x;
+    }
+  });
+  for (var x = args[i]; i < len; x = args[++i]) {
+    if (isNull(x) || !isObject(x)) {
+      str += ' ' + x;
+    } else {
+      str += ' ' + inspect(x);
+    }
+  }
+  return str;
+};
+
+
+// Mark that a method should not be used.
+// Returns a modified function which warns once by default.
+// If --no-deprecation is set, then it is a no-op.
+exports.deprecate = function(fn, msg) {
+  // Allow for deprecating things in the process of starting up.
+  if (isUndefined(global.process)) {
+    return function() {
+      return exports.deprecate(fn, msg).apply(this, arguments);
+    };
+  }
+
+  if (process.noDeprecation === true) {
+    return fn;
+  }
+
+  var warned = false;
+  function deprecated() {
+    if (!warned) {
+      if (process.throwDeprecation) {
+        throw new Error(msg);
+      } else if (process.traceDeprecation) {
+        console.trace(msg);
+      } else {
+        console.error(msg);
+      }
+      warned = true;
+    }
+    return fn.apply(this, arguments);
+  }
+
+  return deprecated;
+};
+
+
+var debugs = {};
+var debugEnviron;
+exports.debuglog = function(set) {
+  if (isUndefined(debugEnviron))
+    debugEnviron = process.env.NODE_DEBUG || '';
+  set = set.toUpperCase();
+  if (!debugs[set]) {
+    if (new RegExp('\\b' + set + '\\b', 'i').test(debugEnviron)) {
+      var pid = process.pid;
+      debugs[set] = function() {
+        var msg = exports.format.apply(exports, arguments);
+        console.error('%s %d: %s', set, pid, msg);
+      };
+    } else {
+      debugs[set] = function() {};
+    }
+  }
+  return debugs[set];
+};
+
+
+/**
+ * Echos the value of a value. Trys to print the value out
+ * in the best way possible given the different types.
+ *
+ * @param {Object} obj The object to print out.
+ * @param {Object} opts Optional options object that alters the output.
+ */
+/* legacy: obj, showHidden, depth, colors*/
+function inspect(obj, opts) {
+  // default options
+  var ctx = {
+    seen: [],
+    stylize: stylizeNoColor
+  };
+  // legacy...
+  if (arguments.length >= 3) ctx.depth = arguments[2];
+  if (arguments.length >= 4) ctx.colors = arguments[3];
+  if (isBoolean(opts)) {
+    // legacy...
+    ctx.showHidden = opts;
+  } else if (opts) {
+    // got an "options" object
+    exports._extend(ctx, opts);
+  }
+  // set default options
+  if (isUndefined(ctx.showHidden)) ctx.showHidden = false;
+  if (isUndefined(ctx.depth)) ctx.depth = 2;
+  if (isUndefined(ctx.colors)) ctx.colors = false;
+  if (isUndefined(ctx.customInspect)) ctx.customInspect = true;
+  if (ctx.colors) ctx.stylize = stylizeWithColor;
+  return formatValue(ctx, obj, ctx.depth);
+}
+exports.inspect = inspect;
+
+
+// http://en.wikipedia.org/wiki/ANSI_escape_code#graphics
+inspect.colors = {
+  'bold' : [1, 22],
+  'italic' : [3, 23],
+  'underline' : [4, 24],
+  'inverse' : [7, 27],
+  'white' : [37, 39],
+  'grey' : [90, 39],
+  'black' : [30, 39],
+  'blue' : [34, 39],
+  'cyan' : [36, 39],
+  'green' : [32, 39],
+  'magenta' : [35, 39],
+  'red' : [31, 39],
+  'yellow' : [33, 39]
+};
+
+// Don't use 'blue' not visible on cmd.exe
+inspect.styles = {
+  'special': 'cyan',
+  'number': 'yellow',
+  'boolean': 'yellow',
+  'undefined': 'grey',
+  'null': 'bold',
+  'string': 'green',
+  'date': 'magenta',
+  // "name": intentionally not styling
+  'regexp': 'red'
+};
+
+
+function stylizeWithColor(str, styleType) {
+  var style = inspect.styles[styleType];
+
+  if (style) {
+    return '\u001b[' + inspect.colors[style][0] + 'm' + str +
+           '\u001b[' + inspect.colors[style][1] + 'm';
+  } else {
+    return str;
+  }
+}
+
+
+function stylizeNoColor(str, styleType) {
+  return str;
+}
+
+
+function arrayToHash(array) {
+  var hash = {};
+
+  array.forEach(function(val, idx) {
+    hash[val] = true;
+  });
+
+  return hash;
+}
+
+
+function formatValue(ctx, value, recurseTimes) {
+  // Provide a hook for user-specified inspect functions.
+  // Check that value is an object with an inspect function on it
+  if (ctx.customInspect &&
+      value &&
+      isFunction(value.inspect) &&
+      // Filter out the util module, it's inspect function is special
+      value.inspect !== exports.inspect &&
+      // Also filter out any prototype objects using the circular check.
+      !(value.constructor && value.constructor.prototype === value)) {
+    var ret = value.inspect(recurseTimes, ctx);
+    if (!isString(ret)) {
+      ret = formatValue(ctx, ret, recurseTimes);
+    }
+    return ret;
+  }
+
+  // Primitive types cannot have properties
+  var primitive = formatPrimitive(ctx, value);
+  if (primitive) {
+    return primitive;
+  }
+
+  // Look up the keys of the object.
+  var keys = Object.keys(value);
+  var visibleKeys = arrayToHash(keys);
+
+  if (ctx.showHidden) {
+    keys = Object.getOwnPropertyNames(value);
+  }
+
+  // IE doesn't make error fields non-enumerable
+  // http://msdn.microsoft.com/en-us/library/ie/dww52sbt(v=vs.94).aspx
+  if (isError(value)
+      && (keys.indexOf('message') >= 0 || keys.indexOf('description') >= 0)) {
+    return formatError(value);
+  }
+
+  // Some type of object without properties can be shortcutted.
+  if (keys.length === 0) {
+    if (isFunction(value)) {
+      var name = value.name ? ': ' + value.name : '';
+      return ctx.stylize('[Function' + name + ']', 'special');
+    }
+    if (isRegExp(value)) {
+      return ctx.stylize(RegExp.prototype.toString.call(value), 'regexp');
+    }
+    if (isDate(value)) {
+      return ctx.stylize(Date.prototype.toString.call(value), 'date');
+    }
+    if (isError(value)) {
+      return formatError(value);
+    }
+  }
+
+  var base = '', array = false, braces = ['{', '}'];
+
+  // Make Array say that they are Array
+  if (isArray(value)) {
+    array = true;
+    braces = ['[', ']'];
+  }
+
+  // Make functions say that they are functions
+  if (isFunction(value)) {
+    var n = value.name ? ': ' + value.name : '';
+    base = ' [Function' + n + ']';
+  }
+
+  // Make RegExps say that they are RegExps
+  if (isRegExp(value)) {
+    base = ' ' + RegExp.prototype.toString.call(value);
+  }
+
+  // Make dates with properties first say the date
+  if (isDate(value)) {
+    base = ' ' + Date.prototype.toUTCString.call(value);
+  }
+
+  // Make error with message first say the error
+  if (isError(value)) {
+    base = ' ' + formatError(value);
+  }
+
+  if (keys.length === 0 && (!array || value.length == 0)) {
+    return braces[0] + base + braces[1];
+  }
+
+  if (recurseTimes < 0) {
+    if (isRegExp(value)) {
+      return ctx.stylize(RegExp.prototype.toString.call(value), 'regexp');
+    } else {
+      return ctx.stylize('[Object]', 'special');
+    }
+  }
+
+  ctx.seen.push(value);
+
+  var output;
+  if (array) {
+    output = formatArray(ctx, value, recurseTimes, visibleKeys, keys);
+  } else {
+    output = keys.map(function(key) {
+      return formatProperty(ctx, value, recurseTimes, visibleKeys, key, array);
+    });
+  }
+
+  ctx.seen.pop();
+
+  return reduceToSingleString(output, base, braces);
+}
+
+
+function formatPrimitive(ctx, value) {
+  if (isUndefined(value))
+    return ctx.stylize('undefined', 'undefined');
+  if (isString(value)) {
+    var simple = '\'' + JSON.stringify(value).replace(/^"|"$/g, '')
+                                             .replace(/'/g, "\\'")
+                                             .replace(/\\"/g, '"') + '\'';
+    return ctx.stylize(simple, 'string');
+  }
+  if (isNumber(value))
+    return ctx.stylize('' + value, 'number');
+  if (isBoolean(value))
+    return ctx.stylize('' + value, 'boolean');
+  // For some reason typeof null is "object", so special case here.
+  if (isNull(value))
+    return ctx.stylize('null', 'null');
+}
+
+
+function formatError(value) {
+  return '[' + Error.prototype.toString.call(value) + ']';
+}
+
+
+function formatArray(ctx, value, recurseTimes, visibleKeys, keys) {
+  var output = [];
+  for (var i = 0, l = value.length; i < l; ++i) {
+    if (hasOwnProperty(value, String(i))) {
+      output.push(formatProperty(ctx, value, recurseTimes, visibleKeys,
+          String(i), true));
+    } else {
+      output.push('');
+    }
+  }
+  keys.forEach(function(key) {
+    if (!key.match(/^\d+$/)) {
+      output.push(formatProperty(ctx, value, recurseTimes, visibleKeys,
+          key, true));
+    }
+  });
+  return output;
+}
+
+
+function formatProperty(ctx, value, recurseTimes, visibleKeys, key, array) {
+  var name, str, desc;
+  desc = Object.getOwnPropertyDescriptor(value, key) || { value: value[key] };
+  if (desc.get) {
+    if (desc.set) {
+      str = ctx.stylize('[Getter/Setter]', 'special');
+    } else {
+      str = ctx.stylize('[Getter]', 'special');
+    }
+  } else {
+    if (desc.set) {
+      str = ctx.stylize('[Setter]', 'special');
+    }
+  }
+  if (!hasOwnProperty(visibleKeys, key)) {
+    name = '[' + key + ']';
+  }
+  if (!str) {
+    if (ctx.seen.indexOf(desc.value) < 0) {
+      if (isNull(recurseTimes)) {
+        str = formatValue(ctx, desc.value, null);
+      } else {
+        str = formatValue(ctx, desc.value, recurseTimes - 1);
+      }
+      if (str.indexOf('\n') > -1) {
+        if (array) {
+          str = str.split('\n').map(function(line) {
+            return '  ' + line;
+          }).join('\n').substr(2);
+        } else {
+          str = '\n' + str.split('\n').map(function(line) {
+            return '   ' + line;
+          }).join('\n');
+        }
+      }
+    } else {
+      str = ctx.stylize('[Circular]', 'special');
+    }
+  }
+  if (isUndefined(name)) {
+    if (array && key.match(/^\d+$/)) {
+      return str;
+    }
+    name = JSON.stringify('' + key);
+    if (name.match(/^"([a-zA-Z_][a-zA-Z_0-9]*)"$/)) {
+      name = name.substr(1, name.length - 2);
+      name = ctx.stylize(name, 'name');
+    } else {
+      name = name.replace(/'/g, "\\'")
+                 .replace(/\\"/g, '"')
+                 .replace(/(^"|"$)/g, "'");
+      name = ctx.stylize(name, 'string');
+    }
+  }
+
+  return name + ': ' + str;
+}
+
+
+function reduceToSingleString(output, base, braces) {
+  var numLinesEst = 0;
+  var length = output.reduce(function(prev, cur) {
+    numLinesEst++;
+    if (cur.indexOf('\n') >= 0) numLinesEst++;
+    return prev + cur.replace(/\u001b\[\d\d?m/g, '').length + 1;
+  }, 0);
+
+  if (length > 60) {
+    return braces[0] +
+           (base === '' ? '' : base + '\n ') +
+           ' ' +
+           output.join(',\n  ') +
+           ' ' +
+           braces[1];
+  }
+
+  return braces[0] + base + ' ' + output.join(', ') + ' ' + braces[1];
+}
+
+
+// NOTE: These type checking functions intentionally don't use `instanceof`
+// because it is fragile and can be easily faked with `Object.create()`.
+function isArray(ar) {
+  return Array.isArray(ar);
+}
+exports.isArray = isArray;
+
+function isBoolean(arg) {
+  return typeof arg === 'boolean';
+}
+exports.isBoolean = isBoolean;
+
+function isNull(arg) {
+  return arg === null;
+}
+exports.isNull = isNull;
+
+function isNullOrUndefined(arg) {
+  return arg == null;
+}
+exports.isNullOrUndefined = isNullOrUndefined;
+
+function isNumber(arg) {
+  return typeof arg === 'number';
+}
+exports.isNumber = isNumber;
+
+function isString(arg) {
+  return typeof arg === 'string';
+}
+exports.isString = isString;
+
+function isSymbol(arg) {
+  return typeof arg === 'symbol';
+}
+exports.isSymbol = isSymbol;
+
+function isUndefined(arg) {
+  return arg === void 0;
+}
+exports.isUndefined = isUndefined;
+
+function isRegExp(re) {
+  return isObject(re) && objectToString(re) === '[object RegExp]';
+}
+exports.isRegExp = isRegExp;
+
+function isObject(arg) {
+  return typeof arg === 'object' && arg !== null;
+}
+exports.isObject = isObject;
+
+function isDate(d) {
+  return isObject(d) && objectToString(d) === '[object Date]';
+}
+exports.isDate = isDate;
+
+function isError(e) {
+  return isObject(e) &&
+      (objectToString(e) === '[object Error]' || e instanceof Error);
+}
+exports.isError = isError;
+
+function isFunction(arg) {
+  return typeof arg === 'function';
+}
+exports.isFunction = isFunction;
+
+function isPrimitive(arg) {
+  return arg === null ||
+         typeof arg === 'boolean' ||
+         typeof arg === 'number' ||
+         typeof arg === 'string' ||
+         typeof arg === 'symbol' ||  // ES6 symbol
+         typeof arg === 'undefined';
+}
+exports.isPrimitive = isPrimitive;
+
+exports.isBuffer = require('./support/isBuffer');
+
+function objectToString(o) {
+  return Object.prototype.toString.call(o);
+}
+
+
+function pad(n) {
+  return n < 10 ? '0' + n.toString(10) : n.toString(10);
+}
+
+
+var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep',
+              'Oct', 'Nov', 'Dec'];
+
+// 26 Feb 16:19:34
+function timestamp() {
+  var d = new Date();
+  var time = [pad(d.getHours()),
+              pad(d.getMinutes()),
+              pad(d.getSeconds())].join(':');
+  return [d.getDate(), months[d.getMonth()], time].join(' ');
+}
+
+
+// log is just a thin wrapper to console.log that prepends a timestamp
+exports.log = function() {
+  console.log('%s - %s', timestamp(), exports.format.apply(exports, arguments));
+};
+
+
+/**
+ * Inherit the prototype methods from one constructor into another.
+ *
+ * The Function.prototype.inherits from lang.js rewritten as a standalone
+ * function (not on Function.prototype). NOTE: If this file is to be loaded
+ * during bootstrapping this function needs to be rewritten using some native
+ * functions as prototype setup using normal JavaScript does not work as
+ * expected during bootstrapping (see mirror.js in r114903).
+ *
+ * @param {function} ctor Constructor function which needs to inherit the
+ *     prototype.
+ * @param {function} superCtor Constructor function to inherit prototype from.
+ */
+exports.inherits = require('inherits');
+
+exports._extend = function(origin, add) {
+  // Don't do anything if add isn't an object
+  if (!add || !isObject(add)) return origin;
+
+  var keys = Object.keys(add);
+  var i = keys.length;
+  while (i--) {
+    origin[keys[i]] = add[keys[i]];
+  }
+  return origin;
+};
+
+function hasOwnProperty(obj, prop) {
+  return Object.prototype.hasOwnProperty.call(obj, prop);
+}
+
+}).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
+},{"./support/isBuffer":51,"_process":143,"inherits":50}],53:[function(require,module,exports){
 (function (global){
 /*!
  * The buffer module from node.js, for the browser.
@@ -17755,7 +20015,7 @@ function isnan (val) {
 }
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"base64-js":43,"ieee754":88,"isarray":92}],47:[function(require,module,exports){
+},{"base64-js":47,"ieee754":95,"isarray":99}],54:[function(require,module,exports){
 (function (Buffer){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -17866,7 +20126,7 @@ function objectToString(o) {
 }
 
 }).call(this,{"isBuffer":require("../../is-buffer/index.js")})
-},{"../../is-buffer/index.js":91}],48:[function(require,module,exports){
+},{"../../is-buffer/index.js":98}],55:[function(require,module,exports){
 var util = require('util')
   , AbstractIterator = require('abstract-leveldown').AbstractIterator
 
@@ -17902,7 +20162,7 @@ DeferredIterator.prototype._operation = function (method, args) {
 
 module.exports = DeferredIterator;
 
-},{"abstract-leveldown":53,"util":304}],49:[function(require,module,exports){
+},{"abstract-leveldown":60,"util":52}],56:[function(require,module,exports){
 (function (Buffer,process){
 var util              = require('util')
   , AbstractLevelDOWN = require('abstract-leveldown').AbstractLevelDOWN
@@ -17962,7 +20222,7 @@ module.exports                  = DeferredLevelDOWN
 module.exports.DeferredIterator = DeferredIterator
 
 }).call(this,{"isBuffer":require("../is-buffer/index.js")},require('_process'))
-},{"../is-buffer/index.js":91,"./deferred-iterator":48,"_process":136,"abstract-leveldown":53,"util":304}],50:[function(require,module,exports){
+},{"../is-buffer/index.js":98,"./deferred-iterator":55,"_process":143,"abstract-leveldown":60,"util":52}],57:[function(require,module,exports){
 (function (process){
 /* Copyright (c) 2013 Rod Vagg, MIT License */
 
@@ -18045,7 +20305,7 @@ AbstractChainedBatch.prototype.write = function (options, callback) {
 
 module.exports = AbstractChainedBatch
 }).call(this,require('_process'))
-},{"_process":136}],51:[function(require,module,exports){
+},{"_process":143}],58:[function(require,module,exports){
 (function (process){
 /* Copyright (c) 2013 Rod Vagg, MIT License */
 
@@ -18098,7 +20358,7 @@ AbstractIterator.prototype.end = function (callback) {
 module.exports = AbstractIterator
 
 }).call(this,require('_process'))
-},{"_process":136}],52:[function(require,module,exports){
+},{"_process":143}],59:[function(require,module,exports){
 (function (Buffer,process){
 /* Copyright (c) 2013 Rod Vagg, MIT License */
 
@@ -18374,13 +20634,13 @@ AbstractLevelDOWN.prototype._checkKey = function (obj, type) {
 module.exports = AbstractLevelDOWN
 
 }).call(this,{"isBuffer":require("../../../is-buffer/index.js")},require('_process'))
-},{"../../../is-buffer/index.js":91,"./abstract-chained-batch":50,"./abstract-iterator":51,"_process":136,"xtend":306}],53:[function(require,module,exports){
+},{"../../../is-buffer/index.js":98,"./abstract-chained-batch":57,"./abstract-iterator":58,"_process":143,"xtend":310}],60:[function(require,module,exports){
 exports.AbstractLevelDOWN    = require('./abstract-leveldown')
 exports.AbstractIterator     = require('./abstract-iterator')
 exports.AbstractChainedBatch = require('./abstract-chained-batch')
 exports.isLevelDOWN          = require('./is-leveldown')
 
-},{"./abstract-chained-batch":50,"./abstract-iterator":51,"./abstract-leveldown":52,"./is-leveldown":54}],54:[function(require,module,exports){
+},{"./abstract-chained-batch":57,"./abstract-iterator":58,"./abstract-leveldown":59,"./is-leveldown":61}],61:[function(require,module,exports){
 var AbstractLevelDOWN = require('./abstract-leveldown')
 
 function isLevelDOWN (db) {
@@ -18396,7 +20656,7 @@ function isLevelDOWN (db) {
 
 module.exports = isLevelDOWN
 
-},{"./abstract-leveldown":52}],55:[function(require,module,exports){
+},{"./abstract-leveldown":59}],62:[function(require,module,exports){
 /**
  * Copyright (c) 2013 Petka Antonov
  * 
@@ -18685,7 +20945,7 @@ function getCapacity(capacity) {
 
 module.exports = Deque;
 
-},{}],56:[function(require,module,exports){
+},{}],63:[function(require,module,exports){
 var prr = require('prr')
 
 function init (type, message, cause) {
@@ -18742,7 +21002,7 @@ module.exports = function (errno) {
   }
 }
 
-},{"prr":137}],57:[function(require,module,exports){
+},{"prr":144}],64:[function(require,module,exports){
 var all = module.exports.all = [
   {
     errno: -2,
@@ -19057,7 +21317,7 @@ all.forEach(function (error) {
 module.exports.custom = require('./custom')(module.exports)
 module.exports.create = module.exports.custom.createError
 
-},{"./custom":56}],58:[function(require,module,exports){
+},{"./custom":63}],65:[function(require,module,exports){
 (function (root, factory) {
   /* istanbul ignore next */
   if (typeof define === 'function' && define.amd) {
@@ -19275,7 +21535,7 @@ module.exports.create = module.exports.custom.createError
   return PromisePool
 })
 
-},{}],59:[function(require,module,exports){
+},{}],66:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -19579,7 +21839,7 @@ function isUndefined(arg) {
   return arg === void 0;
 }
 
-},{}],60:[function(require,module,exports){
+},{}],67:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -19666,7 +21926,7 @@ var EventListener = {
 
 module.exports = EventListener;
 }).call(this,require('_process'))
-},{"./emptyFunction":67,"_process":136}],61:[function(require,module,exports){
+},{"./emptyFunction":74,"_process":143}],68:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -19703,7 +21963,7 @@ var ExecutionEnvironment = {
 };
 
 module.exports = ExecutionEnvironment;
-},{}],62:[function(require,module,exports){
+},{}],69:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -19736,7 +21996,7 @@ function camelize(string) {
 }
 
 module.exports = camelize;
-},{}],63:[function(require,module,exports){
+},{}],70:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -19777,7 +22037,7 @@ function camelizeStyleName(string) {
 }
 
 module.exports = camelizeStyleName;
-},{"./camelize":62}],64:[function(require,module,exports){
+},{"./camelize":69}],71:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -19833,7 +22093,7 @@ function containsNode(_x, _x2) {
 }
 
 module.exports = containsNode;
-},{"./isTextNode":77}],65:[function(require,module,exports){
+},{"./isTextNode":84}],72:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -19919,7 +22179,7 @@ function createArrayFromMixed(obj) {
 }
 
 module.exports = createArrayFromMixed;
-},{"./toArray":85}],66:[function(require,module,exports){
+},{"./toArray":92}],73:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -20006,7 +22266,7 @@ function createNodesFromMarkup(markup, handleScript) {
 
 module.exports = createNodesFromMarkup;
 }).call(this,require('_process'))
-},{"./ExecutionEnvironment":61,"./createArrayFromMixed":65,"./getMarkupWrap":71,"./invariant":75,"_process":136}],67:[function(require,module,exports){
+},{"./ExecutionEnvironment":68,"./createArrayFromMixed":72,"./getMarkupWrap":78,"./invariant":82,"_process":143}],74:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -20045,7 +22305,7 @@ emptyFunction.thatReturnsArgument = function (arg) {
 };
 
 module.exports = emptyFunction;
-},{}],68:[function(require,module,exports){
+},{}],75:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -20068,7 +22328,7 @@ if (process.env.NODE_ENV !== 'production') {
 
 module.exports = emptyObject;
 }).call(this,require('_process'))
-},{"_process":136}],69:[function(require,module,exports){
+},{"_process":143}],76:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -20095,7 +22355,7 @@ function focusNode(node) {
 }
 
 module.exports = focusNode;
-},{}],70:[function(require,module,exports){
+},{}],77:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -20131,7 +22391,7 @@ function getActiveElement() /*?DOMElement*/{
 }
 
 module.exports = getActiveElement;
-},{}],71:[function(require,module,exports){
+},{}],78:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -20229,7 +22489,7 @@ function getMarkupWrap(nodeName) {
 
 module.exports = getMarkupWrap;
 }).call(this,require('_process'))
-},{"./ExecutionEnvironment":61,"./invariant":75,"_process":136}],72:[function(require,module,exports){
+},{"./ExecutionEnvironment":68,"./invariant":82,"_process":143}],79:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -20268,7 +22528,7 @@ function getUnboundedScrollPosition(scrollable) {
 }
 
 module.exports = getUnboundedScrollPosition;
-},{}],73:[function(require,module,exports){
+},{}],80:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -20302,7 +22562,7 @@ function hyphenate(string) {
 }
 
 module.exports = hyphenate;
-},{}],74:[function(require,module,exports){
+},{}],81:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -20342,7 +22602,7 @@ function hyphenateStyleName(string) {
 }
 
 module.exports = hyphenateStyleName;
-},{"./hyphenate":73}],75:[function(require,module,exports){
+},{"./hyphenate":80}],82:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -20395,7 +22655,7 @@ function invariant(condition, format, a, b, c, d, e, f) {
 
 module.exports = invariant;
 }).call(this,require('_process'))
-},{"_process":136}],76:[function(require,module,exports){
+},{"_process":143}],83:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -20419,7 +22679,7 @@ function isNode(object) {
 }
 
 module.exports = isNode;
-},{}],77:[function(require,module,exports){
+},{}],84:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -20445,7 +22705,7 @@ function isTextNode(object) {
 }
 
 module.exports = isTextNode;
-},{"./isNode":76}],78:[function(require,module,exports){
+},{"./isNode":83}],85:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -20496,7 +22756,7 @@ var keyMirror = function (obj) {
 
 module.exports = keyMirror;
 }).call(this,require('_process'))
-},{"./invariant":75,"_process":136}],79:[function(require,module,exports){
+},{"./invariant":82,"_process":143}],86:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -20532,7 +22792,7 @@ var keyOf = function (oneKeyObj) {
 };
 
 module.exports = keyOf;
-},{}],80:[function(require,module,exports){
+},{}],87:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -20584,7 +22844,7 @@ function mapObject(object, callback, context) {
 }
 
 module.exports = mapObject;
-},{}],81:[function(require,module,exports){
+},{}],88:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -20616,7 +22876,7 @@ function memoizeStringOnly(callback) {
 }
 
 module.exports = memoizeStringOnly;
-},{}],82:[function(require,module,exports){
+},{}],89:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -20640,7 +22900,7 @@ if (ExecutionEnvironment.canUseDOM) {
 }
 
 module.exports = performance || {};
-},{"./ExecutionEnvironment":61}],83:[function(require,module,exports){
+},{"./ExecutionEnvironment":68}],90:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -20675,7 +22935,7 @@ if (performance.now) {
 }
 
 module.exports = performanceNow;
-},{"./performance":82}],84:[function(require,module,exports){
+},{"./performance":89}],91:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -20726,7 +22986,7 @@ function shallowEqual(objA, objB) {
 }
 
 module.exports = shallowEqual;
-},{}],85:[function(require,module,exports){
+},{}],92:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -20786,7 +23046,7 @@ function toArray(obj) {
 
 module.exports = toArray;
 }).call(this,require('_process'))
-},{"./invariant":75,"_process":136}],86:[function(require,module,exports){
+},{"./invariant":82,"_process":143}],93:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2014-2015, Facebook, Inc.
@@ -20846,7 +23106,7 @@ if (process.env.NODE_ENV !== 'production') {
 
 module.exports = warning;
 }).call(this,require('_process'))
-},{"./emptyFunction":67,"_process":136}],87:[function(require,module,exports){
+},{"./emptyFunction":74,"_process":143}],94:[function(require,module,exports){
 "use strict"
 
 module.exports = createRBTree
@@ -21843,7 +24103,7 @@ function defaultCompare(a, b) {
 function createRBTree(compare) {
   return new RedBlackTree(compare || defaultCompare, null)
 }
-},{}],88:[function(require,module,exports){
+},{}],95:[function(require,module,exports){
 exports.read = function (buffer, offset, isLE, mLen, nBytes) {
   var e, m
   var eLen = nBytes * 8 - mLen - 1
@@ -21929,7 +24189,7 @@ exports.write = function (buffer, value, offset, isLE, mLen, nBytes) {
   buffer[offset + i - d] |= s * 128
 }
 
-},{}],89:[function(require,module,exports){
+},{}],96:[function(require,module,exports){
 (function (global){
 'use strict';
 var Mutation = global.MutationObserver || global.WebKitMutationObserver;
@@ -22002,32 +24262,9 @@ function immediate(task) {
 }
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],90:[function(require,module,exports){
-if (typeof Object.create === 'function') {
-  // implementation from standard node.js 'util' module
-  module.exports = function inherits(ctor, superCtor) {
-    ctor.super_ = superCtor
-    ctor.prototype = Object.create(superCtor.prototype, {
-      constructor: {
-        value: ctor,
-        enumerable: false,
-        writable: true,
-        configurable: true
-      }
-    });
-  };
-} else {
-  // old school shim for old browsers
-  module.exports = function inherits(ctor, superCtor) {
-    ctor.super_ = superCtor
-    var TempCtor = function () {}
-    TempCtor.prototype = superCtor.prototype
-    ctor.prototype = new TempCtor()
-    ctor.prototype.constructor = ctor
-  }
-}
-
-},{}],91:[function(require,module,exports){
+},{}],97:[function(require,module,exports){
+arguments[4][50][0].apply(exports,arguments)
+},{"dup":50}],98:[function(require,module,exports){
 /*!
  * Determine if an object is a Buffer
  *
@@ -22050,14 +24287,14 @@ function isSlowBuffer (obj) {
   return typeof obj.readFloatLE === 'function' && typeof obj.slice === 'function' && isBuffer(obj.slice(0, 0))
 }
 
-},{}],92:[function(require,module,exports){
+},{}],99:[function(require,module,exports){
 var toString = {}.toString;
 
 module.exports = Array.isArray || function (arr) {
   return toString.call(arr) == '[object Array]';
 };
 
-},{}],93:[function(require,module,exports){
+},{}],100:[function(require,module,exports){
 (function() { 
 
   var slice   = Array.prototype.slice,
@@ -22086,7 +24323,7 @@ module.exports = Array.isArray || function (arr) {
   this.extend = extend;
 
 }).call(this);
-},{}],94:[function(require,module,exports){
+},{}],101:[function(require,module,exports){
 var encodings = require('./lib/encodings');
 
 module.exports = Codec;
@@ -22194,7 +24431,7 @@ Codec.prototype.valueAsBuffer = function(opts){
 };
 
 
-},{"./lib/encodings":95}],95:[function(require,module,exports){
+},{"./lib/encodings":102}],102:[function(require,module,exports){
 (function (Buffer){
 
 exports.utf8 = exports['utf-8'] = {
@@ -22274,7 +24511,7 @@ function isBinary(data){
 
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":46}],96:[function(require,module,exports){
+},{"buffer":53}],103:[function(require,module,exports){
 /* Copyright (c) 2012-2015 LevelUP contributors
  * See list at <https://github.com/rvagg/node-levelup#contributing>
  * MIT License
@@ -22298,7 +24535,7 @@ module.exports = {
   , EncodingError       : createError('EncodingError', LevelUPError)
 }
 
-},{"errno":57}],97:[function(require,module,exports){
+},{"errno":64}],104:[function(require,module,exports){
 var inherits = require('inherits');
 var Readable = require('readable-stream').Readable;
 var extend = require('xtend');
@@ -22356,12 +24593,12 @@ ReadStream.prototype._cleanup = function(){
 };
 
 
-},{"inherits":90,"level-errors":96,"readable-stream":104,"xtend":306}],98:[function(require,module,exports){
+},{"inherits":97,"level-errors":103,"readable-stream":111,"xtend":310}],105:[function(require,module,exports){
 module.exports = Array.isArray || function (arr) {
   return Object.prototype.toString.call(arr) == '[object Array]';
 };
 
-},{}],99:[function(require,module,exports){
+},{}],106:[function(require,module,exports){
 (function (process){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -22454,7 +24691,7 @@ function forEach (xs, f) {
 }
 
 }).call(this,require('_process'))
-},{"./_stream_readable":101,"./_stream_writable":103,"_process":136,"core-util-is":47,"inherits":90}],100:[function(require,module,exports){
+},{"./_stream_readable":108,"./_stream_writable":110,"_process":143,"core-util-is":54,"inherits":97}],107:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -22502,7 +24739,7 @@ PassThrough.prototype._transform = function(chunk, encoding, cb) {
   cb(null, chunk);
 };
 
-},{"./_stream_transform":102,"core-util-is":47,"inherits":90}],101:[function(require,module,exports){
+},{"./_stream_transform":109,"core-util-is":54,"inherits":97}],108:[function(require,module,exports){
 (function (process){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -23457,7 +25694,7 @@ function indexOf (xs, x) {
 }
 
 }).call(this,require('_process'))
-},{"./_stream_duplex":99,"_process":136,"buffer":46,"core-util-is":47,"events":59,"inherits":90,"isarray":98,"stream":285,"string_decoder/":286,"util":45}],102:[function(require,module,exports){
+},{"./_stream_duplex":106,"_process":143,"buffer":53,"core-util-is":54,"events":66,"inherits":97,"isarray":105,"stream":292,"string_decoder/":293,"util":49}],109:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -23668,7 +25905,7 @@ function done(stream, er) {
   return stream.push(null);
 }
 
-},{"./_stream_duplex":99,"core-util-is":47,"inherits":90}],103:[function(require,module,exports){
+},{"./_stream_duplex":106,"core-util-is":54,"inherits":97}],110:[function(require,module,exports){
 (function (process){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -24149,7 +26386,7 @@ function endWritable(stream, state, cb) {
 }
 
 }).call(this,require('_process'))
-},{"./_stream_duplex":99,"_process":136,"buffer":46,"core-util-is":47,"inherits":90,"stream":285}],104:[function(require,module,exports){
+},{"./_stream_duplex":106,"_process":143,"buffer":53,"core-util-is":54,"inherits":97,"stream":292}],111:[function(require,module,exports){
 (function (process){
 exports = module.exports = require('./lib/_stream_readable.js');
 exports.Stream = require('stream');
@@ -24163,7 +26400,7 @@ if (!process.browser && process.env.READABLE_STREAM === 'disable') {
 }
 
 }).call(this,require('_process'))
-},{"./lib/_stream_duplex.js":99,"./lib/_stream_passthrough.js":100,"./lib/_stream_readable.js":101,"./lib/_stream_transform.js":102,"./lib/_stream_writable.js":103,"_process":136,"stream":285}],105:[function(require,module,exports){
+},{"./lib/_stream_duplex.js":106,"./lib/_stream_passthrough.js":107,"./lib/_stream_readable.js":108,"./lib/_stream_transform.js":109,"./lib/_stream_writable.js":110,"_process":143,"stream":292}],112:[function(require,module,exports){
 /* Copyright (c) 2012-2016 LevelUP contributors
  * See list at <https://github.com/level/levelup#contributing>
  * MIT License
@@ -24248,7 +26485,7 @@ Batch.prototype.write = function (callback) {
 
 module.exports = Batch
 
-},{"./util":107,"level-errors":96}],106:[function(require,module,exports){
+},{"./util":114,"level-errors":103}],113:[function(require,module,exports){
 (function (process){
 /* Copyright (c) 2012-2016 LevelUP contributors
  * See list at <https://github.com/level/levelup#contributing>
@@ -24651,7 +26888,7 @@ module.exports.repair  = deprecate(
 
 
 }).call(this,require('_process'))
-},{"./batch":105,"./util":107,"_process":136,"deferred-leveldown":49,"events":59,"level-codec":94,"level-errors":96,"level-iterator-stream":97,"prr":108,"util":304,"xtend":306}],107:[function(require,module,exports){
+},{"./batch":112,"./util":114,"_process":143,"deferred-leveldown":56,"events":66,"level-codec":101,"level-errors":103,"level-iterator-stream":104,"prr":115,"util":52,"xtend":310}],114:[function(require,module,exports){
 /* Copyright (c) 2012-2016 LevelUP contributors
  * See list at <https://github.com/level/levelup#contributing>
  * MIT License
@@ -24730,7 +26967,7 @@ module.exports = {
   , isDefined       : isDefined
 }
 
-},{"../package.json":109,"level-errors":96,"leveldown":45,"leveldown/package":45,"semver":45,"util":304,"xtend":306}],108:[function(require,module,exports){
+},{"../package.json":116,"level-errors":103,"leveldown":49,"leveldown/package":49,"semver":49,"util":52,"xtend":310}],115:[function(require,module,exports){
 /*!
   * prr
   * (c) 2013 Rod Vagg <rod@vagg.org>
@@ -24794,7 +27031,7 @@ module.exports = {
 
   return prr
 })
-},{}],109:[function(require,module,exports){
+},{}],116:[function(require,module,exports){
 module.exports={
   "_args": [
     [
@@ -24991,7 +27228,7 @@ module.exports={
   "version": "1.3.2"
 }
 
-},{}],110:[function(require,module,exports){
+},{}],117:[function(require,module,exports){
 (function (Buffer){
 
 exports.compare = function (a, b) {
@@ -25090,7 +27327,7 @@ exports.filter = function (range, compare) {
 }
 
 }).call(this,{"isBuffer":require("../is-buffer/index.js")})
-},{"../is-buffer/index.js":91}],111:[function(require,module,exports){
+},{"../is-buffer/index.js":98}],118:[function(require,module,exports){
 (function (global){
 /**
  * marked - a markdown parser
@@ -26380,7 +28617,7 @@ if (typeof module !== 'undefined' && typeof exports === 'object') {
 }());
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],112:[function(require,module,exports){
+},{}],119:[function(require,module,exports){
 (function (process,global,Buffer){
 var inherits          = require('inherits')
   , AbstractLevelDOWN = require('abstract-leveldown').AbstractLevelDOWN
@@ -26624,7 +28861,7 @@ MemDOWN.destroy = function (name, callback) {
 module.exports = MemDOWN
 
 }).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {},require("buffer").Buffer)
-},{"_process":136,"abstract-leveldown":116,"buffer":46,"functional-red-black-tree":87,"inherits":90,"ltgt":110}],113:[function(require,module,exports){
+},{"_process":143,"abstract-leveldown":123,"buffer":53,"functional-red-black-tree":94,"inherits":97,"ltgt":117}],120:[function(require,module,exports){
 (function (process){
 /* Copyright (c) 2013 Rod Vagg, MIT License */
 
@@ -26716,9 +28953,9 @@ AbstractChainedBatch.prototype.write = function (options, callback) {
 module.exports = AbstractChainedBatch
 
 }).call(this,require('_process'))
-},{"_process":136}],114:[function(require,module,exports){
-arguments[4][51][0].apply(exports,arguments)
-},{"_process":136,"dup":51}],115:[function(require,module,exports){
+},{"_process":143}],121:[function(require,module,exports){
+arguments[4][58][0].apply(exports,arguments)
+},{"_process":143,"dup":58}],122:[function(require,module,exports){
 (function (Buffer,process){
 /* Copyright (c) 2013 Rod Vagg, MIT License */
 
@@ -26994,11 +29231,11 @@ AbstractLevelDOWN.prototype._checkKey = function (obj, type) {
 module.exports = AbstractLevelDOWN
 
 }).call(this,{"isBuffer":require("../../../is-buffer/index.js")},require('_process'))
-},{"../../../is-buffer/index.js":91,"./abstract-chained-batch":113,"./abstract-iterator":114,"_process":136,"xtend":306}],116:[function(require,module,exports){
-arguments[4][53][0].apply(exports,arguments)
-},{"./abstract-chained-batch":113,"./abstract-iterator":114,"./abstract-leveldown":115,"./is-leveldown":117,"dup":53}],117:[function(require,module,exports){
-arguments[4][54][0].apply(exports,arguments)
-},{"./abstract-leveldown":115,"dup":54}],118:[function(require,module,exports){
+},{"../../../is-buffer/index.js":98,"./abstract-chained-batch":120,"./abstract-iterator":121,"_process":143,"xtend":310}],123:[function(require,module,exports){
+arguments[4][60][0].apply(exports,arguments)
+},{"./abstract-chained-batch":120,"./abstract-iterator":121,"./abstract-leveldown":122,"./is-leveldown":124,"dup":60}],124:[function(require,module,exports){
+arguments[4][61][0].apply(exports,arguments)
+},{"./abstract-leveldown":122,"dup":61}],125:[function(require,module,exports){
 'use strict';
 
 var MIN_MAGNITUDE = -324; // verified by -Number.MIN_VALUE
@@ -27353,7 +29590,7 @@ function numToIndexableString(num) {
   return result;
 }
 
-},{"./utils":119}],119:[function(require,module,exports){
+},{"./utils":126}],126:[function(require,module,exports){
 'use strict';
 
 function pad(str, padWith, upToLength) {
@@ -27424,7 +29661,7 @@ exports.intToDecimalForm = function (int) {
 
   return result;
 };
-},{}],120:[function(require,module,exports){
+},{}],127:[function(require,module,exports){
 'use strict';
 exports.Map = LazyMap; // TODO: use ES6 map
 exports.Set = LazySet; // TODO: use ES6 set
@@ -27495,9 +29732,9 @@ LazySet.prototype.delete = function (key) {
   return this.store.delete(key);
 };
 
-},{}],121:[function(require,module,exports){
+},{}],128:[function(require,module,exports){
 module.exports = require('../lib/extras/memory');
-},{"../lib/extras/memory":122}],122:[function(require,module,exports){
+},{"../lib/extras/memory":129}],129:[function(require,module,exports){
 (function (process,global,Buffer){
 'use strict';
 
@@ -30572,7 +32809,7 @@ if (!PDB) {
   MemoryPouchPlugin(PDB);
 }
 }).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {},require("buffer").Buffer)
-},{"_process":136,"argsarray":42,"buffer":46,"debug":124,"double-ended-queue":55,"events":59,"inherits":126,"js-extend":93,"levelup":106,"lie":127,"memdown":112,"pouchdb":123,"pouchdb-collections":120,"spark-md5":284,"sublevel-pouchdb":289,"through2":134,"vuvuzela":305}],123:[function(require,module,exports){
+},{"_process":143,"argsarray":46,"buffer":53,"debug":131,"double-ended-queue":62,"events":66,"inherits":133,"js-extend":100,"levelup":113,"lie":134,"memdown":119,"pouchdb":130,"pouchdb-collections":127,"spark-md5":291,"sublevel-pouchdb":296,"through2":141,"vuvuzela":309}],130:[function(require,module,exports){
 (function (process,global){
 'use strict';
 
@@ -41263,7 +43500,7 @@ PouchDB.plugin(IDBPouch)
 
 module.exports = PouchDB;
 }).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"_process":136,"argsarray":42,"debug":124,"es6-promise-pool":58,"events":59,"inherits":126,"js-extend":93,"lie":127,"pouchdb-collate":118,"pouchdb-collections":120,"scope-eval":283,"spark-md5":284,"vuvuzela":305}],124:[function(require,module,exports){
+},{"_process":143,"argsarray":46,"debug":131,"es6-promise-pool":65,"events":66,"inherits":133,"js-extend":100,"lie":134,"pouchdb-collate":125,"pouchdb-collections":127,"scope-eval":290,"spark-md5":291,"vuvuzela":309}],131:[function(require,module,exports){
 
 /**
  * This is the web browser implementation of `debug()`.
@@ -41433,7 +43670,7 @@ function localstorage(){
   } catch (e) {}
 }
 
-},{"./debug":125}],125:[function(require,module,exports){
+},{"./debug":132}],132:[function(require,module,exports){
 
 /**
  * This is the common logic for both the Node.js and web browser
@@ -41632,9 +43869,9 @@ function coerce(val) {
   return val;
 }
 
-},{"ms":128}],126:[function(require,module,exports){
-arguments[4][90][0].apply(exports,arguments)
-},{"dup":90}],127:[function(require,module,exports){
+},{"ms":135}],133:[function(require,module,exports){
+arguments[4][50][0].apply(exports,arguments)
+},{"dup":50}],134:[function(require,module,exports){
 'use strict';
 var immediate = require('immediate');
 
@@ -41889,7 +44126,7 @@ function race(iterable) {
   }
 }
 
-},{"immediate":89}],128:[function(require,module,exports){
+},{"immediate":96}],135:[function(require,module,exports){
 /**
  * Helpers.
  */
@@ -42016,7 +44253,7 @@ function plural(ms, n, name) {
   return Math.ceil(ms / n) + ' ' + name + 's';
 }
 
-},{}],129:[function(require,module,exports){
+},{}],136:[function(require,module,exports){
 // a duplex stream is just a stream that is both readable and writable.
 // Since JS doesn't have multiple prototypal inheritance, this class
 // prototypally inherits from Readable, and then parasitically from
@@ -42092,7 +44329,7 @@ function forEach(xs, f) {
     f(xs[i], i);
   }
 }
-},{"./_stream_readable":130,"./_stream_writable":132,"core-util-is":47,"inherits":126,"process-nextick-args":135}],130:[function(require,module,exports){
+},{"./_stream_readable":137,"./_stream_writable":139,"core-util-is":54,"inherits":133,"process-nextick-args":142}],137:[function(require,module,exports){
 (function (process){
 'use strict';
 
@@ -42975,7 +45212,7 @@ function indexOf(xs, x) {
   return -1;
 }
 }).call(this,require('_process'))
-},{"./_stream_duplex":129,"_process":136,"buffer":46,"core-util-is":47,"events":59,"inherits":126,"isarray":92,"process-nextick-args":135,"string_decoder/":286,"util":45}],131:[function(require,module,exports){
+},{"./_stream_duplex":136,"_process":143,"buffer":53,"core-util-is":54,"events":66,"inherits":133,"isarray":99,"process-nextick-args":142,"string_decoder/":293,"util":49}],138:[function(require,module,exports){
 // a transform stream is a readable/writable stream where you do
 // something with the data.  Sometimes it's called a "filter",
 // but that's not a great name for it, since that implies a thing where
@@ -43156,7 +45393,7 @@ function done(stream, er) {
 
   return stream.push(null);
 }
-},{"./_stream_duplex":129,"core-util-is":47,"inherits":126}],132:[function(require,module,exports){
+},{"./_stream_duplex":136,"core-util-is":54,"inherits":133}],139:[function(require,module,exports){
 (function (process){
 // A bit simpler than readable streams.
 // Implement an async ._write(chunk, encoding, cb), and it'll handle all
@@ -43675,10 +45912,10 @@ function CorkedRequest(state) {
   };
 }
 }).call(this,require('_process'))
-},{"./_stream_duplex":129,"_process":136,"buffer":46,"core-util-is":47,"events":59,"inherits":126,"process-nextick-args":135,"util-deprecate":301}],133:[function(require,module,exports){
+},{"./_stream_duplex":136,"_process":143,"buffer":53,"core-util-is":54,"events":66,"inherits":133,"process-nextick-args":142,"util-deprecate":308}],140:[function(require,module,exports){
 module.exports = require("./lib/_stream_transform.js")
 
-},{"./lib/_stream_transform.js":131}],134:[function(require,module,exports){
+},{"./lib/_stream_transform.js":138}],141:[function(require,module,exports){
 (function (process){
 var Transform = require('readable-stream/transform')
   , inherits  = require('util').inherits
@@ -43778,7 +46015,7 @@ module.exports.obj = through2(function (options, transform, flush) {
 })
 
 }).call(this,require('_process'))
-},{"_process":136,"readable-stream/transform":133,"util":304,"xtend":306}],135:[function(require,module,exports){
+},{"_process":143,"readable-stream/transform":140,"util":52,"xtend":310}],142:[function(require,module,exports){
 (function (process){
 'use strict';
 
@@ -43825,7 +46062,7 @@ function nextTick(fn, arg1, arg2, arg3) {
 }
 
 }).call(this,require('_process'))
-},{"_process":136}],136:[function(require,module,exports){
+},{"_process":143}],143:[function(require,module,exports){
 // shim for using process in browser
 var process = module.exports = {};
 
@@ -44011,14 +46248,14 @@ process.chdir = function (dir) {
 };
 process.umask = function() { return 0; };
 
-},{}],137:[function(require,module,exports){
-arguments[4][108][0].apply(exports,arguments)
-},{"dup":108}],138:[function(require,module,exports){
+},{}],144:[function(require,module,exports){
+arguments[4][115][0].apply(exports,arguments)
+},{"dup":115}],145:[function(require,module,exports){
 'use strict';
 
 module.exports = require('react/lib/ReactDOM');
 
-},{"react/lib/ReactDOM":173}],139:[function(require,module,exports){
+},{"react/lib/ReactDOM":180}],146:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -44055,7 +46292,7 @@ var AutoFocusUtils = {
 };
 
 module.exports = AutoFocusUtils;
-},{"./ReactMount":203,"./findDOMNode":246,"fbjs/lib/focusNode":69}],140:[function(require,module,exports){
+},{"./ReactMount":210,"./findDOMNode":253,"fbjs/lib/focusNode":76}],147:[function(require,module,exports){
 /**
  * Copyright 2013-2015 Facebook, Inc.
  * All rights reserved.
@@ -44461,7 +46698,7 @@ var BeforeInputEventPlugin = {
 };
 
 module.exports = BeforeInputEventPlugin;
-},{"./EventConstants":152,"./EventPropagators":156,"./FallbackCompositionState":157,"./SyntheticCompositionEvent":228,"./SyntheticInputEvent":232,"fbjs/lib/ExecutionEnvironment":61,"fbjs/lib/keyOf":79}],141:[function(require,module,exports){
+},{"./EventConstants":159,"./EventPropagators":163,"./FallbackCompositionState":164,"./SyntheticCompositionEvent":235,"./SyntheticInputEvent":239,"fbjs/lib/ExecutionEnvironment":68,"fbjs/lib/keyOf":86}],148:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -44601,7 +46838,7 @@ var CSSProperty = {
 };
 
 module.exports = CSSProperty;
-},{}],142:[function(require,module,exports){
+},{}],149:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -44779,7 +47016,7 @@ ReactPerf.measureMethods(CSSPropertyOperations, 'CSSPropertyOperations', {
 
 module.exports = CSSPropertyOperations;
 }).call(this,require('_process'))
-},{"./CSSProperty":141,"./ReactPerf":209,"./dangerousStyleValue":243,"_process":136,"fbjs/lib/ExecutionEnvironment":61,"fbjs/lib/camelizeStyleName":63,"fbjs/lib/hyphenateStyleName":74,"fbjs/lib/memoizeStringOnly":81,"fbjs/lib/warning":86}],143:[function(require,module,exports){
+},{"./CSSProperty":148,"./ReactPerf":216,"./dangerousStyleValue":250,"_process":143,"fbjs/lib/ExecutionEnvironment":68,"fbjs/lib/camelizeStyleName":70,"fbjs/lib/hyphenateStyleName":81,"fbjs/lib/memoizeStringOnly":88,"fbjs/lib/warning":93}],150:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -44875,7 +47112,7 @@ PooledClass.addPoolingTo(CallbackQueue);
 
 module.exports = CallbackQueue;
 }).call(this,require('_process'))
-},{"./Object.assign":160,"./PooledClass":161,"_process":136,"fbjs/lib/invariant":75}],144:[function(require,module,exports){
+},{"./Object.assign":167,"./PooledClass":168,"_process":143,"fbjs/lib/invariant":82}],151:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -45197,7 +47434,7 @@ var ChangeEventPlugin = {
 };
 
 module.exports = ChangeEventPlugin;
-},{"./EventConstants":152,"./EventPluginHub":153,"./EventPropagators":156,"./ReactUpdates":221,"./SyntheticEvent":230,"./getEventTarget":252,"./isEventSupported":257,"./isTextInputElement":258,"fbjs/lib/ExecutionEnvironment":61,"fbjs/lib/keyOf":79}],145:[function(require,module,exports){
+},{"./EventConstants":159,"./EventPluginHub":160,"./EventPropagators":163,"./ReactUpdates":228,"./SyntheticEvent":237,"./getEventTarget":259,"./isEventSupported":264,"./isTextInputElement":265,"fbjs/lib/ExecutionEnvironment":68,"fbjs/lib/keyOf":86}],152:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -45221,7 +47458,7 @@ var ClientReactRootIndex = {
 };
 
 module.exports = ClientReactRootIndex;
-},{}],146:[function(require,module,exports){
+},{}],153:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -45353,7 +47590,7 @@ ReactPerf.measureMethods(DOMChildrenOperations, 'DOMChildrenOperations', {
 
 module.exports = DOMChildrenOperations;
 }).call(this,require('_process'))
-},{"./Danger":149,"./ReactMultiChildUpdateTypes":205,"./ReactPerf":209,"./setInnerHTML":262,"./setTextContent":263,"_process":136,"fbjs/lib/invariant":75}],147:[function(require,module,exports){
+},{"./Danger":156,"./ReactMultiChildUpdateTypes":212,"./ReactPerf":216,"./setInnerHTML":269,"./setTextContent":270,"_process":143,"fbjs/lib/invariant":82}],154:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -45590,7 +47827,7 @@ var DOMProperty = {
 
 module.exports = DOMProperty;
 }).call(this,require('_process'))
-},{"_process":136,"fbjs/lib/invariant":75}],148:[function(require,module,exports){
+},{"_process":143,"fbjs/lib/invariant":82}],155:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -45818,7 +48055,7 @@ ReactPerf.measureMethods(DOMPropertyOperations, 'DOMPropertyOperations', {
 
 module.exports = DOMPropertyOperations;
 }).call(this,require('_process'))
-},{"./DOMProperty":147,"./ReactPerf":209,"./quoteAttributeValueForBrowser":260,"_process":136,"fbjs/lib/warning":86}],149:[function(require,module,exports){
+},{"./DOMProperty":154,"./ReactPerf":216,"./quoteAttributeValueForBrowser":267,"_process":143,"fbjs/lib/warning":93}],156:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -45966,7 +48203,7 @@ var Danger = {
 
 module.exports = Danger;
 }).call(this,require('_process'))
-},{"_process":136,"fbjs/lib/ExecutionEnvironment":61,"fbjs/lib/createNodesFromMarkup":66,"fbjs/lib/emptyFunction":67,"fbjs/lib/getMarkupWrap":71,"fbjs/lib/invariant":75}],150:[function(require,module,exports){
+},{"_process":143,"fbjs/lib/ExecutionEnvironment":68,"fbjs/lib/createNodesFromMarkup":73,"fbjs/lib/emptyFunction":74,"fbjs/lib/getMarkupWrap":78,"fbjs/lib/invariant":82}],157:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -45994,7 +48231,7 @@ var keyOf = require('fbjs/lib/keyOf');
 var DefaultEventPluginOrder = [keyOf({ ResponderEventPlugin: null }), keyOf({ SimpleEventPlugin: null }), keyOf({ TapEventPlugin: null }), keyOf({ EnterLeaveEventPlugin: null }), keyOf({ ChangeEventPlugin: null }), keyOf({ SelectEventPlugin: null }), keyOf({ BeforeInputEventPlugin: null })];
 
 module.exports = DefaultEventPluginOrder;
-},{"fbjs/lib/keyOf":79}],151:[function(require,module,exports){
+},{"fbjs/lib/keyOf":86}],158:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -46119,7 +48356,7 @@ var EnterLeaveEventPlugin = {
 };
 
 module.exports = EnterLeaveEventPlugin;
-},{"./EventConstants":152,"./EventPropagators":156,"./ReactMount":203,"./SyntheticMouseEvent":234,"fbjs/lib/keyOf":79}],152:[function(require,module,exports){
+},{"./EventConstants":159,"./EventPropagators":163,"./ReactMount":210,"./SyntheticMouseEvent":241,"fbjs/lib/keyOf":86}],159:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -46212,7 +48449,7 @@ var EventConstants = {
 };
 
 module.exports = EventConstants;
-},{"fbjs/lib/keyMirror":78}],153:[function(require,module,exports){
+},{"fbjs/lib/keyMirror":85}],160:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -46494,7 +48731,7 @@ var EventPluginHub = {
 
 module.exports = EventPluginHub;
 }).call(this,require('_process'))
-},{"./EventPluginRegistry":154,"./EventPluginUtils":155,"./ReactErrorUtils":194,"./accumulateInto":240,"./forEachAccumulated":248,"_process":136,"fbjs/lib/invariant":75,"fbjs/lib/warning":86}],154:[function(require,module,exports){
+},{"./EventPluginRegistry":161,"./EventPluginUtils":162,"./ReactErrorUtils":201,"./accumulateInto":247,"./forEachAccumulated":255,"_process":143,"fbjs/lib/invariant":82,"fbjs/lib/warning":93}],161:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -46717,7 +48954,7 @@ var EventPluginRegistry = {
 
 module.exports = EventPluginRegistry;
 }).call(this,require('_process'))
-},{"_process":136,"fbjs/lib/invariant":75}],155:[function(require,module,exports){
+},{"_process":143,"fbjs/lib/invariant":82}],162:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -46922,7 +49159,7 @@ var EventPluginUtils = {
 
 module.exports = EventPluginUtils;
 }).call(this,require('_process'))
-},{"./EventConstants":152,"./ReactErrorUtils":194,"_process":136,"fbjs/lib/invariant":75,"fbjs/lib/warning":86}],156:[function(require,module,exports){
+},{"./EventConstants":159,"./ReactErrorUtils":201,"_process":143,"fbjs/lib/invariant":82,"fbjs/lib/warning":93}],163:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -47060,7 +49297,7 @@ var EventPropagators = {
 
 module.exports = EventPropagators;
 }).call(this,require('_process'))
-},{"./EventConstants":152,"./EventPluginHub":153,"./accumulateInto":240,"./forEachAccumulated":248,"_process":136,"fbjs/lib/warning":86}],157:[function(require,module,exports){
+},{"./EventConstants":159,"./EventPluginHub":160,"./accumulateInto":247,"./forEachAccumulated":255,"_process":143,"fbjs/lib/warning":93}],164:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -47156,7 +49393,7 @@ assign(FallbackCompositionState.prototype, {
 PooledClass.addPoolingTo(FallbackCompositionState);
 
 module.exports = FallbackCompositionState;
-},{"./Object.assign":160,"./PooledClass":161,"./getTextContentAccessor":255}],158:[function(require,module,exports){
+},{"./Object.assign":167,"./PooledClass":168,"./getTextContentAccessor":262}],165:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -47387,7 +49624,7 @@ var HTMLDOMPropertyConfig = {
 };
 
 module.exports = HTMLDOMPropertyConfig;
-},{"./DOMProperty":147,"fbjs/lib/ExecutionEnvironment":61}],159:[function(require,module,exports){
+},{"./DOMProperty":154,"fbjs/lib/ExecutionEnvironment":68}],166:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -47524,7 +49761,7 @@ var LinkedValueUtils = {
 
 module.exports = LinkedValueUtils;
 }).call(this,require('_process'))
-},{"./ReactPropTypeLocations":211,"./ReactPropTypes":212,"_process":136,"fbjs/lib/invariant":75,"fbjs/lib/warning":86}],160:[function(require,module,exports){
+},{"./ReactPropTypeLocations":218,"./ReactPropTypes":219,"_process":143,"fbjs/lib/invariant":82,"fbjs/lib/warning":93}],167:[function(require,module,exports){
 /**
  * Copyright 2014-2015, Facebook, Inc.
  * All rights reserved.
@@ -47572,7 +49809,7 @@ function assign(target, sources) {
 }
 
 module.exports = assign;
-},{}],161:[function(require,module,exports){
+},{}],168:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -47694,7 +49931,7 @@ var PooledClass = {
 
 module.exports = PooledClass;
 }).call(this,require('_process'))
-},{"_process":136,"fbjs/lib/invariant":75}],162:[function(require,module,exports){
+},{"_process":143,"fbjs/lib/invariant":82}],169:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -47735,7 +49972,7 @@ React.__SECRET_DOM_DO_NOT_USE_OR_YOU_WILL_BE_FIRED = ReactDOM;
 React.__SECRET_DOM_SERVER_DO_NOT_USE_OR_YOU_WILL_BE_FIRED = ReactDOMServer;
 
 module.exports = React;
-},{"./Object.assign":160,"./ReactDOM":173,"./ReactDOMServer":183,"./ReactIsomorphic":201,"./deprecated":244}],163:[function(require,module,exports){
+},{"./Object.assign":167,"./ReactDOM":180,"./ReactDOMServer":190,"./ReactIsomorphic":208,"./deprecated":251}],170:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -47774,7 +50011,7 @@ var ReactBrowserComponentMixin = {
 
 module.exports = ReactBrowserComponentMixin;
 }).call(this,require('_process'))
-},{"./ReactInstanceMap":200,"./findDOMNode":246,"_process":136,"fbjs/lib/warning":86}],164:[function(require,module,exports){
+},{"./ReactInstanceMap":207,"./findDOMNode":253,"_process":143,"fbjs/lib/warning":93}],171:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -48099,7 +50336,7 @@ ReactPerf.measureMethods(ReactBrowserEventEmitter, 'ReactBrowserEventEmitter', {
 });
 
 module.exports = ReactBrowserEventEmitter;
-},{"./EventConstants":152,"./EventPluginHub":153,"./EventPluginRegistry":154,"./Object.assign":160,"./ReactEventEmitterMixin":195,"./ReactPerf":209,"./ViewportMetrics":239,"./isEventSupported":257}],165:[function(require,module,exports){
+},{"./EventConstants":159,"./EventPluginHub":160,"./EventPluginRegistry":161,"./Object.assign":167,"./ReactEventEmitterMixin":202,"./ReactPerf":216,"./ViewportMetrics":246,"./isEventSupported":264}],172:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2014-2015, Facebook, Inc.
@@ -48224,7 +50461,7 @@ var ReactChildReconciler = {
 
 module.exports = ReactChildReconciler;
 }).call(this,require('_process'))
-},{"./ReactReconciler":214,"./instantiateReactComponent":256,"./shouldUpdateReactComponent":264,"./traverseAllChildren":265,"_process":136,"fbjs/lib/warning":86}],166:[function(require,module,exports){
+},{"./ReactReconciler":221,"./instantiateReactComponent":263,"./shouldUpdateReactComponent":271,"./traverseAllChildren":272,"_process":143,"fbjs/lib/warning":93}],173:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -48407,7 +50644,7 @@ var ReactChildren = {
 };
 
 module.exports = ReactChildren;
-},{"./PooledClass":161,"./ReactElement":190,"./traverseAllChildren":265,"fbjs/lib/emptyFunction":67}],167:[function(require,module,exports){
+},{"./PooledClass":168,"./ReactElement":197,"./traverseAllChildren":272,"fbjs/lib/emptyFunction":74}],174:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -49181,7 +51418,7 @@ var ReactClass = {
 
 module.exports = ReactClass;
 }).call(this,require('_process'))
-},{"./Object.assign":160,"./ReactComponent":168,"./ReactElement":190,"./ReactNoopUpdateQueue":207,"./ReactPropTypeLocationNames":210,"./ReactPropTypeLocations":211,"_process":136,"fbjs/lib/emptyObject":68,"fbjs/lib/invariant":75,"fbjs/lib/keyMirror":78,"fbjs/lib/keyOf":79,"fbjs/lib/warning":86}],168:[function(require,module,exports){
+},{"./Object.assign":167,"./ReactComponent":175,"./ReactElement":197,"./ReactNoopUpdateQueue":214,"./ReactPropTypeLocationNames":217,"./ReactPropTypeLocations":218,"_process":143,"fbjs/lib/emptyObject":75,"fbjs/lib/invariant":82,"fbjs/lib/keyMirror":85,"fbjs/lib/keyOf":86,"fbjs/lib/warning":93}],175:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -49306,7 +51543,7 @@ if (process.env.NODE_ENV !== 'production') {
 
 module.exports = ReactComponent;
 }).call(this,require('_process'))
-},{"./ReactNoopUpdateQueue":207,"./canDefineProperty":242,"_process":136,"fbjs/lib/emptyObject":68,"fbjs/lib/invariant":75,"fbjs/lib/warning":86}],169:[function(require,module,exports){
+},{"./ReactNoopUpdateQueue":214,"./canDefineProperty":249,"_process":143,"fbjs/lib/emptyObject":75,"fbjs/lib/invariant":82,"fbjs/lib/warning":93}],176:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -49348,7 +51585,7 @@ var ReactComponentBrowserEnvironment = {
 };
 
 module.exports = ReactComponentBrowserEnvironment;
-},{"./ReactDOMIDOperations":178,"./ReactMount":203}],170:[function(require,module,exports){
+},{"./ReactDOMIDOperations":185,"./ReactMount":210}],177:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2014-2015, Facebook, Inc.
@@ -49402,7 +51639,7 @@ var ReactComponentEnvironment = {
 
 module.exports = ReactComponentEnvironment;
 }).call(this,require('_process'))
-},{"_process":136,"fbjs/lib/invariant":75}],171:[function(require,module,exports){
+},{"_process":143,"fbjs/lib/invariant":82}],178:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -50099,7 +52336,7 @@ var ReactCompositeComponent = {
 
 module.exports = ReactCompositeComponent;
 }).call(this,require('_process'))
-},{"./Object.assign":160,"./ReactComponentEnvironment":170,"./ReactCurrentOwner":172,"./ReactElement":190,"./ReactInstanceMap":200,"./ReactPerf":209,"./ReactPropTypeLocationNames":210,"./ReactPropTypeLocations":211,"./ReactReconciler":214,"./ReactUpdateQueue":220,"./shouldUpdateReactComponent":264,"_process":136,"fbjs/lib/emptyObject":68,"fbjs/lib/invariant":75,"fbjs/lib/warning":86}],172:[function(require,module,exports){
+},{"./Object.assign":167,"./ReactComponentEnvironment":177,"./ReactCurrentOwner":179,"./ReactElement":197,"./ReactInstanceMap":207,"./ReactPerf":216,"./ReactPropTypeLocationNames":217,"./ReactPropTypeLocations":218,"./ReactReconciler":221,"./ReactUpdateQueue":227,"./shouldUpdateReactComponent":271,"_process":143,"fbjs/lib/emptyObject":75,"fbjs/lib/invariant":82,"fbjs/lib/warning":93}],179:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -50130,7 +52367,7 @@ var ReactCurrentOwner = {
 };
 
 module.exports = ReactCurrentOwner;
-},{}],173:[function(require,module,exports){
+},{}],180:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -50225,7 +52462,7 @@ if (process.env.NODE_ENV !== 'production') {
 
 module.exports = React;
 }).call(this,require('_process'))
-},{"./ReactCurrentOwner":172,"./ReactDOMTextComponent":184,"./ReactDefaultInjection":187,"./ReactInstanceHandles":199,"./ReactMount":203,"./ReactPerf":209,"./ReactReconciler":214,"./ReactUpdates":221,"./ReactVersion":222,"./findDOMNode":246,"./renderSubtreeIntoContainer":261,"_process":136,"fbjs/lib/ExecutionEnvironment":61,"fbjs/lib/warning":86}],174:[function(require,module,exports){
+},{"./ReactCurrentOwner":179,"./ReactDOMTextComponent":191,"./ReactDefaultInjection":194,"./ReactInstanceHandles":206,"./ReactMount":210,"./ReactPerf":216,"./ReactReconciler":221,"./ReactUpdates":228,"./ReactVersion":229,"./findDOMNode":253,"./renderSubtreeIntoContainer":268,"_process":143,"fbjs/lib/ExecutionEnvironment":68,"fbjs/lib/warning":93}],181:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -50276,7 +52513,7 @@ var ReactDOMButton = {
 };
 
 module.exports = ReactDOMButton;
-},{}],175:[function(require,module,exports){
+},{}],182:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -51241,7 +53478,7 @@ assign(ReactDOMComponent.prototype, ReactDOMComponent.Mixin, ReactMultiChild.Mix
 
 module.exports = ReactDOMComponent;
 }).call(this,require('_process'))
-},{"./AutoFocusUtils":139,"./CSSPropertyOperations":142,"./DOMProperty":147,"./DOMPropertyOperations":148,"./EventConstants":152,"./Object.assign":160,"./ReactBrowserEventEmitter":164,"./ReactComponentBrowserEnvironment":169,"./ReactDOMButton":174,"./ReactDOMInput":179,"./ReactDOMOption":180,"./ReactDOMSelect":181,"./ReactDOMTextarea":185,"./ReactMount":203,"./ReactMultiChild":204,"./ReactPerf":209,"./ReactUpdateQueue":220,"./canDefineProperty":242,"./escapeTextContentForBrowser":245,"./isEventSupported":257,"./setInnerHTML":262,"./setTextContent":263,"./validateDOMNesting":266,"_process":136,"fbjs/lib/invariant":75,"fbjs/lib/keyOf":79,"fbjs/lib/shallowEqual":84,"fbjs/lib/warning":86}],176:[function(require,module,exports){
+},{"./AutoFocusUtils":146,"./CSSPropertyOperations":149,"./DOMProperty":154,"./DOMPropertyOperations":155,"./EventConstants":159,"./Object.assign":167,"./ReactBrowserEventEmitter":171,"./ReactComponentBrowserEnvironment":176,"./ReactDOMButton":181,"./ReactDOMInput":186,"./ReactDOMOption":187,"./ReactDOMSelect":188,"./ReactDOMTextarea":192,"./ReactMount":210,"./ReactMultiChild":211,"./ReactPerf":216,"./ReactUpdateQueue":227,"./canDefineProperty":249,"./escapeTextContentForBrowser":252,"./isEventSupported":264,"./setInnerHTML":269,"./setTextContent":270,"./validateDOMNesting":273,"_process":143,"fbjs/lib/invariant":82,"fbjs/lib/keyOf":86,"fbjs/lib/shallowEqual":91,"fbjs/lib/warning":93}],183:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -51421,7 +53658,7 @@ var ReactDOMFactories = mapObject({
 
 module.exports = ReactDOMFactories;
 }).call(this,require('_process'))
-},{"./ReactElement":190,"./ReactElementValidator":191,"_process":136,"fbjs/lib/mapObject":80}],177:[function(require,module,exports){
+},{"./ReactElement":197,"./ReactElementValidator":198,"_process":143,"fbjs/lib/mapObject":87}],184:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -51440,7 +53677,7 @@ var ReactDOMFeatureFlags = {
 };
 
 module.exports = ReactDOMFeatureFlags;
-},{}],178:[function(require,module,exports){
+},{}],185:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -51537,7 +53774,7 @@ ReactPerf.measureMethods(ReactDOMIDOperations, 'ReactDOMIDOperations', {
 
 module.exports = ReactDOMIDOperations;
 }).call(this,require('_process'))
-},{"./DOMChildrenOperations":146,"./DOMPropertyOperations":148,"./ReactMount":203,"./ReactPerf":209,"_process":136,"fbjs/lib/invariant":75}],179:[function(require,module,exports){
+},{"./DOMChildrenOperations":153,"./DOMPropertyOperations":155,"./ReactMount":210,"./ReactPerf":216,"_process":143,"fbjs/lib/invariant":82}],186:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -51693,7 +53930,7 @@ function _handleChange(event) {
 
 module.exports = ReactDOMInput;
 }).call(this,require('_process'))
-},{"./LinkedValueUtils":159,"./Object.assign":160,"./ReactDOMIDOperations":178,"./ReactMount":203,"./ReactUpdates":221,"_process":136,"fbjs/lib/invariant":75}],180:[function(require,module,exports){
+},{"./LinkedValueUtils":166,"./Object.assign":167,"./ReactDOMIDOperations":185,"./ReactMount":210,"./ReactUpdates":228,"_process":143,"fbjs/lib/invariant":82}],187:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -51785,7 +54022,7 @@ var ReactDOMOption = {
 
 module.exports = ReactDOMOption;
 }).call(this,require('_process'))
-},{"./Object.assign":160,"./ReactChildren":166,"./ReactDOMSelect":181,"_process":136,"fbjs/lib/warning":86}],181:[function(require,module,exports){
+},{"./Object.assign":167,"./ReactChildren":173,"./ReactDOMSelect":188,"_process":143,"fbjs/lib/warning":93}],188:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -51976,7 +54213,7 @@ function _handleChange(event) {
 
 module.exports = ReactDOMSelect;
 }).call(this,require('_process'))
-},{"./LinkedValueUtils":159,"./Object.assign":160,"./ReactMount":203,"./ReactUpdates":221,"_process":136,"fbjs/lib/warning":86}],182:[function(require,module,exports){
+},{"./LinkedValueUtils":166,"./Object.assign":167,"./ReactMount":210,"./ReactUpdates":228,"_process":143,"fbjs/lib/warning":93}],189:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -52189,7 +54426,7 @@ var ReactDOMSelection = {
 };
 
 module.exports = ReactDOMSelection;
-},{"./getNodeForCharacterOffset":254,"./getTextContentAccessor":255,"fbjs/lib/ExecutionEnvironment":61}],183:[function(require,module,exports){
+},{"./getNodeForCharacterOffset":261,"./getTextContentAccessor":262,"fbjs/lib/ExecutionEnvironment":68}],190:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -52216,7 +54453,7 @@ var ReactDOMServer = {
 };
 
 module.exports = ReactDOMServer;
-},{"./ReactDefaultInjection":187,"./ReactServerRendering":218,"./ReactVersion":222}],184:[function(require,module,exports){
+},{"./ReactDefaultInjection":194,"./ReactServerRendering":225,"./ReactVersion":229}],191:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -52346,7 +54583,7 @@ assign(ReactDOMTextComponent.prototype, {
 
 module.exports = ReactDOMTextComponent;
 }).call(this,require('_process'))
-},{"./DOMChildrenOperations":146,"./DOMPropertyOperations":148,"./Object.assign":160,"./ReactComponentBrowserEnvironment":169,"./ReactMount":203,"./escapeTextContentForBrowser":245,"./setTextContent":263,"./validateDOMNesting":266,"_process":136}],185:[function(require,module,exports){
+},{"./DOMChildrenOperations":153,"./DOMPropertyOperations":155,"./Object.assign":167,"./ReactComponentBrowserEnvironment":176,"./ReactMount":210,"./escapeTextContentForBrowser":252,"./setTextContent":270,"./validateDOMNesting":273,"_process":143}],192:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -52462,7 +54699,7 @@ function _handleChange(event) {
 
 module.exports = ReactDOMTextarea;
 }).call(this,require('_process'))
-},{"./LinkedValueUtils":159,"./Object.assign":160,"./ReactDOMIDOperations":178,"./ReactUpdates":221,"_process":136,"fbjs/lib/invariant":75,"fbjs/lib/warning":86}],186:[function(require,module,exports){
+},{"./LinkedValueUtils":166,"./Object.assign":167,"./ReactDOMIDOperations":185,"./ReactUpdates":228,"_process":143,"fbjs/lib/invariant":82,"fbjs/lib/warning":93}],193:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -52530,7 +54767,7 @@ var ReactDefaultBatchingStrategy = {
 };
 
 module.exports = ReactDefaultBatchingStrategy;
-},{"./Object.assign":160,"./ReactUpdates":221,"./Transaction":238,"fbjs/lib/emptyFunction":67}],187:[function(require,module,exports){
+},{"./Object.assign":167,"./ReactUpdates":228,"./Transaction":245,"fbjs/lib/emptyFunction":74}],194:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -52630,7 +54867,7 @@ module.exports = {
   inject: inject
 };
 }).call(this,require('_process'))
-},{"./BeforeInputEventPlugin":140,"./ChangeEventPlugin":144,"./ClientReactRootIndex":145,"./DefaultEventPluginOrder":150,"./EnterLeaveEventPlugin":151,"./HTMLDOMPropertyConfig":158,"./ReactBrowserComponentMixin":163,"./ReactComponentBrowserEnvironment":169,"./ReactDOMComponent":175,"./ReactDOMTextComponent":184,"./ReactDefaultBatchingStrategy":186,"./ReactDefaultPerf":188,"./ReactEventListener":196,"./ReactInjection":197,"./ReactInstanceHandles":199,"./ReactMount":203,"./ReactReconcileTransaction":213,"./SVGDOMPropertyConfig":223,"./SelectEventPlugin":224,"./ServerReactRootIndex":225,"./SimpleEventPlugin":226,"_process":136,"fbjs/lib/ExecutionEnvironment":61}],188:[function(require,module,exports){
+},{"./BeforeInputEventPlugin":147,"./ChangeEventPlugin":151,"./ClientReactRootIndex":152,"./DefaultEventPluginOrder":157,"./EnterLeaveEventPlugin":158,"./HTMLDOMPropertyConfig":165,"./ReactBrowserComponentMixin":170,"./ReactComponentBrowserEnvironment":176,"./ReactDOMComponent":182,"./ReactDOMTextComponent":191,"./ReactDefaultBatchingStrategy":193,"./ReactDefaultPerf":195,"./ReactEventListener":203,"./ReactInjection":204,"./ReactInstanceHandles":206,"./ReactMount":210,"./ReactReconcileTransaction":220,"./SVGDOMPropertyConfig":230,"./SelectEventPlugin":231,"./ServerReactRootIndex":232,"./SimpleEventPlugin":233,"_process":143,"fbjs/lib/ExecutionEnvironment":68}],195:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -52868,7 +55105,7 @@ var ReactDefaultPerf = {
 };
 
 module.exports = ReactDefaultPerf;
-},{"./DOMProperty":147,"./ReactDefaultPerfAnalysis":189,"./ReactMount":203,"./ReactPerf":209,"fbjs/lib/performanceNow":83}],189:[function(require,module,exports){
+},{"./DOMProperty":154,"./ReactDefaultPerfAnalysis":196,"./ReactMount":210,"./ReactPerf":216,"fbjs/lib/performanceNow":90}],196:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -53070,7 +55307,7 @@ var ReactDefaultPerfAnalysis = {
 };
 
 module.exports = ReactDefaultPerfAnalysis;
-},{"./Object.assign":160}],190:[function(require,module,exports){
+},{"./Object.assign":167}],197:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2014-2015, Facebook, Inc.
@@ -53320,7 +55557,7 @@ ReactElement.isValidElement = function (object) {
 
 module.exports = ReactElement;
 }).call(this,require('_process'))
-},{"./Object.assign":160,"./ReactCurrentOwner":172,"./canDefineProperty":242,"_process":136}],191:[function(require,module,exports){
+},{"./Object.assign":167,"./ReactCurrentOwner":179,"./canDefineProperty":249,"_process":143}],198:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2014-2015, Facebook, Inc.
@@ -53604,7 +55841,7 @@ var ReactElementValidator = {
 
 module.exports = ReactElementValidator;
 }).call(this,require('_process'))
-},{"./ReactCurrentOwner":172,"./ReactElement":190,"./ReactPropTypeLocationNames":210,"./ReactPropTypeLocations":211,"./canDefineProperty":242,"./getIteratorFn":253,"_process":136,"fbjs/lib/invariant":75,"fbjs/lib/warning":86}],192:[function(require,module,exports){
+},{"./ReactCurrentOwner":179,"./ReactElement":197,"./ReactPropTypeLocationNames":217,"./ReactPropTypeLocations":218,"./canDefineProperty":249,"./getIteratorFn":260,"_process":143,"fbjs/lib/invariant":82,"fbjs/lib/warning":93}],199:[function(require,module,exports){
 /**
  * Copyright 2014-2015, Facebook, Inc.
  * All rights reserved.
@@ -53660,7 +55897,7 @@ assign(ReactEmptyComponent.prototype, {
 ReactEmptyComponent.injection = ReactEmptyComponentInjection;
 
 module.exports = ReactEmptyComponent;
-},{"./Object.assign":160,"./ReactElement":190,"./ReactEmptyComponentRegistry":193,"./ReactReconciler":214}],193:[function(require,module,exports){
+},{"./Object.assign":167,"./ReactElement":197,"./ReactEmptyComponentRegistry":200,"./ReactReconciler":221}],200:[function(require,module,exports){
 /**
  * Copyright 2014-2015, Facebook, Inc.
  * All rights reserved.
@@ -53709,7 +55946,7 @@ var ReactEmptyComponentRegistry = {
 };
 
 module.exports = ReactEmptyComponentRegistry;
-},{}],194:[function(require,module,exports){
+},{}],201:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -53789,7 +56026,7 @@ if (process.env.NODE_ENV !== 'production') {
 
 module.exports = ReactErrorUtils;
 }).call(this,require('_process'))
-},{"_process":136}],195:[function(require,module,exports){
+},{"_process":143}],202:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -53828,7 +56065,7 @@ var ReactEventEmitterMixin = {
 };
 
 module.exports = ReactEventEmitterMixin;
-},{"./EventPluginHub":153}],196:[function(require,module,exports){
+},{"./EventPluginHub":160}],203:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -54040,7 +56277,7 @@ var ReactEventListener = {
 };
 
 module.exports = ReactEventListener;
-},{"./Object.assign":160,"./PooledClass":161,"./ReactInstanceHandles":199,"./ReactMount":203,"./ReactUpdates":221,"./getEventTarget":252,"fbjs/lib/EventListener":60,"fbjs/lib/ExecutionEnvironment":61,"fbjs/lib/getUnboundedScrollPosition":72}],197:[function(require,module,exports){
+},{"./Object.assign":167,"./PooledClass":168,"./ReactInstanceHandles":206,"./ReactMount":210,"./ReactUpdates":228,"./getEventTarget":259,"fbjs/lib/EventListener":67,"fbjs/lib/ExecutionEnvironment":68,"fbjs/lib/getUnboundedScrollPosition":79}],204:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -54079,7 +56316,7 @@ var ReactInjection = {
 };
 
 module.exports = ReactInjection;
-},{"./DOMProperty":147,"./EventPluginHub":153,"./ReactBrowserEventEmitter":164,"./ReactClass":167,"./ReactComponentEnvironment":170,"./ReactEmptyComponent":192,"./ReactNativeComponent":206,"./ReactPerf":209,"./ReactRootIndex":216,"./ReactUpdates":221}],198:[function(require,module,exports){
+},{"./DOMProperty":154,"./EventPluginHub":160,"./ReactBrowserEventEmitter":171,"./ReactClass":174,"./ReactComponentEnvironment":177,"./ReactEmptyComponent":199,"./ReactNativeComponent":213,"./ReactPerf":216,"./ReactRootIndex":223,"./ReactUpdates":228}],205:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -54204,7 +56441,7 @@ var ReactInputSelection = {
 };
 
 module.exports = ReactInputSelection;
-},{"./ReactDOMSelection":182,"fbjs/lib/containsNode":64,"fbjs/lib/focusNode":69,"fbjs/lib/getActiveElement":70}],199:[function(require,module,exports){
+},{"./ReactDOMSelection":189,"fbjs/lib/containsNode":71,"fbjs/lib/focusNode":76,"fbjs/lib/getActiveElement":77}],206:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -54509,7 +56746,7 @@ var ReactInstanceHandles = {
 
 module.exports = ReactInstanceHandles;
 }).call(this,require('_process'))
-},{"./ReactRootIndex":216,"_process":136,"fbjs/lib/invariant":75}],200:[function(require,module,exports){
+},{"./ReactRootIndex":223,"_process":143,"fbjs/lib/invariant":82}],207:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -54557,7 +56794,7 @@ var ReactInstanceMap = {
 };
 
 module.exports = ReactInstanceMap;
-},{}],201:[function(require,module,exports){
+},{}],208:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -54634,7 +56871,7 @@ var React = {
 
 module.exports = React;
 }).call(this,require('_process'))
-},{"./Object.assign":160,"./ReactChildren":166,"./ReactClass":167,"./ReactComponent":168,"./ReactDOMFactories":176,"./ReactElement":190,"./ReactElementValidator":191,"./ReactPropTypes":212,"./ReactVersion":222,"./onlyChild":259,"_process":136}],202:[function(require,module,exports){
+},{"./Object.assign":167,"./ReactChildren":173,"./ReactClass":174,"./ReactComponent":175,"./ReactDOMFactories":183,"./ReactElement":197,"./ReactElementValidator":198,"./ReactPropTypes":219,"./ReactVersion":229,"./onlyChild":266,"_process":143}],209:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -54680,7 +56917,7 @@ var ReactMarkupChecksum = {
 };
 
 module.exports = ReactMarkupChecksum;
-},{"./adler32":241}],203:[function(require,module,exports){
+},{"./adler32":248}],210:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -55533,7 +57770,7 @@ ReactPerf.measureMethods(ReactMount, 'ReactMount', {
 
 module.exports = ReactMount;
 }).call(this,require('_process'))
-},{"./DOMProperty":147,"./Object.assign":160,"./ReactBrowserEventEmitter":164,"./ReactCurrentOwner":172,"./ReactDOMFeatureFlags":177,"./ReactElement":190,"./ReactEmptyComponentRegistry":193,"./ReactInstanceHandles":199,"./ReactInstanceMap":200,"./ReactMarkupChecksum":202,"./ReactPerf":209,"./ReactReconciler":214,"./ReactUpdateQueue":220,"./ReactUpdates":221,"./instantiateReactComponent":256,"./setInnerHTML":262,"./shouldUpdateReactComponent":264,"./validateDOMNesting":266,"_process":136,"fbjs/lib/containsNode":64,"fbjs/lib/emptyObject":68,"fbjs/lib/invariant":75,"fbjs/lib/warning":86}],204:[function(require,module,exports){
+},{"./DOMProperty":154,"./Object.assign":167,"./ReactBrowserEventEmitter":171,"./ReactCurrentOwner":179,"./ReactDOMFeatureFlags":184,"./ReactElement":197,"./ReactEmptyComponentRegistry":200,"./ReactInstanceHandles":206,"./ReactInstanceMap":207,"./ReactMarkupChecksum":209,"./ReactPerf":216,"./ReactReconciler":221,"./ReactUpdateQueue":227,"./ReactUpdates":228,"./instantiateReactComponent":263,"./setInnerHTML":269,"./shouldUpdateReactComponent":271,"./validateDOMNesting":273,"_process":143,"fbjs/lib/containsNode":71,"fbjs/lib/emptyObject":75,"fbjs/lib/invariant":82,"fbjs/lib/warning":93}],211:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -56032,7 +58269,7 @@ var ReactMultiChild = {
 
 module.exports = ReactMultiChild;
 }).call(this,require('_process'))
-},{"./ReactChildReconciler":165,"./ReactComponentEnvironment":170,"./ReactCurrentOwner":172,"./ReactMultiChildUpdateTypes":205,"./ReactReconciler":214,"./flattenChildren":247,"_process":136}],205:[function(require,module,exports){
+},{"./ReactChildReconciler":172,"./ReactComponentEnvironment":177,"./ReactCurrentOwner":179,"./ReactMultiChildUpdateTypes":212,"./ReactReconciler":221,"./flattenChildren":254,"_process":143}],212:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -56065,7 +58302,7 @@ var ReactMultiChildUpdateTypes = keyMirror({
 });
 
 module.exports = ReactMultiChildUpdateTypes;
-},{"fbjs/lib/keyMirror":78}],206:[function(require,module,exports){
+},{"fbjs/lib/keyMirror":85}],213:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2014-2015, Facebook, Inc.
@@ -56162,7 +58399,7 @@ var ReactNativeComponent = {
 
 module.exports = ReactNativeComponent;
 }).call(this,require('_process'))
-},{"./Object.assign":160,"_process":136,"fbjs/lib/invariant":75}],207:[function(require,module,exports){
+},{"./Object.assign":167,"_process":143,"fbjs/lib/invariant":82}],214:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2015, Facebook, Inc.
@@ -56283,7 +58520,7 @@ var ReactNoopUpdateQueue = {
 
 module.exports = ReactNoopUpdateQueue;
 }).call(this,require('_process'))
-},{"_process":136,"fbjs/lib/warning":86}],208:[function(require,module,exports){
+},{"_process":143,"fbjs/lib/warning":93}],215:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -56377,7 +58614,7 @@ var ReactOwner = {
 
 module.exports = ReactOwner;
 }).call(this,require('_process'))
-},{"_process":136,"fbjs/lib/invariant":75}],209:[function(require,module,exports){
+},{"_process":143,"fbjs/lib/invariant":82}],216:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -56476,7 +58713,7 @@ function _noMeasure(objName, fnName, func) {
 
 module.exports = ReactPerf;
 }).call(this,require('_process'))
-},{"_process":136}],210:[function(require,module,exports){
+},{"_process":143}],217:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -56503,7 +58740,7 @@ if (process.env.NODE_ENV !== 'production') {
 
 module.exports = ReactPropTypeLocationNames;
 }).call(this,require('_process'))
-},{"_process":136}],211:[function(require,module,exports){
+},{"_process":143}],218:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -56526,7 +58763,7 @@ var ReactPropTypeLocations = keyMirror({
 });
 
 module.exports = ReactPropTypeLocations;
-},{"fbjs/lib/keyMirror":78}],212:[function(require,module,exports){
+},{"fbjs/lib/keyMirror":85}],219:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -56883,7 +59120,7 @@ function getClassName(propValue) {
 }
 
 module.exports = ReactPropTypes;
-},{"./ReactElement":190,"./ReactPropTypeLocationNames":210,"./getIteratorFn":253,"fbjs/lib/emptyFunction":67}],213:[function(require,module,exports){
+},{"./ReactElement":197,"./ReactPropTypeLocationNames":217,"./getIteratorFn":260,"fbjs/lib/emptyFunction":74}],220:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -57035,7 +59272,7 @@ assign(ReactReconcileTransaction.prototype, Transaction.Mixin, Mixin);
 PooledClass.addPoolingTo(ReactReconcileTransaction);
 
 module.exports = ReactReconcileTransaction;
-},{"./CallbackQueue":143,"./Object.assign":160,"./PooledClass":161,"./ReactBrowserEventEmitter":164,"./ReactDOMFeatureFlags":177,"./ReactInputSelection":198,"./Transaction":238}],214:[function(require,module,exports){
+},{"./CallbackQueue":150,"./Object.assign":167,"./PooledClass":168,"./ReactBrowserEventEmitter":171,"./ReactDOMFeatureFlags":184,"./ReactInputSelection":205,"./Transaction":245}],221:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -57143,7 +59380,7 @@ var ReactReconciler = {
 };
 
 module.exports = ReactReconciler;
-},{"./ReactRef":215}],215:[function(require,module,exports){
+},{"./ReactRef":222}],222:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -57222,7 +59459,7 @@ ReactRef.detachRefs = function (instance, element) {
 };
 
 module.exports = ReactRef;
-},{"./ReactOwner":208}],216:[function(require,module,exports){
+},{"./ReactOwner":215}],223:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -57252,7 +59489,7 @@ var ReactRootIndex = {
 };
 
 module.exports = ReactRootIndex;
-},{}],217:[function(require,module,exports){
+},{}],224:[function(require,module,exports){
 /**
  * Copyright 2014-2015, Facebook, Inc.
  * All rights reserved.
@@ -57276,7 +59513,7 @@ var ReactServerBatchingStrategy = {
 };
 
 module.exports = ReactServerBatchingStrategy;
-},{}],218:[function(require,module,exports){
+},{}],225:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -57362,7 +59599,7 @@ module.exports = {
   renderToStaticMarkup: renderToStaticMarkup
 };
 }).call(this,require('_process'))
-},{"./ReactDefaultBatchingStrategy":186,"./ReactElement":190,"./ReactInstanceHandles":199,"./ReactMarkupChecksum":202,"./ReactServerBatchingStrategy":217,"./ReactServerRenderingTransaction":219,"./ReactUpdates":221,"./instantiateReactComponent":256,"_process":136,"fbjs/lib/emptyObject":68,"fbjs/lib/invariant":75}],219:[function(require,module,exports){
+},{"./ReactDefaultBatchingStrategy":193,"./ReactElement":197,"./ReactInstanceHandles":206,"./ReactMarkupChecksum":209,"./ReactServerBatchingStrategy":224,"./ReactServerRenderingTransaction":226,"./ReactUpdates":228,"./instantiateReactComponent":263,"_process":143,"fbjs/lib/emptyObject":75,"fbjs/lib/invariant":82}],226:[function(require,module,exports){
 /**
  * Copyright 2014-2015, Facebook, Inc.
  * All rights reserved.
@@ -57450,7 +59687,7 @@ assign(ReactServerRenderingTransaction.prototype, Transaction.Mixin, Mixin);
 PooledClass.addPoolingTo(ReactServerRenderingTransaction);
 
 module.exports = ReactServerRenderingTransaction;
-},{"./CallbackQueue":143,"./Object.assign":160,"./PooledClass":161,"./Transaction":238,"fbjs/lib/emptyFunction":67}],220:[function(require,module,exports){
+},{"./CallbackQueue":150,"./Object.assign":167,"./PooledClass":168,"./Transaction":245,"fbjs/lib/emptyFunction":74}],227:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2015, Facebook, Inc.
@@ -57710,7 +59947,7 @@ var ReactUpdateQueue = {
 
 module.exports = ReactUpdateQueue;
 }).call(this,require('_process'))
-},{"./Object.assign":160,"./ReactCurrentOwner":172,"./ReactElement":190,"./ReactInstanceMap":200,"./ReactUpdates":221,"_process":136,"fbjs/lib/invariant":75,"fbjs/lib/warning":86}],221:[function(require,module,exports){
+},{"./Object.assign":167,"./ReactCurrentOwner":179,"./ReactElement":197,"./ReactInstanceMap":207,"./ReactUpdates":228,"_process":143,"fbjs/lib/invariant":82,"fbjs/lib/warning":93}],228:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -57936,7 +60173,7 @@ var ReactUpdates = {
 
 module.exports = ReactUpdates;
 }).call(this,require('_process'))
-},{"./CallbackQueue":143,"./Object.assign":160,"./PooledClass":161,"./ReactPerf":209,"./ReactReconciler":214,"./Transaction":238,"_process":136,"fbjs/lib/invariant":75}],222:[function(require,module,exports){
+},{"./CallbackQueue":150,"./Object.assign":167,"./PooledClass":168,"./ReactPerf":216,"./ReactReconciler":221,"./Transaction":245,"_process":143,"fbjs/lib/invariant":82}],229:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -57951,7 +60188,7 @@ module.exports = ReactUpdates;
 'use strict';
 
 module.exports = '0.14.9';
-},{}],223:[function(require,module,exports){
+},{}],230:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -58079,7 +60316,7 @@ var SVGDOMPropertyConfig = {
 };
 
 module.exports = SVGDOMPropertyConfig;
-},{"./DOMProperty":147}],224:[function(require,module,exports){
+},{"./DOMProperty":154}],231:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -58281,7 +60518,7 @@ var SelectEventPlugin = {
 };
 
 module.exports = SelectEventPlugin;
-},{"./EventConstants":152,"./EventPropagators":156,"./ReactInputSelection":198,"./SyntheticEvent":230,"./isTextInputElement":258,"fbjs/lib/ExecutionEnvironment":61,"fbjs/lib/getActiveElement":70,"fbjs/lib/keyOf":79,"fbjs/lib/shallowEqual":84}],225:[function(require,module,exports){
+},{"./EventConstants":159,"./EventPropagators":163,"./ReactInputSelection":205,"./SyntheticEvent":237,"./isTextInputElement":265,"fbjs/lib/ExecutionEnvironment":68,"fbjs/lib/getActiveElement":77,"fbjs/lib/keyOf":86,"fbjs/lib/shallowEqual":91}],232:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -58311,7 +60548,7 @@ var ServerReactRootIndex = {
 };
 
 module.exports = ServerReactRootIndex;
-},{}],226:[function(require,module,exports){
+},{}],233:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -58901,7 +61138,7 @@ var SimpleEventPlugin = {
 
 module.exports = SimpleEventPlugin;
 }).call(this,require('_process'))
-},{"./EventConstants":152,"./EventPropagators":156,"./ReactMount":203,"./SyntheticClipboardEvent":227,"./SyntheticDragEvent":229,"./SyntheticEvent":230,"./SyntheticFocusEvent":231,"./SyntheticKeyboardEvent":233,"./SyntheticMouseEvent":234,"./SyntheticTouchEvent":235,"./SyntheticUIEvent":236,"./SyntheticWheelEvent":237,"./getEventCharCode":249,"_process":136,"fbjs/lib/EventListener":60,"fbjs/lib/emptyFunction":67,"fbjs/lib/invariant":75,"fbjs/lib/keyOf":79}],227:[function(require,module,exports){
+},{"./EventConstants":159,"./EventPropagators":163,"./ReactMount":210,"./SyntheticClipboardEvent":234,"./SyntheticDragEvent":236,"./SyntheticEvent":237,"./SyntheticFocusEvent":238,"./SyntheticKeyboardEvent":240,"./SyntheticMouseEvent":241,"./SyntheticTouchEvent":242,"./SyntheticUIEvent":243,"./SyntheticWheelEvent":244,"./getEventCharCode":256,"_process":143,"fbjs/lib/EventListener":67,"fbjs/lib/emptyFunction":74,"fbjs/lib/invariant":82,"fbjs/lib/keyOf":86}],234:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -58941,7 +61178,7 @@ function SyntheticClipboardEvent(dispatchConfig, dispatchMarker, nativeEvent, na
 SyntheticEvent.augmentClass(SyntheticClipboardEvent, ClipboardEventInterface);
 
 module.exports = SyntheticClipboardEvent;
-},{"./SyntheticEvent":230}],228:[function(require,module,exports){
+},{"./SyntheticEvent":237}],235:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -58979,7 +61216,7 @@ function SyntheticCompositionEvent(dispatchConfig, dispatchMarker, nativeEvent, 
 SyntheticEvent.augmentClass(SyntheticCompositionEvent, CompositionEventInterface);
 
 module.exports = SyntheticCompositionEvent;
-},{"./SyntheticEvent":230}],229:[function(require,module,exports){
+},{"./SyntheticEvent":237}],236:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -59017,7 +61254,7 @@ function SyntheticDragEvent(dispatchConfig, dispatchMarker, nativeEvent, nativeE
 SyntheticMouseEvent.augmentClass(SyntheticDragEvent, DragEventInterface);
 
 module.exports = SyntheticDragEvent;
-},{"./SyntheticMouseEvent":234}],230:[function(require,module,exports){
+},{"./SyntheticMouseEvent":241}],237:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -59200,7 +61437,7 @@ PooledClass.addPoolingTo(SyntheticEvent, PooledClass.fourArgumentPooler);
 
 module.exports = SyntheticEvent;
 }).call(this,require('_process'))
-},{"./Object.assign":160,"./PooledClass":161,"_process":136,"fbjs/lib/emptyFunction":67,"fbjs/lib/warning":86}],231:[function(require,module,exports){
+},{"./Object.assign":167,"./PooledClass":168,"_process":143,"fbjs/lib/emptyFunction":74,"fbjs/lib/warning":93}],238:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -59238,7 +61475,7 @@ function SyntheticFocusEvent(dispatchConfig, dispatchMarker, nativeEvent, native
 SyntheticUIEvent.augmentClass(SyntheticFocusEvent, FocusEventInterface);
 
 module.exports = SyntheticFocusEvent;
-},{"./SyntheticUIEvent":236}],232:[function(require,module,exports){
+},{"./SyntheticUIEvent":243}],239:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -59277,7 +61514,7 @@ function SyntheticInputEvent(dispatchConfig, dispatchMarker, nativeEvent, native
 SyntheticEvent.augmentClass(SyntheticInputEvent, InputEventInterface);
 
 module.exports = SyntheticInputEvent;
-},{"./SyntheticEvent":230}],233:[function(require,module,exports){
+},{"./SyntheticEvent":237}],240:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -59363,7 +61600,7 @@ function SyntheticKeyboardEvent(dispatchConfig, dispatchMarker, nativeEvent, nat
 SyntheticUIEvent.augmentClass(SyntheticKeyboardEvent, KeyboardEventInterface);
 
 module.exports = SyntheticKeyboardEvent;
-},{"./SyntheticUIEvent":236,"./getEventCharCode":249,"./getEventKey":250,"./getEventModifierState":251}],234:[function(require,module,exports){
+},{"./SyntheticUIEvent":243,"./getEventCharCode":256,"./getEventKey":257,"./getEventModifierState":258}],241:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -59437,7 +61674,7 @@ function SyntheticMouseEvent(dispatchConfig, dispatchMarker, nativeEvent, native
 SyntheticUIEvent.augmentClass(SyntheticMouseEvent, MouseEventInterface);
 
 module.exports = SyntheticMouseEvent;
-},{"./SyntheticUIEvent":236,"./ViewportMetrics":239,"./getEventModifierState":251}],235:[function(require,module,exports){
+},{"./SyntheticUIEvent":243,"./ViewportMetrics":246,"./getEventModifierState":258}],242:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -59484,7 +61721,7 @@ function SyntheticTouchEvent(dispatchConfig, dispatchMarker, nativeEvent, native
 SyntheticUIEvent.augmentClass(SyntheticTouchEvent, TouchEventInterface);
 
 module.exports = SyntheticTouchEvent;
-},{"./SyntheticUIEvent":236,"./getEventModifierState":251}],236:[function(require,module,exports){
+},{"./SyntheticUIEvent":243,"./getEventModifierState":258}],243:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -59545,7 +61782,7 @@ function SyntheticUIEvent(dispatchConfig, dispatchMarker, nativeEvent, nativeEve
 SyntheticEvent.augmentClass(SyntheticUIEvent, UIEventInterface);
 
 module.exports = SyntheticUIEvent;
-},{"./SyntheticEvent":230,"./getEventTarget":252}],237:[function(require,module,exports){
+},{"./SyntheticEvent":237,"./getEventTarget":259}],244:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -59601,7 +61838,7 @@ function SyntheticWheelEvent(dispatchConfig, dispatchMarker, nativeEvent, native
 SyntheticMouseEvent.augmentClass(SyntheticWheelEvent, WheelEventInterface);
 
 module.exports = SyntheticWheelEvent;
-},{"./SyntheticMouseEvent":234}],238:[function(require,module,exports){
+},{"./SyntheticMouseEvent":241}],245:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -59835,7 +62072,7 @@ var Transaction = {
 
 module.exports = Transaction;
 }).call(this,require('_process'))
-},{"_process":136,"fbjs/lib/invariant":75}],239:[function(require,module,exports){
+},{"_process":143,"fbjs/lib/invariant":82}],246:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -59863,7 +62100,7 @@ var ViewportMetrics = {
 };
 
 module.exports = ViewportMetrics;
-},{}],240:[function(require,module,exports){
+},{}],247:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2014-2015, Facebook, Inc.
@@ -59925,7 +62162,7 @@ function accumulateInto(current, next) {
 
 module.exports = accumulateInto;
 }).call(this,require('_process'))
-},{"_process":136,"fbjs/lib/invariant":75}],241:[function(require,module,exports){
+},{"_process":143,"fbjs/lib/invariant":82}],248:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -59968,7 +62205,7 @@ function adler32(data) {
 }
 
 module.exports = adler32;
-},{}],242:[function(require,module,exports){
+},{}],249:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -59995,7 +62232,7 @@ if (process.env.NODE_ENV !== 'production') {
 
 module.exports = canDefineProperty;
 }).call(this,require('_process'))
-},{"_process":136}],243:[function(require,module,exports){
+},{"_process":143}],250:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -60051,7 +62288,7 @@ function dangerousStyleValue(name, value) {
 }
 
 module.exports = dangerousStyleValue;
-},{"./CSSProperty":141}],244:[function(require,module,exports){
+},{"./CSSProperty":148}],251:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -60102,7 +62339,7 @@ function deprecated(fnName, newModule, newPackage, ctx, fn) {
 
 module.exports = deprecated;
 }).call(this,require('_process'))
-},{"./Object.assign":160,"_process":136,"fbjs/lib/warning":86}],245:[function(require,module,exports){
+},{"./Object.assign":167,"_process":143,"fbjs/lib/warning":93}],252:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -60141,7 +62378,7 @@ function escapeTextContentForBrowser(text) {
 }
 
 module.exports = escapeTextContentForBrowser;
-},{}],246:[function(require,module,exports){
+},{}],253:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -60193,7 +62430,7 @@ function findDOMNode(componentOrElement) {
 
 module.exports = findDOMNode;
 }).call(this,require('_process'))
-},{"./ReactCurrentOwner":172,"./ReactInstanceMap":200,"./ReactMount":203,"_process":136,"fbjs/lib/invariant":75,"fbjs/lib/warning":86}],247:[function(require,module,exports){
+},{"./ReactCurrentOwner":179,"./ReactInstanceMap":207,"./ReactMount":210,"_process":143,"fbjs/lib/invariant":82,"fbjs/lib/warning":93}],254:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -60244,7 +62481,7 @@ function flattenChildren(children) {
 
 module.exports = flattenChildren;
 }).call(this,require('_process'))
-},{"./traverseAllChildren":265,"_process":136,"fbjs/lib/warning":86}],248:[function(require,module,exports){
+},{"./traverseAllChildren":272,"_process":143,"fbjs/lib/warning":93}],255:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -60274,7 +62511,7 @@ var forEachAccumulated = function (arr, cb, scope) {
 };
 
 module.exports = forEachAccumulated;
-},{}],249:[function(require,module,exports){
+},{}],256:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -60325,7 +62562,7 @@ function getEventCharCode(nativeEvent) {
 }
 
 module.exports = getEventCharCode;
-},{}],250:[function(require,module,exports){
+},{}],257:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -60429,7 +62666,7 @@ function getEventKey(nativeEvent) {
 }
 
 module.exports = getEventKey;
-},{"./getEventCharCode":249}],251:[function(require,module,exports){
+},{"./getEventCharCode":256}],258:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -60474,7 +62711,7 @@ function getEventModifierState(nativeEvent) {
 }
 
 module.exports = getEventModifierState;
-},{}],252:[function(require,module,exports){
+},{}],259:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -60504,7 +62741,7 @@ function getEventTarget(nativeEvent) {
 }
 
 module.exports = getEventTarget;
-},{}],253:[function(require,module,exports){
+},{}],260:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -60545,7 +62782,7 @@ function getIteratorFn(maybeIterable) {
 }
 
 module.exports = getIteratorFn;
-},{}],254:[function(require,module,exports){
+},{}],261:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -60619,7 +62856,7 @@ function getNodeForCharacterOffset(root, offset) {
 }
 
 module.exports = getNodeForCharacterOffset;
-},{}],255:[function(require,module,exports){
+},{}],262:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -60653,7 +62890,7 @@ function getTextContentAccessor() {
 }
 
 module.exports = getTextContentAccessor;
-},{"fbjs/lib/ExecutionEnvironment":61}],256:[function(require,module,exports){
+},{"fbjs/lib/ExecutionEnvironment":68}],263:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -60768,7 +63005,7 @@ function instantiateReactComponent(node) {
 
 module.exports = instantiateReactComponent;
 }).call(this,require('_process'))
-},{"./Object.assign":160,"./ReactCompositeComponent":171,"./ReactEmptyComponent":192,"./ReactNativeComponent":206,"_process":136,"fbjs/lib/invariant":75,"fbjs/lib/warning":86}],257:[function(require,module,exports){
+},{"./Object.assign":167,"./ReactCompositeComponent":178,"./ReactEmptyComponent":199,"./ReactNativeComponent":213,"_process":143,"fbjs/lib/invariant":82,"fbjs/lib/warning":93}],264:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -60829,7 +63066,7 @@ function isEventSupported(eventNameSuffix, capture) {
 }
 
 module.exports = isEventSupported;
-},{"fbjs/lib/ExecutionEnvironment":61}],258:[function(require,module,exports){
+},{"fbjs/lib/ExecutionEnvironment":68}],265:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -60870,7 +63107,7 @@ function isTextInputElement(elem) {
 }
 
 module.exports = isTextInputElement;
-},{}],259:[function(require,module,exports){
+},{}],266:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -60906,7 +63143,7 @@ function onlyChild(children) {
 
 module.exports = onlyChild;
 }).call(this,require('_process'))
-},{"./ReactElement":190,"_process":136,"fbjs/lib/invariant":75}],260:[function(require,module,exports){
+},{"./ReactElement":197,"_process":143,"fbjs/lib/invariant":82}],267:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -60933,7 +63170,7 @@ function quoteAttributeValueForBrowser(value) {
 }
 
 module.exports = quoteAttributeValueForBrowser;
-},{"./escapeTextContentForBrowser":245}],261:[function(require,module,exports){
+},{"./escapeTextContentForBrowser":252}],268:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -60950,7 +63187,7 @@ module.exports = quoteAttributeValueForBrowser;
 var ReactMount = require('./ReactMount');
 
 module.exports = ReactMount.renderSubtreeIntoContainer;
-},{"./ReactMount":203}],262:[function(require,module,exports){
+},{"./ReactMount":210}],269:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -61041,7 +63278,7 @@ if (ExecutionEnvironment.canUseDOM) {
 }
 
 module.exports = setInnerHTML;
-},{"fbjs/lib/ExecutionEnvironment":61}],263:[function(require,module,exports){
+},{"fbjs/lib/ExecutionEnvironment":68}],270:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -61082,7 +63319,7 @@ if (ExecutionEnvironment.canUseDOM) {
 }
 
 module.exports = setTextContent;
-},{"./escapeTextContentForBrowser":245,"./setInnerHTML":262,"fbjs/lib/ExecutionEnvironment":61}],264:[function(require,module,exports){
+},{"./escapeTextContentForBrowser":252,"./setInnerHTML":269,"fbjs/lib/ExecutionEnvironment":68}],271:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -61126,7 +63363,7 @@ function shouldUpdateReactComponent(prevElement, nextElement) {
 }
 
 module.exports = shouldUpdateReactComponent;
-},{}],265:[function(require,module,exports){
+},{}],272:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -61318,7 +63555,7 @@ function traverseAllChildren(children, callback, traverseContext) {
 
 module.exports = traverseAllChildren;
 }).call(this,require('_process'))
-},{"./ReactCurrentOwner":172,"./ReactElement":190,"./ReactInstanceHandles":199,"./getIteratorFn":253,"_process":136,"fbjs/lib/invariant":75,"fbjs/lib/warning":86}],266:[function(require,module,exports){
+},{"./ReactCurrentOwner":179,"./ReactElement":197,"./ReactInstanceHandles":206,"./getIteratorFn":260,"_process":143,"fbjs/lib/invariant":82,"fbjs/lib/warning":93}],273:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2015, Facebook, Inc.
@@ -61684,15 +63921,15 @@ if (process.env.NODE_ENV !== 'production') {
 
 module.exports = validateDOMNesting;
 }).call(this,require('_process'))
-},{"./Object.assign":160,"_process":136,"fbjs/lib/emptyFunction":67,"fbjs/lib/warning":86}],267:[function(require,module,exports){
+},{"./Object.assign":167,"_process":143,"fbjs/lib/emptyFunction":74,"fbjs/lib/warning":93}],274:[function(require,module,exports){
 'use strict';
 
 module.exports = require('./lib/React');
 
-},{"./lib/React":162}],268:[function(require,module,exports){
+},{"./lib/React":169}],275:[function(require,module,exports){
 module.exports = require('./lib/_stream_duplex.js');
 
-},{"./lib/_stream_duplex.js":269}],269:[function(require,module,exports){
+},{"./lib/_stream_duplex.js":276}],276:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -61817,7 +64054,7 @@ function forEach(xs, f) {
     f(xs[i], i);
   }
 }
-},{"./_stream_readable":271,"./_stream_writable":273,"core-util-is":47,"inherits":90,"process-nextick-args":135}],270:[function(require,module,exports){
+},{"./_stream_readable":278,"./_stream_writable":280,"core-util-is":54,"inherits":97,"process-nextick-args":142}],277:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -61865,7 +64102,7 @@ function PassThrough(options) {
 PassThrough.prototype._transform = function (chunk, encoding, cb) {
   cb(null, chunk);
 };
-},{"./_stream_transform":272,"core-util-is":47,"inherits":90}],271:[function(require,module,exports){
+},{"./_stream_transform":279,"core-util-is":54,"inherits":97}],278:[function(require,module,exports){
 (function (process,global){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -62875,7 +65112,7 @@ function indexOf(xs, x) {
   return -1;
 }
 }).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./_stream_duplex":269,"./internal/streams/BufferList":274,"./internal/streams/destroy":275,"./internal/streams/stream":276,"_process":136,"core-util-is":47,"events":59,"inherits":90,"isarray":92,"process-nextick-args":135,"safe-buffer":282,"string_decoder/":277,"util":45}],272:[function(require,module,exports){
+},{"./_stream_duplex":276,"./internal/streams/BufferList":281,"./internal/streams/destroy":282,"./internal/streams/stream":283,"_process":143,"core-util-is":54,"events":66,"inherits":97,"isarray":99,"process-nextick-args":142,"safe-buffer":289,"string_decoder/":284,"util":49}],279:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -63090,7 +65327,7 @@ function done(stream, er, data) {
 
   return stream.push(null);
 }
-},{"./_stream_duplex":269,"core-util-is":47,"inherits":90}],273:[function(require,module,exports){
+},{"./_stream_duplex":276,"core-util-is":54,"inherits":97}],280:[function(require,module,exports){
 (function (process,global){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -63757,7 +65994,7 @@ Writable.prototype._destroy = function (err, cb) {
   cb(err);
 };
 }).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./_stream_duplex":269,"./internal/streams/destroy":275,"./internal/streams/stream":276,"_process":136,"core-util-is":47,"inherits":90,"process-nextick-args":135,"safe-buffer":282,"util-deprecate":301}],274:[function(require,module,exports){
+},{"./_stream_duplex":276,"./internal/streams/destroy":282,"./internal/streams/stream":283,"_process":143,"core-util-is":54,"inherits":97,"process-nextick-args":142,"safe-buffer":289,"util-deprecate":308}],281:[function(require,module,exports){
 'use strict';
 
 /*<replacement>*/
@@ -63832,7 +66069,7 @@ module.exports = function () {
 
   return BufferList;
 }();
-},{"safe-buffer":282}],275:[function(require,module,exports){
+},{"safe-buffer":289}],282:[function(require,module,exports){
 'use strict';
 
 /*<replacement>*/
@@ -63905,10 +66142,10 @@ module.exports = {
   destroy: destroy,
   undestroy: undestroy
 };
-},{"process-nextick-args":135}],276:[function(require,module,exports){
+},{"process-nextick-args":142}],283:[function(require,module,exports){
 module.exports = require('events').EventEmitter;
 
-},{"events":59}],277:[function(require,module,exports){
+},{"events":66}],284:[function(require,module,exports){
 'use strict';
 
 var Buffer = require('safe-buffer').Buffer;
@@ -64181,10 +66418,10 @@ function simpleWrite(buf) {
 function simpleEnd(buf) {
   return buf && buf.length ? this.write(buf) : '';
 }
-},{"safe-buffer":282}],278:[function(require,module,exports){
+},{"safe-buffer":289}],285:[function(require,module,exports){
 module.exports = require('./readable').PassThrough
 
-},{"./readable":279}],279:[function(require,module,exports){
+},{"./readable":286}],286:[function(require,module,exports){
 exports = module.exports = require('./lib/_stream_readable.js');
 exports.Stream = exports;
 exports.Readable = exports;
@@ -64193,13 +66430,13 @@ exports.Duplex = require('./lib/_stream_duplex.js');
 exports.Transform = require('./lib/_stream_transform.js');
 exports.PassThrough = require('./lib/_stream_passthrough.js');
 
-},{"./lib/_stream_duplex.js":269,"./lib/_stream_passthrough.js":270,"./lib/_stream_readable.js":271,"./lib/_stream_transform.js":272,"./lib/_stream_writable.js":273}],280:[function(require,module,exports){
+},{"./lib/_stream_duplex.js":276,"./lib/_stream_passthrough.js":277,"./lib/_stream_readable.js":278,"./lib/_stream_transform.js":279,"./lib/_stream_writable.js":280}],287:[function(require,module,exports){
 module.exports = require('./readable').Transform
 
-},{"./readable":279}],281:[function(require,module,exports){
+},{"./readable":286}],288:[function(require,module,exports){
 module.exports = require('./lib/_stream_writable.js');
 
-},{"./lib/_stream_writable.js":273}],282:[function(require,module,exports){
+},{"./lib/_stream_writable.js":280}],289:[function(require,module,exports){
 /* eslint-disable node/no-deprecated-api */
 var buffer = require('buffer')
 var Buffer = buffer.Buffer
@@ -64263,7 +66500,7 @@ SafeBuffer.allocUnsafeSlow = function (size) {
   return buffer.SlowBuffer(size)
 }
 
-},{"buffer":46}],283:[function(require,module,exports){
+},{"buffer":53}],290:[function(require,module,exports){
 // Generated by CoffeeScript 1.9.2
 (function() {
   var hasProp = {}.hasOwnProperty,
@@ -64287,7 +66524,7 @@ SafeBuffer.allocUnsafeSlow = function (size) {
 
 }).call(this);
 
-},{}],284:[function(require,module,exports){
+},{}],291:[function(require,module,exports){
 (function (factory) {
     if (typeof exports === 'object') {
         // Node/CommonJS
@@ -64992,7 +67229,7 @@ SafeBuffer.allocUnsafeSlow = function (size) {
     return SparkMD5;
 }));
 
-},{}],285:[function(require,module,exports){
+},{}],292:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -65121,7 +67358,7 @@ Stream.prototype.pipe = function(dest, options) {
   return dest;
 };
 
-},{"events":59,"inherits":90,"readable-stream/duplex.js":268,"readable-stream/passthrough.js":278,"readable-stream/readable.js":279,"readable-stream/transform.js":280,"readable-stream/writable.js":281}],286:[function(require,module,exports){
+},{"events":66,"inherits":97,"readable-stream/duplex.js":275,"readable-stream/passthrough.js":285,"readable-stream/readable.js":286,"readable-stream/transform.js":287,"readable-stream/writable.js":288}],293:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -65344,7 +67581,7 @@ function base64DetectIncompleteChar(buffer) {
   this.charLength = this.charReceived ? 3 : 0;
 }
 
-},{"buffer":46}],287:[function(require,module,exports){
+},{"buffer":53}],294:[function(require,module,exports){
 module.exports = {
   encode: function (decodedKey) {
     return '\xff' + decodedKey[0] + '\xff' + decodedKey[1]
@@ -65359,7 +67596,7 @@ module.exports = {
 }
 
 
-},{}],288:[function(require,module,exports){
+},{}],295:[function(require,module,exports){
 /* Copyright (c) 2012-2014 LevelUP contributors
  * See list at <https://github.com/rvagg/node-levelup#contributing>
  * MIT License
@@ -65383,7 +67620,7 @@ module.exports = {
   , EncodingError       : createError('EncodingError', LevelUPError)
 }
 
-},{"errno":57}],289:[function(require,module,exports){
+},{"errno":64}],296:[function(require,module,exports){
 var nut   = require('./nut')
 var shell = require('./shell') //the shell surrounds the nut
 var Codec = require('level-codec')
@@ -65398,7 +67635,7 @@ module.exports = function (db) {
 }
 
 
-},{"./codec/legacy":287,"./nut":290,"./read-stream":291,"./shell":292,"level-codec":94}],290:[function(require,module,exports){
+},{"./codec/legacy":294,"./nut":297,"./read-stream":298,"./shell":299,"level-codec":101}],297:[function(require,module,exports){
 var ltgt = require('ltgt')
 
 function isFunction (f) {
@@ -65580,7 +67817,7 @@ module.exports = function (db, precodec, codec, compare) {
 
 }
 
-},{"ltgt":294}],291:[function(require,module,exports){
+},{"ltgt":301}],298:[function(require,module,exports){
 /* Copyright (c) 2012-2014 LevelUP contributors
  * See list at <https://github.com/rvagg/node-levelup#contributing>
  * MIT License <https://github.com/rvagg/node-levelup/blob/master/LICENSE.md>
@@ -65675,7 +67912,7 @@ ReadStream.prototype.toString = function () {
 module.exports = ReadStream
 
 
-},{"./errors":288,"inherits":90,"readable-stream":300}],292:[function(require,module,exports){
+},{"./errors":295,"inherits":97,"readable-stream":307}],299:[function(require,module,exports){
 (function (process){
 var EventEmitter = require('events').EventEmitter
 
@@ -65820,9 +68057,9 @@ var sublevel = module.exports = function (nut, prefix, createStream, options) {
 }
 
 }).call(this,require('_process'))
-},{"./errors":288,"_process":136,"events":59}],293:[function(require,module,exports){
-arguments[4][98][0].apply(exports,arguments)
-},{"dup":98}],294:[function(require,module,exports){
+},{"./errors":295,"_process":143,"events":66}],300:[function(require,module,exports){
+arguments[4][105][0].apply(exports,arguments)
+},{"dup":105}],301:[function(require,module,exports){
 (function (Buffer){
 
 exports.compare = function (a, b) {
@@ -65972,11 +68209,11 @@ exports.filter = function (range, compare) {
 }
 
 }).call(this,{"isBuffer":require("../../../is-buffer/index.js")})
-},{"../../../is-buffer/index.js":91}],295:[function(require,module,exports){
-arguments[4][99][0].apply(exports,arguments)
-},{"./_stream_readable":297,"./_stream_writable":299,"_process":136,"core-util-is":47,"dup":99,"inherits":90}],296:[function(require,module,exports){
-arguments[4][100][0].apply(exports,arguments)
-},{"./_stream_transform":298,"core-util-is":47,"dup":100,"inherits":90}],297:[function(require,module,exports){
+},{"../../../is-buffer/index.js":98}],302:[function(require,module,exports){
+arguments[4][106][0].apply(exports,arguments)
+},{"./_stream_readable":304,"./_stream_writable":306,"_process":143,"core-util-is":54,"dup":106,"inherits":97}],303:[function(require,module,exports){
+arguments[4][107][0].apply(exports,arguments)
+},{"./_stream_transform":305,"core-util-is":54,"dup":107,"inherits":97}],304:[function(require,module,exports){
 (function (process){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -66962,7 +69199,7 @@ function indexOf (xs, x) {
 }
 
 }).call(this,require('_process'))
-},{"_process":136,"buffer":46,"core-util-is":47,"events":59,"inherits":90,"isarray":293,"stream":285,"string_decoder/":286}],298:[function(require,module,exports){
+},{"_process":143,"buffer":53,"core-util-is":54,"events":66,"inherits":97,"isarray":300,"stream":292,"string_decoder/":293}],305:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -67174,7 +69411,7 @@ function done(stream, er) {
   return stream.push(null);
 }
 
-},{"./_stream_duplex":295,"core-util-is":47,"inherits":90}],299:[function(require,module,exports){
+},{"./_stream_duplex":302,"core-util-is":54,"inherits":97}],306:[function(require,module,exports){
 (function (process){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -67564,7 +69801,7 @@ function endWritable(stream, state, cb) {
 }
 
 }).call(this,require('_process'))
-},{"./_stream_duplex":295,"_process":136,"buffer":46,"core-util-is":47,"inherits":90,"stream":285}],300:[function(require,module,exports){
+},{"./_stream_duplex":302,"_process":143,"buffer":53,"core-util-is":54,"inherits":97,"stream":292}],307:[function(require,module,exports){
 var Stream = require('stream'); // hack to fix a circular dependency issue when used with browserify
 exports = module.exports = require('./lib/_stream_readable.js');
 exports.Stream = Stream;
@@ -67574,7 +69811,7 @@ exports.Duplex = require('./lib/_stream_duplex.js');
 exports.Transform = require('./lib/_stream_transform.js');
 exports.PassThrough = require('./lib/_stream_passthrough.js');
 
-},{"./lib/_stream_duplex.js":295,"./lib/_stream_passthrough.js":296,"./lib/_stream_readable.js":297,"./lib/_stream_transform.js":298,"./lib/_stream_writable.js":299,"stream":285}],301:[function(require,module,exports){
+},{"./lib/_stream_duplex.js":302,"./lib/_stream_passthrough.js":303,"./lib/_stream_readable.js":304,"./lib/_stream_transform.js":305,"./lib/_stream_writable.js":306,"stream":292}],308:[function(require,module,exports){
 (function (global){
 
 /**
@@ -67645,606 +69882,7 @@ function config (name) {
 }
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],302:[function(require,module,exports){
-arguments[4][90][0].apply(exports,arguments)
-},{"dup":90}],303:[function(require,module,exports){
-module.exports = function isBuffer(arg) {
-  return arg && typeof arg === 'object'
-    && typeof arg.copy === 'function'
-    && typeof arg.fill === 'function'
-    && typeof arg.readUInt8 === 'function';
-}
-},{}],304:[function(require,module,exports){
-(function (process,global){
-// Copyright Joyent, Inc. and other Node contributors.
-//
-// Permission is hereby granted, free of charge, to any person obtaining a
-// copy of this software and associated documentation files (the
-// "Software"), to deal in the Software without restriction, including
-// without limitation the rights to use, copy, modify, merge, publish,
-// distribute, sublicense, and/or sell copies of the Software, and to permit
-// persons to whom the Software is furnished to do so, subject to the
-// following conditions:
-//
-// The above copyright notice and this permission notice shall be included
-// in all copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
-// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
-// NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-// DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-// OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
-// USE OR OTHER DEALINGS IN THE SOFTWARE.
-
-var formatRegExp = /%[sdj%]/g;
-exports.format = function(f) {
-  if (!isString(f)) {
-    var objects = [];
-    for (var i = 0; i < arguments.length; i++) {
-      objects.push(inspect(arguments[i]));
-    }
-    return objects.join(' ');
-  }
-
-  var i = 1;
-  var args = arguments;
-  var len = args.length;
-  var str = String(f).replace(formatRegExp, function(x) {
-    if (x === '%%') return '%';
-    if (i >= len) return x;
-    switch (x) {
-      case '%s': return String(args[i++]);
-      case '%d': return Number(args[i++]);
-      case '%j':
-        try {
-          return JSON.stringify(args[i++]);
-        } catch (_) {
-          return '[Circular]';
-        }
-      default:
-        return x;
-    }
-  });
-  for (var x = args[i]; i < len; x = args[++i]) {
-    if (isNull(x) || !isObject(x)) {
-      str += ' ' + x;
-    } else {
-      str += ' ' + inspect(x);
-    }
-  }
-  return str;
-};
-
-
-// Mark that a method should not be used.
-// Returns a modified function which warns once by default.
-// If --no-deprecation is set, then it is a no-op.
-exports.deprecate = function(fn, msg) {
-  // Allow for deprecating things in the process of starting up.
-  if (isUndefined(global.process)) {
-    return function() {
-      return exports.deprecate(fn, msg).apply(this, arguments);
-    };
-  }
-
-  if (process.noDeprecation === true) {
-    return fn;
-  }
-
-  var warned = false;
-  function deprecated() {
-    if (!warned) {
-      if (process.throwDeprecation) {
-        throw new Error(msg);
-      } else if (process.traceDeprecation) {
-        console.trace(msg);
-      } else {
-        console.error(msg);
-      }
-      warned = true;
-    }
-    return fn.apply(this, arguments);
-  }
-
-  return deprecated;
-};
-
-
-var debugs = {};
-var debugEnviron;
-exports.debuglog = function(set) {
-  if (isUndefined(debugEnviron))
-    debugEnviron = process.env.NODE_DEBUG || '';
-  set = set.toUpperCase();
-  if (!debugs[set]) {
-    if (new RegExp('\\b' + set + '\\b', 'i').test(debugEnviron)) {
-      var pid = process.pid;
-      debugs[set] = function() {
-        var msg = exports.format.apply(exports, arguments);
-        console.error('%s %d: %s', set, pid, msg);
-      };
-    } else {
-      debugs[set] = function() {};
-    }
-  }
-  return debugs[set];
-};
-
-
-/**
- * Echos the value of a value. Trys to print the value out
- * in the best way possible given the different types.
- *
- * @param {Object} obj The object to print out.
- * @param {Object} opts Optional options object that alters the output.
- */
-/* legacy: obj, showHidden, depth, colors*/
-function inspect(obj, opts) {
-  // default options
-  var ctx = {
-    seen: [],
-    stylize: stylizeNoColor
-  };
-  // legacy...
-  if (arguments.length >= 3) ctx.depth = arguments[2];
-  if (arguments.length >= 4) ctx.colors = arguments[3];
-  if (isBoolean(opts)) {
-    // legacy...
-    ctx.showHidden = opts;
-  } else if (opts) {
-    // got an "options" object
-    exports._extend(ctx, opts);
-  }
-  // set default options
-  if (isUndefined(ctx.showHidden)) ctx.showHidden = false;
-  if (isUndefined(ctx.depth)) ctx.depth = 2;
-  if (isUndefined(ctx.colors)) ctx.colors = false;
-  if (isUndefined(ctx.customInspect)) ctx.customInspect = true;
-  if (ctx.colors) ctx.stylize = stylizeWithColor;
-  return formatValue(ctx, obj, ctx.depth);
-}
-exports.inspect = inspect;
-
-
-// http://en.wikipedia.org/wiki/ANSI_escape_code#graphics
-inspect.colors = {
-  'bold' : [1, 22],
-  'italic' : [3, 23],
-  'underline' : [4, 24],
-  'inverse' : [7, 27],
-  'white' : [37, 39],
-  'grey' : [90, 39],
-  'black' : [30, 39],
-  'blue' : [34, 39],
-  'cyan' : [36, 39],
-  'green' : [32, 39],
-  'magenta' : [35, 39],
-  'red' : [31, 39],
-  'yellow' : [33, 39]
-};
-
-// Don't use 'blue' not visible on cmd.exe
-inspect.styles = {
-  'special': 'cyan',
-  'number': 'yellow',
-  'boolean': 'yellow',
-  'undefined': 'grey',
-  'null': 'bold',
-  'string': 'green',
-  'date': 'magenta',
-  // "name": intentionally not styling
-  'regexp': 'red'
-};
-
-
-function stylizeWithColor(str, styleType) {
-  var style = inspect.styles[styleType];
-
-  if (style) {
-    return '\u001b[' + inspect.colors[style][0] + 'm' + str +
-           '\u001b[' + inspect.colors[style][1] + 'm';
-  } else {
-    return str;
-  }
-}
-
-
-function stylizeNoColor(str, styleType) {
-  return str;
-}
-
-
-function arrayToHash(array) {
-  var hash = {};
-
-  array.forEach(function(val, idx) {
-    hash[val] = true;
-  });
-
-  return hash;
-}
-
-
-function formatValue(ctx, value, recurseTimes) {
-  // Provide a hook for user-specified inspect functions.
-  // Check that value is an object with an inspect function on it
-  if (ctx.customInspect &&
-      value &&
-      isFunction(value.inspect) &&
-      // Filter out the util module, it's inspect function is special
-      value.inspect !== exports.inspect &&
-      // Also filter out any prototype objects using the circular check.
-      !(value.constructor && value.constructor.prototype === value)) {
-    var ret = value.inspect(recurseTimes, ctx);
-    if (!isString(ret)) {
-      ret = formatValue(ctx, ret, recurseTimes);
-    }
-    return ret;
-  }
-
-  // Primitive types cannot have properties
-  var primitive = formatPrimitive(ctx, value);
-  if (primitive) {
-    return primitive;
-  }
-
-  // Look up the keys of the object.
-  var keys = Object.keys(value);
-  var visibleKeys = arrayToHash(keys);
-
-  if (ctx.showHidden) {
-    keys = Object.getOwnPropertyNames(value);
-  }
-
-  // IE doesn't make error fields non-enumerable
-  // http://msdn.microsoft.com/en-us/library/ie/dww52sbt(v=vs.94).aspx
-  if (isError(value)
-      && (keys.indexOf('message') >= 0 || keys.indexOf('description') >= 0)) {
-    return formatError(value);
-  }
-
-  // Some type of object without properties can be shortcutted.
-  if (keys.length === 0) {
-    if (isFunction(value)) {
-      var name = value.name ? ': ' + value.name : '';
-      return ctx.stylize('[Function' + name + ']', 'special');
-    }
-    if (isRegExp(value)) {
-      return ctx.stylize(RegExp.prototype.toString.call(value), 'regexp');
-    }
-    if (isDate(value)) {
-      return ctx.stylize(Date.prototype.toString.call(value), 'date');
-    }
-    if (isError(value)) {
-      return formatError(value);
-    }
-  }
-
-  var base = '', array = false, braces = ['{', '}'];
-
-  // Make Array say that they are Array
-  if (isArray(value)) {
-    array = true;
-    braces = ['[', ']'];
-  }
-
-  // Make functions say that they are functions
-  if (isFunction(value)) {
-    var n = value.name ? ': ' + value.name : '';
-    base = ' [Function' + n + ']';
-  }
-
-  // Make RegExps say that they are RegExps
-  if (isRegExp(value)) {
-    base = ' ' + RegExp.prototype.toString.call(value);
-  }
-
-  // Make dates with properties first say the date
-  if (isDate(value)) {
-    base = ' ' + Date.prototype.toUTCString.call(value);
-  }
-
-  // Make error with message first say the error
-  if (isError(value)) {
-    base = ' ' + formatError(value);
-  }
-
-  if (keys.length === 0 && (!array || value.length == 0)) {
-    return braces[0] + base + braces[1];
-  }
-
-  if (recurseTimes < 0) {
-    if (isRegExp(value)) {
-      return ctx.stylize(RegExp.prototype.toString.call(value), 'regexp');
-    } else {
-      return ctx.stylize('[Object]', 'special');
-    }
-  }
-
-  ctx.seen.push(value);
-
-  var output;
-  if (array) {
-    output = formatArray(ctx, value, recurseTimes, visibleKeys, keys);
-  } else {
-    output = keys.map(function(key) {
-      return formatProperty(ctx, value, recurseTimes, visibleKeys, key, array);
-    });
-  }
-
-  ctx.seen.pop();
-
-  return reduceToSingleString(output, base, braces);
-}
-
-
-function formatPrimitive(ctx, value) {
-  if (isUndefined(value))
-    return ctx.stylize('undefined', 'undefined');
-  if (isString(value)) {
-    var simple = '\'' + JSON.stringify(value).replace(/^"|"$/g, '')
-                                             .replace(/'/g, "\\'")
-                                             .replace(/\\"/g, '"') + '\'';
-    return ctx.stylize(simple, 'string');
-  }
-  if (isNumber(value))
-    return ctx.stylize('' + value, 'number');
-  if (isBoolean(value))
-    return ctx.stylize('' + value, 'boolean');
-  // For some reason typeof null is "object", so special case here.
-  if (isNull(value))
-    return ctx.stylize('null', 'null');
-}
-
-
-function formatError(value) {
-  return '[' + Error.prototype.toString.call(value) + ']';
-}
-
-
-function formatArray(ctx, value, recurseTimes, visibleKeys, keys) {
-  var output = [];
-  for (var i = 0, l = value.length; i < l; ++i) {
-    if (hasOwnProperty(value, String(i))) {
-      output.push(formatProperty(ctx, value, recurseTimes, visibleKeys,
-          String(i), true));
-    } else {
-      output.push('');
-    }
-  }
-  keys.forEach(function(key) {
-    if (!key.match(/^\d+$/)) {
-      output.push(formatProperty(ctx, value, recurseTimes, visibleKeys,
-          key, true));
-    }
-  });
-  return output;
-}
-
-
-function formatProperty(ctx, value, recurseTimes, visibleKeys, key, array) {
-  var name, str, desc;
-  desc = Object.getOwnPropertyDescriptor(value, key) || { value: value[key] };
-  if (desc.get) {
-    if (desc.set) {
-      str = ctx.stylize('[Getter/Setter]', 'special');
-    } else {
-      str = ctx.stylize('[Getter]', 'special');
-    }
-  } else {
-    if (desc.set) {
-      str = ctx.stylize('[Setter]', 'special');
-    }
-  }
-  if (!hasOwnProperty(visibleKeys, key)) {
-    name = '[' + key + ']';
-  }
-  if (!str) {
-    if (ctx.seen.indexOf(desc.value) < 0) {
-      if (isNull(recurseTimes)) {
-        str = formatValue(ctx, desc.value, null);
-      } else {
-        str = formatValue(ctx, desc.value, recurseTimes - 1);
-      }
-      if (str.indexOf('\n') > -1) {
-        if (array) {
-          str = str.split('\n').map(function(line) {
-            return '  ' + line;
-          }).join('\n').substr(2);
-        } else {
-          str = '\n' + str.split('\n').map(function(line) {
-            return '   ' + line;
-          }).join('\n');
-        }
-      }
-    } else {
-      str = ctx.stylize('[Circular]', 'special');
-    }
-  }
-  if (isUndefined(name)) {
-    if (array && key.match(/^\d+$/)) {
-      return str;
-    }
-    name = JSON.stringify('' + key);
-    if (name.match(/^"([a-zA-Z_][a-zA-Z_0-9]*)"$/)) {
-      name = name.substr(1, name.length - 2);
-      name = ctx.stylize(name, 'name');
-    } else {
-      name = name.replace(/'/g, "\\'")
-                 .replace(/\\"/g, '"')
-                 .replace(/(^"|"$)/g, "'");
-      name = ctx.stylize(name, 'string');
-    }
-  }
-
-  return name + ': ' + str;
-}
-
-
-function reduceToSingleString(output, base, braces) {
-  var numLinesEst = 0;
-  var length = output.reduce(function(prev, cur) {
-    numLinesEst++;
-    if (cur.indexOf('\n') >= 0) numLinesEst++;
-    return prev + cur.replace(/\u001b\[\d\d?m/g, '').length + 1;
-  }, 0);
-
-  if (length > 60) {
-    return braces[0] +
-           (base === '' ? '' : base + '\n ') +
-           ' ' +
-           output.join(',\n  ') +
-           ' ' +
-           braces[1];
-  }
-
-  return braces[0] + base + ' ' + output.join(', ') + ' ' + braces[1];
-}
-
-
-// NOTE: These type checking functions intentionally don't use `instanceof`
-// because it is fragile and can be easily faked with `Object.create()`.
-function isArray(ar) {
-  return Array.isArray(ar);
-}
-exports.isArray = isArray;
-
-function isBoolean(arg) {
-  return typeof arg === 'boolean';
-}
-exports.isBoolean = isBoolean;
-
-function isNull(arg) {
-  return arg === null;
-}
-exports.isNull = isNull;
-
-function isNullOrUndefined(arg) {
-  return arg == null;
-}
-exports.isNullOrUndefined = isNullOrUndefined;
-
-function isNumber(arg) {
-  return typeof arg === 'number';
-}
-exports.isNumber = isNumber;
-
-function isString(arg) {
-  return typeof arg === 'string';
-}
-exports.isString = isString;
-
-function isSymbol(arg) {
-  return typeof arg === 'symbol';
-}
-exports.isSymbol = isSymbol;
-
-function isUndefined(arg) {
-  return arg === void 0;
-}
-exports.isUndefined = isUndefined;
-
-function isRegExp(re) {
-  return isObject(re) && objectToString(re) === '[object RegExp]';
-}
-exports.isRegExp = isRegExp;
-
-function isObject(arg) {
-  return typeof arg === 'object' && arg !== null;
-}
-exports.isObject = isObject;
-
-function isDate(d) {
-  return isObject(d) && objectToString(d) === '[object Date]';
-}
-exports.isDate = isDate;
-
-function isError(e) {
-  return isObject(e) &&
-      (objectToString(e) === '[object Error]' || e instanceof Error);
-}
-exports.isError = isError;
-
-function isFunction(arg) {
-  return typeof arg === 'function';
-}
-exports.isFunction = isFunction;
-
-function isPrimitive(arg) {
-  return arg === null ||
-         typeof arg === 'boolean' ||
-         typeof arg === 'number' ||
-         typeof arg === 'string' ||
-         typeof arg === 'symbol' ||  // ES6 symbol
-         typeof arg === 'undefined';
-}
-exports.isPrimitive = isPrimitive;
-
-exports.isBuffer = require('./support/isBuffer');
-
-function objectToString(o) {
-  return Object.prototype.toString.call(o);
-}
-
-
-function pad(n) {
-  return n < 10 ? '0' + n.toString(10) : n.toString(10);
-}
-
-
-var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep',
-              'Oct', 'Nov', 'Dec'];
-
-// 26 Feb 16:19:34
-function timestamp() {
-  var d = new Date();
-  var time = [pad(d.getHours()),
-              pad(d.getMinutes()),
-              pad(d.getSeconds())].join(':');
-  return [d.getDate(), months[d.getMonth()], time].join(' ');
-}
-
-
-// log is just a thin wrapper to console.log that prepends a timestamp
-exports.log = function() {
-  console.log('%s - %s', timestamp(), exports.format.apply(exports, arguments));
-};
-
-
-/**
- * Inherit the prototype methods from one constructor into another.
- *
- * The Function.prototype.inherits from lang.js rewritten as a standalone
- * function (not on Function.prototype). NOTE: If this file is to be loaded
- * during bootstrapping this function needs to be rewritten using some native
- * functions as prototype setup using normal JavaScript does not work as
- * expected during bootstrapping (see mirror.js in r114903).
- *
- * @param {function} ctor Constructor function which needs to inherit the
- *     prototype.
- * @param {function} superCtor Constructor function to inherit prototype from.
- */
-exports.inherits = require('inherits');
-
-exports._extend = function(origin, add) {
-  // Don't do anything if add isn't an object
-  if (!add || !isObject(add)) return origin;
-
-  var keys = Object.keys(add);
-  var i = keys.length;
-  while (i--) {
-    origin[keys[i]] = add[keys[i]];
-  }
-  return origin;
-};
-
-function hasOwnProperty(obj, prop) {
-  return Object.prototype.hasOwnProperty.call(obj, prop);
-}
-
-}).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./support/isBuffer":303,"_process":136,"inherits":302}],305:[function(require,module,exports){
+},{}],309:[function(require,module,exports){
 'use strict';
 
 /**
@@ -68419,7 +70057,7 @@ exports.parse = function (str) {
   }
 };
 
-},{}],306:[function(require,module,exports){
+},{}],310:[function(require,module,exports){
 module.exports = extend
 
 var hasOwnProperty = Object.prototype.hasOwnProperty;

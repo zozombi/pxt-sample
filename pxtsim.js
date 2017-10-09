@@ -3,6 +3,71 @@ var __extends = (this && this.__extends) || function (d, b) {
     function __() { this.constructor = d; }
     d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
 };
+// Helpers designed to help to make a simulator accessible.
+var pxsim;
+(function (pxsim) {
+    var accessibility;
+    (function (accessibility) {
+        var liveRegion;
+        function makeFocusable(elem) {
+            elem.setAttribute("focusable", "true");
+            elem.setAttribute("tabindex", "0");
+        }
+        accessibility.makeFocusable = makeFocusable;
+        function enableKeyboardInteraction(elem, handlerKeyDown, handlerKeyUp) {
+            if (handlerKeyDown) {
+                elem.addEventListener('keydown', function (e) {
+                    var charCode = (typeof e.which == "number") ? e.which : e.keyCode;
+                    if (charCode === 32 || charCode === 13) {
+                        handlerKeyDown();
+                    }
+                });
+            }
+            if (handlerKeyUp) {
+                elem.addEventListener('keyup', function (e) {
+                    var charCode = (typeof e.which == "number") ? e.which : e.keyCode;
+                    if (charCode === 32 || charCode === 13) {
+                        handlerKeyUp();
+                    }
+                });
+            }
+        }
+        accessibility.enableKeyboardInteraction = enableKeyboardInteraction;
+        function setAria(elem, role, label) {
+            if (role && !elem.hasAttribute("role")) {
+                elem.setAttribute("role", role);
+            }
+            if (label && !elem.hasAttribute("aria-label")) {
+                elem.setAttribute("aria-label", label);
+            }
+        }
+        accessibility.setAria = setAria;
+        function setLiveContent(value) {
+            if (!liveRegion) {
+                var style = "position: absolute !important;" +
+                    "display: block;" +
+                    "visibility: visible;" +
+                    "overflow: hidden;" +
+                    "width: 1px;" +
+                    "height: 1px;" +
+                    "margin: -1px;" +
+                    "border: 0;" +
+                    "padding: 0;" +
+                    "clip: rect(0 0 0 0);";
+                liveRegion = document.createElement("div");
+                liveRegion.setAttribute("role", "status");
+                liveRegion.setAttribute("aria-live", "polite");
+                liveRegion.setAttribute("aria-hidden", "false");
+                liveRegion.setAttribute("style", style);
+                document.body.appendChild(liveRegion);
+            }
+            if (liveRegion.textContent !== value) {
+                liveRegion.textContent = value;
+            }
+        }
+        accessibility.setLiveContent = setLiveContent;
+    })(accessibility = pxsim.accessibility || (pxsim.accessibility = {}));
+})(pxsim || (pxsim = {}));
 var pxsim;
 (function (pxsim) {
     var GROUND_COLOR = "blue";
@@ -1857,6 +1922,9 @@ var pxsim;
             stop();
             if (msg.mute)
                 mute(msg.mute);
+            if (msg.localizedStrings) {
+                pxsim.localization.setLocalizedStrings(msg.localizedStrings);
+            }
             runtime = new pxsim.Runtime(msg.code);
             runtime.id = msg.id;
             runtime.board.initAsync(msg)
@@ -2916,14 +2984,6 @@ var pxsim;
             pxtrt.decr(map);
         }
         pxtrt.mapSetRef = mapSetRef;
-        function switch_eq(a, b) {
-            if (a == b) {
-                pxtrt.decr(b);
-                return true;
-            }
-            return false;
-        }
-        pxtrt.switch_eq = switch_eq;
     })(pxtrt = pxsim.pxtrt || (pxsim.pxtrt = {}));
     var pxtcore;
     (function (pxtcore) {
@@ -2938,6 +2998,14 @@ var pxsim;
             return r;
         }
         pxtcore.mkClassInstance = mkClassInstance;
+        function switch_eq(a, b) {
+            if (a == b) {
+                pxtcore.decr(b);
+                return true;
+            }
+            return false;
+        }
+        pxtcore.switch_eq = switch_eq;
     })(pxtcore = pxsim.pxtcore || (pxsim.pxtcore = {}));
     var thread;
     (function (thread) {
@@ -3073,7 +3141,7 @@ var pxsim;
         function pop(c, x) {
             pxsim.pxtrt.nullCheck(c);
             var ret = c.pop();
-            pxsim.decr(ret);
+            // no decr() since we're returning it
             return ret;
         }
         Array_.pop = pop;
@@ -3088,7 +3156,7 @@ var pxsim;
             pxsim.pxtrt.nullCheck(c);
             if (!c.isValidIndex(x))
                 return;
-            pxsim.decr(c.getAt(x));
+            // no decr() since we're returning it
             return c.removeAt(x);
         }
         Array_.removeAt = removeAt;
@@ -3571,359 +3639,21 @@ var pxsim;
         BufferMethods.write = write;
     })(BufferMethods = pxsim.BufferMethods || (pxsim.BufferMethods = {}));
 })(pxsim || (pxsim = {}));
+// Localization functions. Please port any modifications over to pxtlib/util.ts
 var pxsim;
 (function (pxsim) {
-    var logs;
-    (function (logs) {
-        var TrendChartElement = (function () {
-            function TrendChartElement(log, className) {
-                this.log = log;
-                this.vpw = 80;
-                this.vph = 15;
-                this.log = log;
-                this.element = pxsim.svg.elt("svg");
-                pxsim.svg.hydrate(this.element, { class: className, viewBox: "0 0 " + this.vpw + " " + this.vph });
-                this.g = pxsim.svg.child(this.element, "g");
-                this.line = pxsim.svg.child(this.g, "polyline");
-            }
-            TrendChartElement.prototype.render = function () {
-                var _this = this;
-                var data = this.log.accvalues.slice(-25); // take last 10 entry
-                var margin = 2;
-                var times = data.map(function (d) { return d.t; });
-                var values = data.map(function (d) { return d.v; });
-                var maxt = Math.max.apply(null, times);
-                var mint = Math.min.apply(null, times);
-                var maxv = Math.max.apply(null, values);
-                var minv = Math.min.apply(null, values);
-                var h = (maxv - minv) || 10;
-                var w = (maxt - mint) || 10;
-                var points = data.map(function (d) { return ((d.t - mint) / w * _this.vpw + "," + (_this.vph - (d.v - minv) / h * (_this.vph - 2 * margin) - margin)); }).join(' ');
-                pxsim.svg.hydrate(this.line, { points: points });
-            };
-            return TrendChartElement;
-        }());
-        var LogViewElement = (function () {
-            function LogViewElement(props) {
-                var _this = this;
-                this.props = props;
-                this.shouldScroll = false;
-                this.entries = [];
-                this.serialBuffers = {};
-                this.dropSim = false; // drop simulator events
-                this.registerEvents();
-                this.registerChromeSerial();
-                this.element = document.createElement("div");
-                this.element.className = "ui segment hideempty logs";
-                if (this.props.onClick)
-                    this.element.onclick = function () { return _this.props.onClick(_this.rows()); };
-            }
-            LogViewElement.prototype.setLabel = function (text, theme) {
-                if (this.labelElement && this.labelElement.innerText == text)
-                    return;
-                if (this.labelElement) {
-                    if (this.labelElement.parentElement)
-                        this.labelElement.parentElement.removeChild(this.labelElement);
-                    this.labelElement = undefined;
-                }
-                if (text) {
-                    this.labelElement = document.createElement("a");
-                    this.labelElement.className = "ui " + theme + " top right attached mini label";
-                    this.labelElement.appendChild(document.createTextNode(text));
-                }
-            };
-            LogViewElement.prototype.hasTrends = function () {
-                return this.entries.some(function (entry) { return !!entry.chartElement; });
-            };
-            // creates a deep clone of the log entries
-            LogViewElement.prototype.rows = function () {
-                return this.entries.map(function (e) {
-                    return {
-                        id: e.id,
-                        theme: e.theme,
-                        variable: e.variable,
-                        accvalues: e.accvalues ? e.accvalues.slice(0) : undefined,
-                        time: e.time,
-                        value: e.value,
-                        source: e.source,
-                        count: e.count
-                    };
-                });
-            };
-            LogViewElement.prototype.streamPayload = function (startTime) {
-                // filter out data
-                var es = this.entries.filter(function (e) { return !!e.accvalues && e.time + e.accvalues[e.accvalues.length - 1].t >= startTime; });
-                if (es.length == 0)
-                    return undefined;
-                var fields = { "timestamp": 1, "partition": 1 };
-                var rows = [];
-                function entryVariable(e) {
-                    return /^\s*$/.test(e.variable) ? 'data' : e.variable;
-                }
-                // collect fields
-                es.forEach(function (e) {
-                    var n = entryVariable(e);
-                    if (!fields[n])
-                        fields[n] = 1;
-                });
-                // collapse data and fill values
-                var fs = Object.keys(fields);
-                es.forEach(function (e) {
-                    var n = entryVariable(e);
-                    var ei = fs.indexOf(n);
-                    e.accvalues
-                        .filter(function (v) { return (e.time + v.t) >= startTime; })
-                        .forEach(function (v) {
-                        var row = [e.time + v.t, 0];
-                        for (var i = 2; i < fs.length; ++i)
-                            row.push(i == ei ? v.v : null);
-                        rows.push(row);
-                    });
-                });
-                return { fields: fs, values: rows };
-            };
-            LogViewElement.prototype.registerChromeSerial = function () {
-                var _this = this;
-                var extensionId = this.props.chromeExtension;
-                if (!extensionId)
-                    return;
-                var buffers = {};
-                var chrome = window.chrome;
-                if (chrome && chrome.runtime) {
-                    console.debug("chrome: connecting to extension " + extensionId);
-                    var port = chrome.runtime.connect(extensionId, { name: "serial" });
-                    port.postMessage({
-                        type: "serial-config",
-                        useHF2: this.props.useHF2,
-                        vendorId: this.props.vendorId,
-                        productId: this.props.productId,
-                        nameFilter: this.props.nameFilter
-                    });
-                    port.onMessage.addListener(function (msg) {
-                        if (msg.type == "serial") {
-                            if (!_this.dropSim) {
-                                _this.clear();
-                                _this.dropSim = true;
-                            }
-                            var buf = (buffers[msg.id] || "") + msg.data;
-                            var i = buf.lastIndexOf("\n");
-                            if (i >= 0) {
-                                var msgb = buf.substring(0, i + 1);
-                                msgb.split('\n').filter(function (line) { return !!line; }).forEach(function (line) { return _this.appendEntry('microbit' + msg.id, line, 'black'); });
-                                buf = buf.slice(i + 1);
-                            }
-                            buffers[msg.id] = buf;
-                        }
-                    });
-                }
-            };
-            LogViewElement.prototype.registerEvents = function () {
-                var _this = this;
-                window.addEventListener('message', function (ev) {
-                    var msg = ev.data;
-                    switch (msg.type || '') {
-                        case 'serial':
-                            var smsg = msg;
-                            if (_this.dropSim && smsg.sim) {
-                                // drop simulated event since we are receiving real events
-                                return;
-                            }
-                            else if (!_this.dropSim && !smsg.sim) {
-                                // first non-simulator serial event, drop all previous events
-                                _this.clear();
-                                _this.dropSim = true;
-                            }
-                            var value = smsg.data || '';
-                            var source = smsg.id || '?';
-                            var theme = source.split('-')[0] || '';
-                            if (!/^[a-z]+$/.test(theme))
-                                theme = 'black';
-                            var buffer = _this.serialBuffers[source] || '';
-                            for (var i = 0; i < value.length; ++i) {
-                                switch (value.charCodeAt(i)) {
-                                    case 10:
-                                        _this.appendEntry(source, buffer, theme);
-                                        buffer = '';
-                                        break;
-                                    case 13:
-                                        break;
-                                    default:
-                                        buffer += value[i];
-                                        if (buffer.length > (_this.props.maxLineLength || 255)) {
-                                            _this.appendEntry(source, buffer, theme);
-                                            buffer = '';
-                                        }
-                                        break;
-                                }
-                            }
-                            _this.serialBuffers[source] = buffer;
-                            break;
-                    }
-                }, false);
-            };
-            LogViewElement.prototype.appendEntry = function (source, value, theme) {
-                var _this = this;
-                if (this.labelElement && !this.labelElement.parentElement)
-                    this.element.insertBefore(this.labelElement, this.element.firstElementChild);
-                var ens = this.entries;
-                while (ens.length > this.props.maxEntries) {
-                    var po = ens.shift();
-                    if (po.element && po.element.parentElement)
-                        po.element.parentElement.removeChild(po.element);
-                }
-                // find the entry with same source
-                var last = undefined;
-                var m = /^\s*(([^:]+):)?\s*(-?\d+)/i.exec(value);
-                var variable = m ? (m[2] || ' ') : undefined;
-                var nvalue = m ? parseInt(m[3]) : null;
-                for (var i = ens.length - 1; i >= 0; --i) {
-                    if (ens[i].source == source &&
-                        ((i == ens.length - 1 && ens[i].value == value) ||
-                            (variable && ens[i].variable == variable))) {
-                        last = ens[i];
-                        break;
-                    }
-                }
-                if (last) {
-                    last.value = value;
-                    if (last.accvalues) {
-                        last.accvalues.push({
-                            t: Date.now() - last.time,
-                            v: nvalue
-                        });
-                        if (last.accvalues.length > this.props.maxAccValues)
-                            last.accvalues.shift();
-                    }
-                    else if (!last.countElement) {
-                        last.countElement = document.createElement("span");
-                        last.countElement.className = 'ui log counter';
-                        last.element.insertBefore(last.countElement, last.element.firstChild);
-                    }
-                    last.count++;
-                    this.scheduleRender(last);
-                }
-                else {
-                    var e_1 = {
-                        id: LogViewElement.counter++,
-                        theme: theme,
-                        time: Date.now(),
-                        value: value,
-                        source: source,
-                        count: 1,
-                        dirty: true,
-                        variable: variable,
-                        accvalues: nvalue != null ? [{ t: 0, v: nvalue }] : undefined,
-                        element: document.createElement("div"),
-                        valueElement: document.createTextNode('')
-                    };
-                    e_1.element.className = "ui log " + e_1.theme;
-                    var raiseTrends = false;
-                    if (e_1.accvalues) {
-                        e_1.accvaluesElement = document.createElement('span');
-                        e_1.accvaluesElement.className = "ui log " + e_1.theme + " gauge";
-                        e_1.chartElement = new TrendChartElement(e_1, "ui trend " + e_1.theme);
-                        if (this.props.onTrendChartClick) {
-                            e_1.chartElement.element.onclick = function () { return _this.props.onTrendChartClick(e_1); };
-                            e_1.chartElement.element.className += " link";
-                        }
-                        e_1.element.appendChild(e_1.accvaluesElement);
-                        e_1.element.appendChild(e_1.chartElement.element);
-                        raiseTrends = true;
-                    }
-                    e_1.element.appendChild(e_1.valueElement);
-                    ens.push(e_1);
-                    this.element.appendChild(e_1.element);
-                    this.scheduleRender(e_1);
-                    if (raiseTrends && this.props.onTrendChartChanged)
-                        this.props.onTrendChartChanged();
-                }
-            };
-            LogViewElement.prototype.scheduleRender = function (e) {
-                var _this = this;
-                e.dirty = true;
-                if (!this.renderFiberId)
-                    this.renderFiberId = setTimeout(function () { return _this.render(); }, 50);
-            };
-            LogViewElement.prototype.clear = function () {
-                this.entries = [];
-                if (this.labelElement && this.labelElement.parentElement)
-                    this.labelElement.parentElement.removeChild(this.labelElement);
-                this.element.innerHTML = '';
-                this.serialBuffers = {};
-                this.dropSim = false;
-                if (this.props.onTrendChartChanged)
-                    this.props.onTrendChartChanged();
-            };
-            LogViewElement.prototype.render = function () {
-                this.entries.forEach(function (entry) {
-                    if (!entry.dirty)
-                        return;
-                    if (entry.countElement)
-                        entry.countElement.innerText = entry.count.toString();
-                    if (entry.accvaluesElement)
-                        entry.accvaluesElement.innerText = entry.value;
-                    if (entry.chartElement)
-                        entry.chartElement.render();
-                    entry.valueElement.textContent = entry.accvalues ? '' : entry.value;
-                    entry.dirty = false;
-                });
-                this.renderFiberId = 0;
-            };
-            LogViewElement.counter = 0;
-            return LogViewElement;
-        }());
-        logs.LogViewElement = LogViewElement;
-        function entriesToCSV(entries) {
-            // first log all data entries to CSV
-            var dataEntries = [];
-            var rows = entries.length;
-            entries.forEach(function (e) {
-                if (e.accvalues && e.accvalues.length > 0) {
-                    dataEntries.push(e);
-                    rows = Math.max(e.accvalues.length, rows);
-                }
-            });
-            var csv = '';
-            // name columns
-            csv += dataEntries.map(function (entry) { return (entry.theme + " time, " + entry.theme + " " + (entry.variable.trim() || "data")); })
-                .concat(['log time', 'log source', 'log message'])
-                .join(', ');
-            csv += '\n';
-            var _loop_2 = function(i) {
-                var cols = [];
-                dataEntries.forEach(function (entry) {
-                    var t0 = entry.accvalues[0].t;
-                    if (i < entry.accvalues.length) {
-                        cols.push(((entry.accvalues[i].t - t0) / 1000).toString());
-                        cols.push(entry.accvalues[i].v.toString());
-                    }
-                    else {
-                        cols.push(' ');
-                        cols.push(' ');
-                    }
-                });
-                if (i < entries.length) {
-                    var t0 = entries[0].time;
-                    cols.push(((entries[i].time - t0) / 1000).toString());
-                    cols.push(entries[i].source);
-                    cols.push(entries[i].value);
-                }
-                csv += cols.join(', ') + '\n';
-            };
-            for (var i = 0; i < rows; ++i) {
-                _loop_2(i);
-            }
-            return csv;
+    var localization;
+    (function (localization) {
+        var _localizeStrings = {};
+        function setLocalizedStrings(strs) {
+            _localizeStrings = strs || {};
         }
-        logs.entriesToCSV = entriesToCSV;
-        function entryToCSV(entry) {
-            var t0 = entry.accvalues.length > 0 ? entry.accvalues[0].t : 0;
-            var csv = (entry.theme + " time, " + (entry.variable.trim() || "data") + "\n")
-                + entry.accvalues.map(function (v) { return ((v.t - t0) / 1000) + ", " + v.v; }).join('\n');
-            return csv;
+        localization.setLocalizedStrings = setLocalizedStrings;
+        function lf(s) {
+            return _localizeStrings[s] || s;
         }
-        logs.entryToCSV = entryToCSV;
-    })(logs = pxsim.logs || (pxsim.logs = {}));
+        localization.lf = lf;
+    })(localization = pxsim.localization || (pxsim.localization = {}));
 })(pxsim || (pxsim = {}));
 /// <reference path="../typings/globals/bluebird/index.d.ts"/>
 /// <reference path="../localtypings/pxtparts.d.ts"/>
@@ -4661,7 +4391,8 @@ var pxsim;
                 partDefinitions: opts.partDefinitions,
                 mute: opts.mute,
                 highContrast: opts.highContrast,
-                cdnUrl: opts.cdnUrl
+                cdnUrl: opts.cdnUrl,
+                localizedStrings: opts.localizedStrings
             };
             this.applyAspectRatio();
             this.scheduleFrameCleanup();
@@ -5336,7 +5067,7 @@ var pxsim;
             }, false); });
         }
         svg_1.onClick = onClick;
-        function buttonEvents(el, move, start, stop) {
+        function buttonEvents(el, move, start, stop, keydown) {
             var captured = false;
             svg_1.touchEvents.mousedown.forEach(function (evname) { return el.addEventListener(evname, function (ev) {
                 captured = true;
@@ -5363,11 +5094,17 @@ var pxsim;
                 if (stop)
                     stop(ev);
             }, false); });
+            el.addEventListener('keydown', function (ev) {
+                captured = false;
+                if (keydown)
+                    keydown(ev);
+            });
         }
         svg_1.buttonEvents = buttonEvents;
-        function mkLinearGradient(id) {
+        function mkLinearGradient(id, horizontal) {
+            if (horizontal === void 0) { horizontal = false; }
             var gradient = svg.elt("linearGradient");
-            svg.hydrate(gradient, { id: id, x1: "0%", y1: "0%", x2: "0%", y2: "100%" });
+            svg.hydrate(gradient, { id: id, x1: "0%", y1: "0%", x2: horizontal ? "100%" : "0%", y2: horizontal ? "0%" : "100%" });
             var stop1 = svg.child(gradient, "stop", { offset: "0%" });
             var stop2 = svg.child(gradient, "stop", { offset: "100%" });
             var stop3 = svg.child(gradient, "stop", { offset: "100%" });
@@ -5375,8 +5112,9 @@ var pxsim;
             return gradient;
         }
         svg_1.mkLinearGradient = mkLinearGradient;
-        function linearGradient(defs, id) {
-            var lg = mkLinearGradient(id);
+        function linearGradient(defs, id, horizontal) {
+            if (horizontal === void 0) { horizontal = false; }
+            var lg = mkLinearGradient(id, horizontal);
             defs.appendChild(lg);
             return lg;
         }
@@ -5896,12 +5634,12 @@ var pxsim;
             };
             var rowGaps = 0;
             var rowIdxsWithGap = copyArr(opts.rowIdxsWithGap);
-            var _loop_3 = function(i) {
+            var _loop_2 = function(i) {
                 var colGaps = 0;
                 var colIdxsWithGap = copyArr(opts.colIdxsWithGap);
                 var cy = yOff + i * opts.pinDist + rowGaps * opts.pinDist;
                 var rowIdx = i + rowIdxOffset;
-                var _loop_4 = function(j) {
+                var _loop_3 = function(j) {
                     var cx = xOff + j * opts.pinDist + colGaps * opts.pinDist;
                     var colIdx = j + colIdxOffset;
                     var addEl = function (pin) {
@@ -5922,13 +5660,13 @@ var pxsim;
                     colGaps += removeAll(colIdxsWithGap, colIdx);
                 };
                 for (var j = 0; j < opts.colCount; j++) {
-                    _loop_4(j);
+                    _loop_3(j);
                 }
                 //row gaps
                 rowGaps += removeAll(rowIdxsWithGap, rowIdx);
             };
             for (var i = 0; i < opts.rowCount; i++) {
-                _loop_3(i);
+                _loop_2(i);
             }
             return { g: grid, allPins: allPins };
         }

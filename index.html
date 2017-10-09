@@ -66,7 +66,7 @@
     <div id='content' class="ui dimmable full-abs">
     </div>
 
-    <div id='msg'>
+    <div id='msg' aria-live="polite">
         <div id='errmsg' class="ui red inverted segment"></div>
         <div id='warnmsg' class="ui orange inverted segment"></div>
         <div id='infomsg' class="ui teal inverted segment"></div>
@@ -80,7 +80,7 @@
     "workerjs": "/pxt-sample/worker.js",
     "tdworkerjs": "/pxt-sample/tdworker.js",
     "monacoworkerjs": "/pxt-sample/monacoworker.js",
-    "pxtVersion": "2.0.31",
+    "pxtVersion": "2.2.4",
     "pxtRelId": "",
     "pxtCdnUrl": "/pxt-sample/",
     "commitCdnUrl": "/pxt-sample/",
@@ -129,6 +129,7 @@
     });
     appInsights.trackPageView(null, null, {urlReferrer: document.referrer});
 </script>
+
 <!-- end include tracking.html -->
 
 
@@ -140,6 +141,7 @@
     <script type="text/javascript" src="/pxt-sample/blockly/blockly_compressed.js"></script>
     <script type="text/javascript" src="/pxt-sample/blockly/blocks_compressed.js"></script>
     <script type="text/javascript" src="/pxt-sample/blockly/msg/js/en.js"></script>
+    <script type="text/javascript" src="/pxt-sample/smoothie/smoothie_compressed.js"></script>
     <script type="text/javascript" src="/pxt-sample/semantic.js"></script>
     <!-- unpatch to load JS in electron -->
     <script>if (window.module) module = window.module;</script>
