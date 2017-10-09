@@ -3,7 +3,8 @@
   "homeUrl": "http://microsoft.github.io/pxt-sample/",
   "privacyUrl": "https://go.microsoft.com/fwlink/?LinkId=521839",
   "termsOfUseUrl": "https://go.microsoft.com/fwlink/?LinkID=206977",
-  "betaUrl": "https://makecode.com/",
+  "betaUrl": "https://github.com/microsoft/pxt-sample",
+  "githubUrl": "https://github.com/microsoft/pxt-sample",
   "docMenu": [
     {
       "name": "About",
@@ -28,7 +29,7 @@
   },
   "simAnimationEnter": "fly right in",
   "simAnimationExit": "fly right out",
-  "disableBlockIcons": true,
+  "showHomeScreen": true,
   "TOC": [
     {
       "name": "Blocks",
