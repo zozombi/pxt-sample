@@ -34,6 +34,16 @@ var pxsim;
             return Promise.delay(400);
         }
         turtle.turnAsync = turnAsync;
+        /**
+         * Triggers when the turtle bumps a wall
+         * @param handler
+         */
+        //% blockId=onBump block="on bump"
+        function onBump(handler) {
+            var b = pxsim.board();
+            b.bus.listen("Turtle", "Bump", handler);
+        }
+        turtle.onBump = onBump;
     })(turtle = pxsim.turtle || (pxsim.turtle = {}));
 })(pxsim || (pxsim = {}));
 var pxsim;
@@ -109,6 +119,8 @@ var pxsim;
             this.x += Math.cos(deg) * steps * 10;
             this.y += Math.sin(deg) * steps * 10;
             pxsim.board().updateView();
+            if (this.x < 0 || this.y < 0)
+                pxsim.board().bus.queue("TURTLE", "BUMP");
             return Promise.delay(400);
         };
         return Sprite;
@@ -154,6 +166,7 @@ var pxsim;
         __extends(Board, _super);
         function Board() {
             _super.call(this);
+            this.bus = new pxsim.EventBus(pxsim.runtime);
             this.element = document.getElementById('svgcanvas');
             this.spriteElement = this.element.getElementById('svgsprite');
             this.sprite = new pxsim.Sprite();
