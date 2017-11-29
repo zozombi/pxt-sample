@@ -35,13 +35,6 @@ body {
     margin-right: 0.25rem;
 }
 
-.searchdialog .cards {
-    max-height: 20rem;
-    overflow-y: auto;
-    overflow-x: hidden;
-    margin-top:0.5rem;
-}
-
 .ui.card > .content > a.header {
     word-break: break-all;
 }
@@ -130,7 +123,6 @@ html {
 }
 
 #blocksEditor > div.loading {
-    background:#fff;
     position: absolute;
     left: 0;
     top: 0;
@@ -222,9 +214,6 @@ div.blocklyWidgetDiv {
 }
 .monacoToolboxDiv.hide {
     display: none;
-}
-.monaco-editor-hover {
-    z-index:1000 !important;
 }
 
 #monacoEditorInner {

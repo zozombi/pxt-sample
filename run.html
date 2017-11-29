@@ -85,7 +85,7 @@
     "workerjs": "/pxt-sample/worker.js",
     "tdworkerjs": "/pxt-sample/tdworker.js",
     "monacoworkerjs": "/pxt-sample/monacoworker.js",
-    "pxtVersion": "2.2.4",
+    "pxtVersion": "2.3.29",
     "pxtRelId": "",
     "pxtCdnUrl": "/pxt-sample/",
     "commitCdnUrl": "/pxt-sample/",
@@ -120,6 +120,13 @@
             loading.textContent = 'Oops, wrong arguments...';
             return;
         }
+
+        function initAppCache() {
+            window.applicationCache.addEventListener('updateready', () => {
+                window.location.reload();
+            });
+        }
+        initAppCache();
 
         ksRunnerReady(function() {
             var theme = pxt.appTarget.appTheme;

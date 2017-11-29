@@ -3,8 +3,7 @@
   "homeUrl": "http://microsoft.github.io/pxt-sample/",
   "privacyUrl": "https://go.microsoft.com/fwlink/?LinkId=521839",
   "termsOfUseUrl": "https://go.microsoft.com/fwlink/?LinkID=206977",
-  "betaUrl": "https://github.com/microsoft/pxt-sample",
-  "githubUrl": "https://github.com/microsoft/pxt-sample",
+  "betaUrl": "https://makecode.com/",
   "docMenu": [
     {
       "name": "About",
@@ -18,7 +17,8 @@
   "coloredToolbox": true,
   "monacoToolbox": true,
   "invertedMenu": true,
-  "useStartPage": true,
+  "showHomeScreen": true,
+  "homeScreenHero": "./static/hero.png",
   "blocklyOptions": {
     "grid": {
       "spacing": 45,
@@ -29,7 +29,9 @@
   },
   "simAnimationEnter": "fly right in",
   "simAnimationExit": "fly right out",
-  "showHomeScreen": true,
+  "monacoColors": {
+    "editor.background": "#ecf0f1"
+  },
   "TOC": [
     {
       "name": "Blocks",
@@ -419,7 +421,16 @@
           "subitems": [],
           "path": "/raspberry-pi",
           "prevName": "Visual Studio Code support",
-          "prevPath": "/code"
+          "prevPath": "/code",
+          "nextName": "Blocks Embed",
+          "nextPath": "/blocks-embed"
+        },
+        {
+          "name": "Blocks Embed",
+          "subitems": [],
+          "path": "/blocks-embed",
+          "prevName": "Coding on Raspberry Pi",
+          "prevPath": "/raspberry-pi"
         }
       ],
       "prevName": "Streaming",

@@ -63,7 +63,16 @@
     "floatingPoint": true
   },
   "versions": {
-    "target": "1.0.13",
-    "pxt": "2.2.4"
+    "target": "1.0.14",
+    "pxt": "2.3.29"
+  },
+  "config": {
+    "packages": {
+      "approvedOrgs": [],
+      "approvedRepos": []
+    },
+    "galleries": {
+      "Examples": "examples"
+    }
   }
 }
