@@ -9464,7 +9464,7 @@ var pxt;
         }
         Cloud.isLocalHost = isLocalHost;
         function privateRequestAsync(options) {
-            options.url = pxt.appTarget.packaged ? pxt.webConfig.relprefix + options.url : Cloud.apiRoot + options.url;
+            options.url = pxt.webConfig.isStatic ? pxt.webConfig.relprefix + options.url : Cloud.apiRoot + options.url;
             options.allowGzipPost = true;
             if (!Cloud.isOnline()) {
                 return offlineError(options.url);
@@ -9500,7 +9500,7 @@ var pxt;
         function downloadTargetConfigAsync() {
             if (!Cloud.isOnline())
                 return Promise.resolve(undefined);
-            var url = pxt.appTarget.packaged ? "targetconfig.json" : "config/" + pxt.appTarget.id + "/targetconfig";
+            var url = pxt.webConfig.isStatic ? "targetconfig.json" : "config/" + pxt.appTarget.id + "/targetconfig";
             if (Cloud.isLocalHost())
                 return Util.requestAsync({
                     url: "/api/" + url,
@@ -9519,7 +9519,7 @@ var pxt;
         }
         Cloud.downloadScriptFilesAsync = downloadScriptFilesAsync;
         function downloadMarkdownAsync(docid, locale, live) {
-            var packaged = pxt.appTarget.packaged;
+            var packaged = !!pxt.webConfig.isStatic;
             var url = packaged
                 ? "docs/" + docid + ".md"
                 : "md/" + pxt.appTarget.id + "/" + docid.replace(/^\//, "") + "?targetVersion=" + encodeURIComponent(pxt.webConfig.targetVersion);

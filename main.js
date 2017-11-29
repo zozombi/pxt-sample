@@ -1,4 +1,100 @@
 (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
+/// <reference path="../../typings/globals/react/index.d.ts" />
+/// <reference path="../../typings/globals/react-dom/index.d.ts" />
+/// <reference path="../../built/pxtlib.d.ts" />
+"use strict";
+var __extends = (this && this.__extends) || function (d, b) {
+    for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
+    function __() { this.constructor = d; }
+    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+};
+var React = require("react");
+var data = require("./data");
+var sui = require("./sui");
+var EditorAccessibilityMenu = (function (_super) {
+    __extends(EditorAccessibilityMenu, _super);
+    function EditorAccessibilityMenu() {
+        _super.apply(this, arguments);
+    }
+    EditorAccessibilityMenu.prototype.openJavaScript = function () {
+        pxt.tickEvent("accmenu.editor.openJS");
+        this.props.parent.openJavaScript();
+    };
+    EditorAccessibilityMenu.prototype.selectLang = function () {
+        pxt.tickEvent("accmenu.editor.importdialog");
+        this.props.parent.selectLang();
+    };
+    EditorAccessibilityMenu.prototype.toggleHighContrast = function () {
+        pxt.tickEvent("accmenu.editor.togglecontrast");
+        this.props.parent.toggleHighContrast();
+    };
+    EditorAccessibilityMenu.prototype.goHome = function () {
+        pxt.tickEvent("accmenu.editor.home");
+        this.props.parent.exitAndSave();
+    };
+    EditorAccessibilityMenu.prototype.componentWillReceiveProps = function (nextProps) {
+        var newState = {};
+        if (nextProps.highContrast != undefined) {
+            newState.highContrast = nextProps.highContrast;
+        }
+        if (Object.keys(newState).length > 0)
+            this.setState(newState);
+    };
+    EditorAccessibilityMenu.prototype.shouldComponentUpdate = function (nextProps, nextState, nextContext) {
+        return this.state.highContrast != nextState.highContrast;
+    };
+    EditorAccessibilityMenu.prototype.renderCore = function () {
+        var _this = this;
+        var highContrast = this.props.parent.state.highContrast;
+        var targetTheme = pxt.appTarget.appTheme;
+        return React.createElement("div", {className: "ui accessibleMenu borderless fixed menu", role: "menubar"}, React.createElement(sui.Item, {class: (targetTheme.invertedMenu ? "inverted" : '') + " menu", role: "menuitem", icon: "xicon js", text: lf("Skip to JavaScript editor"), onClick: function () { return _this.openJavaScript(); }}), targetTheme.selectLanguage ? React.createElement(sui.Item, {class: (targetTheme.invertedMenu ? "inverted" : '') + " menu", role: "menuitem", icon: "xicon globe", text: lf("Select Language"), onClick: function () { return _this.selectLang(); }}) : undefined, targetTheme.highContrast ? React.createElement(sui.Item, {class: (targetTheme.invertedMenu ? "inverted" : '') + " menu", role: "menuitem", text: highContrast ? lf("High Contrast Off") : lf("High Contrast On"), onClick: function () { return _this.toggleHighContrast(); }}) : undefined, React.createElement(sui.Item, {class: (targetTheme.invertedMenu ? "inverted" : '') + " menu", role: "menuitem", icon: "home", text: lf("Go Home"), onClick: function () { return _this.goHome(); }}));
+    };
+    return EditorAccessibilityMenu;
+}(data.Component));
+exports.EditorAccessibilityMenu = EditorAccessibilityMenu;
+var HomeAccessibilityMenu = (function (_super) {
+    __extends(HomeAccessibilityMenu, _super);
+    function HomeAccessibilityMenu() {
+        _super.apply(this, arguments);
+    }
+    HomeAccessibilityMenu.prototype.newProject = function () {
+        pxt.tickEvent("accmenu.home.new");
+        this.props.parent.newProject();
+    };
+    HomeAccessibilityMenu.prototype.importProjectDialog = function () {
+        pxt.tickEvent("accmenu.home.importdialog");
+        this.props.parent.importProjectDialog();
+    };
+    HomeAccessibilityMenu.prototype.selectLang = function () {
+        pxt.tickEvent("accmenu.home.langpicker");
+        this.props.parent.selectLang();
+    };
+    HomeAccessibilityMenu.prototype.toggleHighContrast = function () {
+        pxt.tickEvent("accmenu.home.togglecontrast");
+        this.props.parent.toggleHighContrast();
+    };
+    HomeAccessibilityMenu.prototype.componentWillReceiveProps = function (nextProps) {
+        var newState = {};
+        if (nextProps.highContrast != undefined) {
+            newState.highContrast = nextProps.highContrast;
+        }
+        if (Object.keys(newState).length > 0)
+            this.setState(newState);
+    };
+    HomeAccessibilityMenu.prototype.shouldComponentUpdate = function (nextProps, nextState, nextContext) {
+        return this.state.highContrast != nextState.highContrast;
+    };
+    HomeAccessibilityMenu.prototype.renderCore = function () {
+        var _this = this;
+        var highContrast = this.state.highContrast;
+        var targetTheme = pxt.appTarget.appTheme;
+        return React.createElement("div", {className: "ui accessibleMenu borderless fixed menu", role: "menubar"}, React.createElement(sui.Item, {class: (targetTheme.invertedMenu ? "inverted" : '') + " menu", role: "menuitem", icon: "add circle", text: lf("New Project"), onClick: function () { return _this.newProject(); }}), React.createElement(sui.Item, {class: (targetTheme.invertedMenu ? "inverted" : '') + " menu", role: "menuitem", icon: "upload", text: lf("Import Project"), onClick: function () { return _this.importProjectDialog(); }}), targetTheme.selectLanguage ? React.createElement(sui.Item, {class: (targetTheme.invertedMenu ? "inverted" : '') + " menu", role: "menuitem", icon: "xicon globe", text: lf("Select Language"), onClick: function () { return _this.selectLang(); }}) : undefined, targetTheme.highContrast ? React.createElement(sui.Item, {class: (targetTheme.invertedMenu ? "inverted" : '') + " menu", role: "menuitem", text: highContrast ? lf("High Contrast Off") : lf("High Contrast On"), onClick: function () { return _this.toggleHighContrast(); }}) : undefined);
+    };
+    return HomeAccessibilityMenu;
+}(data.Component));
+exports.HomeAccessibilityMenu = HomeAccessibilityMenu;
+
+},{"./data":14,"./sui":44,"react":277}],2:[function(require,module,exports){
 /// <reference path="../../localtypings/pxtpackage.d.ts"/>
 /// <reference path="../../built/pxtlib.d.ts"/>
 /// <reference path="../../built/pxtblocks.d.ts"/>
@@ -2198,103 +2294,7 @@ $(document).ready(function () {
     }, false);
 });
 
-},{"./accessibility":2,"./appcache":3,"./blocks":5,"./cmds":9,"./compiler":11,"./container":12,"./core":13,"./data":14,"./draganddrop":16,"./editortoolbar":17,"./electron":18,"./extensions":20,"./filelist":21,"./hidbridge":24,"./lang":26,"./make":27,"./monaco":29,"./monacoSnippets":30,"./notification":31,"./package":32,"./projects":33,"./pxtjson":34,"./screenshot":35,"./scriptsearch":36,"./serial":37,"./serialindicator":38,"./share":39,"./simtoolbar":40,"./simulator":41,"./sounds":42,"./sui":44,"./tdlegacy":45,"./toolbox":46,"./tutorial":47,"./workspace":48,"marked":121,"react":277,"react-dom":148}],2:[function(require,module,exports){
-/// <reference path="../../typings/globals/react/index.d.ts" />
-/// <reference path="../../typings/globals/react-dom/index.d.ts" />
-/// <reference path="../../built/pxtlib.d.ts" />
-"use strict";
-var __extends = (this && this.__extends) || function (d, b) {
-    for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
-    function __() { this.constructor = d; }
-    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
-};
-var React = require("react");
-var data = require("./data");
-var sui = require("./sui");
-var EditorAccessibilityMenu = (function (_super) {
-    __extends(EditorAccessibilityMenu, _super);
-    function EditorAccessibilityMenu() {
-        _super.apply(this, arguments);
-    }
-    EditorAccessibilityMenu.prototype.openJavaScript = function () {
-        pxt.tickEvent("accmenu.editor.openJS");
-        this.props.parent.openJavaScript();
-    };
-    EditorAccessibilityMenu.prototype.selectLang = function () {
-        pxt.tickEvent("accmenu.editor.importdialog");
-        this.props.parent.selectLang();
-    };
-    EditorAccessibilityMenu.prototype.toggleHighContrast = function () {
-        pxt.tickEvent("accmenu.editor.togglecontrast");
-        this.props.parent.toggleHighContrast();
-    };
-    EditorAccessibilityMenu.prototype.goHome = function () {
-        pxt.tickEvent("accmenu.editor.home");
-        this.props.parent.exitAndSave();
-    };
-    EditorAccessibilityMenu.prototype.componentWillReceiveProps = function (nextProps) {
-        var newState = {};
-        if (nextProps.highContrast != undefined) {
-            newState.highContrast = nextProps.highContrast;
-        }
-        if (Object.keys(newState).length > 0)
-            this.setState(newState);
-    };
-    EditorAccessibilityMenu.prototype.shouldComponentUpdate = function (nextProps, nextState, nextContext) {
-        return this.state.highContrast != nextState.highContrast;
-    };
-    EditorAccessibilityMenu.prototype.renderCore = function () {
-        var _this = this;
-        var highContrast = this.props.parent.state.highContrast;
-        var targetTheme = pxt.appTarget.appTheme;
-        return React.createElement("div", {className: "ui accessibleMenu borderless fixed menu", role: "menubar"}, React.createElement(sui.Item, {class: (targetTheme.invertedMenu ? "inverted" : '') + " menu", role: "menuitem", icon: "xicon js", text: lf("Skip to JavaScript editor"), onClick: function () { return _this.openJavaScript(); }}), targetTheme.selectLanguage ? React.createElement(sui.Item, {class: (targetTheme.invertedMenu ? "inverted" : '') + " menu", role: "menuitem", icon: "xicon globe", text: lf("Select Language"), onClick: function () { return _this.selectLang(); }}) : undefined, targetTheme.highContrast ? React.createElement(sui.Item, {class: (targetTheme.invertedMenu ? "inverted" : '') + " menu", role: "menuitem", text: highContrast ? lf("High Contrast Off") : lf("High Contrast On"), onClick: function () { return _this.toggleHighContrast(); }}) : undefined, React.createElement(sui.Item, {class: (targetTheme.invertedMenu ? "inverted" : '') + " menu", role: "menuitem", icon: "home", text: lf("Go Home"), onClick: function () { return _this.goHome(); }}));
-    };
-    return EditorAccessibilityMenu;
-}(data.Component));
-exports.EditorAccessibilityMenu = EditorAccessibilityMenu;
-var HomeAccessibilityMenu = (function (_super) {
-    __extends(HomeAccessibilityMenu, _super);
-    function HomeAccessibilityMenu() {
-        _super.apply(this, arguments);
-    }
-    HomeAccessibilityMenu.prototype.newProject = function () {
-        pxt.tickEvent("accmenu.home.new");
-        this.props.parent.newProject();
-    };
-    HomeAccessibilityMenu.prototype.importProjectDialog = function () {
-        pxt.tickEvent("accmenu.home.importdialog");
-        this.props.parent.importProjectDialog();
-    };
-    HomeAccessibilityMenu.prototype.selectLang = function () {
-        pxt.tickEvent("accmenu.home.langpicker");
-        this.props.parent.selectLang();
-    };
-    HomeAccessibilityMenu.prototype.toggleHighContrast = function () {
-        pxt.tickEvent("accmenu.home.togglecontrast");
-        this.props.parent.toggleHighContrast();
-    };
-    HomeAccessibilityMenu.prototype.componentWillReceiveProps = function (nextProps) {
-        var newState = {};
-        if (nextProps.highContrast != undefined) {
-            newState.highContrast = nextProps.highContrast;
-        }
-        if (Object.keys(newState).length > 0)
-            this.setState(newState);
-    };
-    HomeAccessibilityMenu.prototype.shouldComponentUpdate = function (nextProps, nextState, nextContext) {
-        return this.state.highContrast != nextState.highContrast;
-    };
-    HomeAccessibilityMenu.prototype.renderCore = function () {
-        var _this = this;
-        var highContrast = this.state.highContrast;
-        var targetTheme = pxt.appTarget.appTheme;
-        return React.createElement("div", {className: "ui accessibleMenu borderless fixed menu", role: "menubar"}, React.createElement(sui.Item, {class: (targetTheme.invertedMenu ? "inverted" : '') + " menu", role: "menuitem", icon: "add circle", text: lf("New Project"), onClick: function () { return _this.newProject(); }}), React.createElement(sui.Item, {class: (targetTheme.invertedMenu ? "inverted" : '') + " menu", role: "menuitem", icon: "upload", text: lf("Import Project"), onClick: function () { return _this.importProjectDialog(); }}), targetTheme.selectLanguage ? React.createElement(sui.Item, {class: (targetTheme.invertedMenu ? "inverted" : '') + " menu", role: "menuitem", icon: "xicon globe", text: lf("Select Language"), onClick: function () { return _this.selectLang(); }}) : undefined, targetTheme.highContrast ? React.createElement(sui.Item, {class: (targetTheme.invertedMenu ? "inverted" : '') + " menu", role: "menuitem", text: highContrast ? lf("High Contrast Off") : lf("High Contrast On"), onClick: function () { return _this.toggleHighContrast(); }}) : undefined);
-    };
-    return HomeAccessibilityMenu;
-}(data.Component));
-exports.HomeAccessibilityMenu = HomeAccessibilityMenu;
-
-},{"./data":14,"./sui":44,"react":277}],3:[function(require,module,exports){
+},{"./accessibility":1,"./appcache":3,"./blocks":5,"./cmds":9,"./compiler":11,"./container":12,"./core":13,"./data":14,"./draganddrop":16,"./editortoolbar":17,"./electron":18,"./extensions":20,"./filelist":21,"./hidbridge":24,"./lang":26,"./make":27,"./monaco":29,"./monacoSnippets":30,"./notification":31,"./package":32,"./projects":33,"./pxtjson":34,"./screenshot":35,"./scriptsearch":36,"./serial":37,"./serialindicator":38,"./share":39,"./simtoolbar":40,"./simulator":41,"./sounds":42,"./sui":44,"./tdlegacy":45,"./toolbox":46,"./tutorial":47,"./workspace":48,"marked":121,"react":277,"react-dom":148}],3:[function(require,module,exports){
 "use strict";
 var core = require("./core");
 function init(updated) {
@@ -71110,4 +71110,4 @@ function extend() {
     return target
 }
 
-},{}]},{},[1]);
+},{}]},{},[2]);

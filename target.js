@@ -525,6 +525,5 @@ var pxtTargetBundle = {
   "versions": {
     "target": "1.0.17",
     "pxt": "2.3.29"
-  },
-  "packaged": true
+  }
 }
