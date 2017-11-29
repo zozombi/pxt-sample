@@ -9464,7 +9464,7 @@ var pxt;
         }
         Cloud.isLocalHost = isLocalHost;
         function privateRequestAsync(options) {
-            options.url = Cloud.apiRoot + options.url;
+            options.url = pxt.appTarget.packaged ? pxt.webConfig.relprefix + options.url : Cloud.apiRoot + options.url;
             options.allowGzipPost = true;
             if (!Cloud.isOnline()) {
                 return offlineError(options.url);
@@ -9498,11 +9498,9 @@ var pxt;
         }
         Cloud.privateGetAsync = privateGetAsync;
         function downloadTargetConfigAsync() {
-            if (pxt.appTarget.packaged)
-                return Promise.resolve(pxt.appTarget.config || {});
             if (!Cloud.isOnline())
                 return Promise.resolve(undefined);
-            var url = "config/" + pxt.appTarget.id + "/targetconfig";
+            var url = pxt.appTarget.packaged ? "targetconfig.json" : "config/" + pxt.appTarget.id + "/targetconfig";
             if (Cloud.isLocalHost())
                 return Util.requestAsync({
                     url: "/api/" + url,
@@ -9521,9 +9519,11 @@ var pxt;
         }
         Cloud.downloadScriptFilesAsync = downloadScriptFilesAsync;
         function downloadMarkdownAsync(docid, locale, live) {
-            docid = docid.replace(/^\//, "");
-            var url = "md/" + pxt.appTarget.id + "/" + docid + "?targetVersion=" + encodeURIComponent(pxt.webConfig.targetVersion);
-            if (locale != "en") {
+            var packaged = pxt.appTarget.packaged;
+            var url = packaged
+                ? "docs/" + docid + ".md"
+                : "md/" + pxt.appTarget.id + "/" + docid.replace(/^\//, "") + "?targetVersion=" + encodeURIComponent(pxt.webConfig.targetVersion);
+            if (!packaged && locale != "en") {
                 url += "&lang=" + encodeURIComponent(Util.userLanguage());
                 if (live)
                     url += "&live=1";

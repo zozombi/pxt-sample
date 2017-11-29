@@ -526,14 +526,5 @@ var pxtTargetBundle = {
     "target": "1.0.17",
     "pxt": "2.3.29"
   },
-  "config": {
-    "packages": {
-      "approvedOrgs": [],
-      "approvedRepos": []
-    },
-    "galleries": {
-      "Examples": "examples"
-    }
-  },
   "packaged": true
 }
