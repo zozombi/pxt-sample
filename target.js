@@ -523,7 +523,7 @@ var pxtTargetBundle = {
     "floatingPoint": true
   },
   "versions": {
-    "target": "1.0.14",
+    "target": "1.0.16",
     "pxt": "2.3.29"
   },
   "config": {
@@ -534,5 +534,6 @@ var pxtTargetBundle = {
     "galleries": {
       "Examples": "examples"
     }
-  }
+  },
+  "packaged": true
 }

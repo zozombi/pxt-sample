@@ -1,1 +1,594 @@
-var pxt;!function(e){!function(e){!function(e){e[e.Hidden=0]="Hidden",e[e.Visible=1]="Visible",e[e.Disabled=2]="Disabled"}(e.FilterState||(e.FilterState={}));e.FilterState}(e.editor||(e.editor={}))}(pxt||(pxt={}));var pxt;!function(e){!function(t){function o(e,t,o,r){e.response&&window.parent.postMessage({type:e.type,id:e.id,resp:t,success:o,error:r},"*")}function r(t){return new Promise(function(o,r){var a=e.Util.clone(t);a.id=e.Util.guidGen(),t.response&&(n[a.id]={resolve:o,reject:r}),window.parent.postMessage(a,"*"),t.response||o(void 0)})}var n={};t.bindEditorMessages=function(t){var r=e.appTarget.appTheme.allowParentController&&e.BrowserUtils.isIFrame(),a=e.appTarget.appTheme.allowPackageExtensions,s=e.appTarget.appTheme.allowSimulatorTelemetry;(r||a||s)&&window.addEventListener("message",function(i){var c=i.data;if(!c||!/^pxt(host|editor|pkgext|sim)$/.test(c.type))return!1;if("pxtpkgext"===c.type&&a)t.handleExtensionRequest(c);else if("pxtsim"===c.type&&s){var l=c;"event"===l.action&&(l.category||l.message?e.reportError(l.category,l.message,l.data):e.tickEvent(l.tick,l.data))}else if(r){var p=Promise.resolve(),u=void 0;if("pxthost"==c.type){var d=n[c.id];d?p=p.then(function(){return d.resolve(c)}):e.debug("pxthost: unknown request "+c.id)}else if("pxteditor"==c.type){var f=c;switch(e.debug("pxteditor: "+f.action),f.action.toLowerCase()){case"switchjavascript":p=p.then(function(){return t.openJavaScript()});break;case"switchblocks":p=p.then(function(){return t.openBlocks()});break;case"startsimulator":p=p.then(function(){return t.startSimulator()});break;case"restartsimulator":p=p.then(function(){return t.restartSimulator()});break;case"hidesimulator":p=p.then(function(){return t.collapseSimulator()});break;case"showsimulator":p=p.then(function(){return t.expandSimulator()});break;case"closeflyout":p=p.then(function(){return t.closeFlyout()});break;case"redo":p=p.then(function(){var e=t.editor;e&&e.hasRedo()&&e.redo()});break;case"undo":p=p.then(function(){var e=t.editor;e&&e.hasUndo()&&e.undo()});break;case"stopsimulator":var m=c;p=p.then(function(){return t.stopSimulator(m.unload)});break;case"newproject":var g=c;p=p.then(function(){return t.newProject(g.options)});break;case"importproject":var b=c;p=p.then(function(){return t.importProjectAsync(b.project,{filters:b.filters,searchBar:b.searchBar})});break;case"proxytosim":var y=c;p=p.then(function(){return t.proxySimulatorMessage(y.content)});break;case"renderblocks":var h=c;p=p.then(function(){return t.renderBlocksAsync(h)}).then(function(e){u=e});break;case"toggletrace":var v=c;p=p.then(function(){return t.toggleTrace(v.intervalSpeed)})}}p.done(function(){return o(c,u,!0,void 0)},function(e){return o(c,u,!1,e)})}return!0},!1)},t.enableControllerAnalytics=function(){if(e.appTarget.appTheme.allowParentController&&e.BrowserUtils.isIFrame()){var t=e.tickEvent;e.tickEvent=function(e,o){t&&t(e,o),r({type:"pxthost",action:"event",tick:e,response:!1,data:o})};var o=e.reportException;e.reportException=function(e,t){o&&o(e,t);try{r({type:"pxthost",action:"event",tick:"error",message:e.message,response:!1,data:t})}catch(e){}};var n=e.reportError;e.reportError=function(e,t,o){n&&n(e,t,o),r({type:"pxthost",action:"event",tick:"error",category:e,message:t,data:o})}}},t.postHostMessageAsync=r}(e.editor||(e.editor={}))}(pxt||(pxt={}));var pxt;!function(e){!function(e){!function(e){e[e.Granted=0]="Granted",e[e.Denied=1]="Denied",e[e.NotAvailable=2]="NotAvailable"}(e.PermissionResponses||(e.PermissionResponses={}));e.PermissionResponses}(e.editor||(e.editor={}))}(pxt||(pxt={}));var pxt;!function(e){!function(t){function o(){return e.appTarget?e.appTarget.id:window.pxtConfig?window.pxtConfig.targetId:""}function r(){if(!s){var t=o(),r=!1;if(!e.shell.isSandboxMode())try{window.localStorage[t]="1";window.localStorage[t];r=!0}catch(e){}r?(s=new a(t),e.debug("storage: local under "+t)):(s=new n,e.debug("storage: in memory"))}}var n=function(){function e(){this.items={}}return e.prototype.removeItem=function(e){delete this.items[e]},e.prototype.getItem=function(e){return this.items[e]},e.prototype.setItem=function(e,t){this.items[e]=t},e.prototype.clear=function(){this.items={}},e}(),a=function(){function e(e){this.storageId=e}return e.prototype.targetKey=function(e){return this.storageId+"/"+e},e.prototype.removeItem=function(e){window.localStorage.removeItem(this.targetKey(e))},e.prototype.getItem=function(e){return window.localStorage[this.targetKey(e)]},e.prototype.setItem=function(e,t){window.localStorage[this.targetKey(e)]=t},e.prototype.clear=function(){for(var e=this.targetKey(""),t=[],o=0;o<window.localStorage.length;++o){var r=window.localStorage.key(o);0==r.indexOf(e)&&t.push(r)}t.forEach(function(e){return window.localStorage.removeItem(e)})},e}();t.storageId=o;var s;t.setLocal=function(e,t){r(),s.setItem(e,t)},t.getLocal=function(e){return r(),s.getItem(e)},t.removeLocal=function(e){r(),s.removeItem(e)},t.clearLocal=function(){r(),s.clear()}}(e.storage||(e.storage={}))}(pxt||(pxt={}));var pxt;!function(e){!function(t){function o(){monaco.languages.typescript&&(n(),monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions({noSyntaxValidation:!0,noSemanticValidation:!0}),monaco.languages.typescript.typescriptDefaults.setCompilerOptions({allowUnreachableCode:!0,noImplicitAny:!0,allowJs:!1,allowUnusedLabels:!0,target:monaco.languages.typescript.ScriptTarget.ES5,outDir:"built",rootDir:".",noLib:!0,mouseWheelZoom:!0}),monaco.languages.typescript.typescriptDefaults.setMaximunWorkerIdleTime(12e5))}function r(t){var o=e.appTarget.appTheme.invertedMonaco,r=monaco.editor.create(t,{model:null,ariaLabel:e.Util.lf("JavaScript editor"),fontFamily:"'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', 'source-code-pro', 'monospace'",scrollBeyondLastLine:!1,language:"typescript",mouseWheelZoom:!0,wordBasedSuggestions:!0,lineNumbersMinChars:3,formatOnPaste:!0,minimap:{enabled:!1},autoIndent:!0,dragAndDrop:!0,matchBrackets:!0,occurrencesHighlight:!1,mouseWheelScrollSensitivity:.5,quickSuggestionsDelay:200,theme:o?"vs-dark":"vs",accessibilityHelpUrl:""});return r.layout(),r}function n(){monaco.languages.register({id:"asm",extensions:[".asm"]}),monaco.languages.setMonarchTokensProvider("asm",{tokenPostfix:"",keywords:["movs","mov","adds","add","adcs","adr","subs","sbcs","sub","rsbs","muls","cmp","cmn","ands","eors","orrs","bics","mvns","tst","lsls","lsrs","asrs","rors","ldr","ldrh","ldrb","ldrsh","ldrsb","ldm","str","strh","strb","stm","push","pop","cbz","cbnz","b","bl","bx","blx","sxth","sxtb","uxth","uxtb","rev","rev16","revsh","svc","cpsid","cpsie","setend","bkpt","nop","sev","wfe","wfi","yield","beq","bne","bcs","bhs","bcc","blo","bmi","bpl","bvs","bvc","bhi","bls","bge","blt","bgt","ble","bal","r0","r1","r2","r3","r4","r5","r6","r7","r8","r9","r10","r11","r12","r13","r14","r15","pc","sp","lr"],typeKeywords:[".startaddr",".hex",".short",".space",".section",".string",".byte"],operators:[],symbols:/[:\*]+/,escapes:/\\(?:[abfnrtv\\"']|x[0-9A-Fa-f]{1,4}|u[0-9A-Fa-f]{4}|U[0-9A-Fa-f]{8})/,tokenizer:{root:[[/(\.)?[a-z_$\.][\w$]*/,{cases:{"@typeKeywords":"keyword","@keywords":"keyword","@default":"identifier"}}],{include:"@whitespace"},[/[{}()\[\]]/,"@brackets"],[/[<>](?!@symbols)/,"@brackets"],[/@symbols/,{cases:{"@operators":"operator","@default":""}}],[/@\s*[a-zA-Z_\$][\w\$]*/,{token:"annotation"}],[/(#|(0[xX]))?[0-9a-fA-F]+/,"number"],[/[;,.]/,"delimiter"],[/"([^"\\]|\\.)*$/,"string.invalid"],[/"/,{token:"string.quote",bracket:"@open",next:"@string"}],[/'[^\\']'/,"string"],[/(')(@escapes)(')/,["string","string.escape","string"]],[/'/,"string.invalid"]],comment:[],string:[[/[^\\"]+/,"string"],[/@escapes/,"string.escape"],[/\\./,"string.escape.invalid"],[/"/,{token:"string.quote",bracket:"@close",next:"@pop"}]],whitespace:[[/[ \t\r\n]+/,"white"],[/\/\*/,"comment","@comment"],[/;.*$/,"comment"]]}})}t.syncModels=function(e,t,o,r){if(!r){var n=monaco.languages.typescript.typescriptDefaults.getExtraLibs(),a={};e.sortedDeps().forEach(function(e){e.getFiles().forEach(function(r){var n=e.id+"/"+r;if(/\.(ts)$/.test(r)&&n!=o){if(!monaco.languages.typescript.typescriptDefaults.getExtraLibs()[n]){var s=e.readFile(r)||" ";t[n]=monaco.languages.typescript.typescriptDefaults.addExtraLib(s,n)}a[n]="1"}})}),Object.keys(n).filter(function(e){return/\.(ts)$/.test(e)&&!a[e]}).forEach(function(e){t[e].dispose()})}},t.initMonacoAsync=function(e){return new Promise(function(t,n){if("object"!=typeof window.monaco){var a=window.MonacoPaths,s=function(){var n=window.require;n.config({paths:a}),n(["vs/editor/editor.main"],function(){o(),t(r(e))})};if(window.require)s();else{var i=document.createElement("script");i.type="text/javascript",i.src=a["vs/loader"],i.addEventListener("load",s),document.body.appendChild(i)}}else t(r(e))})},t.createEditor=r}(e.vs||(e.vs={}))}(pxt||(pxt={}));var pxt;!function(e){!function(t){function o(){if(void 0===a){var t=/sandbox=1|#sandbox|#sandboxproject/i.test(window.location.href)||e.BrowserUtils.isIFrame(),o=/nosandbox=1/i.test(window.location.href),r=/editorlayout=(widget|sandbox|ide)/i.exec(window.location.href);if(a=s.IDE,o?a=s.Widget:t&&(a=s.Sandbox),r)switch(r[1].toLowerCase()){case"widget":a=s.Widget;break;case"sandbox":a=s.Sandbox;break;case"ide":a=s.IDE}e.debug("shell: layout type "+s[a]+", readonly "+n())}}function r(){return o(),a==s.Sandbox}function n(){return r()&&!/[?&]edit=1/i.test(window.location.href)}!function(e){e[e.IDE=0]="IDE",e[e.Sandbox=1]="Sandbox",e[e.Widget=2]="Widget"}(t.EditorLayoutType||(t.EditorLayoutType={}));var a,s=t.EditorLayoutType;t.layoutTypeClass=function(){return o(),e.shell.EditorLayoutType[a].toLowerCase()},t.isSandboxMode=r,t.isReadOnly=n}(e.shell||(e.shell={}))}(pxt||(pxt={}));
+var pxt;
+(function (pxt) {
+    var editor;
+    (function (editor) {
+        (function (FilterState) {
+            FilterState[FilterState["Hidden"] = 0] = "Hidden";
+            FilterState[FilterState["Visible"] = 1] = "Visible";
+            FilterState[FilterState["Disabled"] = 2] = "Disabled";
+        })(editor.FilterState || (editor.FilterState = {}));
+        var FilterState = editor.FilterState;
+    })(editor = pxt.editor || (pxt.editor = {}));
+})(pxt || (pxt = {}));
+var pxt;
+(function (pxt) {
+    var editor;
+    (function (editor_1) {
+        var pendingRequests = {};
+        /**
+         * Binds incoming window messages to the project view.
+         * Requires the "allowParentController" flag in the pxtarget.json/appTheme object.
+         *
+         * When the project view receives a request (EditorMessageRequest),
+         * it starts the command and returns the result upon completion.
+         * The response (EditorMessageResponse) contains the request id and result.
+         * Some commands may be async, use the ``id`` field to correlate to the original request.
+         */
+        function bindEditorMessages(projectView) {
+            var allowEditorMessages = pxt.appTarget.appTheme.allowParentController && pxt.BrowserUtils.isIFrame();
+            var allowExtensionMessages = pxt.appTarget.appTheme.allowPackageExtensions;
+            var allowSimTelemetry = pxt.appTarget.appTheme.allowSimulatorTelemetry;
+            if (!allowEditorMessages && !allowExtensionMessages && !allowSimTelemetry)
+                return;
+            window.addEventListener("message", function (msg) {
+                var data = msg.data;
+                if (!data || !/^pxt(host|editor|pkgext|sim)$/.test(data.type))
+                    return false;
+                if (data.type === "pxtpkgext" && allowExtensionMessages) {
+                    // Messages sent to the editor iframe from a child iframe containing an extension
+                    projectView.handleExtensionRequest(data);
+                }
+                else if (data.type === "pxtsim" && allowSimTelemetry) {
+                    var event_1 = data;
+                    if (event_1.action === "event") {
+                        if (event_1.category || event_1.message) {
+                            pxt.reportError(event_1.category, event_1.message, event_1.data);
+                        }
+                        else {
+                            pxt.tickEvent(event_1.tick, event_1.data);
+                        }
+                    }
+                }
+                else if (allowEditorMessages) {
+                    // Messages sent to the editor from the parent frame
+                    var p = Promise.resolve();
+                    var resp_1 = undefined;
+                    if (data.type == "pxthost") {
+                        var req_1 = pendingRequests[data.id];
+                        if (!req_1) {
+                            pxt.debug("pxthost: unknown request " + data.id);
+                        }
+                        else {
+                            p = p.then(function () { return req_1.resolve(data); });
+                        }
+                    }
+                    else if (data.type == "pxteditor") {
+                        var req = data;
+                        pxt.debug("pxteditor: " + req.action);
+                        switch (req.action.toLowerCase()) {
+                            case "switchjavascript":
+                                p = p.then(function () { return projectView.openJavaScript(); });
+                                break;
+                            case "switchblocks":
+                                p = p.then(function () { return projectView.openBlocks(); });
+                                break;
+                            case "startsimulator":
+                                p = p.then(function () { return projectView.startSimulator(); });
+                                break;
+                            case "restartsimulator":
+                                p = p.then(function () { return projectView.restartSimulator(); });
+                                break;
+                            case "hidesimulator":
+                                p = p.then(function () { return projectView.collapseSimulator(); });
+                                break;
+                            case "showsimulator":
+                                p = p.then(function () { return projectView.expandSimulator(); });
+                                break;
+                            case "closeflyout":
+                                p = p.then(function () { return projectView.closeFlyout(); });
+                                break;
+                            case "redo":
+                                p = p.then(function () {
+                                    var editor = projectView.editor;
+                                    if (editor && editor.hasRedo())
+                                        editor.redo();
+                                });
+                                break;
+                            case "undo":
+                                p = p.then(function () {
+                                    var editor = projectView.editor;
+                                    if (editor && editor.hasUndo())
+                                        editor.undo();
+                                });
+                                break;
+                            case "stopsimulator": {
+                                var stop_1 = data;
+                                p = p.then(function () { return projectView.stopSimulator(stop_1.unload); });
+                                break;
+                            }
+                            case "newproject": {
+                                var create_1 = data;
+                                p = p.then(function () { return projectView.newProject(create_1.options); });
+                                break;
+                            }
+                            case "importproject": {
+                                var load_1 = data;
+                                p = p.then(function () { return projectView.importProjectAsync(load_1.project, {
+                                    filters: load_1.filters,
+                                    searchBar: load_1.searchBar
+                                }); });
+                                break;
+                            }
+                            case "proxytosim": {
+                                var simmsg_1 = data;
+                                p = p.then(function () { return projectView.proxySimulatorMessage(simmsg_1.content); });
+                                break;
+                            }
+                            case "renderblocks": {
+                                var rendermsg_1 = data;
+                                p = p.then(function () { return projectView.renderBlocksAsync(rendermsg_1); })
+                                    .then(function (img) { resp_1 = img; });
+                                break;
+                            }
+                            case "toggletrace": {
+                                var togglemsg_1 = data;
+                                p = p.then(function () { return projectView.toggleTrace(togglemsg_1.intervalSpeed); });
+                                break;
+                            }
+                        }
+                    }
+                    p.done(function () { return sendResponse(data, resp_1, true, undefined); }, function (err) { return sendResponse(data, resp_1, false, err); });
+                }
+                return true;
+            }, false);
+        }
+        editor_1.bindEditorMessages = bindEditorMessages;
+        /**
+         * Sends analytics messages upstream to container if any
+         */
+        function enableControllerAnalytics() {
+            if (!pxt.appTarget.appTheme.allowParentController || !pxt.BrowserUtils.isIFrame())
+                return;
+            var te = pxt.tickEvent;
+            pxt.tickEvent = function (id, data) {
+                if (te)
+                    te(id, data);
+                postHostMessageAsync({
+                    type: 'pxthost',
+                    action: 'event',
+                    tick: id,
+                    response: false,
+                    data: data
+                });
+            };
+            var rexp = pxt.reportException;
+            pxt.reportException = function (err, data) {
+                if (rexp)
+                    rexp(err, data);
+                try {
+                    postHostMessageAsync({
+                        type: 'pxthost',
+                        action: 'event',
+                        tick: 'error',
+                        message: err.message,
+                        response: false,
+                        data: data
+                    });
+                }
+                catch (e) {
+                }
+            };
+            var re = pxt.reportError;
+            pxt.reportError = function (cat, msg, data) {
+                if (re)
+                    re(cat, msg, data);
+                postHostMessageAsync({
+                    type: 'pxthost',
+                    action: 'event',
+                    tick: 'error',
+                    category: cat,
+                    message: msg,
+                    data: data
+                });
+            };
+        }
+        editor_1.enableControllerAnalytics = enableControllerAnalytics;
+        function sendResponse(request, resp, success, error) {
+            if (request.response) {
+                window.parent.postMessage({
+                    type: request.type,
+                    id: request.id,
+                    resp: resp,
+                    success: success,
+                    error: error
+                }, "*");
+            }
+        }
+        /**
+         * Posts a message from the editor to the host
+         */
+        function postHostMessageAsync(msg) {
+            return new Promise(function (resolve, reject) {
+                var env = pxt.Util.clone(msg);
+                env.id = pxt.Util.guidGen();
+                if (msg.response)
+                    pendingRequests[env.id] = { resolve: resolve, reject: reject };
+                window.parent.postMessage(env, "*");
+                if (!msg.response)
+                    resolve(undefined);
+            });
+        }
+        editor_1.postHostMessageAsync = postHostMessageAsync;
+    })(editor = pxt.editor || (pxt.editor = {}));
+})(pxt || (pxt = {}));
+var pxt;
+(function (pxt) {
+    var editor;
+    (function (editor) {
+        (function (PermissionResponses) {
+            PermissionResponses[PermissionResponses["Granted"] = 0] = "Granted";
+            PermissionResponses[PermissionResponses["Denied"] = 1] = "Denied";
+            PermissionResponses[PermissionResponses["NotAvailable"] = 2] = "NotAvailable";
+        })(editor.PermissionResponses || (editor.PermissionResponses = {}));
+        var PermissionResponses = editor.PermissionResponses;
+    })(editor = pxt.editor || (pxt.editor = {}));
+})(pxt || (pxt = {}));
+var pxt;
+(function (pxt) {
+    var storage;
+    (function (storage) {
+        var MemoryStorage = (function () {
+            function MemoryStorage() {
+                this.items = {};
+            }
+            MemoryStorage.prototype.removeItem = function (key) {
+                delete this.items[key];
+            };
+            MemoryStorage.prototype.getItem = function (key) {
+                return this.items[key];
+            };
+            MemoryStorage.prototype.setItem = function (key, value) {
+                this.items[key] = value;
+            };
+            MemoryStorage.prototype.clear = function () {
+                this.items = {};
+            };
+            return MemoryStorage;
+        }());
+        var LocalStorage = (function () {
+            function LocalStorage(storageId) {
+                this.storageId = storageId;
+            }
+            LocalStorage.prototype.targetKey = function (key) {
+                return this.storageId + '/' + key;
+            };
+            LocalStorage.prototype.removeItem = function (key) {
+                window.localStorage.removeItem(this.targetKey(key));
+            };
+            LocalStorage.prototype.getItem = function (key) {
+                return window.localStorage[this.targetKey(key)];
+            };
+            LocalStorage.prototype.setItem = function (key, value) {
+                window.localStorage[this.targetKey(key)] = value;
+            };
+            LocalStorage.prototype.clear = function () {
+                var prefix = this.targetKey('');
+                var keys = [];
+                for (var i = 0; i < window.localStorage.length; ++i) {
+                    var key = window.localStorage.key(i);
+                    if (key.indexOf(prefix) == 0)
+                        keys.push(key);
+                }
+                keys.forEach(function (key) { return window.localStorage.removeItem(key); });
+            };
+            return LocalStorage;
+        }());
+        function storageId() {
+            var id = pxt.appTarget ? pxt.appTarget.id : window.pxtConfig ? window.pxtConfig.targetId : '';
+            return id;
+        }
+        storage.storageId = storageId;
+        var impl;
+        function init() {
+            if (impl)
+                return;
+            // test if local storage is supported
+            var sid = storageId();
+            var supported = false;
+            // no local storage in sandbox mode
+            if (!pxt.shell.isSandboxMode()) {
+                try {
+                    window.localStorage[sid] = '1';
+                    var v = window.localStorage[sid];
+                    supported = true;
+                }
+                catch (e) { }
+            }
+            if (!supported) {
+                impl = new MemoryStorage();
+                pxt.debug('storage: in memory');
+            }
+            else {
+                impl = new LocalStorage(sid);
+                pxt.debug("storage: local under " + sid);
+            }
+        }
+        function setLocal(key, value) {
+            init();
+            impl.setItem(key, value);
+        }
+        storage.setLocal = setLocal;
+        function getLocal(key) {
+            init();
+            return impl.getItem(key);
+        }
+        storage.getLocal = getLocal;
+        function removeLocal(key) {
+            init();
+            impl.removeItem(key);
+        }
+        storage.removeLocal = removeLocal;
+        function clearLocal() {
+            init();
+            impl.clear();
+        }
+        storage.clearLocal = clearLocal;
+    })(storage = pxt.storage || (pxt.storage = {}));
+})(pxt || (pxt = {}));
+/// <reference path="../typings/globals/bluebird/index.d.ts"/>
+/// <reference path="../localtypings/monaco.d.ts" />
+/// <reference path="../built/pxtlib.d.ts"/>
+var pxt;
+(function (pxt) {
+    var vs;
+    (function (vs) {
+        function syncModels(mainPkg, libs, currFile, readOnly) {
+            if (readOnly)
+                return;
+            var extraLibs = monaco.languages.typescript.typescriptDefaults.getExtraLibs();
+            var modelMap = {};
+            mainPkg.sortedDeps().forEach(function (pkg) {
+                pkg.getFiles().forEach(function (f) {
+                    var fp = pkg.id + "/" + f;
+                    var proto = "pkg:" + fp;
+                    if (/\.(ts)$/.test(f) && fp != currFile) {
+                        if (!monaco.languages.typescript.typescriptDefaults.getExtraLibs()[fp]) {
+                            var content = pkg.readFile(f) || " ";
+                            libs[fp] = monaco.languages.typescript.typescriptDefaults.addExtraLib(content, fp);
+                        }
+                        modelMap[fp] = "1";
+                    }
+                });
+            });
+            // dispose of any extra libraries, the typescript worker will be killed as a result of this
+            Object.keys(extraLibs)
+                .filter(function (lib) { return /\.(ts)$/.test(lib) && !modelMap[lib]; })
+                .forEach(function (lib) {
+                libs[lib].dispose();
+            });
+        }
+        vs.syncModels = syncModels;
+        function initMonacoAsync(element) {
+            return new Promise(function (resolve, reject) {
+                if (typeof (window.monaco) === 'object') {
+                    // monaco is already loaded
+                    resolve(createEditor(element));
+                    return;
+                }
+                var monacoPaths = window.MonacoPaths;
+                var onGotAmdLoader = function () {
+                    var req = window.require;
+                    req.config({ paths: monacoPaths });
+                    // Load monaco
+                    req(['vs/editor/editor.main'], function () {
+                        setupMonaco();
+                        resolve(createEditor(element));
+                    });
+                };
+                // Load AMD loader if necessary
+                if (!window.require) {
+                    var loaderScript = document.createElement('script');
+                    loaderScript.type = 'text/javascript';
+                    loaderScript.src = monacoPaths['vs/loader'];
+                    loaderScript.addEventListener('load', onGotAmdLoader);
+                    document.body.appendChild(loaderScript);
+                }
+                else {
+                    onGotAmdLoader();
+                }
+            });
+        }
+        vs.initMonacoAsync = initMonacoAsync;
+        function setupMonaco() {
+            if (!monaco.languages.typescript)
+                return;
+            initAsmMonarchLanguage();
+            // validation settings
+            monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions({
+                noSyntaxValidation: true,
+                noSemanticValidation: true
+            });
+            // compiler options
+            monaco.languages.typescript.typescriptDefaults.setCompilerOptions({
+                allowUnreachableCode: true,
+                noImplicitAny: true,
+                allowJs: false,
+                allowUnusedLabels: true,
+                target: monaco.languages.typescript.ScriptTarget.ES5,
+                outDir: "built",
+                rootDir: ".",
+                noLib: true,
+                mouseWheelZoom: true
+            });
+            // maximum idle time
+            monaco.languages.typescript.typescriptDefaults.setMaximunWorkerIdleTime(20 * 60 * 1000);
+        }
+        function createEditor(element) {
+            var inverted = pxt.appTarget.appTheme.invertedMonaco;
+            var editor = monaco.editor.create(element, {
+                model: null,
+                ariaLabel: pxt.Util.lf("JavaScript editor"),
+                fontFamily: "'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', 'source-code-pro', 'monospace'",
+                scrollBeyondLastLine: false,
+                language: "typescript",
+                mouseWheelZoom: true,
+                wordBasedSuggestions: true,
+                lineNumbersMinChars: 3,
+                formatOnPaste: true,
+                minimap: {
+                    enabled: false
+                },
+                autoIndent: true,
+                dragAndDrop: true,
+                matchBrackets: true,
+                occurrencesHighlight: false,
+                mouseWheelScrollSensitivity: 0.5,
+                quickSuggestionsDelay: 200,
+                theme: inverted ? 'vs-dark' : 'vs',
+                //accessibilitySupport: 'on',
+                accessibilityHelpUrl: "" //TODO: Add help url explaining how to use the editor with a screen reader
+            });
+            editor.layout();
+            return editor;
+        }
+        vs.createEditor = createEditor;
+        function initAsmMonarchLanguage() {
+            monaco.languages.register({ id: 'asm', extensions: ['.asm'] });
+            monaco.languages.setMonarchTokensProvider('asm', {
+                // Set defaultToken to invalid to see what you do not tokenize yet
+                // defaultToken: 'invalid',
+                tokenPostfix: '',
+                //Extracted from http://infocenter.arm.com/help/topic/com.arm.doc.qrc0006e/QRC0006_UAL16.pdf
+                //Should be a superset of the instructions emitted
+                keywords: [
+                    'movs', 'mov', 'adds', 'add', 'adcs', 'adr', 'subs', 'sbcs', 'sub', 'rsbs',
+                    'muls', 'cmp', 'cmn', 'ands', 'eors', 'orrs', 'bics', 'mvns', 'tst', 'lsls',
+                    'lsrs', 'asrs', 'rors', 'ldr', 'ldrh', 'ldrb', 'ldrsh', 'ldrsb', 'ldm',
+                    'str', 'strh', 'strb', 'stm', 'push', 'pop', 'cbz', 'cbnz', 'b', 'bl', 'bx', 'blx',
+                    'sxth', 'sxtb', 'uxth', 'uxtb', 'rev', 'rev16', 'revsh', 'svc', 'cpsid', 'cpsie',
+                    'setend', 'bkpt', 'nop', 'sev', 'wfe', 'wfi', 'yield',
+                    'beq', 'bne', 'bcs', 'bhs', 'bcc', 'blo', 'bmi', 'bpl', 'bvs', 'bvc', 'bhi', 'bls',
+                    'bge', 'blt', 'bgt', 'ble', 'bal',
+                    //Registers
+                    'r0', 'r1', 'r2', 'r3', 'r4', 'r5', 'r6', 'r7', 'r8', 'r9', 'r10', 'r11', 'r12', 'r13', 'r14', 'r15',
+                    'pc', 'sp', 'lr'
+                ],
+                typeKeywords: [
+                    '.startaddr', '.hex', '.short', '.space', '.section', '.string', '.byte'
+                ],
+                operators: [],
+                // Not all of these are valid in ARM Assembly
+                symbols: /[:\*]+/,
+                // C# style strings
+                escapes: /\\(?:[abfnrtv\\"']|x[0-9A-Fa-f]{1,4}|u[0-9A-Fa-f]{4}|U[0-9A-Fa-f]{8})/,
+                // The main tokenizer for our languages
+                tokenizer: {
+                    root: [
+                        // identifiers and keywords
+                        [/(\.)?[a-z_$\.][\w$]*/, {
+                                cases: {
+                                    '@typeKeywords': 'keyword',
+                                    '@keywords': 'keyword',
+                                    '@default': 'identifier'
+                                }
+                            }],
+                        // whitespace
+                        { include: '@whitespace' },
+                        // delimiters and operators
+                        [/[{}()\[\]]/, '@brackets'],
+                        [/[<>](?!@symbols)/, '@brackets'],
+                        [/@symbols/, {
+                                cases: {
+                                    '@operators': 'operator',
+                                    '@default': ''
+                                }
+                            }],
+                        // @ annotations.
+                        [/@\s*[a-zA-Z_\$][\w\$]*/, { token: 'annotation' }],
+                        // numbers
+                        //[/\d*\.\d+([eE][\-+]?\d+)?/, 'number.float'],
+                        [/(#|(0[xX]))?[0-9a-fA-F]+/, 'number'],
+                        // delimiter: after number because of .\d floats
+                        [/[;,.]/, 'delimiter'],
+                        // strings
+                        [/"([^"\\]|\\.)*$/, 'string.invalid'],
+                        [/"/, { token: 'string.quote', bracket: '@open', next: '@string' }],
+                        // characters
+                        [/'[^\\']'/, 'string'],
+                        [/(')(@escapes)(')/, ['string', 'string.escape', 'string']],
+                        [/'/, 'string.invalid']
+                    ],
+                    comment: [],
+                    string: [
+                        [/[^\\"]+/, 'string'],
+                        [/@escapes/, 'string.escape'],
+                        [/\\./, 'string.escape.invalid'],
+                        [/"/, { token: 'string.quote', bracket: '@close', next: '@pop' }]
+                    ],
+                    whitespace: [
+                        [/[ \t\r\n]+/, 'white'],
+                        [/\/\*/, 'comment', '@comment'],
+                        [/;.*$/, 'comment'],
+                    ],
+                }
+            });
+        }
+    })(vs = pxt.vs || (pxt.vs = {}));
+})(pxt || (pxt = {}));
+var pxt;
+(function (pxt) {
+    var shell;
+    (function (shell) {
+        (function (EditorLayoutType) {
+            EditorLayoutType[EditorLayoutType["IDE"] = 0] = "IDE";
+            EditorLayoutType[EditorLayoutType["Sandbox"] = 1] = "Sandbox";
+            EditorLayoutType[EditorLayoutType["Widget"] = 2] = "Widget";
+        })(shell.EditorLayoutType || (shell.EditorLayoutType = {}));
+        var EditorLayoutType = shell.EditorLayoutType;
+        var layoutType;
+        function init() {
+            if (layoutType !== undefined)
+                return;
+            var sandbox = /sandbox=1|#sandbox|#sandboxproject/i.test(window.location.href)
+                || pxt.BrowserUtils.isIFrame();
+            var nosandbox = /nosandbox=1/i.test(window.location.href);
+            var layout = /editorlayout=(widget|sandbox|ide)/i.exec(window.location.href);
+            layoutType = EditorLayoutType.IDE;
+            if (nosandbox)
+                layoutType = EditorLayoutType.Widget;
+            else if (sandbox)
+                layoutType = EditorLayoutType.Sandbox;
+            if (layout) {
+                switch (layout[1].toLowerCase()) {
+                    case "widget":
+                        layoutType = EditorLayoutType.Widget;
+                        break;
+                    case "sandbox":
+                        layoutType = EditorLayoutType.Sandbox;
+                        break;
+                    case "ide":
+                        layoutType = EditorLayoutType.IDE;
+                        break;
+                }
+            }
+            pxt.debug("shell: layout type " + EditorLayoutType[layoutType] + ", readonly " + isReadOnly());
+        }
+        function layoutTypeClass() {
+            init();
+            return pxt.shell.EditorLayoutType[layoutType].toLowerCase();
+        }
+        shell.layoutTypeClass = layoutTypeClass;
+        function isSandboxMode() {
+            init();
+            return layoutType == EditorLayoutType.Sandbox;
+        }
+        shell.isSandboxMode = isSandboxMode;
+        function isReadOnly() {
+            return isSandboxMode()
+                && !/[?&]edit=1/i.test(window.location.href);
+        }
+        shell.isReadOnly = isReadOnly;
+    })(shell = pxt.shell || (pxt.shell = {}));
+})(pxt || (pxt = {}));
+/// <reference path="../typings/globals/bluebird/index.d.ts"/>
+/// <reference path="../built/pxtlib.d.ts"/>

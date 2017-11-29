@@ -1,1 +1,7909 @@
-var __extends=this&&this.__extends||function(e,t){function o(){this.constructor=e}for(var i in t)t.hasOwnProperty(i)&&(e[i]=t[i]);e.prototype=null===t?Object.create(t):(o.prototype=t.prototype,new o)},B=Blockly,iface,pxt;!function(e){!function(t){function o(t,o){return e.worker.getWorker(e.webConfig.workerjs).opAsync(t,o)}function i(e,t){e.push.apply(e,t)}function r(e){if(!e)throw new Error("Assertion failure")}function n(e,t){var o=new Error(e);throw o.block=t,o}function l(e){return e.link?l(e.link):e}function a(e,t){var o=l(e),i=l(t);if(r(null==o.link&&null==i.link),o!=i){if(o.childType&&i.childType){var n=o.childType;o.childType=null,a(n,i.childType)}else o.childType&&!i.childType&&(i.childType=o.childType);if(o.parentType&&i.parentType){var s=o.parentType;o.parentType=null,a(s,i.parentType)}else o.parentType&&!i.parentType&&(i.parentType=o.parentType);var c=p(o.type,i.type);e.link=i,o.link=i,e.type=null,t.type=c}}function s(e){return new xe(null,e)}function c(e){if(!e)return s(e);switch(e.toLowerCase()){case"number":return Ee;case"boolean":return Be;case"string":return Ae;case"void":return Ce;default:return s(e)}}function u(e,t){if(r(null!=t),"placeholder"==t.type||t.type===pxtc.TS_OUTPUT_TYPE)return l(t.p);if("variables_get"==t.type)return l(G(e,K(t.getFieldValue("VAR"),e)).type);if(!t.outputConnection)return c(Ce.type);var o=t.outputConnection.check_&&t.outputConnection.check_.length?t.outputConnection.check_[0]:"T";if("Array"===o){var i=void 0;if(t.inputList&&t.inputList.length)for(var n=0,a=t.inputList;n<a.length;n++){var p=a[n];if(p.connection&&p.connection.targetBlock()){var h=l(u(e,p.connection.targetBlock()));if(h){if(h.parentType)return h.parentType;y(i=c(h.type+"[]"),h);break}}}return i||c("Array")}if("T"===o){var m=e.stdCallTable[t.type],f="lists_index_get"===t.type;if(f||m&&m.args.length){var g=void 0;if((g=f?t.inputList.filter(function(e){return"LIST"===e.name})[0]:t.inputList.filter(function(e){return e.name===m.args[0].field})[0]).connection&&g.connection.targetBlock()){var b=u(e,g.connection.targetBlock());if(b.childType)return b.childType;var k=s(d(b.type)?b.type.substr(-2):null);return y(b,k),k}}return s(null)}return c(o)}function p(e,t){if(null==e||"Array"===e&&d(t))return t;if(null==t||"Array"===t&&d(e))return e;if(e==t)return e;throw new Error("cannot mix "+e+" with "+t)}function d(e){return e&&-1!==e.indexOf("[]")}function h(e,t,o){return{type:"placeholder",p:s(o||null),workspace:e.workspace,parentBlock_:t}}function m(e,t,o,i){var r=t.getInputTargetBlock(o);r?r.type!==pxtc.TS_OUTPUT_TYPE||r.p||(r.p=s(null)):(_e[t.id]||(_e[t.id]={}),_e[t.id][o]||(_e[t.id][o]=h(e,t,i)))}function f(e,t){var o=e.getInputTargetBlock(t);return o||_e[e.id]&&_e[e.id][t]}function g(){_e={}}function b(e,t,o,i){try{m(e,t,o),a(u(e,f(t,o)),i)}catch(e){n("The parameter "+o+" of this block is of the wrong type. More precisely: "+e,t)}}function k(e,t){function o(e){return e.name?e.connection&&e.connection.check_&&e.connection.check_.length?e.connection.check_[0]:"T":void 0}function i(t,i){var r=t.inputList.filter(function(e){return"T"===o(e)});if(r.length){var n=f(t,r[0].name);if(n){var l=u(e,n),a=c(l.type?u(e,n).type+"[]":null);return y(a,l),b(e,t,i,a),!0}}return!1}t&&t.getAllBlocks().filter(function(e){return!e.disabled}).forEach(function(t){try{switch(t.type){case"math_op2":b(e,t,"x",c(Ee.type)),b(e,t,"y",c(Ee.type));break;case"math_op3":b(e,t,"x",c(Ee.type));break;case"math_arithmetic":case"logic_compare":switch(t.getFieldValue("OP")){case"ADD":case"MINUS":case"MULTIPLY":case"DIVIDE":case"LT":case"LTE":case"GT":case"GTE":case"POWER":b(e,t,"A",c(Ee.type)),b(e,t,"B",c(Ee.type));break;case"AND":case"OR":m(e,t,"A",Be.type),m(e,t,"B",Be.type);break;case"EQ":case"NEQ":m(e,t,"A"),m(e,t,"B");var r=u(e,f(t,"A")),s=u(e,f(t,"B"));try{a(r,s)}catch(e){n("Comparing objects of different types",t)}var p=l(r).type;p!=Ae.type&&p!=Be.type&&p!=Ee.type&&null!=p&&n("I can only compare strings, booleans and numbers",t)}break;case"logic_operation":m(e,t,"A",Be.type),m(e,t,"B",Be.type);break;case"logic_negate":m(e,t,"BOOL",Be.type);break;case"controls_if":for(var d=0;d<=t.elseifCount_;++d)m(e,t,"IF"+d,Be.type);break;case"controls_simple_for":b(e,t,"TO",c(Ee.type));break;case"controls_for_of":b(e,t,"LIST",c("Array")),y(u(e,f(t,"LIST")),G(e,K(t.getFieldValue("VAR"),e)).type);break;case"variables_set":case"variables_change":var h=K(t.getFieldValue("VAR"),e),g=G(e,h).type;m(e,t,"VALUE");var k=f(t,"VALUE");if(k){var v=u(e,k);try{a(g,v)}catch(e){n("Assigning a value of the wrong type to variable "+h,t)}}break;case"controls_repeat_ext":b(e,t,"TIMES",c(Ee.type));break;case"device_while":m(e,t,"COND",Be.type);break;case"lists_index_get":b(e,t,"LIST",c("Array")),b(e,t,"INDEX",c(Ee.type)),y(u(e,f(t,"LIST")),u(e,t));break;case"lists_index_set":b(e,t,"LIST",c("Array")),m(e,t,"VALUE"),i(t,"LIST"),b(e,t,"INDEX",c(Ee.type));break;default:if(t.type in e.stdCallTable){var _=e.stdCallTable[t.type];_.args.forEach(function(r,n){var l=_.isExtensionMethod&&0===n;if(r.field&&!t.getFieldValue(r.field)){var a=t.inputList.filter(function(e){return e.name==r.field})[0];if(a.connection&&a.connection.check_){if(l&&"Array"===o(a)&&i(t,r.field))return;for(var s=0;s<a.connection.check_.length;s++)try{var u=a.connection.check_[s];b(e,t,r.field,c(u));break}catch(e){}}}})}}}catch(o){var T=o.block||t;T.setWarningText(o+""),e.errors.push(T)}}),e.bindings.forEach(function(e){null==v(e.type).type&&a(e.type,c(Ee.type))})}function y(e,t){var o=l(e),i=l(t);o.childType?a(o.childType,i):o.childType=i,i.parentType?a(i.parentType,o):i.parentType=o}function v(e,t){void 0===t&&(t=[]);var o=l(e);if(-1===t.indexOf(o)&&(t.push(o),!o.type||"Array"===o.type)){if(o.parentType){var i=v(o.parentType,t);if(i.type&&"Array"!==i.type)return o.type=i.type.substr(0,i.type.length-2),o}if(o.childType){var r=v(o.childType,t);if(r.type)return o.type=r.type+"[]",o}}return o}function _(e){var t=e.getFieldValue("math_number_minmax"===e.type?"SLIDER":"NUM"),o=parseFloat(t);return T(o,e),o}function T(e,t){(e===1/0||isNaN(e))&&n(lf("Number entered is either too large or too small"),t)}function x(e,o,i){return t.mkText(o.getFieldValue("EXPRESSION").trim())}function E(e,o,i){return t.H.mkNumberLiteral(_(o))}function B(e,o,i){var n=o.getFieldValue("OP"),l=f(o,"A"),a=f(o,"B"),s=[V(e,l,i),V(e,a,i)],c=u(e,l).type;if(c==Ae.type){if("EQ"==n)return t.H.mkSimpleCall("==",s);if("NEQ"==n)return t.H.mkSimpleCall("!=",s)}else if(c==Be.type)return t.H.mkSimpleCall(Ne[n],s);return"POWER"==n?t.H.mathCall("pow",s):(r(n in Ne),t.H.mkSimpleCall(Ne[n],s))}function A(e,o,i){var r=f(o,"DIVIDEND"),n=f(o,"DIVISOR"),l=[V(e,r,i),V(e,n,i)];return t.H.mkSimpleCall("%",l)}function C(e,o,i){var r=o.getFieldValue("op"),n=V(e,f(o,"x"),i),l=V(e,f(o,"y"),i);return t.H.mathCall(r,[n,l])}function N(e,o,i){var r=V(e,f(o,"x"),i);return t.H.mathCall("abs",[r])}function w(e,o,i){return t.H.mkStringLiteral(o.getFieldValue("TEXT"))}function I(e,o,i){for(var r,n=0;;){var l=f(o,"ADD"+n);if(n++,!l){if(n<o.inputList.length)continue;break}var a=V(e,l,i);r=r?t.H.mkSimpleCall("+",[r,a]):0===l.type.indexOf("text")?a:t.H.mkSimpleCall("+",[t.H.mkStringLiteral(""),a])}return r||t.H.mkStringLiteral("")}function S(e,o,i){return t.H.mkBooleanLiteral("TRUE"==o.getFieldValue("BOOL"))}function D(e,o,i){var r=V(e,f(o,"BOOL"),i);return t.mkPrefix("!",[t.H.mkParenthesizedExpression(r)])}function O(e,o,i){var r=o.inputList.map(function(t){return t.connection&&t.connection.targetBlock()?V(e,t.connection.targetBlock(),i):void 0}).filter(function(e){return!!e});return t.H.mkArrayLiteral(r)}function L(e,o,i){var r=V(e,f(o,"LIST"),i),n=V(e,f(o,"INDEX"),i);return t.mkGroup([r,t.mkText("["),n,t.mkText("]")])}function F(e,o,i){var r=f(o,"LIST"),n=V(e,r,i),l=V(e,f(o,"INDEX"),i),a=V(e,f(o,"VALUE"),i),s=t.mkGroup([n,t.mkText("["),l,t.mkText("] = "),a]);return"lists_create_with"===r.type?de(s):s}function R(e,o,i){var r=K(o.getFieldValue("NAME"),e,!0),n=f(o,"STACK");return[t.mkText("function "+r+"() "),ue(e,n)]}function P(e,o,i){var r=K(o.getFieldValue("NAME"),e,!0);return t.mkStmt(t.mkText(r+"()"))}function M(e){if(null==e.type&&(a(e,c(Ee.type)),e=l(e)),d(e.type))return t.mkText("[]");switch(e.type){case"boolean":return t.H.mkBooleanLiteral(!1);case"number":return t.H.mkNumberLiteral(0);case"string":return t.H.mkStringLiteral("");default:return t.mkText("null")}}function V(o,i,n){r(null!=i),o.stats[i.type]=(o.stats[i.type]||0)+1,ye(i,n);var a;if(i.disabled||"placeholder"==i.type)if("Array"===l(u(o,i)).type){var s="lists_index_get"===i.parentBlock_.type;s||(s=(p=o.stdCallTable[i.parentBlock_.type])&&p.isExpression);var c=t.mkText("[0]");a=s?c:de(c)}else a=M(u(o,i));else switch(i.type){case"math_number":case"math_number_minmax":a=E(o,i,n);break;case"math_op2":a=C(o,i,n);break;case"math_op3":a=N(o,i,n);break;case"math_arithmetic":case"logic_compare":case"logic_operation":a=B(o,i,n);break;case"math_modulo":a=A(o,i,n);break;case"logic_boolean":a=S(o,i,n);break;case"logic_negate":a=D(o,i,n);break;case"variables_get":a=J(o,i);break;case"text":a=w(o,i,n);break;case"text_join":a=I(o,i,n);break;case"lists_create_with":a=O(o,i,n);break;case"lists_index_get":a=L(o,i,n);break;case"lists_index_set":a=F(o,i,n);break;case pxtc.TS_OUTPUT_TYPE:a=x(o,i,n);break;default:var p=o.stdCallTable[i.type];p?a=p.imageLiteral?se(o,i,p.imageLiteral,p.namespace,p.f,p.args.map(function(e){return te(o,i,e,n)})):oe(o,i,p,n):(e.reportError("blocks","unabled compile expression",{details:i.type}),a=M(u(o,i)))}return a.id=i.id,a}function U(e){return e.declaredInLocalScope&&!e.mustBeGlobal}function H(e,t,o){return r(null==G(e,t)),{workspace:e.workspace,bindings:[{name:t,type:c(o),declaredInLocalScope:0}].concat(e.bindings),stdCallTable:e.stdCallTable,errors:e.errors,renames:e.renames,stats:e.stats}}function G(e,t){for(var o=0;o<e.bindings.length;++o)if(e.bindings[o].name==t)return e.bindings[o];return null}function W(e){return{workspace:e,bindings:[],stdCallTable:{},errors:[],renames:{oldToNew:{},takenNames:{},oldToNewFunctions:{}},stats:{}}}function X(e,o,r){for(var n=[],l=0;l<=o.elseifCount_;++l){var a=V(e,f(o,"IF"+l),r),s=ue(e,f(o,"DO"+l)),c=t.mkText("if (");l>0&&((c=t.mkText("else if (")).glueToBlock=t.GlueMode.WithSpace),i(n,[c,a,t.mkText(")"),s])}if(o.elseCount_){var u=t.mkText("else");u.glueToBlock=t.GlueMode.WithSpace,i(n,[u,ue(e,f(o,"ELSE"))])}return n}function q(e,o,i){var n=K(o.getFieldValue("VAR"),e),l=f(o,"TO"),a=f(o,"DO"),s=f(o,"BY"),c=f(o,"FROM"),u=!s||s.type.match(/^math_number/)&&1==_(s);return r(G(e,n).declaredInLocalScope>0),[t.mkText("for (let "+n+" = "),c?V(e,c,i):t.mkText("0"),t.mkText("; "),t.mkInfix(t.mkText(n),"<=",V(e,l,i)),t.mkText("; "),u?t.mkText(n+"++"):t.mkInfix(t.mkText(n),"+=",V(e,s,i)),t.mkText(")"),ue(e,a)]}function Y(e,o,i){for(var r=V(e,f(o,"TIMES"),i),n=ue(e,f(o,"DO")),l="i",a=0;!function(t){return!G(e,t)}(l);a++)l="i"+a;return[t.mkText("for (let "+l+" = 0; "),t.mkInfix(t.mkText(l),"<",r),t.mkText("; "+l+"++)"),n]}function j(e,o,i){var r=V(e,f(o,"COND"),i),n=ue(e,f(o,"DO"));return[t.mkText("while ("),r,t.mkText(")"),n]}function z(e,o,i){var n=K(o.getFieldValue("VAR"),e),l=f(o,"LIST"),a=f(o,"DO");return r(G(e,n).declaredInLocalScope>0),[t.mkText("for (let "+n+" of "),V(e,l,i),t.mkText(")"),ue(e,a)]}function K(e,t,o){if(void 0===o&&(o=!1),!e)return"_";if(o){if(t.renames.oldToNewFunctions[e])return t.renames.oldToNewFunctions[e]}else if(t.renames.oldToNew[e])return t.renames.oldToNew[e];var i=ts.pxtc.escapeIdentifier(e);if(t.renames.takenNames[i]){for(var r=2;t.renames.takenNames[i+r];)r++;i+=r}return o?t.renames.oldToNewFunctions[e]=i:t.renames.oldToNew[e]=i,t.renames.takenNames[i]=!0,i}function J(e,o){var i=K(o.getFieldValue("VAR"),e),n=G(e,i);return n.assigned||(n.assigned=we.Read),r(null!=n&&null!=n.type),t.mkText(i)}function Q(e,o,i){var r=K(o.getFieldValue("VAR"),e),n=f(o,"VALUE"),l=G(e,r),a=!1;l.assigned||(o.getSurroundParent()?l.assigned=we.Read:(l.assigned=we.Assign,a=!0));var s=V(e,n,i);return t.mkStmt(t.mkText(a?"let ":""),t.mkText(r+" = "),s)}function $(e,o,i){var r=K(o.getFieldValue("VAR"),e),n=f(o,"VALUE"),l=G(e,r);l.assigned||(l.assigned=we.Read);var a=V(e,n,i),s=t.mkText(r);return t.mkStmt(t.mkInfix(s,"+=",a))}function Z(e){return e.args.map(function(e){return e.field}).filter(function(e){return!!e})}function ee(e,o,i){var r=e.stdCallTable[o.type];return r.imageLiteral?t.mkStmt(se(e,o,r.imageLiteral,r.namespace,r.f,r.args.map(function(t){return te(e,o,t,i)}))):r.hasHandler?le(e,o,r,Z(r),r.namespace,i):t.mkStmt(oe(e,o,r,i))}function te(e,o,i,r,n){void 0===n&&(n=!1);var l=i.literal;if(l)return l instanceof String?t.H.mkStringLiteral(l):t.H.mkNumberLiteral(l);var a=o.getFieldValue(i.field);if(null!=a)return o.getField(i.field)instanceof pxtblockly.FieldTextInput?t.H.mkStringLiteral(a):t.mkText(a);m(e,o,i.field);var s=f(o,i.field);return n&&"lists_create_with"===s.type?de(V(e,s,r)):V(e,s,r)}function oe(e,o,i,r){var n;n=ae(o)&&o.mutation.getMutationType()===t.MutatorTypes.RestParameterMutator?o.mutation.compileMutation(e,r).children:i.args.map(function(t,n){return te(e,o,t,r,i.isExtensionMethod&&0===n&&!i.isExpression)});var l=!o.getInputsInline();if(i.isIdentity)return n[0];if(i.property)return t.H.mkPropertyAccess(i.f,n[0]);if(i.isExtensionMethod){if(i.attrs.defaultInstance){var a=void 0;ae(o)&&o.mutation.getMutationType()===t.MutatorTypes.DefaultInstanceMutator&&(a=o.mutation.compileMutation(e,r)),a?n.unshift(a):n.unshift(t.mkText(i.attrs.defaultInstance))}return t.H.extensionCall(i.f,n,l)}return i.namespace?t.H.namespaceCall(i.namespace,i.f,n,l):t.H.stdCall(i.f,n,l)}function ie(e,o,i,r,n,l,a){void 0===a&&(a=!1),n.noFinalNewline=!0;var s;return s=l?t.mkGroup([l,n]):t.mkGroup([t.mkText("function ()"),n]),a?t.mkStmt(t.H.extensionCall(i,r.concat([s]),!1)):t.mkStmt(t.H.namespaceCall(o,i,r.concat([s]),!1))}function re(e,o,i,r){var n=f(o,i);return n?V(e,n,r):o.getField(i)instanceof pxtblockly.FieldTextInput?t.H.mkStringLiteral(o.getFieldValue(i)):t.mkText(o.getFieldValue(i))}function ne(o,i){var r=ue(o,f(i,"HANDLER"));return e.appTarget.compile&&e.appTarget.compile.onStartText&&r&&r.children&&r.children.unshift(t.mkStmt(t.mkText("// "+pxtc.ON_START_COMMENT+"\n"))),r}function le(o,i,r,n,l,a){var s=n.map(function(e){return re(o,i,e,a)}),c=f(i,"HANDLER"),u=ue(o,c);e.appTarget.compile&&e.appTarget.compile.emptyEventHandlerComments&&0===u.children.length&&u.children.unshift(t.mkStmt(t.mkText("// "+pxtc.HANDLER_COMMENT)));var p;if(ae(i)&&i.mutation.getMutationType()===t.MutatorTypes.ObjectDestructuringMutator)p=i.mutation.compileMutation(o,a);else if(r.handlerArgs.length){for(var d=[],h=0;h<r.handlerArgs.length;h++){var m=r.handlerArgs[h],g=i.getFieldValue("HANDLER_"+m.name);if(null===g)break;d.push(K(g,o))}p=t.mkText("function ("+d.join(", ")+")")}return ie(o,l,r.f,s,u,p,r.isExtensionMethod)}function ae(e){return!!e.mutation}function se(e,o,i,r,n,l){l=void 0===l?[]:l;for(var a="\n",s=5*i,c=0;c<5;++c){for(var u=0;u<s;++u)u>0&&(a+=" "),a+=/TRUE/.test(o.getFieldValue("LED"+u+c))?"#":".";a+="\n"}var p=t.H.mkStringLiteral(a);return p.canIndentInside=!0,t.H.namespaceCall(r,n,[p].concat(l),!1)}function ce(o,i){var r,n=[];switch(o.stats[i.type]=(o.stats[i.type]||0)+1,ye(i,n),i.type){case"controls_if":r=X(o,i,n);break;case"controls_for":case"controls_simple_for":r=q(o,i,n);break;case"controls_for_of":r=z(o,i,n);break;case"variables_set":r=[Q(o,i,n)];break;case"variables_change":r=[$(o,i,n)];break;case"controls_repeat_ext":r=Y(o,i,n);break;case"device_while":r=j(o,i,n);break;case"procedures_defnoreturn":r=R(o,i,n);break;case"procedures_callnoreturn":r=[P(o,i,n)];break;case ts.pxtc.ON_START_TYPE:r=ne(o,i).children;break;case pxtc.TS_STATEMENT_TYPE:r=pe(o,i);break;default:r=o.stdCallTable[i.type]?[ee(o,i,n)]:[t.mkStmt(V(o,i,n))]}var l=r[r.length-1];return l&&(l.id=i.id),n.length&&ve(n,r),r.forEach(function(o){(o.type===t.NT.Block||o.type===t.NT.Prefix&&e.Util.startsWith(o.op,"//"))&&(o.id=i.id)}),r}function ue(e,o){for(var r=[];o;)o.disabled||i(r,ce(e,o)),o=o.getNextBlock();return t.mkBlock(r)}function pe(e,o){for(var i=[],r=0;;){var n=o.getFieldValue("LINE"+r);if(r++,null===n)break;i.push(t.mkText(n+"\n"));var l=o.declaredVariables;l&&l.split(",").forEach(function(t){var o=G(e,t);o?(o.assigned=we.Assign,o.mustBeGlobal=!1):e.bindings.push({name:t,type:s(null),assigned:we.Assign,declaredInLocalScope:1,mustBeGlobal:!1})})}return i}function de(e){var o=t.mkStmt(t.mkText(";"));return o.glueToBlock=t.GlueMode.NoSpace,t.mkGroup([o,e])}function he(t,o,i){function r(e,t){null==G(n,e)&&(n=H(n,e,t)),++G(n,e).declaredInLocalScope>1&&(G(n,e).mustBeGlobal=!0)}var n=W(t);if(o&&(Object.keys(o.apis.byQName).forEach(function(e){var t=o.apis.byQName[e];t.kind===pxtc.SymbolKind.Enum&&(n.renames.takenNames[t.qName]=!0)}),o.blocks.forEach(function(t){if(n.stdCallTable[t.attributes.blockId])e.reportError("blocks","function already defined",{details:t.attributes.blockId});else{n.renames.takenNames[t.namespace]=!0;var o=e.blocks.parameterNames(t),i=o.attrNames,r=o.handlerArgs,l=t.kind==pxtc.SymbolKind.Method||t.kind==pxtc.SymbolKind.Property,a=(t.parameters||[]).map(function(e){return i[e.name]&&i[e.name].name?{field:i[e.name].name}:null}).filter(function(e){return!!e});l&&!t.attributes.defaultInstance&&a.unshift({field:i.this.name}),n.stdCallTable[t.attributes.blockId]={namespace:t.namespace,f:t.name,args:a,attrs:t.attributes,handlerArgs:r,isExtensionMethod:l,isExpression:t.retType&&"void"!==t.retType,imageLiteral:t.attributes.imageLiteral,hasHandler:!!r.length||t.parameters&&t.parameters.some(function(e){return"() => void"==e.type||!!e.properties}),property:!t.parameters,isIdentity:"TD_ID"==t.attributes.shim}}})),i)return n;var l=function(e,t){if(!e)return!1;if(("controls_for"==e.type||"controls_simple_for"==e.type||"controls_for_of"==e.type)&&K(e.getFieldValue("VAR"),n)==t)return!0;if(ae(e)&&e.mutation.isDeclaredByMutation(t))return!0;var o=n.stdCallTable[e.type];if(o&&o.handlerArgs.length){var i=!1;if(o.handlerArgs.forEach(function(o){if(!i){var r=e.getFieldValue("HANDLER_"+o.name);null!=r&&K(r,n)===t&&(i=!0)}}),i)return!0}return l(e.getSurroundParent(),t)};return t&&t.getAllBlocks().filter(function(e){return!e.disabled}).forEach(function(e){if("controls_for"==e.type||"controls_simple_for"==e.type||"controls_for_of"==e.type){var t=K(e.getFieldValue("VAR"),n);"controls_for_of"==e.type?r(t,null):r(t,Ee.type)}else if(ae(e)){var o=e.mutation.getDeclaredVariables();if(o)for(var i in o)r(K(i,n),o[i])}var l=n.stdCallTable[e.type];l&&l.handlerArgs.length&&l.handlerArgs.forEach(function(t){var o=e.getFieldValue("HANDLER_"+t.name);null!=o&&r(K(o,n),t.type)})}),t&&t.getAllBlocks().filter(function(e){return!e.disabled}).forEach(function(e){if("variables_get"==e.type||"variables_set"==e.type||"variables_change"==e.type){var t=K(e.getFieldValue("VAR"),n);null==G(n,t)&&(n=H(n,t,null));var o=G(n,t);o.declaredInLocalScope&&!l(e,t)&&(o.mustBeGlobal=!0)}}),n}function me(e,t){if(e.type===ts.pxtc.ON_START_TYPE)return 0;var o=t.stdCallTable[e.type];return o&&o.attrs.afterOnStart?1:-1}function fe(e,o,r){try{k(e,o);var n=[],l=o.getTopBlocks(!0).sort(function(t,o){return me(t,e)-me(o,e)});return be(e,o.getAllBlocks(),l),l.forEach(function(o){if(o.type==ts.pxtc.ON_START_TYPE)i(n,ne(e,o).children);else{var r=ue(e,o);r.type==t.NT.Block?i(n,r.children):n.push(r)}}),e.bindings.filter(function(e){return!U(e)&&e.assigned!=we.Assign}).map(function(e){var o,i=v(e.type),n="";if("null"==(o="Array"===i.type?t.mkText("[]"):M(i)).op||"[]"==o.op){var l=i.type;"Array"!==l&&"null[]"!==l||(l="number[]");var a=r.apis.byQName[l];a&&a.attributes.autoCreate?o=t.mkText(a.attributes.autoCreate+"()"):n=": "+l}return t.mkStmt(t.mkText("let "+e.name+n+" = "),o)}).concat(n)}catch(t){var a=t.block;if(!a)throw t;a.setWarningText(t+""),e.errors.push(a)}finally{g()}return[]}function ge(e,t){if(t.type==ts.pxtc.ON_START_TYPE)return JSON.stringify({name:ts.pxtc.ON_START_TYPE});var o=e.stdCallTable[t.type];if(o){var i=Z(o).map(function(o){return re(e,t,o,[])});return JSON.stringify({name:o.f,ns:o.namespace,compiledArgs:i}).replace(/"id"\s*:\s*"[^"]+"/g,"")}}function be(e,t,o){function i(e,t){r[e]?t.setDisabled(!0):(t.setDisabled(!1),r[e]=t)}t.forEach(function(e){return e.setDisabled(!1)});var r={};o.forEach(function(t){var o=e.stdCallTable[t.type];if(t.type==ts.pxtc.ON_START_TYPE)i(ts.pxtc.ON_START_TYPE,t);else{if("procedures_defnoreturn"===t.type||o&&o.attrs.blockAllowMultiple&&!o.attrs.handlerStatement)return;if(o&&o.hasHandler&&!o.attrs.handlerStatement)i(ge(e,t),t);else for(var r=t;r;)r.setDisabled(!0),r=r.getNextBlock()}})}function ke(e,i){var r=t.flattenNode(i);return o("format",{format:{input:r.output,pos:1}}).then(function(){return{source:r.output,sourceMap:r.sourceMap,stats:e.stats}})}function ye(e,t){e.comment&&("string"==typeof e.comment?t.push(e.comment):t.push(e.comment.getText()))}function ve(e,o){for(var i=[],r=[],n=0,l=e;n<l.length;n++)for(var a=0,s=l[n].split("\n");a<s.length;a++){var c=s[a];r.push(c)}for(var u=0;u<r.length;u++){for(var p=void 0,d=0,h=r[u].split(/\s/);d<h.length;d++){var m=h[d];p?p.length+m.length>Te?(i.push(t.mkText("// "+p)),i.push(t.mkNewLine()),p=m):p+=" "+m:p=m}p&&(i.push(t.mkText("// "+p)),i.push(t.mkNewLine())),u!==r.length-1&&(i.push(t.mkText("//")),i.push(t.mkNewLine()))}for(var f=0,g=i.reverse();f<g.length;f++){var b=g[f];o.unshift(b)}}t.workerOpAsync=o;var _e={},Te=50,xe=function(){return function(e,t,o,i){this.link=e,this.type=t,this.parentType=o,this.childType=i}}();t.Point=xe;var Ee=s("number"),Be=s("boolean"),Ae=s("string"),Ce=s("void"),Ne={ADD:"+",MINUS:"-",MULTIPLY:"*",DIVIDE:"/",LT:"<",LTE:"<=",GT:">",GTE:">=",AND:"&&",OR:"||",EQ:"==",NEQ:"!="};t.compileExpression=V,function(e){e[e.Unknown=0]="Unknown",e[e.Read=1]="Read",e[e.Assign=2]="Assign"}(t.VarUsage||(t.VarUsage={}));var we=t.VarUsage;t.escapeVarName=K,t.mkEnv=he,t.compileBlockAsync=function(e,t){var o=e.workspace,i=he(o,t);k(i,o);var r=ce(i,e);return g(),ke(i,r)},t.callKey=ge,t.findBlockId=function(e,t){if(t){for(var o,i,r=0;r<e.length;++r){var n=e[r];n.start<=t.start&&n.end>t.start+t.length&&(!o||i>n.end-n.start)&&(o=n,i=n.end-n.start)}return o?o.id:void 0}},t.compileAsync=function(e,t){var o=he(e,t);return ke(o,fe(o,e,t))}}(e.blocks||(e.blocks={}))}(pxt||(pxt={}));var pxt;!function(e){!function(e){function t(e,t,i){void 0==o[e]&&(o[e]={field:t,validator:i})}var o={};e.initFieldEditors=function(){t("text",pxtblockly.FieldTextInput),t("note",pxtblockly.FieldNote,function(e){if(null===e)return null;e=String(e);var t=parseFloat(e||"0");return isNaN(t)||t<0?null:String(Math.round(Number(e)))}),t("gridpicker",pxtblockly.FieldGridPicker),t("textdropdown",pxtblockly.FieldTextDropdown),t("numberdropdown",pxtblockly.FieldNumberDropdown),t("imagedropdown",pxtblockly.FieldImageDropdown),t("colorwheel",pxtblockly.FieldColorWheel),t("toggle",pxtblockly.FieldToggle),t("toggleonoff",pxtblockly.FieldToggleOnOff),t("toggleyesno",pxtblockly.FieldToggleYesNo),t("colornumber",pxtblockly.FieldColorNumber)},e.registerFieldEditor=t,e.createFieldEditor=function(e,t,i){if(void 0==o[e])return console.error("Field editor "+e+" not registered"),null;var r=o[e];return new r.field(t,i,r.validator)}}(e.blocks||(e.blocks={}))}(pxt||(pxt={}));var pxt;!function(e){!function(t){function o(e,t){for(var o=[],i=0;i<e.childNodes.length;i++){var r=e.childNodes.item(i);r.tagName===t&&o.push(r)}return o}function i(e,t){return r(e,"block","type",t)}function r(t,o,i,r){return e.Util.toArray(t.getElementsByTagName(o)).filter(function(e){return e.getAttribute(i)===r})}function n(e,t,o,i){var n=r(e,t,o,i);return n.length?n[0]:void 0}function l(o,r){var n=i(o,ts.pxtc.ON_START_TYPE),l=n.length?n[0]:void 0;if(l)l.removeAttribute("deletable");else{var a=[],s={};r.blocks.forEach(function(e){return s[e.attributes.blockId]=e});for(var c=o.firstElementChild,u=void 0;c;){var p=c.nextElementSibling,d=c.getAttribute("type");if(!c.getAttribute("disabled")&&!c.getElementsByTagName("statement").length&&(e.blocks.buildinBlockStatements[d]||s[d]&&"void"==s[d].retType&&!t.hasArrowFunction(s[d])))if(u){var h=o.ownerDocument.createElement("next");h.appendChild(c),u.appendChild(h),c.removeAttribute("x"),c.removeAttribute("y"),u=c}else(u=o.ownerDocument.createElement("statement")).setAttribute("name","HANDLER"),l||((l=o.ownerDocument.createElement("block")).setAttribute("type",ts.pxtc.ON_START_TYPE),a.push(l)),l.appendChild(u),u.appendChild(c),c.removeAttribute("x"),c.removeAttribute("y"),u=c;c=p}a.forEach(function(e){return o.appendChild(e)})}}function a(e,o,i){var r=i.getAttribute("type"),l=Blockly.Blocks[r],a=t.blockSymbol(r);if(a&&l){var s=t.parameterNames(a).attrNames;a.parameters.forEach(function(t,r){var l=e.apis.byQName[t.type];if(l&&l.kind==pxtc.SymbolKind.Enum){var a=n(i,"field","name",s[t.name].name);if(a){var c=o[l.name+"."+a.textContent];c&&(a.textContent=c)}}})}}t.saveWorkspaceXml=function(e){var t=Blockly.Xml.workspaceToDom(e);return Blockly.Xml.domToPrettyText(t)},t.getDirectChildren=o,t.getBlocksWithType=i,t.getChildrenWithAttr=r,t.getFirstChildWithAttr=n,t.loadWorkspaceXml=function(t,o){void 0===o&&(o=!1);var i=new Blockly.Workspace;try{var r=Blockly.Xml.textToDom(t);return Blockly.Xml.domToWorkspace(r,i),i}catch(t){return o||e.reportException(t),null}},t.importXml=function(t,r,n){void 0===n&&(n=!1);try{var s=(new DOMParser).parseFromString(t,"application/xml");if(e.appTarget.compile){var c=e.appTarget.compile.upgrades||[];c.filter(function(e){return"blockId"==e.type}).forEach(function(t){return Object.keys(t.map).forEach(function(o){i(s,o).forEach(function(i){i.setAttribute("type",t.map[o]),e.debug("patched block "+o+" -> "+t.map[o])})})}),c.filter(function(e){return"blockValue"==e.type}).forEach(function(t){return Object.keys(t.map).forEach(function(r){var n=r.split("."),l=n[0];n[1],i(s,l).reduce(function(e,t){return e.concat(o(t,"value"))},[]).forEach(function(o){o.setAttribute("name",t.map[r]),e.debug("patched block value "+r+" -> "+t.map[r])})})})}var u={};for(var p in r.apis.byQName){var d=r.apis.byQName[p];d.kind==pxtc.SymbolKind.EnumMember&&(u[d.namespace+"."+(d.attributes.blockImportId||d.attributes.block||d.attributes.blockId||d.name)]=d.namespace+"."+d.name)}for(var h=s.getElementsByTagName("block"),m=0;m<h.length;++m)a(r,u,h[m]);return l(s.documentElement,r),(new XMLSerializer).serializeToString(s)}catch(o){return n||e.reportException(o),t}},t.convertColour=function(e){var t=parseInt(e);return isNaN(t)?e:Blockly.hueToRgb(t)}}(e.blocks||(e.blocks={}))}(pxt||(pxt={}));var pxt;!function(e){!function(t){!function(t){function o(t,o){var i=Blockly.Xml.workspaceToDom(t),r=Blockly.Xml.workspaceToDom(o);return e.Util.toArray(i.childNodes).filter(function(e){return e.nodeType==Node.ELEMENT_NODE&&"block"==e.localName&&"true"==e.getAttribute("disabled")}).forEach(function(e){return r.appendChild(r.ownerDocument.importNode(e,!0))}),Blockly.Xml.domToPrettyText(r)}function i(t,o,i){var r,n;o.getTopBlocks(!1).filter(function(e){return!e.disabled}).forEach(function(l){var a=l.xy_;if(a&&0!=a.x&&0!=a.y){r||(r=e.blocks.mkEnv(o,t,!0),n={},i.getTopBlocks(!1).forEach(function(t){var o=e.blocks.callKey(r,t),i=n[o]||[];i.push(t),n[o]=i}));var s=e.blocks.callKey(r,l),c=(n[s]||[]).shift();c&&(c.xy_=a.clone())}})}function r(e){return l(e).then(function(e){return e?n(e.width,e.height,4,e.xml):Promise.resolve(void 0)})}function n(t,o,i,r){return new Promise(function(n,l){var a=document.createElement("canvas"),s=a.getContext("2d"),c=new Image;a.width=t*i,a.height=o*i,c.onload=function(){s.drawImage(c,0,0,t,o,0,0,a.width,a.height);var e=a.toDataURL("image/png");n(e)},c.onerror=function(t){e.reportError("blocks","blocks screenshot failed"),n(void 0)},c.src=r})}function l(e){if(!e)return Promise.resolve(void 0);var t=document.getElementsByClassName("blocklyBlockCanvas")[0].getBBox();return a(e.svgBlockCanvas_.cloneNode(!0),t.x,t.y,t.width,t.height)}function a(t,o,i,r,n){if(!t.childNodes[0])return Promise.resolve(void 0);t.removeAttribute("width"),t.removeAttribute("height"),t.removeAttribute("transform");var l=(new DOMParser).parseFromString('<svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="'+p+'" width="'+r+'" height="'+n+'" viewBox="'+o+" "+i+" "+r+" "+n+'">\n            '+(new XMLSerializer).serializeToString(t)+"\n            </svg>","image/svg+xml"),a=l.createElementNS("http://www.w3.org/1999/xhtml","style"),u=document.getElementById("blocklycss").href;return e.BrowserUtils.loadAjaxAsync(u).then(function(t){var o=e.Util.toArray(document.head.querySelectorAll("style")).filter(function(e){return/\.blocklySvg/.test(e.innerText)})[0];return a.appendChild(l.createCDATASection((o?o.innerText:"")+"\n\n"+t+"\n\n")),l.documentElement.insertBefore(a,l.documentElement.firstElementChild),c(l).then(function(){return{width:r,height:n,svg:(new XMLSerializer).serializeToString(l),xml:s(l)}})})}function s(e){var t=(new XMLSerializer).serializeToString(e);return"data:image/svg+xml;base64,"+btoa(unescape(encodeURIComponent(t)))}function c(t){d||(d={});var o=t.getElementsByTagName("image"),i=e.Util.toArray(o).filter(function(e){return!/^data:/.test(e.getAttributeNS(p,"href"))}).map(function(t){var o=t.getAttributeNS(p,"href"),i=d[o];return(i?Promise.resolve(d[o]):e.BrowserUtils.loadImageAsync(t.getAttributeNS(p,"href")).then(function(e){var t=document.createElement("canvas"),r=t.getContext("2d");return t.width=e.width,t.height=e.height,r.drawImage(e,0,0,e.width,e.height,0,0,t.width,t.height),d[o]=i=t.toDataURL("image/png"),i}).catch(function(t){e.debug("svg render: failed to load "+o)})).then(function(e){t.setAttributeNS(p,"href",e)})});return Promise.all(i).then(function(){})}function u(e,t,o){void 0===t&&(t=1.62);var i;if(o>20)i=o-20;else{for(var r=0,n=0,l=e;n<l.length;n++)r+=(m=(d=l[n]).getHeightWidth()).width*m.height;i=Math.sqrt(r)*t}for(var a=20,s=20,c=0,u=0,p=e;u<p.length;u++){var d=p[u],h=d.getBoundingRectangle(),m=d.getHeightWidth();d.moveBy(a-h.topLeft.x,s-h.topLeft.y),a+=m.width+16,c=Math.max(c,s+m.height+16),a>i&&(a=20,s=c)}}t.patchBlocksFromOldWorkspace=function(t,r,n){var l=e.blocks.loadWorkspaceXml(n,!0);return i(t,r,l),o(r,l)},t.verticalAlign=function(e,t){var o=0;e.getTopBlocks(!0).forEach(function(e){e.moveBy(0,o),o+=e.getHeightWidth().height,o+=t})},t.flow=function(e,t){if(t){if(t.useViewWidth){var o=e.getMetrics();if(o.viewHeight>o.viewWidth)return void u(e.getTopBlocks(!0),void 0,o.viewWidth)}u(e.getTopBlocks(!0),t.ratio)}else u(e.getTopBlocks(!0))},t.screenshotEnabled=function(){return!e.BrowserUtils.isIE()&&!e.BrowserUtils.isUwpEdge()},t.screenshotAsync=function(e){return r(e)},t.toPngAsync=r,t.svgToPngAsync=function(e,t,o,i,r,l){return a(e,t,o,i,r).then(function(e){return e?n(e.width,e.height,l,e.xml):Promise.resolve(void 0)})};var p="http://www.w3.org/1999/xlink";t.toSvgAsync=l,t.blocklyToSvgAsync=a,t.documentToSvg=s;var d}(t.layout||(t.layout={}))}(e.blocks||(e.blocks={}))}(pxt||(pxt={}));var Util=pxt.Util,lf=Util.lf,pxt;!function(e){!function(t){function o(){return e.Util.lf("{id:category}Advanced")}function i(){return e.Util.lf("{id:category}Extensions")}function r(e,t,o,i){if(o&&'"'==o.slice(0,1)&&(o=JSON.parse(o)),"number"==t&&"value"==i)return(u=document.createElement("field")).setAttribute("name",e),u.appendChild(document.createTextNode("0")),u;var r="variables_get"==i,n=document.createElement("value");n.setAttribute("name",e);var l=document.createElement(r?"block":"shadow");n.appendChild(l);var a=J[t];if(l.setAttribute("type",i||a&&a.block||t),l.setAttribute("colour",Blockly.Colours.textField),a){u=document.createElement("field");l.appendChild(u);var s=void 0;switch(i){case"variables_get":s="VAR";break;case"math_number_minmax":s="SLIDER";break;default:s=a.field}u.setAttribute("name",s);var c;c="boolean"==t?document.createTextNode((o||a.defaultValue).toUpperCase()):document.createTextNode(o||a.defaultValue),u.appendChild(c)}else if(r&&o){var u=document.createElement("field");l.appendChild(u),u.setAttribute("name","VAR"),u.textContent=o}return n}function n(t,o,i){var n=i.attrNames,l=i.handlerArgs,a=document.createElement("block");if(a.setAttribute("type",o.attributes.blockId),o.attributes.blockGap?a.setAttribute("gap",o.attributes.blockGap):e.appTarget.appTheme&&e.appTarget.appTheme.defaultBlockGap&&a.setAttribute("gap",e.appTarget.appTheme.defaultBlockGap.toString()),(o.kind==pxtc.SymbolKind.Method||o.kind==pxtc.SymbolKind.Property)&&n.this){var s=n.this;a.appendChild(r(s.name,s.type,s.shadowValue||s.name,s.shadowType||"variables_get"))}return o.parameters&&(o.parameters.filter(function(e){return!!n[e.name].name&&(/^(string|number|boolean)$/.test(n[e.name].type)||!!n[e.name].shadowType||!!n[e.name].shadowValue)}).forEach(function(e){var t,o,i=n[e.name];e.options&&e.options.min&&e.options.max?(t=r(i.name,i.type,i.shadowValue,"math_number_minmax"),(o=document.createElement("mutation")).setAttribute("min",e.options.min.value),o.setAttribute("max",e.options.max.value),o.setAttribute("label",e.name.charAt(0).toUpperCase()+e.name.slice(1)),e.options.fieldEditorOptions&&(e.options.fieldEditorOptions.value.step&&o.setAttribute("step",e.options.fieldEditorOptions.value.step),e.options.fieldEditorOptions.value.color&&o.setAttribute("color",e.options.fieldEditorOptions.value.color))):t=r(i.name,i.type,i.shadowValue,i.shadowType),e.options&&e.options.fieldEditorOptions&&(o||(o=document.createElement("mutation")),o.setAttribute("customfield",JSON.stringify(e.options.fieldEditorOptions.value))),t&&o&&t.firstChild.appendChild(o),a.appendChild(t)}),l.forEach(function(e){var t=document.createElement("field");t.setAttribute("name","HANDLER_"+e.name),t.textContent=e.name,a.appendChild(t)})),ie[o.attributes.blockId]=a.cloneNode(!0),a}function l(e,t,o,i,r){var n=document.createElement("category");return n.setAttribute("name",e),n.setAttribute("nameid",t.toLowerCase()),n.setAttribute("weight",o.toString()),i&&n.setAttribute("colour",i),r&&(n.setAttribute("iconclass",r),n.setAttribute("expandedclass",r)),n}function a(o,i,r,n,a,p){if(void 0===a&&(a=K.Basic),!r.attributes.blockHidden&&!r.attributes.deprecated){var g=(r.attributes.blockNamespace||r.namespace).split(".")[0],b=i.apis.byQName[g],k=b&&b.attributes.advanced;b&&(g=b.attributes.block||g);var y=ts.pxtc.blocksCategory(r);b&&b.name&&(y=e.Util.capitalize(b.name));var v=A(o,y);if(a===K.All||a==K.Basic&&!k){if(!v){d(o);e.debug("toolbox: adding category "+g);var _=(b?b.attributes.weight:50)||50,T=e.Util.capitalize((b?b.attributes.block:"")||y);if(v=l(T,y,_),b&&b.attributes.color?v.setAttribute("colour",b.attributes.color):H(g)&&v.setAttribute("colour",H(g)),b&&b.attributes.icon){var x=("blocklyTreeIcon"+b.name.toLowerCase()).replace(/\s/g,"");c(x,b.attributes.icon),v.setAttribute("iconclass",x),v.setAttribute("expandedclass",x),v.setAttribute("web-icon",b.attributes.icon)}else v.setAttribute("iconclass","blocklyTreeIconDefault"),v.setAttribute("expandedclass","blocklyTreeIconDefault"),v.setAttribute("web-icon","");b&&b.attributes.groups&&v.setAttribute("groups",b.attributes.groups.join(", ")),b&&b.attributes.labelLineWidth&&v.setAttribute("labellinewidth",b.attributes.labelLineWidth),h(v,o,_,k)}if(r.attributes.advanced)v=m(v,lf("More"),"More",1,v.getAttribute("colour"),"blocklyTreeIconmore");else if(r.attributes.subcategory){var E=r.attributes.subcategory,B=b.attributes.subcategories;if(B&&-1!==B.indexOf(E)){var C=1e4-B.indexOf(E);v=m(v,E,E,C,v.getAttribute("colour"),"blocklyTreeIconmore")}else v=f(v,E,E,v.getAttribute("colour"),"blocklyTreeIconmore");b&&b.attributes.groups&&v.setAttribute("groups",b.attributes.groups.join(", "))}}if(a===K.Basic&&k){var N=n.getAttribute("type");Z[N]=!0}if(r.attributes.optionalVariableArgs&&r.attributes.toolboxVariableArgs){var w=p.handlerArgs;(I=r.attributes.toolboxVariableArgs.split(";").map(function(e){return parseInt(e)}).filter(function(e){return e<=w.length&&e>=0})).forEach(function(e){var t=n.cloneNode(!0),i=document.createElement("mutation");i.setAttribute("numargs",e.toString());for(var l=0;l<e;l++)i.setAttribute("arg"+l,w[l].name);t.appendChild(i),a!==K.None?s(t,v,r.attributes.weight):o.appendChild(t)})}else if(r.attributes.mutateDefaults){var I=r.attributes.mutateDefaults.split(";");I.forEach(function(e){var i=n.cloneNode(!0);t.mutateToolboxBlock(i,r.attributes.mutate,e),a!==K.None?s(i,v,r.attributes.weight):o.appendChild(i)})}else a===K.None||a===K.Basic&&k?a===K.None&&o.appendChild(n):(s(n,v,r.attributes.weight,r.attributes.group),u())}}function s(e,o,i,r){var n=!!t.blockColors[o.getAttribute("nameid")];if(r&&e.setAttribute("group",r),n&&i>50){e.setAttribute("loaded","true");for(var l=void 0,a=0;a<o.childNodes.length;a++){var s=o.childNodes.item(a);if("block"===s.tagName&&!s.getAttribute("loaded")){l=s;break}}l?o.insertBefore(e,l):o.appendChild(e)}else o.appendChild(e)}function c(t,o){if(!(ne.indexOf(t)>-1))if(1===o.length){var i=e.Util.unicodeToChar(o);ne+="\n                .blocklyTreeIcon."+t+'::before {\n                    content: "'+i+'";\n                }\n            '}else ne+="\n                .blocklyTreeIcon."+t+' {\n                    background-image: url("'+e.Util.pathJoin(e.webConfig.commitCdnUrl,encodeURI(o))+'")!important;\n                    width: 30px;\n                    height: 100%;\n                    background-size: 20px !important;\n                    background-repeat: no-repeat !important;\n                    background-position: 50% 50% !important;\n                }\n            '}function u(){re||((re=document.createElement("style")).id="blocklyToolboxIcons",re.type="text/css",(document.head||document.getElementsByTagName("head")[0]).appendChild(re)),re.sheet?re.textContent=ne+le:re.appendChild(document.createTextNode(ne+le))}function p(e,t){var o=e.toLowerCase();t=t||"#dddddd",le.indexOf(o)>-1||(le+="\n            span.docs."+o+" {\n                background-color: "+t+" !important;\n                border-color: "+Blockly.PXTUtils.fadeColour(t,.2,!0)+" !important;\n            }\n        ")}function d(e){for(var t=e.getElementsByTagName("category"),o=[],i=0;i<t.length;i++)t[i].parentNode===e&&o.push(t[i]);return o}function h(e,t,o,i){var r=d(t);i&&e.setAttribute("advanced","true");var n=0;for(n=0;n<r.length;++n){var l=r[n],a=l.hasAttribute("advanced")&&"false"!==l.getAttribute("advanced");if(i){if(!a)continue}else if(a){t.insertBefore(e,l);break}if(parseInt(l.getAttribute("weight")||"50")<o){t.insertBefore(e,l);break}}n==r.length&&t.appendChild(e)}function m(e,o,i,r,n,a){var s=t.getFirstChildWithAttr(e,"category","nameid",i.toLowerCase());if(s)return s;var c=l(o,i,r,n,a),u=e.getElementsByTagName("category"),p=0;for(p=0;p<u.length;++p){var d=u[p];if(parseInt(d.getAttribute("weight")||"50")<r){e.insertBefore(c,d);break}}return p==u.length&&e.appendChild(c),c}function f(e,o,i,r,n){var a=t.getFirstChildWithAttr(e,"category","nameid",i.toLowerCase());if(a)return a;var s=l(o,i,100,r,n),c=e.getElementsByTagName("category"),u=[],p=0,d=!1,h=void 0;for(p=0;p<c.length;++p){var m=c[p],f=parseInt(m.getAttribute("weight")||"50");if(!(f>=1e3)){if(1===f){h=m;break}u.push(m),!d&&m.getAttribute("name").localeCompare(o)>=0&&(e.insertBefore(s,m),u.splice(u.length-1,0,s),d=!0)}}return d||(u.push(s),h?e.insertBefore(s,h):e.appendChild(s)),u.forEach(function(e,t){e.setAttribute("weight",(200-t).toString())}),s}function g(t,o,i,r){var n=o.attributes.blockId;if(te[n])return e.reportError("blocks","trying to override builtin block",{details:n}),!1;var l=JSON.stringify(o);if(oe[n]&&oe[n].hash==l)return!0;if(Blockly.Blocks[o.attributes.blockId])return console.error("duplicate block definition: "+n),!1;var a={hash:l,fn:o,block:{codeCard:y(o,r),init:function(){_(this,t,o,i)}}};return oe[n]=a,Blockly.Blocks[n]=a.block,!0}function b(e,t,o,i,r,n,l,a){if(r&&r.indexOf("`")>-1)for(var s=/([^`]+|(`([^`]+)`))/gi,c=void 0;c=s.exec(r);){var u=void 0;c[3]&&(u=j(c[3]))?e.appendField(u):e.appendField(c[1])}else r&&e.appendField(r);return n&&e.setAlign(Blockly.ALIGN_LEFT),l&&"T"!=l&&(Q.test(l)?e.setCheck("Array"):e.setCheck(l)),e}function k(e){return e.outerHTML.replace(/^<\?[^>]*>/,"")}function y(e,t){return{name:e.namespace+"."+e.name,shortName:e.name,description:e.attributes.jsDoc,url:e.attributes.help?"reference/"+e.attributes.help.replace(/^\//,""):void 0,blocksXml:'<xml xmlns="http://www.w3.org/1999/xhtml">'+k(t)+"</xml>"}}function v(e,t,o){if(t==o)return!0;var i=e.byQName[t];return!(!i||!i.extendsTypes)&&i.extendsTypes.indexOf(o)>=0}function _(o,i,r,n){var l=this,a=n.attrNames,s=n.handlerArgs,c=(r.attributes.blockNamespace||r.namespace).split(".")[0],u=r.kind==pxtc.SymbolKind.Method||r.kind==pxtc.SymbolKind.Property,p=i.apis.byQName[c],d=r.attributes.color||(p?p.attributes.color:void 0)||H(c.toLowerCase())||255;if(r.attributes.help)o.setHelpUrl("/reference/"+r.attributes.help.replace(/^\//,""));else if(r.pkg&&!e.appTarget.bundledpkgs[r.pkg]){var h=r.qName.toLowerCase().split(".");h[0]==r.pkg&&h.shift(),o.setHelpUrl("/pkg/"+r.pkg+"#"+encodeURIComponent(h.join("-")))}o.setTooltip(r.attributes.jsDoc),o.setColour(d,r.attributes.colorSecondary,r.attributes.colorTertiary);var m=Blockly.OUTPUT_SHAPE_ROUND;"boolean"==r.retType&&(m=Blockly.OUTPUT_SHAPE_HEXAGONAL),o.setOutputShape(m),r.attributes.undeletable&&o.setDeletable(!1),t.parseFields(r.attributes.block).map(function(n){var l;if(n.p){var s=n.pre,c=n.p,h=Object.keys(a).filter(function(e){return a[e].name==c})[0];if(!h)return void console.error("block "+r.attributes.blockId+": unkown parameter "+c);var m=a[h],f=e.U.lookup(i.apis.byQName,m.type),g=f&&f.kind==pxtc.SymbolKind.Enum,k=f&&!!f.attributes.fixedInstances&&!m.shadowType,y=r.attributes.paramFieldEditor&&r.attributes.paramFieldEditor[c],_=m.name.charAt(0).toUpperCase()+m.name.slice(1),T=m.type;if(g||k){var x=e.Util.values(i.apis.byQName).filter(function(e){return g?e.namespace==m.type:e.kind==pxtc.SymbolKind.Variable&&e.attributes.fixedInstance&&v(i.apis,e.retType,f.qName)});0==x.length&&console.error("no instances of "+f.qName+" found");var E=x.map(function(t){var o=t.attributes.block||t.attributes.blockId||t.name;return[t.attributes.iconURL||t.attributes.blockImage?{src:t.attributes.iconURL||e.Util.pathJoin(e.webConfig.commitCdnUrl,"blocks/"+t.namespace.toLowerCase()+"/"+t.name.toLowerCase()+".png"),alt:o,width:36,height:36,value:t.name}:o,t.namespace+"."+t.name]});if(l=b(o.appendDummyInput(),n.ni,r,p,s,!0),m.shadowValue){var B=-1;if(E.some(function(e,t){return e[1]===m.shadowValue&&(B=t,!0)}),B>-1){var A=E.splice(B,1)[0];E.unshift(A)}}if(y){var C=r.attributes.paramDefl[m.name]||"",N={data:E,colour:d,label:_,type:T};e.Util.jsonMergeFrom(N,r.attributes.paramFieldEditorOptions&&r.attributes.paramFieldEditorOptions[m.name]||{}),l.appendField(t.createFieldEditor(y,C,N),a[h].name)}else l.appendField(new Blockly.FieldDropdown(E),a[h].name)}else if(y){l=b(o.appendDummyInput(),n.ni,r,p,s,!0);var C=r.attributes.paramDefl[m.name]||"",w={colour:d,label:_,type:T};e.Util.jsonMergeFrom(w,r.attributes.paramFieldEditorOptions&&r.attributes.paramFieldEditorOptions[m.name]||{}),l.appendField(t.createFieldEditor(y,C,w),a[h].name)}else u&&"this"==h?r.attributes.defaultInstance||(l=b(o.appendValueInput(c),n.ni,r,p,s,!0,m.type)):"number"==m.type?m.shadowType&&"value"==m.shadowType?(l=o.appendDummyInput(),s&&l.appendField(s),l.appendField(new Blockly.FieldTextInput("0",Blockly.FieldTextInput.numberValidator),c)):l=b(o.appendValueInput(c),n.ni,r,p,s,!0,"Number"):l="boolean"==m.type?b(o.appendValueInput(c),n.ni,r,p,s,!0,"Boolean"):"string"==m.type?b(o.appendValueInput(c),n.ni,r,p,s,!0,"String"):b(o.appendValueInput(c),n.ni,r,p,s,!0,m.type)}else l=b(o.appendDummyInput(),n.ni,r,p,n.n)});var f=!1;if(s.length)if(f=!0,r.attributes.optionalVariableArgs)E(o,s);else{var g=o.appendDummyInput();s.forEach(function(e){g.appendField(new Blockly.FieldVariable(e.name),"HANDLER_"+e.name)})}r.attributes.mutate?t.addMutation(o,r,r.attributes.mutate):r.attributes.defaultInstance&&t.addMutation(o,r,t.MutatorTypes.DefaultInstanceMutator);var k=o.mutationToDom,y=o.domToMutation;if(o.mutationToDom=function(){var e=k?k.call(l):document.createElement("mutation");return o.inputList.forEach(function(t){t.fieldRow.forEach(function(t){if(t.isFieldCustom_&&t.saveOptions){var o=t.saveOptions();e.setAttribute("customfield",JSON.stringify(o))}})}),e},o.domToMutation=function(e){y&&y.call(l,e),o.inputList.forEach(function(t){t.fieldRow.forEach(function(t){if(t.isFieldCustom_&&t.restoreOptions){var o=JSON.parse(e.getAttribute("customfield"));t.restoreOptions(o)}})})},r.attributes.imageLiteral)for(var _=0;_<5;++_)for(var x=o.appendDummyInput(),B=0;B<5*r.attributes.imageLiteral;++B)B>0&&B%5==0?x.appendField("  "):B>0&&x.appendField(" "),x.appendField(new Blockly.FieldCheckbox("FALSE"),"LED"+B+_);switch("external"===r.attributes.inlineInputMode?o.setInputsInline(!1):"inline"===r.attributes.inlineInputMode?o.setInputsInline(!0):o.setInputsInline(r.parameters.length<4&&!r.attributes.imageLiteral),((r.parameters?r.parameters.filter(function(e){return"() => void"==e.type})[0]:void 0)||f)&&(o.appendStatementInput("HANDLER").setCheck("null"),o.setInputsInline(!0)),r.retType){case"number":o.setOutput(!0,"Number");break;case"string":o.setOutput(!0,"String");break;case"boolean":o.setOutput(!0,"Boolean");break;case"void":break;default:Q.test(r.retType)?o.setOutput(!0,"Array"):o.setOutput(!0,"T"!==r.retType?r.retType:void 0)}var A=T(r);o.setPreviousStatement(!(A&&!r.attributes.handlerStatement)&&"void"==r.retType),o.setNextStatement(!(A&&!r.attributes.handlerStatement)&&"void"==r.retType),o.setTooltip(r.attributes.jsDoc)}function T(e){return!!(e.parameters?e.parameters.filter(function(e){return/^\([^\)]*\)\s*=>/.test(e.type)})[0]:void 0)}function x(e,t){var o=A(e,t);o&&o.parentNode&&o.parentNode.removeChild(o)}function E(t,o){function i(){l.appendField(new Blockly.FieldImage(t.ADD_IMAGE_DATAURI,24,24,!1,lf("Add argument"),function(){r=Math.min(r+1,o.length),a()}),"_HANDLER_ADD")}e.U.assert(!t.domToMutation),e.U.assert(!t.mutationToDom);var r=0,n=0,l=t.appendDummyInput(),a=function(){if(r!==n){if(r>n)for(var e=r-n,t=0;t<e;t++){a=o[n+t];l.insertFieldAt(l.fieldRow.length-1,new Blockly.FieldVariable(a.name),"HANDLER_"+a.name)}else for(var e=n-r,t=0;t<e;t++){var a=o[n-t-1];l.removeField("HANDLER_"+a.name)}r>=o.length?l.removeField("_HANDLER_ADD"):n>=o.length&&i(),n=r}};Blockly.Extensions.apply("inline-svgs",t,!1),i(),t.domToMutation=function(e){var i=parseInt(e.getAttribute("numargs"));r=Math.min(isNaN(i)?0:i,o.length),a();for(var n=0;n<r;n++){var l=e.getAttribute("arg"+n);t.setFieldValue(l,"HANDLER_"+o[n].name)}},t.mutationToDom=function(){var e=document.createElement("mutation");e.setAttribute("numArgs",r.toString());for(var i=0;i<r;i++){var n=t.getFieldValue("HANDLER_"+o[i].name);e.setAttribute("arg"+i,n)}return e}}function B(r,c,f,b,k){function y(e,t){for(var o=!1,i=0;i<e.length;++i){var r=e.item(i),n=r.getAttribute("type");switch(b.blocks&&void 0!=b.blocks[n]?b.blocks[n]:void 0!=t?t:b.defaultState){case ae.Hidden:r.parentNode.removeChild(r),--i;break;case ae.Disabled:r.setAttribute("disabled","true");break;case ae.Visible:o=!0}}return o}function v(e,t){if(t)x(_,e);else{var o=A(_,e);if(o){var i=o.getAttribute("advanced");if(i&&"false"!==i){E=!0;for(var r=o.getElementsByTagName("block"),n=0;n<r.length;n++){var l=r.item(n);Z[l.getAttribute("type")]=!0}f===K.Basic&&x(_,e)}}}}void 0===f&&(f=K.Basic),N();var _=c?c.cloneNode(!0):void 0;r.blocks.sort(function(e,t){var o=r.apis.byQName[e.attributes.blockNamespace||e.namespace.split(".")[0]],i=r.apis.byQName[t.attributes.blockNamespace||t.namespace.split(".")[0]];if(o&&!i)return-1;if(i&&!o)return 1;var n=0;return o&&i&&0!=(n=(i.attributes.weight||50)-(o.attributes.weight||50))?n:n=(t.attributes.weight||50)-(e.attributes.weight||50)}),ie={},Z={};var T={},E=!1,B=e.options.debug;if(r.blocks.filter(function(e){return!_||!t.getFirstChildWithAttr(_,"block","type",e.attributes.blockId)}).forEach(function(o){if(o.attributes.blockBuiltin)e.Util.assert(!!te[o.attributes.blockId]),te[o.attributes.blockId].symbol=o;else{var i=t.parameterNames(o),l=n(r,o,i);if(g(r,o,i,l)&&(!_||o.attributes.debug&&!B||a(_,r,o,l,f,i),T[o.attributes.blockId]=1,!E&&!o.attributes.blockHidden&&!o.attributes.deprecated)){var s=(o.attributes.blockNamespace||o.namespace).split(".")[0],c=r.apis.byQName[s];E=E||c&&c.attributes.advanced}}}),Object.keys(oe).filter(function(e){return!T[e]}).forEach(function(e){return C(oe[e].fn)}),_&&e.appTarget.runtime){var w=e.appTarget.runtime.extraBlocks||[];w.push({namespace:e.appTarget.runtime.onStartNamespace||"loops",weight:e.appTarget.runtime.onStartWeight||10,type:ts.pxtc.ON_START_TYPE}),w.forEach(function(e){var t=document.createElement("block");if(t.setAttribute("type",e.type),t.setAttribute("weight",(e.weight||50).toString()),e.gap&&t.setAttribute("gap",e.gap.toString()),e.fields)for(var o in e.fields){var i=document.createElement("field");i.setAttribute("name",o),i.appendChild(document.createTextNode(e.fields[o])),t.appendChild(i)}if(f!==K.None){var r=A(_,e.namespace);r?s(t,r,e.weight):console.error("trying to add block "+e.type+" to unknown category "+e.namespace)}else _.appendChild(t)})}if(_&&k&&k.length>0&&k.forEach(function(t){var o=t.name,i=t.extension.color||"#7f8c8d",r=t.extension.label?e.Util.rlf(t.extension.label):e.Util.lf("Editor"),n=goog.dom.createDom("button");n.setAttribute("text",r),n.setAttribute("callbackkey","EXT"+o+"_BUTTON");var a=t.extension.namespace||o,s=t.extension.advanced||!1,c=function(e,t){for(var o,i=0;i<t.childNodes.length;i++){var r=t.childNodes.item(i);if("block"===r.tagName){o=r;break}}o?t.insertBefore(e,o):t.appendChild(e)};if(f!==K.None){if(f===K.All||f==K.Basic&&!s){var u=A(_,a);if(u)c(n,u);else{var p=l(e.Util.rlf("{id:category}"+o),o,55,i,"blocklyTreeIconextensions");h(p,_,55,!1),c(n,p)}}}else _.appendChild(n)}),_&&f!==K.None){var I=e.appTarget.runtime||{};v("Math",!I.mathBlocks),v("Variables",!I.variablesBlocks),v("Logic",!I.logicBlocks),v("Loops",!I.loopsBlocks),v("Text",!I.textBlocks),v("Arrays",!I.listsBlocks),v("Functions",!I.functionBlocks),!I.listsBlocks&&I.loopsBlocks&&(G=A(_,"Loops"))&&G.removeChild(t.getFirstChildWithAttr(G,"block","type","controls_for_of"));for(var S=_.getElementsByTagName("category"),D=0;D<S.length;D++)S[D].setAttribute("name",e.Util.rlf("{id:category}"+S[D].getAttribute("name"),[])),p(S[D].getAttribute("name"),S[D].getAttribute("colour"));for(var O=t.getDirectChildren(_,"category"),D=0;D<O.length;D++){var L=H(O[D].getAttribute("nameid"));if(L&&""!=L){O[D].setAttribute("colour",L);for(var F=d(O[D]),R=0;R<F.length;R++)F[R].setAttribute("colour",L)}if(!e.appTarget.appTheme.hideFlyoutHeadings){var P=goog.dom.createDom("label");P.setAttribute("text",O[D].getAttribute("name")),P.setAttribute("web-class","blocklyFlyoutHeading"),P.setAttribute("web-icon-color",O[D].getAttribute("colour"));var M=O[D].getAttribute("web-icon"),V=O[D].getAttribute("web-icon-class");M&&(1===M.length?(P.setAttribute("web-icon",M),V&&P.setAttribute("web-icon-class",V)):(ne+="\n                                .blocklyFlyoutLabelIcon.blocklyFlyoutIcon"+O[D].getAttribute("name")+' {\n                                    display: inline-block !important;\n                                    background-image: url("'+e.Util.pathJoin(e.webConfig.commitCdnUrl,encodeURI(M))+'")!important;\n                                    width: 1em;\n                                    height: 1em;\n                                    background-size: 1em!important;\n                                }\n                            ',u(),P.setAttribute("web-icon-class","blocklyFlyoutIcon"+O[D].getAttribute("name")))),O[D].insertBefore(P,O[D].firstChild);for(var F=d(O[D]),R=0;R<F.length;R++){var U=goog.dom.createDom("label");U.setAttribute("text",O[D].getAttribute("name")+" > "+F[R].getAttribute("name")),U.setAttribute("web-class","blocklyFlyoutHeading"),U.setAttribute("web-icon-color",O[D].getAttribute("colour")),F[R].insertBefore(U,F[R].firstChild),M&&(1==M.length?(U.setAttribute("web-icon",M),V&&U.setAttribute("web-icon-class",V)):U.setAttribute("web-icon-class","blocklyFlyoutIcon"+O[D].getAttribute("name")))}}}}if(_&&$(_).find("shadow:empty").each(function(e,t){var o=t.getAttribute("type"),i=$(_).find('block[type="'+o+'"]')[0];i&&(t.innerHTML=i.innerHTML)}),E&&_&&f!==K.None){var G=l(o(),"Advanced",1,H("advanced"),f===K.Basic?"blocklyTreeIconadvancedcollapsed":"blocklyTreeIconadvancedexpanded");h(document.createElement("sep"),_,1.5,!1),h(G,_,1,!1)}if(_&&(!E||f===K.All)&&e.appTarget.cloud&&e.appTarget.cloud.packages&&(E||h(document.createElement("sep"),_,1.5,!1),m(_,i(),"Extensions",1,"#717171","blocklyTreeIconaddpackage")),_){for(var W=_.getElementsByTagName("block"),D=0;D<W.length;D++)Z[W.item(D).getAttribute("type")]=!0;ee=!0}if(_&&b){if(f!==K.None){for(var X=_.getElementsByTagName("category"),q=0;q<X.length;++q)if("more"!==(le=(G=X.item(q)).getAttribute("nameid"))&&"advanced"!==le&&("variables"!==le||b.blocks&&!b.blocks.variables_set&&!b.blocks.variables_get&&!b.blocks.variables_change||b.namespaces&&b.namespaces.variables===ae.Disabled)){var Y=b.namespaces&&void 0!=b.namespaces[le]?b.namespaces[le]:b.defaultState,j=G.getElementsByTagName("block"),z="variables"==le&&b.blocks?b.blocks.variables_get||b.blocks.variables_set:y(j,Y);switch(Y){case ae.Disabled:if(!z){G.setAttribute("disabled","true");for(var J=G.getElementsByTagName("category"),Q=0;Q<J.length;++Q)J.item(Q).setAttribute("disabled","true")}break;case ae.Visible:case ae.Hidden:z||(G.parentNode.removeChild(G),--q)}}for(q=0;q<X.length;++q)if("advanced"==(le=(G=X.item(q)).getAttribute("nameid"))&&0==G.childNodes.length){G.parentNode.removeChild(G),--q;var re=_.getElementsByTagName("sep")[0];re.parentNode.removeChild(re)}}else y(_.getElementsByTagName("block"));if(f!==K.None)for(var X=_.getElementsByTagName("category"),q=0;q<X.length;++q){var le=(G=X.item(q)).getAttribute("nameid");"variables"!=le&&"functions"!=le&&"advanced"!=le&&(0==G.getElementsByTagName("block").length&&G.parentNode&&G.parentNode.removeChild(G))}}if(_)for(var X=_.getElementsByTagName("category"),q=0;q<X.length;++q){(function(o){var i=X.item(o);if("advanced"===i.getAttribute("nameid"))return"continue";var r=t.getDirectChildren(i,"block"),n=i.getAttribute("groups"),l=i.getAttribute("labellinewidth"),a={},s=[];n&&(s=n.split(", "));for(var c=0;c<r.length;++c){var u=r[c];a[h=u.getAttribute("group")||"other"]||(a[h]=[]),a[h].push(u)}if(Object.keys(a).length>1){Object.keys(a).sort().forEach(function(e){-1==s.indexOf(e)&&s.push(e)});for(var p=[],d=0;d<s.length;++d){var h=s[d];if(a[h]&&a[h].length){if("other"!=h){var m=goog.dom.createDom("label");m.setAttribute("text",e.Util.rlf("{id:group}"+h)),m.setAttribute("web-class","blocklyFlyoutGroup"),m.setAttribute("web-line","1.5"),l&&m.setAttribute("web-line-width",l),p.push(m)}a[h]&&a[h].forEach(function(e){i.removeChild(e),p.push(e)})}}p.forEach(function(e){i.appendChild(e)})}})(q)}return _}function A(e,o){return e?t.getFirstChildWithAttr(e,"category","nameid",o.toLowerCase()):void 0}function C(e){delete Blockly.Blocks[e.attributes.blockId],delete oe[e.attributes.blockId]}function N(){se||(se=!0,goog.provide("Blockly.Blocks.device"),goog.require("Blockly.Blocks"),window.PointerEvent&&(Blockly.bindEvent_.TOUCH_MAP={mousedown:"pointerdown",mousemove:"pointermove",mouseup:"pointerup"},document.body.style.touchAction="none"),Blockly.FieldCheckbox.CHECK_CHAR="■",Blockly.BlockSvg.START_HAT=!!e.appTarget.appTheme.blockHats,t.initFieldEditors(),R(),V(),U(),G(),W(),O(),L(),X(),q(),F())}function w(t,o){var i=e.blocks.getBlockDefinition(o);S(t,o,i.name,i.tooltip,i.url,H(i.category))}function I(t){var o=e.blocks.getBlockDefinition(t);D(t,o.name,o.tooltip,o.url,H(o.category))}function S(e,o,i,r,n,l,a,s,c){!r||"string"!=typeof r&&"function"!=typeof r||e.setTooltip(r),n&&e.setHelpUrl(n),l&&e.setColour(l,a,s),c&&e.setDeletable(!1);var u=document.getElementById("blocklyToolboxDefinition"),p=u?t.getFirstChildWithAttr(u,"block","type",o):void 0;e.codeCard={header:i,name:i,software:1,description:goog.isFunction(r)?r(e):r,blocksXml:p?'<xml xmlns="http://www.w3.org/1999/xhtml">'+(k(p)||'<block type="'+o+'"></block>')+"</xml>":void 0,url:n}}function D(e,t,o,i,r,n,l){var a=Blockly.Blocks[e],s=a.init;s&&(a.init=function(){s.call(this);S(this,e,t,o,i,r,n,l)})}function O(){var t=Blockly.Msg,o=e.blocks.getBlockDefinition("lists_create_with");t.LISTS_CREATE_EMPTY_TITLE=o.block.LISTS_CREATE_EMPTY_TITLE,t.LISTS_CREATE_WITH_INPUT_WITH=o.block.LISTS_CREATE_WITH_INPUT_WITH,t.LISTS_CREATE_WITH_CONTAINER_TITLE_ADD=o.block.LISTS_CREATE_WITH_CONTAINER_TITLE_ADD,t.LISTS_CREATE_WITH_ITEM_TITLE=o.block.LISTS_CREATE_WITH_ITEM_TITLE,I("lists_create_with");var i=e.blocks.getBlockDefinition("lists_length");t.LISTS_LENGTH_TITLE=i.block.LISTS_LENGTH_TITLE,Blockly.Blocks.lists_length.init=function(){this.jsonInit({message0:t.LISTS_LENGTH_TITLE,args0:[{type:"input_value",name:"VALUE",check:["Array"]}],output:"Number"})},I("lists_length")}function L(){var t=Blockly.Msg,o=e.blocks.getBlockDefinition("controls_repeat_ext");t.CONTROLS_REPEAT_TITLE=o.block.CONTROLS_REPEAT_TITLE,t.CONTROLS_REPEAT_INPUT_DO=o.block.CONTROLS_REPEAT_INPUT_DO,I("controls_repeat_ext");var i=e.blocks.getBlockDefinition("device_while");Blockly.Blocks.device_while={init:function(){this.jsonInit({message0:i.block.message0,args0:[{type:"input_value",name:"COND",check:"Boolean"}],previousStatement:null,nextStatement:null,colour:H("loops")}),this.appendStatementInput("DO").appendField(i.block.appendField),w(this,"device_while")}};var r=e.blocks.getBlockDefinition("controls_simple_for");Blockly.Blocks.controls_simple_for={init:function(){this.jsonInit({message0:r.block.message0,args0:[{type:"field_variable",name:"VAR",variable:r.block.variable},{type:"input_value",name:"TO",check:"Number"}],previousStatement:null,nextStatement:null,colour:H("loops"),inputsInline:!0}),this.appendStatementInput("DO").appendField(r.block.appendField);var t=this;S(this,"controls_simple_for",r.name,function(){return e.U.rlf(r.tooltip,t.getFieldValue("VAR"))},r.url,String(H("loops")))},getVars:function(){return[this.getFieldValue("VAR")]},renameVar:function(e,t){Blockly.Names.equals(e,this.getFieldValue("VAR"))&&this.setFieldValue(t,"VAR")},customContextMenu:function(e){if(!this.isCollapsed()){var t={enabled:!0},o=this.getFieldValue("VAR");t.text=lf("Create 'get {0}'",o);var i=goog.dom.createDom("field",null,o);i.setAttribute("name","VAR");var r=goog.dom.createDom("block",null,i);r.setAttribute("type","variables_get"),t.callback=Blockly.ContextMenu.callbackFactory(this,r),e.push(t)}}}}function F(){var e=function(e,t){return Math.floor(t-(e.left+e.width/2))},t=Blockly.BlockDragger.prototype.dragBlock;Blockly.BlockDragger.prototype.dragBlock=function(o,i){var r=document.getElementsByClassName("blocklyToolboxDiv")[0],n=document.getElementsByClassName("blocklyTreeRoot")[0],l=document.getElementById("blocklyTrashIcon");if(n&&l){var a=e(n.getBoundingClientRect(),o.clientX);if(a<200){var s=a/200;l.style.opacity=""+(1-s),l.style.display="block",n.style.opacity=""+s,a<50&&r.classList.add("blocklyToolboxDeleting")}else l.style.display="none",n.style.opacity="1",r.classList.remove("blocklyToolboxDeleting")}return t.call(this,o,i)};var o=Blockly.BlockDragger.prototype.endBlockDrag;Blockly.BlockDragger.prototype.endBlockDrag=function(e,t){o.call(this,e,t);var i=document.getElementsByClassName("blocklyToolboxDiv")[0],r=document.getElementsByClassName("blocklyTreeRoot")[0],n=document.getElementById("blocklyTrashIcon");n&&(n.style.display="none",r.style.opacity="1",i.classList.remove("blocklyToolboxDeleting"))}}function R(){var o=Blockly.Msg;o.DUPLICATE_BLOCK=lf("{id:block}Duplicate"),o.REMOVE_COMMENT=lf("Remove Comment"),o.ADD_COMMENT=lf("Add Comment"),o.EXTERNAL_INPUTS=lf("External Inputs"),o.INLINE_INPUTS=lf("Inline Inputs"),o.EXPAND_BLOCK=lf("Expand Block"),o.COLLAPSE_BLOCK=lf("Collapse Block"),o.ENABLE_BLOCK=lf("Enable Block"),o.DISABLE_BLOCK=lf("Disable Block"),o.DELETE_BLOCK=lf("Delete Block"),o.DELETE_X_BLOCKS=lf("Delete All Blocks"),o.HELP=lf("Help"),Blockly.BlockSvg.prototype.showHelp_=function(){var t=goog.isFunction(this.helpUrl)?this.helpUrl():this.helpUrl;t&&(e.blocks.openHelpUrl||window.open)(t)},Blockly.WorkspaceSvg.prototype.showContextMenu_=function(o){function i(e){if(e.isDeletable())b=b.concat(e.getDescendants());else for(var t=e.getChildren(),o=0;o<t.length;o++)i(t[o])}function r(){Blockly.Events.setGroup(s);var e=b.shift();e&&(e.workspace?(e.dispose(!1,!0),setTimeout(r,c)):r()),Blockly.Events.setGroup(!1)}var n=this;if(!this.options.readOnly&&!this.isFlyout){var l=[],a=this.getTopBlocks(!0),s=Blockly.utils.genUid(),c=10;if(this.options.collapse){for(var u=!1,p=!1,d=0;d<a.length;d++)for(var h=a[d];h;)h.isCollapsed()?u=!0:p=!0,h=h.getNextBlock();var m=function(e){for(var t=0,o=0;o<a.length;o++)for(var i=a[o];i;)setTimeout(i.setCollapsed.bind(i,e),t),i=i.getNextBlock(),t+=c},f={enabled:p};f.text=lf("Collapse Block"),f.callback=function(){e.tickEvent("blocks.context.collapse"),m(!0)},l.push(f);var g={enabled:u};g.text=lf("Expand Block"),g.callback=function(){e.tickEvent("blocks.context.expand"),m(!1)},l.push(g)}for(var b=[],d=0;d<a.length;d++)i(a[d]);var k={text:1==b.length?lf("Delete Block"):lf("Delete All Blocks",b.length),enabled:b.length>0,callback:function(){e.tickEvent("blocks.context.delete"),(b.length<2||window.confirm(lf("Delete all {0} blocks?",b.length)))&&r()}};l.push(k);var y={text:lf("Format Code"),enabled:!0,callback:function(){e.tickEvent("blocks.context.format"),e.blocks.layout.flow(n,{useViewWidth:!0})}};if(l.push(y),e.blocks.layout.screenshotEnabled()){var v={text:lf("Download Screenshot"),enabled:a.length>0,callback:function(){e.tickEvent("blocks.context.screenshot"),e.blocks.layout.screenshotAsync(n).done(function(t){e.BrowserUtils.isSafari()&&(t=t.replace(/^data:image\/[^;]/,"data:application/octet-stream")),e.BrowserUtils.browserDownloadDataUri(t,(e.appTarget.nickname||e.appTarget.id)+"-"+lf("screenshot")+".png")})}};l.push(v)}t.onShowContextMenu&&t.onShowContextMenu(this,l),Blockly.ContextMenu.show(o,l,this.RTL)}},Blockly.Toolbox.TreeNode.prototype.onClick_=function(e){var t=this;t.isSelected()||P(t.getTree().getSelectedItem(),t),t.hasChildren()&&t.isUserCollapsible_?t.isSelected()?(P(t.getTree().getSelectedItem(),t),t.getTree().setSelectedItem(null)):(t.setExpanded(!0),t.select()):t.isSelected()?t.getTree().setSelectedItem(null):t.select(),t.updateRow()};var i=Blockly.Toolbox.TreeControl.prototype.setSelectedItem;Blockly.Toolbox.TreeControl.prototype.setSelectedItem=function(e){var t=this,o=t.toolbox_;if(e!=t.selectedItem_&&e!=o.tree_){var r=t.selectedItem_;i.call(t,e),null===e&&P(r)}},Blockly.Flyout.prototype.addBlockListeners_=function(e,t,o){this.listeners_.push(Blockly.bindEventWithChecks_(e,"mousedown",null,this.blockMouseDown_(t))),this.listeners_.push(Blockly.bindEventWithChecks_(o,"mousedown",null,this.blockMouseDown_(t))),this.listeners_.push(Blockly.bindEvent_(e,"mouseover",t,t.addSelect)),this.listeners_.push(Blockly.bindEvent_(e,"mouseout",t,t.removeSelect)),this.listeners_.push(Blockly.bindEvent_(o,"mouseover",t,t.addSelect)),this.listeners_.push(Blockly.bindEvent_(o,"mouseout",t,t.removeSelect))}}function P(e,t){for(;e;)!e.isUserCollapsible_||!e.getTree()||e==t||t&&M(t,e)||(e.setExpanded(!1),e.updateRow()),e=e.getParent()}function M(e,t){var o=e.getParent();return!!o&&(o===t||M(o,t))}function V(){var o=e.blocks.getBlockDefinition(ts.pxtc.ON_START_TYPE);Blockly.Blocks[ts.pxtc.ON_START_TYPE]={init:function(){this.jsonInit({message0:o.block.message0,args0:[{type:"input_dummy"},{type:"input_statement",name:"HANDLER"}],colour:(e.appTarget.runtime?e.appTarget.runtime.onStartColor:"")||H("loops")}),S(this,ts.pxtc.ON_START_TYPE,o.name,o.tooltip,o.url,String((e.appTarget.runtime?e.appTarget.runtime.onStartColor:"")||H("loops")),void 0,void 0,!!e.appTarget.runtime&&e.appTarget.runtime.onStartUnDeletable)}},Blockly.Blocks[pxtc.TS_STATEMENT_TYPE]={init:function(){var e=this,t=this;t.setColour("#717171"),t.setPreviousStatement(!0),t.setNextStatement(!0),t.setInputsInline(!1),this.domToMutation=function(o){var i=parseInt(o.getAttribute("numlines"));e.declaredVariables=o.getAttribute("declaredvars");for(var r=0;r<i;r++){var n=o.getAttribute("line"+r);t.appendDummyInput().appendField(n,"LINE"+r)}},this.mutationToDom=function(){for(var o=document.createElement("mutation"),i=0;;){var r=t.getFieldValue("LINE"+i);if(null===r)break;o.setAttribute("line"+i,r),i++}return o.setAttribute("numlines",i.toString()),e.declaredVariables&&o.setAttribute("declaredvars",e.declaredVariables),o},t.setEditable(!1),S(this,pxtc.TS_STATEMENT_TYPE,lf("JavaScript statement"),lf("A JavaScript statement that could not be converted to blocks"),"/blocks/javascript-blocks","#717171")}},Blockly.Blocks[pxtc.TS_OUTPUT_TYPE]={init:function(){var e=this;e.setColour("#717171"),e.setPreviousStatement(!1),e.setNextStatement(!1),e.setOutput(!0),e.setEditable(!1),e.appendDummyInput().appendField(new pxtblockly.FieldTsExpression(""),"EXPRESSION"),S(e,pxtc.TS_OUTPUT_TYPE,lf("JavaScript expression"),lf("A JavaScript expression that could not be converted to blocks"),"/blocks/javascript-blocks","#717171")}};var i=e.blocks.getBlockDefinition("controls_for_of");Blockly.Blocks.controls_for_of={init:function(){this.jsonInit({message0:i.block.message0,args0:[{type:"field_variable",name:"VAR",variable:i.block.variable},{type:"input_value",name:"LIST",check:"Array"}],previousStatement:null,nextStatement:null,colour:t.blockColors.loops,inputsInline:!0}),this.appendStatementInput("DO").appendField(i.block.appendField);var o=this;S(this,"controls_for_of",i.name,function(){return e.U.rlf(i.tooltip,o.getFieldValue("VAR"))},i.url,String(H("loops")))}};var r=e.blocks.getBlockDefinition("lists_index_get");Blockly.Blocks.lists_index_get={init:function(){this.jsonInit({message0:r.block.message0,args0:[{type:"input_value",name:"LIST",check:"Array"},{type:"input_value",name:"INDEX",check:"Number"}],colour:t.blockColors.arrays,inputsInline:!0}),this.setPreviousStatement(!1),this.setNextStatement(!1),this.setOutput(!0),w(this,"lists_index_get")}};var n=e.blocks.getBlockDefinition("lists_index_set");Blockly.Blocks.lists_index_set={init:function(){this.jsonInit({message0:n.block.message0,args0:[{type:"input_value",name:"LIST",check:"Array"},{type:"input_value",name:"INDEX",check:"Number"},{type:"input_value",name:"VALUE",check:null}],previousStatement:null,nextStatement:null,colour:t.blockColors.arrays,inputsInline:!0}),w(this,"lists_index_set")}}}function U(){var t=e.blocks.getBlockDefinition("math_op2"),o=t.tooltip;Blockly.Blocks.math_op2={init:function(){this.jsonInit({message0:lf("%1 of %2 and %3"),args0:[{type:"field_dropdown",name:"op",options:[[lf("{id:op}min"),"min"],[lf("{id:op}max"),"max"]]},{type:"input_value",name:"x",check:"Number"},{type:"input_value",name:"y",check:"Number"}],inputsInline:!0,output:"Number",colour:H("math")});S(this,"math_op2",t.name,function(e){return o[e.getFieldValue("op")]},t.url,H(t.category))}};var i=e.blocks.getBlockDefinition("math_op3");Blockly.Blocks.math_op3={init:function(){this.jsonInit({message0:i.block.message0,args0:[{type:"input_value",name:"x",check:"Number"}],inputsInline:!0,output:"Number",colour:H("math")}),w(this,"math_op3")}};var r=e.blocks.getBlockDefinition("math_number");D("math_number",r.name,lf(e.appTarget.compile&&e.appTarget.compile.floatingPoint?"a decimal number":"an integer number"),r.url,Blockly.Colours.textField,Blockly.Colours.textField,Blockly.Colours.textField);var n=e.blocks.getBlockDefinition("math_number_minmax");D("math_number_minmax",n.name,lf(e.appTarget.compile&&e.appTarget.compile.floatingPoint?"a decimal number":"an integer number"),n.url,Blockly.Colours.textField,Blockly.Colours.textField,Blockly.Colours.textField);var l=Blockly.Msg,a=e.blocks.getBlockDefinition("math_arithmetic"),s=a.tooltip;l.MATH_ADDITION_SYMBOL=a.block.MATH_ADDITION_SYMBOL,l.MATH_SUBTRACTION_SYMBOL=a.block.MATH_SUBTRACTION_SYMBOL,l.MATH_MULTIPLICATION_SYMBOL=a.block.MATH_MULTIPLICATION_SYMBOL,l.MATH_DIVISION_SYMBOL=a.block.MATH_DIVISION_SYMBOL,l.MATH_POWER_SYMBOL=a.block.MATH_POWER_SYMBOL,D("math_arithmetic",a.name,function(e){return s[e.getFieldValue("OP")]},a.url,H(a.category));var c=e.blocks.getBlockDefinition("math_modulo");l.MATH_MODULO_TITLE=c.block.MATH_MODULO_TITLE,I("math_modulo")}function H(o){return e.appTarget.appTheme.blockColors&&e.appTarget.appTheme.blockColors[o]?e.appTarget.appTheme.blockColors[o]:t.blockColors[o]?t.blockColors[o]:""}function G(){var t=lf("{id:var}item");Blockly.Variables.flyoutCategory=function(t){var o=[];if(!e.appTarget.appTheme.hideFlyoutHeadings){var i=goog.dom.createDom("label");i.setAttribute("text",lf("Variables")),i.setAttribute("web-class","blocklyFlyoutHeading"),i.setAttribute("web-icon",""),i.setAttribute("web-icon-color",H("variables")),o.push(i)}var r=goog.dom.createDom("button");r.setAttribute("text",lf("Make a Variable")),r.setAttribute("callbackkey","CREATE_VARIABLE"),t.registerButtonCallback("CREATE_VARIABLE",function(e){Blockly.Variables.createVariable(e.getTargetWorkspace())}),o.push(r);var n=Blockly.Variables.flyoutCategoryBlocks(t);return o=o.concat(n)},Blockly.Variables.flyoutCategoryBlocks=function(e){var o=e.getVariablesOfType("");o.sort(Blockly.VariableModel.compareByName);for(var i=0,r=void 0;r=o[i];i++)if(r.name==t){o.splice(i,1);break}var n=new Blockly.VariableModel(e,t);o.unshift(n);var l=[];if(o.length>0){for(var i=0,a=void 0;a=o[i];i++)if(Blockly.Blocks.variables_get){var s='<xml><block type="variables_get" gap="8">'+Blockly.Variables.generateVariableFieldXml_(a)+"</block></xml>",c=Blockly.Xml.textToDom(s).firstChild;l.push(c)}l[l.length-1].setAttribute("gap","24");var u=o[0];if(Blockly.Blocks.variables_set){var s='<xml><block type="variables_set" gap="'+(p=Blockly.Blocks.variables_change?8:24)+'">'+Blockly.Variables.generateVariableFieldXml_(u)+"</block></xml>",c=Blockly.Xml.textToDom(s).firstChild;(d=goog.dom.createDom("value")).setAttribute("name","VALUE"),(h=goog.dom.createDom("shadow")).setAttribute("type","math_number"),d.appendChild(h),(m=goog.dom.createDom("field")).setAttribute("name","NUM"),m.appendChild(document.createTextNode("0")),h.appendChild(m),c.appendChild(d),l.push(c)}if(Blockly.Blocks.variables_change){var p=Blockly.Blocks.variables_get?20:8,s='<xml><block type="variables_change" gap="'+p+'">'+Blockly.Variables.generateVariableFieldXml_(u)+'<value name="DELTA"><shadow type="math_number"><field name="NUM">1</field></shadow></value></block></xml>',c=Blockly.Xml.textToDom(s).firstChild,d=goog.dom.createDom("value");d.setAttribute("name","VALUE");var h=goog.dom.createDom("shadow");h.setAttribute("type","math_number"),d.appendChild(h);var m=goog.dom.createDom("field");m.setAttribute("name","NUM"),m.appendChild(document.createTextNode("1")),h.appendChild(m),c.appendChild(d),l.push(c)}}return l};var o=Blockly.Msg,i=e.blocks.getBlockDefinition("variables_get");o.VARIABLES_GET_CREATE_SET=i.block.VARIABLES_GET_CREATE_SET,I("variables_get"),o.RENAME_VARIABLE=lf("Rename variable..."),o.DELETE_VARIABLE=lf('Delete the "%1" variable'),o.DELETE_VARIABLE_CONFIRMATION=lf('Delete %1 uses of the "%2" variable?');var r=e.blocks.getBlockDefinition("variables_set");o.VARIABLES_SET=r.block.VARIABLES_SET,o.VARIABLES_DEFAULT_NAME=t,o.VARIABLES_SET_CREATE_GET=lf("Create 'get %1'"),I("variables_set");var n=e.blocks.getBlockDefinition("variables_change");Blockly.Blocks.variables_change={init:function(){this.jsonInit({message0:n.block.message0,args0:[{type:"field_variable",name:"VAR",variable:t},{type:"input_value",name:"VALUE",check:"Number"}],inputsInline:!0,previousStatement:null,nextStatement:null,colour:H("variables")}),w(this,"variables_change")}},o.NEW_VARIABLE_TITLE=lf("New variable name:")}function W(){var t=Blockly.Msg,o=e.blocks.getBlockDefinition("procedures_defnoreturn");t.PROCEDURES_DEFNORETURN_TITLE=o.block.PROCEDURES_DEFNORETURN_TITLE,t.PROCEDURE_ALREADY_EXISTS=o.block.PROCEDURE_ALREADY_EXISTS,Blockly.Blocks.procedures_defnoreturn.init=function(){var e=new Blockly.FieldTextInput("",Blockly.Procedures.rename);this.appendDummyInput().appendField(Blockly.Msg.PROCEDURES_DEFNORETURN_TITLE).appendField(e,"NAME").appendField("","PARAMS"),this.setColour(H("functions")),this.arguments_=[],this.setStartHat(!0),this.setStatements_(!0),this.statementConnection_=null},I("procedures_defnoreturn");var i=e.blocks.getBlockDefinition("procedures_callnoreturn");t.PROCEDURES_CALLRETURN_TOOLTIP=o.tooltip,Blockly.Blocks.procedures_callnoreturn={init:function(){var e=new pxtblockly.FieldProcedure("");e.setSourceBlock(this),this.appendDummyInput("TOPROW").appendField(i.block.PROCEDURES_CALLNORETURN_TITLE).appendField(e,"NAME"),this.setPreviousStatement(!0),this.setNextStatement(!0),this.setColour(H("functions")),this.arguments_=[],this.quarkConnections_={},this.quarkIds_=null},getProcedureCall:function(){return this.getFieldValue("NAME")},renameProcedure:function(e,t){Blockly.Names.equals(e,this.getProcedureCall())&&this.setFieldValue(t,"NAME")},onchange:function(e){if(this.workspace&&!this.workspace.isFlyout&&!this.isInsertionMarker())if(e.type==Blockly.Events.CREATE&&-1!=e.ids.indexOf(this.id)){var t=this.getProcedureCall();if(!(c=Blockly.Procedures.getDefinition(t,this.workspace))||c.type==this.defType_&&JSON.stringify(c.arguments_)==JSON.stringify(this.arguments_)||(c=null),!c){Blockly.Events.setGroup(e.group);var o=goog.dom.createDom("xml"),i=goog.dom.createDom("block");i.setAttribute("type",this.defType_);var r=this.getRelativeToSurfaceXY(),n=r.x+Blockly.SNAP_RADIUS*(this.RTL?-1:1),l=r.y+2*Blockly.SNAP_RADIUS;i.setAttribute("x",n),i.setAttribute("y",l);var a=goog.dom.createDom("field");a.setAttribute("name","NAME"),a.appendChild(document.createTextNode(this.getProcedureCall())),i.appendChild(a),o.appendChild(i),Blockly.Xml.domToWorkspace(o,this.workspace),Blockly.Events.setGroup(!1)}}else if(e.type==Blockly.Events.DELETE){var s=this.getProcedureCall(),c=Blockly.Procedures.getDefinition(s,this.workspace);c||(Blockly.Events.setGroup(e.group),this.dispose(!0,!1),Blockly.Events.setGroup(!1))}},mutationToDom:function(){var e=document.createElement("mutation");return e.setAttribute("name",this.getProcedureCall()),e},domToMutation:function(e){var t=e.getAttribute("name");this.renameProcedure(this.getProcedureCall(),t)},customContextMenu:function(e){var t={enabled:!0};t.text=Blockly.Msg.PROCEDURES_HIGHLIGHT_DEF;var o=this.getProcedureCall(),i=this.workspace;t.callback=function(){var e=Blockly.Procedures.getDefinition(o,i);e&&e.select()},e.push(t)},defType_:"procedures_defnoreturn"},I("procedures_callnoreturn"),Blockly.Procedures.flyoutCategory=function(t){var o=[];if(!e.appTarget.appTheme.hideFlyoutHeadings){var i=goog.dom.createDom("label");i.setAttribute("text",lf("Functions")),i.setAttribute("web-class","blocklyFlyoutHeading"),i.setAttribute("web-icon",""),i.setAttribute("web-icon-class","blocklyFlyoutIconfunctions"),i.setAttribute("web-icon-color",H("functions")),o.push(i)}var r=lf("Make a Function"),n=lf("New function name:"),l=goog.dom.createDom("button");l.setAttribute("text",r),l.setAttribute("callbackkey","CREATE_FUNCTION");var a=function(e){var o=t.getTopBlocks(!0)[0],i=0,r=0;if(o){var n=o.getRelativeToSurfaceXY();i=n.x+Blockly.SNAP_RADIUS*(o.RTL?-1:1),r=n.y+2*Blockly.SNAP_RADIUS}var l=goog.dom.createDom("xml"),a=goog.dom.createDom("block");a.setAttribute("type","procedures_defnoreturn"),a.setAttribute("x",String(i)),a.setAttribute("y",String(r));var s=goog.dom.createDom("field");s.setAttribute("name","NAME"),s.appendChild(document.createTextNode(e)),a.appendChild(s),l.appendChild(a);var c=Blockly.Xml.domToWorkspace(l,t);t.toolbox_.clearSelection(),t.getBlockById(c[0]).select()};return t.registerButtonCallback("CREATE_FUNCTION",function(e){var o=function(e){Blockly.prompt(n,e,function(e){e&&(e=e.replace(/[\s\xa0]+/g," ").replace(/^ | $/g,""))==r&&(e=null),e&&(t.getVariable(e)?Blockly.alert(Blockly.Msg.VARIABLE_ALREADY_EXISTS.replace("%1",e.toLowerCase()),function(){o(e)}):Blockly.Procedures.isLegalName_(e,t)?a(e):Blockly.alert(Blockly.Msg.PROCEDURE_ALREADY_EXISTS.replace("%1",e.toLowerCase()),function(){o(e)}))})};o("doSomething")}),o.push(l),function(e,t){for(var i=0;i<e.length;i++){var r=e[i][0],n=(e[i][1],goog.dom.createDom("block"));n.setAttribute("type",t),n.setAttribute("gap","16"),n.setAttribute("colour",H("functions"));var l=goog.dom.createDom("field",null,r);l.setAttribute("name","NAME"),n.appendChild(l),o.push(n)}}(Blockly.Procedures.allProcedures(t)[0],"procedures_callnoreturn"),o}}function X(){var t=Blockly.Msg,o=e.blocks.getBlockDefinition("controls_if"),i=o.tooltip;t.CONTROLS_IF_MSG_IF=o.block.CONTROLS_IF_MSG_IF,t.CONTROLS_IF_MSG_THEN=o.block.CONTROLS_IF_MSG_THEN,t.CONTROLS_IF_MSG_ELSE=o.block.CONTROLS_IF_MSG_ELSE,t.CONTROLS_IF_MSG_ELSEIF=o.block.CONTROLS_IF_MSG_ELSEIF,t.CONTROLS_IF_TOOLTIP_1=i.CONTROLS_IF_TOOLTIP_1,t.CONTROLS_IF_TOOLTIP_2=i.CONTROLS_IF_TOOLTIP_2,t.CONTROLS_IF_TOOLTIP_3=i.CONTROLS_IF_TOOLTIP_3,t.CONTROLS_IF_TOOLTIP_4=i.CONTROLS_IF_TOOLTIP_4,I("controls_if");var r=e.blocks.getBlockDefinition("logic_compare").tooltip;t.LOGIC_COMPARE_TOOLTIP_EQ=r.LOGIC_COMPARE_TOOLTIP_EQ,t.LOGIC_COMPARE_TOOLTIP_NEQ=r.LOGIC_COMPARE_TOOLTIP_NEQ,t.LOGIC_COMPARE_TOOLTIP_LT=r.LOGIC_COMPARE_TOOLTIP_LT,t.LOGIC_COMPARE_TOOLTIP_LTE=r.LOGIC_COMPARE_TOOLTIP_LTE,t.LOGIC_COMPARE_TOOLTIP_GT=r.LOGIC_COMPARE_TOOLTIP_GT,t.LOGIC_COMPARE_TOOLTIP_GTE=r.LOGIC_COMPARE_TOOLTIP_GTE,I("logic_compare");var n=e.blocks.getBlockDefinition("logic_operation"),l=n.tooltip;t.LOGIC_OPERATION_AND=n.block.LOGIC_OPERATION_AND,t.LOGIC_OPERATION_OR=n.block.LOGIC_OPERATION_OR,t.LOGIC_OPERATION_TOOLTIP_AND=l.LOGIC_OPERATION_TOOLTIP_AND,t.LOGIC_OPERATION_TOOLTIP_OR=l.LOGIC_OPERATION_TOOLTIP_OR,I("logic_operation");var a=e.blocks.getBlockDefinition("logic_negate");t.LOGIC_NEGATE_TITLE=a.block.LOGIC_NEGATE_TITLE,I("logic_negate");var s=e.blocks.getBlockDefinition("logic_boolean");t.LOGIC_BOOLEAN_TRUE=s.block.LOGIC_BOOLEAN_TRUE,t.LOGIC_BOOLEAN_FALSE=s.block.LOGIC_BOOLEAN_FALSE,I("logic_boolean")}function q(){var t=e.blocks.getBlockDefinition("text");D("text",t.name,t.tooltip,t.url,Blockly.Colours.textField,Blockly.Colours.textField,Blockly.Colours.textField);var o=Blockly.Msg,i=e.blocks.getBlockDefinition("text_length");o.TEXT_LENGTH_TITLE=i.block.TEXT_LENGTH_TITLE,Blockly.Blocks.text_length.init=function(){this.jsonInit({message0:o.TEXT_LENGTH_TITLE,args0:[{type:"input_value",name:"VALUE",check:["String"]}],output:"Number"})},I("text_length");var r=e.blocks.getBlockDefinition("text_join");o.TEXT_JOIN_TITLE_CREATEWITH=r.block.TEXT_JOIN_TITLE_CREATEWITH,I("text_join")}function Y(t){var o=function(e){if(e.disabled)return lf("This block is disabled and will not run. Attach this block to an event to enable it.");for(var t=e.tooltip;goog.isFunction(t);)t=t(e);return t};Blockly.Tooltip.show_=function(){function t(){var e=Blockly.Tooltip.element_.RTL,t=goog.dom.getViewportSize();Blockly.Tooltip.DIV.style.direction=e?"rtl":"ltr",Blockly.Tooltip.DIV.style.display="block",Blockly.Tooltip.visible=!0;var o=Blockly.Tooltip.lastX_;e?o-=Blockly.Tooltip.OFFSET_X+Blockly.Tooltip.DIV.offsetWidth:o+=Blockly.Tooltip.OFFSET_X;var i=Blockly.Tooltip.lastY_+Blockly.Tooltip.OFFSET_Y;i+Blockly.Tooltip.DIV.offsetHeight>t.height+window.scrollY&&(i-=Blockly.Tooltip.DIV.offsetHeight+2*Blockly.Tooltip.OFFSET_Y),e?o=Math.max(Blockly.Tooltip.MARGINS-window.scrollX,o):o+Blockly.Tooltip.DIV.offsetWidth>t.width+window.scrollX-2*Blockly.Tooltip.MARGINS&&(o=t.width-Blockly.Tooltip.DIV.offsetWidth-2*Blockly.Tooltip.MARGINS),Blockly.Tooltip.DIV.style.top=i+"px",Blockly.Tooltip.DIV.style.left=o+"px"}if(Blockly.Tooltip.poisonedElement_=Blockly.Tooltip.element_,Blockly.Tooltip.DIV)if(goog.dom.removeChildren(Blockly.Tooltip.DIV),Blockly.Tooltip.element_.codeCard){var i=e.docs.codeCard.render({header:o(Blockly.Tooltip.element_)});Blockly.Tooltip.DIV.appendChild(i),t()}else{for(var r=o(Blockly.Tooltip.element_),n=(r=Blockly.utils.wrap(r,Blockly.Tooltip.LIMIT)).split("\n"),l=0;l<n.length;l++){var a=document.createElement("div");a.appendChild(document.createTextNode(n[l])),Blockly.Tooltip.DIV.appendChild(a)}t()}}}function j(t){var o=ce[t];{if(o)return new Blockly.FieldImage(o,56,56,!1,"");e.log("missing jres icon "+t)}}function z(e){ce={};var t=e.apis.jres;t&&Object.keys(t).forEach(function(e){var o=t[e];o&&o.icon&&(ce[e]=o.icon)})}t.blockColors={loops:"#107c10",logic:"#006970",math:"#712672",images:"#5C2D91",variables:"#A80000",functions:"#005a9e",text:"#996600",arrays:"#A94400",advanced:"#3c3c3c"},function(e){e[e.All=0]="All",e[e.None=1]="None",e[e.Basic=2]="Basic"}(t.CategoryMode||(t.CategoryMode={}));var K=t.CategoryMode,J={string:{field:"TEXT",block:"text",defaultValue:""},number:{field:"NUM",block:"math_number",defaultValue:"0"},boolean:{field:"BOOL",block:"logic_boolean",defaultValue:"false"},Array:{field:"VAR",block:"variables_get",defaultValue:"list"}};t.advancedTitle=o,t.addPackageTitle=i;var Q=/^(?:Array<.+>)|(?:.+\[\])|(?:\[.+\])$/,Z={},ee=!1,te={};Object.keys(Blockly.Blocks).forEach(function(e){return te[e]={block:Blockly.Blocks[e]}}),t.buildinBlockStatements={controls_if:!0,controls_for:!0,controls_simple_for:!0,controls_repeat_ext:!0,variables_set:!0,variables_change:!0,device_while:!0};var oe={},ie={};t.blockSymbol=function(e){var t=oe[e];return t?t.fn:void 0};var re,ne="";t.appendToolboxIconCss=c,t.injectToolboxIconCss=u;var le="";t.appendNamespaceCss=p,t.hasArrowFunction=T,function(e){e[e.Hidden=0]="Hidden",e[e.Visible=1]="Visible",e[e.Disabled=2]="Disabled"}(t.FilterState||(t.FilterState={}));var ae=t.FilterState;t.createToolbox=B,t.initBlocks=function(e,t,o,i,r){void 0===o&&(o=K.Basic),N(),Y(),z(e);var n=B(e,t,o,i,r);if(!document.getElementById("blocklyTrashIcon")){var l=document.createElement("div");l.id="blocklyTrashIcon",l.style.opacity="0",l.style.display="none";var a=document.createElement("i");a.className="trash icon",l.appendChild(a);var s=document.getElementsByClassName("injectionDiv")[0];s&&s.appendChild(l)}return n},t.initSearch=function(o,i,r,n,a){var s=document.getElementById("blocklySearchInputField"),c=document.getElementById("blocklySearchInput"),u=document.getElementById("blocklySearchLabel");if(!c){var p=document.createElement("div");p.id="blocklySearchArea",(c=document.createElement("div")).id="blocklySearchInput",c.className="ui fluid icon input",c.setAttribute("role","search"),(s=document.createElement("input")).type="text",s.placeholder=lf("Search..."),s.id="blocklySearchInputField",s.className="blocklySearchInputField";var h=document.createElement("i");h.className="search icon",h.setAttribute("role","presentation"),h.setAttribute("aria-hidden","true"),(u=document.createElement("div")).className="accessible-hidden",u.id="blocklySearchLabel",u.setAttribute("aria-live","polite"),c.appendChild(s),c.appendChild(h),c.appendChild(u),p.appendChild(c);var m=document.getElementsByClassName("blocklyToolboxDiv")[0];m&&m.insertBefore(p,m.firstChild)}var f=function(){return document.getElementsByClassName("blocklyTreeIconsearch").length>0},g=function(){var e=o.toolbox_.tree_;e.setSelectedItem(e.getChildren()[0])};e.blocks.cachedSearchTb=i,e.blocks.cachedSearchTbAll=r;var b="",k=e.Util.debounce(function(){var o=document.getElementById("blocklySearchInputField").value.toLowerCase(),r=document.getElementById("blocklySearchLabel");if(r.textContent="",""!=o){c.className+=" loading",b=o,e.tickEvent("blocks.search");var u=e.blocks.cachedSearchTb?e.blocks.cachedSearchTb.cloneNode(!0):void 0,p=A(u,"Search");if(!p){var h=d(u),m=u;(p=l(lf("{id:category}Search"),"Search",101)).setAttribute("colour","#000"),p.setAttribute("iconclass","blocklyTreeIconsearch"),p.setAttribute("expandedclass","blocklyTreeIconsearch");var f=0;for(f=0;f<h.length;++f){var k=h[f];if(parseInt(k.getAttribute("weight")||"50")<101){m.insertBefore(p,k);break}}f==h.length&&m.appendChild(p)}n({term:o,subset:ee?Z:void 0}).then(function(i){if(e.log("searching for: "+o),ee=!1,i){if(0==i.length?r.textContent=lf("No search results..."):r.textContent=lf("{0} result matching '{1}'",i.length,s.value.toLowerCase()),0==i.length){var n=goog.dom.createDom("label");return n.setAttribute("text",lf("No search results...")),void p.appendChild(n)}i.forEach(function(o){if(e.blocks.cachedSearchTbAll){var i=o.id,r=ie[i];if(!r){var n=t.getFirstChildWithAttr(e.blocks.cachedSearchTbAll,"block","type",i);n&&(r=ie[i]=n.cloneNode(!0))}r&&p.appendChild(r)}})}}).finally(function(){i&&(a(u),c.className="ui fluid icon input",g())})}else""!=b&&(a(e.blocks.cachedSearchTb),c.className="ui fluid icon input")},300,!1);s.oninput=k,s.onfocus=function(){s.select(),""!=s.value.toLowerCase()&&(f()?g():(b="",k()))},e.BrowserUtils.isTouchEnabled()&&(s.ontouchstart=function(){s.focus()}),Blockly.Toolbox.TreeNode.prototype.onKeyDown=function(e){var t=e.which||e.keyCode,o=t>64&&t<91,i=e.ctrlKey||e.metaKey;if(o&&!i){var r=document.getElementById("blocklySearchInputField"),n=String.fromCharCode(t);return r.focus(),r.value=r.value+n,!0}if(this.getTree()&&this.getTree().toolbox_.horizontalLayout_){var l={},a=goog.events.KeyCodes.DOWN,s=goog.events.KeyCodes.UP;l[goog.events.KeyCodes.RIGHT]=this.rightToLeft_?s:a,l[goog.events.KeyCodes.LEFT]=this.rightToLeft_?a:s,l[goog.events.KeyCodes.UP]=goog.events.KeyCodes.LEFT,l[goog.events.KeyCodes.DOWN]=goog.events.KeyCodes.RIGHT;var c=l[e.keyCode];e.keyCode=c||e.keyCode}return Blockly.Toolbox.TreeNode.superClass_.onKeyDown.call(this,e)}},t.removeSearch=function(){var e=document.getElementById("blocklySearchArea");e&&e.parentNode.removeChild(e)},t.cleanBlocks=function(){e.debug("removing all custom blocks");for(var t in oe)C(oe[t].fn)};var se=!1;t.onShowContextMenu=void 0,t.getNamespaceColor=H,t.initFlyouts=function(e){e.registerToolboxCategoryCallback(Blockly.VARIABLE_CATEGORY_NAME,Blockly.Variables.flyoutCategory),e.registerToolboxCategoryCallback(Blockly.PROCEDURE_CATEGORY_NAME,Blockly.Procedures.flyoutCategory)},t.initExtensions=function(e,t,o){t.forEach(function(t){var i=t.name;e.registerButtonCallback("EXT"+i+"_BUTTON",function(e){o(i)})})};var ce={}}(e.blocks||(e.blocks={}))}(pxt||(pxt={}));var pxt;!function(e){!function(t){var o;!function(e){e.ObjectDestructuringMutator="objectdestructuring",e.RestParameterMutator="restparameter",e.DefaultInstanceMutator="defaultinstance"}(o=t.MutatorTypes||(t.MutatorTypes={})),t.addMutation=function(e,t,i){var a;switch(i){case o.ObjectDestructuringMutator:if(!t.parameters||t.parameters.length<1)console.error("Destructuring mutations require at least one parameter");else{for(var s=!1,c=0,u=t.parameters;c<u.length;c++){var p=u[c];if(-1!==p.type.indexOf("=>")){if(!p.properties||0===p.properties.length)return void console.error("Destructuring mutations only supported for functions with an event parameter that has multiple properties");s=!0}}if(!s)return void console.error("Destructuring mutations must have an event parameter")}a=new r(e,t);break;case o.RestParameterMutator:a=new n(e,t);break;case o.DefaultInstanceMutator:a=new l(e,t);break;default:return void console.warn("Ignoring unknown mutation type: "+i)}e.mutationToDom=a.mutationToDom.bind(a),e.domToMutation=a.domToMutation.bind(a),e.compose=a.compose.bind(a),e.decompose=a.decompose.bind(a),e.mutation=a},t.mutateToolboxBlock=function(e,t,i){var a=document.createElement("mutation");switch(t){case o.ObjectDestructuringMutator:a.setAttribute(r.propertiesAttributeName,i);break;case o.RestParameterMutator:a.setAttribute(n.countAttributeName,i);break;case o.DefaultInstanceMutator:a.setAttribute(l.attributeName,i);default:return void console.warn("Ignoring unknown mutation type: "+t)}e.appendChild(a)};var i=function(){function e(e,t){this.info=t,this.block=e,this.topBlockType=this.block.type+"_mutator";var o=this.getSubBlockNames();this.initializeMutatorTopBlock(),this.initializeMutatorSubBlocks(o);var i=o.map(function(e){return e.type});this.block.setMutator(new Blockly.Mutator(i))}return e.prototype.compose=function(e){var t=e.getDescendants().map(function(e){return{type:e.type,name:e.inputList[0].name}});t.shift(),this.updateBlock(t)},e.prototype.decompose=function(t){var o=t.newBlock(this.topBlockType);o.initSvg();for(var i=this,r=0,n=o.inputList;r<n.length&&"break"!==function(o){if(o.name===e.mutatorStatmentInput){var r=o.connection;return i.getVisibleBlockTypes().forEach(function(e){var o=t.newBlock(e);o.initSvg(),r.connect(o.previousConnection),r=o.nextConnection}),"break"}}(n[r]);r++);return o},e.prototype.compileMutation=function(e,t){},e.prototype.getDeclaredVariables=function(){},e.prototype.isDeclaredByMutation=function(e){return!1},e.prototype.initializeMutatorSubBlock=function(e,t,o){e.appendDummyInput(t).appendField(t),e.setColour(o),e.setNextStatement(!0),e.setPreviousStatement(!0)},e.prototype.initializeMutatorTopBlock=function(){var t=this.info.attributes.mutateText,o=this.block.getColour();Blockly.Blocks[this.topBlockType]=Blockly.Blocks[this.topBlockType]||{init:function(){var i=this;i.appendDummyInput().appendField(t),i.setColour(o),i.appendStatementInput(e.mutatorStatmentInput)}}},e.prototype.initializeMutatorSubBlocks=function(e){var t=this.block.getColour(),o=this.initializeMutatorSubBlock.bind(this);e.forEach(function(e){Blockly.Blocks[e.type]=Blockly.Blocks[e.type]||{init:function(){o(this,e.name,t)}}})},e.mutatorStatmentInput="PROPERTIES",e.mutatedVariableInputName="properties",e}(),r=function(r){function n(e,t){r.call(this,e,t),this.currentlyVisible=[],this.parameterRenames={},this.prefix=this.info.attributes.mutatePrefix,this.block.appendDummyInput(i.mutatedVariableInputName),this.block.appendStatementInput("HANDLER").setCheck("null")}return __extends(n,r),n.prototype.getMutationType=function(){return o.ObjectDestructuringMutator},n.prototype.compileMutation=function(e,o){var i=this;if(this.info.attributes.mutatePropertyEnum||this.parameters.length){var r="function ({ "+this.parameters.map(function(o){var r=i.block.getFieldValue(o),n=t.escapeVarName(o,e);return r!==o?(i.parameterRenames[o]=r,o+": "+t.escapeVarName(r,e)):n}).join(", ")+" })";return this.info.attributes.mutatePropertyEnum?t.mkText(" ["+this.parameters.map(function(e){return i.info.attributes.mutatePropertyEnum+"."+e}).join(", ")+"],"+r):t.mkText(r)}},n.prototype.getDeclaredVariables=function(){var e=this,t={};return this.parameters.forEach(function(o){t[e.block.getFieldValue(o)]=e.parameterTypes[o]}),t},n.prototype.isDeclaredByMutation=function(e){var t=this;return this.parameters.some(function(o){return t.block.getFieldValue(o)===e})},n.prototype.mutationToDom=function(){var t=this,o=document.createElement("mutation"),i=this.parameters.map(function(o){var i=t.block.getFieldValue(o);return i!==o&&(t.parameterRenames[o]=e.Util.htmlEscape(i)),e.Util.htmlEscape(o)}).join(",");o.setAttribute(n.propertiesAttributeName,i);for(var r in this.parameterRenames)r===this.parameterRenames[r]&&delete this.parameterRenames[r];return o.setAttribute(n.renameAttributeName,JSON.stringify(this.parameterRenames)),o},n.prototype.domToMutation=function(e){var t=this,o=e.getAttribute(n.propertiesAttributeName);if(o){var i=o.split(","),r=[];if(void 0===this.paramIndex&&(this.paramIndex=this.getParameterIndex()),i.forEach(function(e){var o=e.split(":");t.info.parameters[t.paramIndex].properties.some(function(e){return e.name===o[0]})&&r.push({property:o[0],newName:o[1]})}),this.parameterRenames=void 0,e.hasAttribute(n.renameAttributeName))try{this.parameterRenames=JSON.parse(e.getAttribute(n.renameAttributeName))}catch(e){console.warn("Ignoring invalid rename map in saved block mutation")}this.parameterRenames=this.parameterRenames||{},this.parameters=[],r.forEach(function(e){t.parameters.push(e.property),e.newName&&e.newName!==e.property&&(t.parameterRenames[e.property],e.newName)}),this.updateVisibleProperties(),r.filter(function(e){return!!e.newName}).forEach(function(e){return t.block.setFieldValue(e.newName,e.property)})}},n.prototype.updateBlock=function(e){var t=this;this.parameters=[],e.forEach(function(e){-1===t.parameters.indexOf(e.name)&&t.parameters.push(e.name)}),this.updateVisibleProperties()},n.prototype.getSubBlockNames=function(){var e=this;return this.parameters=[],this.parameterTypes={},void 0===this.paramIndex&&(this.paramIndex=this.getParameterIndex()),this.info.parameters[this.paramIndex].properties.map(function(t){return e.parameterTypes[t.name]=t.type,{type:e.propertyId(t.name),name:t.name}})},n.prototype.getVisibleBlockTypes=function(){var e=this;return this.currentlyVisible.map(function(t){return e.propertyId(t)})},n.prototype.updateVisibleProperties=function(){var t=this;if(!e.Util.listsEqual(this.currentlyVisible,this.parameters)){var o=this.block.inputList.filter(function(e){return e.name===i.mutatedVariableInputName})[0];this.prefix&&0===this.currentlyVisible.length&&o.appendField(this.prefix,n.prefixLabel),this.currentlyVisible.forEach(function(e){if(-1===t.parameters.indexOf(e)){var i=t.block.getFieldValue(e);i!==e&&(t.parameterRenames[e]=i),o.removeField(e)}}),this.parameters.forEach(function(e){if(-1===t.currentlyVisible.indexOf(e)){var i=t.parameterRenames[e]||e;o.appendField(new Blockly.FieldVariable(i),e)}}),this.prefix&&0===this.parameters.length&&o.removeField(n.prefixLabel),this.currentlyVisible=this.parameters}},n.prototype.propertyId=function(e){return this.block.type+"_"+e},n.prototype.getParameterIndex=function(){for(var e=0;e<this.info.parameters.length;e++)if(-1!==this.info.parameters[e].type.indexOf("=>"))return e},n.propertiesAttributeName="callbackproperties",n.renameAttributeName="renamemap",n.prefixLabel="0prefix_label_",n}(i),n=function(e){function i(){e.apply(this,arguments),this.count=0}return __extends(i,e),i.prototype.getMutationType=function(){return o.RestParameterMutator},i.prototype.compileMutation=function(e,o){var i=[];return this.forEachInput(function(r){return i.push(t.compileExpression(e,r,o))}),t.mkGroup(i)},i.prototype.mutationToDom=function(){var e=document.createElement("mutation");return e.setAttribute(i.countAttributeName,this.count.toString()),e},i.prototype.domToMutation=function(e){var t=e.getAttribute(i.countAttributeName);if(t){try{this.count=parseInt(t)}catch(e){return}for(var o=0;o<this.count;o++)this.addNumberField(!1,o)}},i.prototype.updateBlock=function(e){if(e){var t=Math.abs(this.count-e.length);if(this.count<e.length)for(o=0;o<t;o++)this.addNumberField(!0,this.count);else if(this.count>e.length)for(var o=0;o<t;o++)this.removeNumberField()}},i.prototype.getSubBlockNames=function(){return[{name:"Value",type:i.entryTypeName}]},i.prototype.getVisibleBlockTypes=function(){var e=[];return this.forEachInput(function(){return e.push(i.entryTypeName)}),e},i.prototype.addNumberField=function(e,t){var o=this.block.appendValueInput(i.valueInputPrefix+t).setCheck("Number");if(e){var r=this.block.workspace.newBlock("math_number");r.initSvg(),r.setShadow(!0),o.connection.connect(r.outputConnection),this.block.workspace.render(),this.count++}},i.prototype.removeNumberField=function(){this.count>0&&this.block.removeInput(i.valueInputPrefix+(this.count-1)),this.count--},i.prototype.forEachInput=function(e){for(var t=0;t<this.count;t++)e(this.block.getInputTargetBlock(i.valueInputPrefix+t),t)},i.countAttributeName="count",i.entryTypeName="entry",i.valueInputPrefix="value_input_",i}(i),l=function(e){function i(){e.apply(this,arguments),this.showing=!1}return __extends(i,e),i.prototype.getMutationType=function(){return o.DefaultInstanceMutator},i.prototype.compileMutation=function(e,o){if(this.showing){var r=this.block.getInputTargetBlock(i.instanceInputName);if(r)return t.compileExpression(e,r,o)}},i.prototype.mutationToDom=function(){var e=document.createElement("mutation");return e.setAttribute(i.attributeName,this.showing?"true":"false"),e},i.prototype.domToMutation=function(e){var t=e.getAttribute(i.attributeName);t?this.updateShape("true"===t):this.updateShape(!1)},i.prototype.updateBlock=function(e){this.updateShape(!(!e||!e.length))},i.prototype.getSubBlockNames=function(){return[{name:"Instance",type:i.instanceSubBlockType}]},i.prototype.getVisibleBlockTypes=function(){var e=[];return this.showing&&e.push(i.instanceSubBlockType),e},i.prototype.updateShape=function(e){this.showing!==e&&(e&&!this.block.getInputTargetBlock(i.instanceInputName)?this.block.appendValueInput(i.instanceInputName):this.block.removeInput(i.instanceInputName),this.showing=e)},i.attributeName="showing",i.instanceInputName="__instance__",i.instanceSubBlockType="instance",i}(i)}(e.blocks||(e.blocks={}))}(pxt||(pxt={}));var pxt;!function(e){!function(t){var o,i;!function(e){e[e.Align=1]="Align",e[e.Clean=3]="Clean",e[e.Flow=4]="Flow"}(t.BlockLayout||(t.BlockLayout={}));var r=t.BlockLayout;t.render=function(t,n){void 0===n&&(n={emPixels:14,layout:r.Flow}),o||((i=document.createElement("div")).style.position="absolute",i.style.top="0",i.style.left="0",i.style.width="1px",i.style.height="1px",document.body.appendChild(i),o=Blockly.inject(i,{scrollbars:!1,readOnly:!0,zoom:!1,sound:!1,media:e.webConfig.commitCdnUrl+"blockly/media/",rtl:e.Util.isUserLanguageRtl()})),o.clear();try{var l=t||'<xml xmlns="http://www.w3.org/1999/xhtml"></xml>',a=Blockly.Xml.textToDom(l);switch(Blockly.Xml.domToWorkspace(a,o),n.layout){case r.Align:e.blocks.layout.verticalAlign(o,n.emPixels);break;case r.Flow:e.blocks.layout.flow(o,{ratio:n.aspectRatio,useViewWidth:n.useViewWidth});break;case r.Clean:o.cleanUp_&&o.cleanUp_()}var s=o.getMetrics(),c=$(i).find("svg").clone(!0,!0);return c.removeClass("blocklySvg").addClass("blocklyPreview"),c.find(".blocklyBlockCanvas,.blocklyBubbleCanvas").attr("transform","translate("+-s.contentLeft+", "+-s.contentTop+") scale(1)"),c.find(".blocklyMainBackground").remove(),c[0].setAttribute("viewBox","0 0 "+s.contentWidth+" "+s.contentHeight),c.removeAttr("width"),c.removeAttr("height"),n.emPixels&&(c[0].style.width=s.contentWidth/n.emPixels+"em",c[0].style.height=s.contentHeight/n.emPixels+"em"),c[0]}catch(t){return void e.reportException(t)}},t.blocksMetrics=function(e){var t=e.getTopBlocks(!1);if(!t.length)return{width:0,height:0};var o=void 0;return t.forEach(function(e){var t=e.getBoundingRectangle();o?(o.l=Math.min(o.l,t.topLeft.x),o.r=Math.max(o.r,t.bottomRight.y),o.t=Math.min(o.t,t.topLeft.y),o.b=Math.min(o.b,t.bottomRight.y)):o={l:t.topLeft.x,r:t.bottomRight.x,t:t.topLeft.y,b:t.bottomRight.y}}),{width:o.r-o.l,height:o.b-o.t}}}(e.blocks||(e.blocks={}))}(pxt||(pxt={}));var pxt;!function(e){!function(t){!function(t){e.Util.repeatMap;t.render=function(t,o){void 0===o&&(o={});var i=e.Util.repeatMap,r=t.color||"";r||(t.hardware&&!t.software?r="black":t.software&&!t.hardware&&(r="teal"));var n=t.url?/^[^:]+:\/\//.test(t.url)?t.url:"/"+t.url.replace(/^\.?\/?/,""):void 0,l=!!n,a=function(e,t,o,i){void 0===o&&(o="div"),void 0===i&&(i="");var r=document.createElement(o);return t&&(r.className=t),e&&e.appendChild(r),i&&r.appendChild(document.createTextNode(i+"")),r},s=a(null,"ui card "+(t.color||"")+(l?" link":""),l?"a":"div");if(s.setAttribute("role","option"),s.setAttribute("aria-selected","true"),n&&(s.href=n),!o.hideHeader&&(t.header||t.blocks||t.javascript||t.hardware||t.software||t.any)){var c=a(s,"ui content "+(t.responsive?" tall desktop only":"")),u=a(c,"right floated meta");t.any&&a(u,"ui grey circular label tiny","i",t.any>0?t.any:""),i(t.blocks,function(e){return a(u,"puzzle orange icon","i")}),i(t.javascript,function(e){return a(u,"align left blue icon","i")}),i(t.hardware,function(e){return a(u,"certificate black icon","i")}),i(t.software,function(e){return a(u,"square teal icon","i")}),t.header&&a(c,"description","span",t.header)}var p=(o.shortName?t.shortName:"")||t.name,d=a(s,"ui image"+(t.responsive?" tall landscape only":""));if(t.label){var h=document.createElement("label");h.className="ui "+(t.labelClass?t.labelClass:"orange right ribbon")+" label",h.textContent=t.label,d.appendChild(h)}if(t.blocksXml){var m=e.blocks.render(t.blocksXml);if(m){var f=a(d,"");f.setAttribute("style","width:100%; min-height:10em"),f.appendChild(m)}else console.error("failed to render blocks"),e.debug(t.blocksXml)}if(t.typeScript){var g=document.createElement("pre");g.appendChild(document.createTextNode(t.typeScript)),d.appendChild(g)}if(t.imageUrl){var b=document.createElement("div");b.className="ui imagewrapper";var k=document.createElement("img");k.className="ui cardimage",k.src=t.imageUrl,k.alt=p,k.setAttribute("role","presentation"),b.appendChild(k),d.appendChild(b)}if(t.youTubeId){var y=document.createElement("img");y.className="ui image",y.src="https://img.youtube.com/vi/"+t.youTubeId+"/maxresdefault.jpg",d.appendChild(y)}if("file"==t.cardType){var v=a(s,"ui fileimage");d.appendChild(v)}if(p||t.description){var _=a(s,"ui content");p&&(s.setAttribute("aria-label",p),n&&!l?function(e,t,o,i){var r=document.createElement("a");r.className=i,r.href=t,r.appendChild(document.createTextNode(o)),r.target="_blank",e.appendChild(r)}(_,n,p,"header"):a(_,"header","div",p)),t.description&&a(_,"ui description").appendChild(document.createTextNode(t.description.split(".")[0]+"."))}if(t.time){var T=a(s,"meta");t.time&&a(T,"date","span").appendChild(document.createTextNode(e.Util.timeSince(t.time)))}return t.extracontent&&a(s,"extra content","div").appendChild(document.createTextNode(t.extracontent)),s}}(t.codeCard||(t.codeCard={}))}(e.docs||(e.docs={}))}(pxt||(pxt={}));var pxtblockly;!function(e){var t=function(e){function t(t,o,i){e.call(this,String(t),"0","255",null,"10","Color",i),this.isFieldCustom_=!0,this.params=o,this.params.min&&(this.min_=parseFloat(this.params.min)),this.params.max&&(this.max_=parseFloat(this.params.max)),this.params.label&&(this.labelText_=this.params.label),this.params.channel&&(this.channel_=this.params.channel)}return __extends(t,e),t.prototype.setBackground_=function(e){var t=this.createColourStops_().join(",");goog.style.setStyle(e,"background","-moz-linear-gradient(left, "+t+")"),goog.style.setStyle(e,"background","-webkit-linear-gradient(left, "+t+")"),goog.style.setStyle(e,"background","-o-linear-gradient(left, "+t+")"),goog.style.setStyle(e,"background","-ms-linear-gradient(left, "+t+")"),goog.style.setStyle(e,"background","linear-gradient(left, "+t+")"),this.params.sliderWidth&&goog.style.setStyle(e,"width",this.params.sliderWidth+"px")},t.prototype.setReadout_=function(e,t){var o=this.colorWheel(parseInt(t),this.channel_);e.innerHTML='<span class="blocklyColorReadout" style="background-color: '+o+';"></span>'},t.prototype.createColourStops_=function(){for(var e=[],t=0;t<=255;t+=20)e.push(this.colorWheel(t,this.channel_));return e},t.prototype.colorWheel=function(e,t){return"hsvfast"==t?this.hsvFast(e,255,255):(e=255-e)<85?this.hex(3*e,255,255-3*e):e<170?(e-=85,this.hex(255,255-3*e,3*e)):(e-=170,this.hex(255-3*e,3*e,255))},t.prototype.hsvFast=function(e,t,o){var i=e%255>>0;i<0&&(i+=255);var r,n,l,a=o*(255-t)/255>>0,s=o-a,c=(i=192*i/255>>0)/64>>0,u=i%64>>0,p=(u*s/63.75>>0)+a,d=((63-u)*s/63.75>>0)+a;return c?1==c?(r=a,n=d,l=p):(r=p,n=a,l=d):(r=d,n=p,l=a),this.hex(r,n,l)},t.prototype.hex=function(e,t,o){return"#"+this.componentToHex(255&e)+this.componentToHex(255&t)+this.componentToHex(255&o)},t.prototype.componentToHex=function(e){var t=e.toString(16);return 1==t.length?"0"+t:t},t}(Blockly.FieldSlider);e.FieldColorWheel=t}(pxtblockly||(pxtblockly={}));var pxtblockly;!function(e){var t=function(e){function t(t,o,i){e.call(this,t,i),this.isFieldCustom_=!0,o.colours&&this.setColours(JSON.parse(o.colours)),o.columns&&this.setColumns(parseInt(o.columns)),o.className&&(this.className_=o.className)}return __extends(t,e),t.prototype.getValue=function(e){return!e&&this.colour_.indexOf("#")>-1?"0x"+this.colour_.replace(/^#/,""):this.colour_},t.prototype.setValue=function(e){e.indexOf("0x")>-1&&(e="#"+e.substr(2)),this.sourceBlock_&&Blockly.Events.isEnabled()&&this.colour_!=e&&Blockly.Events.fire(new Blockly.Events.BlockChange(this.sourceBlock_,"field",this.name,this.colour_,e)),this.colour_=e,this.sourceBlock_&&this.sourceBlock_.setColour(e,e,e)},t.prototype.showEditor_=function(){e.prototype.showEditor_.call(this),this.className_&&this.colorPicker_&&Blockly.utils.addClass(this.colorPicker_.getElement(),this.className_)},t}(Blockly.FieldColour);e.FieldColorNumber=t}(pxtblockly||(pxtblockly={}));var pxtblockly;!function(e){var t=function(t){function o(o,i,r){t.call(this,i.data),this.isFieldCustom_=!0,this.tooltips_=[],this.columns_=parseInt(i.columns)||4,this.maxRows_=parseInt(i.maxRows)||0,this.width_=parseInt(i.width)||400,this.backgroundColour_=e.parseColour(i.colour),this.itemColour_=i.itemColour||"rgba(255, 255, 255, 0.6)",this.borderColour_=Blockly.PXTUtils.fadeColour(this.backgroundColour_,.4,!1);var n={xOffset:parseInt(i.tooltipsXOffset)||15,yOffset:parseInt(i.tooltipsYOffset)||-10};this.tooltipConfig_=n,this.hasSearchBar_=!!i.hasSearchBar||!1,this.hideRect_=!!i.hideRect||!1}return __extends(o,t),o.prototype.dispose=function(){t.prototype.dispose.call(this),this.disposeTooltips()},o.prototype.populateTableContainer=function(e,t){this.disposeTooltips(),t.removeChildren(!0),0==e.length&&(this.firstItem_=void 0);for(n=0;n<e.length/this.columns_;n++){var o=this.createRow(n,e);t.addChild(o,!0)}var i=t.getElement();if(i)for(var r=i.childNodes,n=0;n<r.length;++n)r[n].className="blocklyGridPickerRow"},o.prototype.createTooltips=function(e,t){for(var o=this,i=e.length<this.columns_,r=t.getElement().getElementsByClassName("goog-menuitem"),n=-1,l=this,a=0;a<r.length;++a)!function(t){var a=r[t];a.style.borderColor=l.backgroundColour_,a.style.backgroundColor=l.itemColour_,i&&(a.className+=" floatLeft");var s=e[t][0].alt;if(s){var c=new goog.ui.Tooltip(a,s),u=c.onShow;c.onShow=function(){u.call(c);var e=new goog.positioning.ClientPosition(c.cursorPosition.x+o.tooltipConfig_.xOffset,c.cursorPosition.y+o.tooltipConfig_.yOffset);c.setPosition(e)},c.setShowDelayMs(0),c.className="goog-tooltip blocklyGridPickerTooltip",a.addEventListener("mousemove",function(e){var t=new goog.positioning.ClientPosition(e.clientX+o.tooltipConfig_.xOffset,e.clientY+o.tooltipConfig_.yOffset);c.setPosition(t)}),l.tooltips_.push(c)}else{var p=goog.style.getSize(a).width;p>n&&(n=p)}}(a);if(n>-1)for(a=0;a<r.length;++a){var s=r[a];goog.style.setWidth(s,n)}},o.prototype.shouldShowRect_=function(){return!this.hideRect_&&!this.sourceBlock_.isShadow()},o.prototype.selectItem=function(e){this.menu_&&(this.onItemSelected(this.menu_,e),this.close())},o.prototype.close=function(){Blockly.WidgetDiv.hideIfOwner(this),Blockly.Events.setGroup(!1),this.disposeTooltips()},o.prototype.getFirstItem=function(){return this.firstItem_},o.prototype.highlightFirstItem=function(e){var t=e.childNodes;if(t.length&&t[0].childNodes){for(var o=0;o<t.length;++o)for(var i=t[o].childNodes.length,r=0;r<i;++r){var n=t[o].childNodes[r];n.classList.remove("goog-menuitem-highlight"),n.classList.remove("goog-option-selected")}t[0].childNodes[0].className+=" goog-menuitem-highlight"}},o.prototype.highlightAndScrollSelected=function(e,t){for(var o,i=e.getElement(),r=e.getChildCount(),n=0;n<r;++n){for(var l=0;l<this.columns_;++l){var a=e.getChildAt(n).getChildAt(l).getValue();if(this.value_===a){o=i.children[n].children[l];break}}if(o){goog.style.scrollIntoContainerView(o,t,!0);break}}},o.prototype.showEditor_=function(){var e=this;Blockly.WidgetDiv.show(this,this.sourceBlock_.RTL,null),this.disposeTooltips();var t=this.getOptions(),o=new goog.ui.Control;this.populateTableContainer(t,o);var i=new goog.ui.Control,r=new goog.ui.Control,n=goog.dom.getViewportSize(),l=goog.style.getViewportPageOffset(document),a=this.getAbsoluteXY_(),s=this.getScaledBBox_(),c=Blockly.WidgetDiv.DIV;i.addChild(o,!0),r.addChild(i,!0),r.render(c);var u=r.getElement(),p=i.getElement(),d=o.getElement();if(this.hasSearchBar_){var h=document.createElement("div");h.setAttribute("class","ui fluid icon input");var m=document.createElement("i");m.setAttribute("class","search icon");var f=document.createElement("input");f.setAttribute("type","search"),f.setAttribute("id","search-bar"),f.setAttribute("class","blocklyGridPickerSearchBar"),f.setAttribute("placeholder",pxt.Util.lf("Search")),f.addEventListener("click",function(){f.focus(),f.setSelectionRange(0,f.value.length)}),f.addEventListener("keyup",Util.debounce(function(){var i=f.value,r=new RegExp(i,"i"),n=t.filter(function(e){var t=e[0].alt,o=e[1];return t?r.test(t):r.test(o)});e.populateTableContainer.bind(e)(n,o),e.createTooltips(n,o),i?e.highlightFirstItem(d):e.highlightAndScrollSelected(o,p)},300,!1)),f.addEventListener("keyup",function(t){if(13==t.keyCode){var o=f.value,i=e.getFirstItem();o&&i&&e.selectItem(i)}}),h.appendChild(f),h.appendChild(m),u.insertBefore(h,u.childNodes[0]),f.focus()}u.style.border="solid 1px "+this.borderColour_,this.width_>n.width&&(this.width_=n.width),d.style.width=this.width_+"px",d.style.backgroundColor=this.backgroundColour_,p.style.backgroundColor=this.backgroundColour_,u.style.backgroundColor=this.backgroundColour_,d.className="blocklyGridPickerMenu",p.className="blocklyGridPickerScroller",u.className="blocklyGridPickerPadder",this.createTooltips(t,o);var g=goog.style.getSize(u),b=goog.style.getSize(p);if(b.height=p.scrollHeight,b.width=p.scrollWidth,g.height=u.scrollHeight,g.width=u.scrollWidth,this.maxRows_>0){var k=d.children[0],y=goog.style.getSize(k).height*(this.maxRows_+.3);if(b.height>y){p.style.overflowY="auto",goog.style.setHeight(p,y);var v=goog.style.getPaddingBox(p),_=v.left+v.right,T=goog.style.getMarginBox(p),x=T.left+T.right,E=goog.style.getBorderBox(p),B=_+x+(E.left+E.right),A=p.offsetWidth-p.clientWidth-B;goog.style.setWidth(p,b.width+A),g.height=u.scrollHeight,g.width=u.scrollWidth,this.highlightAndScrollSelected(o,p)}}a.y+g.height+s.height>=n.height+l.y?a.y-=g.height+2:a.y+=s.height,this.sourceBlock_.RTL?(a.x+=g.width/2-s.width/2,a.x<l.x+g.width&&(a.x=l.x+g.width)):(a.x+=s.width/2-g.width/2,a.x>n.width+l.x-g.width&&(a.x=n.width+l.x-g.width)),Blockly.WidgetDiv.position(a.x,a.y,n,l,this.sourceBlock_.RTL),goog.style.setHeight(c,"auto")},o.prototype.createRow=function(e,t){var o=this,i=this.columns_,r=new goog.ui.Menu;r.setRightToLeft(this.sourceBlock_.RTL);for(var n=i*e;n<Math.min(i*e+i,t.length);n++){var l=t[n][0],a=t[n][1];if("object"==typeof l){var s=new Image(l.width,l.height);s.src=l.src,s.alt=l.alt||"",l=s}var c=new goog.ui.MenuItem(l);c.setRightToLeft(this.sourceBlock_.RTL),c.setValue(a),c.setCheckable(!0),c.setChecked(a==this.value_),r.addChild(c,!0),0==n&&(this.firstItem_=c)}return goog.events.listen(r,goog.ui.Component.EventType.ACTION,function(e){var t=e.target;t&&o.selectItem.bind(o)(t)}),this.menu_=r,r},o.prototype.disposeTooltips=function(){this.tooltips_&&this.tooltips_.length&&(this.tooltips_.forEach(function(e){return e.dispose()}),this.tooltips_=[])},o.prototype.setText=function(e){null!==e&&e!==this.text_&&(this.text_=e,this.updateTextNode_(),this.imageJson_&&this.textElement_?(this.textElement_.setAttribute("class",this.textElement_.getAttribute("class")+" blocklyHidden"),this.imageElement_.parentNode.appendChild(this.arrow_)):this.textElement_&&(this.textElement_.setAttribute("class",this.textElement_.getAttribute("class")+" blocklyDropdownText"),this.textElement_.parentNode.appendChild(this.arrow_)),this.sourceBlock_&&this.sourceBlock_.rendered&&(this.sourceBlock_.render(),this.sourceBlock_.bumpNeighbours_()))},o.prototype.updateWidth=function(){var e;this.imageJson_?(e=this.imageJson_.width+5,this.arrowY_=this.imageJson_.height/2):e=Blockly.Field.getCachedWidth(this.textElement_),this.EDITABLE&&(e+=Blockly.BlockSvg.EDITABLE_FIELD_PADDING),this.arrowWidth_=0,this.positionArrow&&(this.arrowWidth_=this.positionArrow(e),e+=this.arrowWidth_),this.box_&&(e+=2*Blockly.BlockSvg.BOX_FIELD_PADDING),this.size_.width=e},o.prototype.updateTextNode_=function(){if(this.textElement_||this.imageElement_){var e=this.text_;if(e.length>this.maxDisplayLength?(e=e.substring(0,this.maxDisplayLength-2)+"…",this.textElement_.setAttribute("class","blocklyText blocklyTextTruncated")):this.textElement_.setAttribute("class","blocklyText"),goog.dom.removeChildren(this.textElement_),goog.dom.removeNode(this.imageElement_),this.imageElement_=null,this.imageJson_)this.imageElement_=Blockly.utils.createSvgElement("image",{y:5,x:8,height:this.imageJson_.height+"px",width:this.imageJson_.width+"px",cursor:"pointer"}),this.imageElement_.setAttributeNS("http://www.w3.org/1999/xlink","xlink:href",this.imageJson_.src),this.size_.height=Number(this.imageJson_.height)+10,this.textElement_.parentNode.appendChild(this.imageElement_);else{e=e.replace(/\s/g,Blockly.Field.NBSP),this.sourceBlock_.RTL&&e&&(e+="‏"),e||(e=Blockly.Field.NBSP);var t=document.createTextNode(e);this.textElement_.appendChild(t)}this.size_.width=0}},o}(Blockly.FieldDropdown);e.FieldGridPicker=t}(pxtblockly||(pxtblockly={}));var pxtblockly;!function(e){var t=function(t){function o(o,i,r){t.call(this,i.data),this.isFieldCustom_=!0,this.buttonClick_=function(e){var t=e.target.getAttribute("data-value");this.setValue(t),Blockly.DropDownDiv.hide()},this.onHide_=function(){Blockly.DropDownDiv.content_.removeAttribute("role"),Blockly.DropDownDiv.content_.removeAttribute("aria-haspopup"),Blockly.DropDownDiv.content_.removeAttribute("aria-activedescendant")},this.columns_=parseInt(i.columns),this.maxRows_=parseInt(i.maxRows)||0,this.width_=parseInt(i.width)||300,this.backgroundColour_=e.parseColour(i.colour),this.itemColour_=i.itemColour||"rgba(255, 255, 255, 0.6)",this.borderColour_=Blockly.PXTUtils.fadeColour(this.backgroundColour_,.4,!1)}return __extends(o,t),o.prototype.showEditor_=function(){if(!Blockly.DropDownDiv.hideIfOwner(this)){Blockly.DropDownDiv.hideWithoutAnimation(),Blockly.DropDownDiv.clearContent();var e=Blockly.DropDownDiv.getContentDiv(),t=document.createElement("div");t.setAttribute("role","menu"),t.setAttribute("aria-haspopup","true");for(var o=this.getOptions(),i=0;o[i];i++){var r=o[i][0],n=o[i][1];if("placeholder"!=r.type){var l=document.createElement("button");l.setAttribute("id",":"+i),l.setAttribute("role","menuitem"),l.setAttribute("class","blocklyDropDownButton"),l.title=r.alt,this.columns_?(l.style.width=this.width_/this.columns_-8+"px",l.style.height=this.width_/this.columns_-8+"px"):(l.style.width=r.width+"px",l.style.height=r.height+"px");var a=this.backgroundColour_;n==this.getValue()&&(a=this.sourceBlock_.getColourTertiary(),l.setAttribute("aria-selected","true")),l.style.backgroundColor=a,l.style.borderColor=this.borderColour_,Blockly.bindEvent_(l,"click",this,this.buttonClick_),Blockly.bindEvent_(l,"mouseup",this,this.buttonClick_),Blockly.bindEvent_(l,"mousedown",l,function(e){this.setAttribute("class","blocklyDropDownButton blocklyDropDownButtonHover"),e.preventDefault()}),Blockly.bindEvent_(l,"mouseover",l,function(){this.setAttribute("class","blocklyDropDownButton blocklyDropDownButtonHover"),t.setAttribute("aria-activedescendant",this.id)}),Blockly.bindEvent_(l,"mouseout",l,function(){this.setAttribute("class","blocklyDropDownButton"),t.removeAttribute("aria-activedescendant")});var s=document.createElement("img");s.src=r.src,l.setAttribute("data-value",n),s.setAttribute("data-value",n),l.appendChild(s),t.appendChild(l)}else{var c=document.createElement("span");c.setAttribute("class","blocklyDropDownPlaceholder"),c.style.width=r.width+"px",c.style.height=r.height+"px",t.appendChild(c)}}t.style.width=this.width_+"px",e.appendChild(t),Blockly.DropDownDiv.setColour(this.backgroundColour_,this.borderColour_);var u=this.sourceBlock_.workspace.scale,p=-Blockly.BlockSvg.MIN_BLOCK_Y*u-Blockly.BlockSvg.FIELD_Y_OFFSET*u;Blockly.DropDownDiv.showPositionedByBlock(this,this.sourceBlock_,this.onHide_.bind(this),p)}},o.prototype.setText=function(e){null!==e&&e!==this.text_&&(this.text_=e,this.updateTextNode_(),this.imageJson_&&this.textElement_?(this.textElement_.setAttribute("class",this.textElement_.getAttribute("class")+" blocklyHidden"),this.imageElement_.parentNode.appendChild(this.arrow_)):this.textElement_&&(this.textElement_.setAttribute("class",this.textElement_.getAttribute("class")+" blocklyDropdownText"),this.textElement_.parentNode.appendChild(this.arrow_)),this.sourceBlock_&&this.sourceBlock_.rendered&&(this.sourceBlock_.render(),this.sourceBlock_.bumpNeighbours_()))},o.prototype.updateWidth=function(){var e=this.imageJson_.width+5;this.EDITABLE&&(e+=Blockly.BlockSvg.EDITABLE_FIELD_PADDING),this.arrowY_=this.imageJson_.height/2,this.arrowWidth_=0,this.positionArrow&&(this.arrowWidth_=this.positionArrow(e),e+=this.arrowWidth_),this.box_&&(e+=2*Blockly.BlockSvg.BOX_FIELD_PADDING),this.size_.width=e},o.prototype.updateTextNode_=function(){if(this.textElement_||this.imageElement_){var e=this.text_;if(e.length>this.maxDisplayLength?(e=e.substring(0,this.maxDisplayLength-2)+"…",this.textElement_.setAttribute("class","blocklyText blocklyTextTruncated")):this.textElement_.setAttribute("class","blocklyText"),goog.dom.removeChildren(this.textElement_),goog.dom.removeNode(this.imageElement_),this.imageElement_=null,this.imageJson_)this.imageElement_=Blockly.utils.createSvgElement("image",{y:5,x:8,height:this.imageJson_.height+"px",width:this.imageJson_.width+"px"}),this.imageElement_.setAttributeNS("http://www.w3.org/1999/xlink","xlink:href",this.imageJson_.src),this.size_.height=Number(this.imageJson_.height)+10,this.textElement_.parentNode.appendChild(this.imageElement_);else{e=e.replace(/\s/g,Blockly.Field.NBSP),this.sourceBlock_.RTL&&e&&(e+="‏"),e||(e=Blockly.Field.NBSP);var t=document.createTextNode(e);this.textElement_.appendChild(t)}this.size_.width=0}},o}(Blockly.FieldDropdown);e.FieldImageDropdown=t}(pxtblockly||(pxtblockly={}));var pxtblockly;!function(e){var t;!function(e){e[e.C=262]="C",e[e.CSharp=277]="CSharp",e[e.D=294]="D",e[e.Eb=311]="Eb",e[e.E=330]="E",e[e.F=349]="F",e[e.FSharp=370]="FSharp",e[e.G=392]="G",e[e.GSharp=415]="GSharp",e[e.A=440]="A",e[e.Bb=466]="Bb",e[e.B=494]="B",e[e.C3=131]="C3",e[e.CSharp3=139]="CSharp3",e[e.D3=147]="D3",e[e.Eb3=156]="Eb3",e[e.E3=165]="E3",e[e.F3=175]="F3",e[e.FSharp3=185]="FSharp3",e[e.G3=196]="G3",e[e.GSharp3=208]="GSharp3",e[e.A3=220]="A3",e[e.Bb3=233]="Bb3",e[e.B3=247]="B3",e[e.C4=262]="C4",e[e.CSharp4=277]="CSharp4",e[e.D4=294]="D4",e[e.Eb4=311]="Eb4",e[e.E4=330]="E4",e[e.F4=349]="F4",e[e.FSharp4=370]="FSharp4",e[e.G4=392]="G4",e[e.GSharp4=415]="GSharp4",e[e.A4=440]="A4",e[e.Bb4=466]="Bb4",e[e.B4=494]="B4",e[e.C5=523]="C5",e[e.CSharp5=555]="CSharp5",e[e.D5=587]="D5",e[e.Eb5=622]="Eb5",e[e.E5=659]="E5",e[e.F5=698]="F5",e[e.FSharp5=740]="FSharp5",e[e.G5=784]="G5",e[e.GSharp5=831]="GSharp5",e[e.A5=880]="A5",e[e.Bb5=932]="Bb5",e[e.B5=988]="B5",e[e.C6=1047]="C6",e[e.CSharp6=1109]="CSharp6",e[e.D6=1175]="D6",e[e.Eb6=1245]="Eb6",e[e.E6=1319]="E6",e[e.F6=1397]="F6",e[e.FSharp6=1480]="FSharp6",e[e.G6=1568]="G6",e[e.GSharp6=1568]="GSharp6",e[e.A6=1760]="A6",e[e.Bb6=1865]="Bb6",e[e.B6=1976]="B6",e[e.C7=2093]="C7"}(t||(t={}));var o={28:{name:"C",prefixedName:"Low C",freq:131},29:{name:"C#",prefixedName:"Low C#",freq:139},30:{name:"D",prefixedName:"Low D",freq:147},31:{name:"D#",prefixedName:"Low D#",freq:156},32:{name:"E",prefixedName:"Low E",freq:165},33:{name:"F",prefixedName:"Low F",freq:175},34:{name:"F#",prefixedName:"Low F#",freq:185},35:{name:"G",prefixedName:"Low G",freq:196},36:{name:"G#",prefixedName:"Low G#",freq:208},37:{name:"A",prefixedName:"Low A",freq:220},38:{name:"A#",prefixedName:"Low A#",freq:233},39:{name:"B",prefixedName:"Low B",freq:247},40:{name:"C",prefixedName:"Middle C",freq:262},41:{name:"C#",prefixedName:"Middle C#",freq:277},42:{name:"D",prefixedName:"Middle D",freq:294},43:{name:"D#",prefixedName:"Middle D#",freq:311},44:{name:"E",prefixedName:"Middle E",freq:330},45:{name:"F",prefixedName:"Middle F",freq:349},46:{name:"F#",prefixedName:"Middle F#",freq:370},47:{name:"G",prefixedName:"Middle G",freq:392},48:{name:"G#",prefixedName:"Middle G#",freq:415},49:{name:"A",prefixedName:"Middle A",freq:440},50:{name:"A#",prefixedName:"Middle A#",freq:466},51:{name:"B",prefixedName:"Middle B",freq:494},52:{name:"C",prefixedName:"Tenor C",altPrefixedName:"High C",freq:523},53:{name:"C#",prefixedName:"Tenor C#",altPrefixedName:"High C#",freq:554},54:{name:"D",prefixedName:"Tenor D",altPrefixedName:"High D",freq:587},55:{name:"D#",prefixedName:"Tenor D#",altPrefixedName:"High D#",freq:622},56:{name:"E",prefixedName:"Tenor E",altPrefixedName:"High E",freq:659},57:{name:"F",prefixedName:"Tenor F",altPrefixedName:"High F",freq:698},58:{name:"F#",prefixedName:"Tenor F#",altPrefixedName:"High F#",freq:740},59:{name:"G",prefixedName:"Tenor G",altPrefixedName:"High G",freq:784},60:{name:"G#",prefixedName:"Tenor G#",altPrefixedName:"High G#",freq:831},61:{name:"A",prefixedName:"Tenor A",altPrefixedName:"High A",freq:880},62:{name:"A#",prefixedName:"Tenor A#",altPrefixedName:"High A#",freq:932},63:{name:"B",prefixedName:"Tenor B",altPrefixedName:"High B",freq:988},64:{name:"C",prefixedName:"High C",freq:1046},65:{name:"C#",prefixedName:"High C#",freq:1109},66:{name:"D",prefixedName:"High D",freq:1175},67:{name:"D#",prefixedName:"High D#",freq:1245},68:{name:"E",prefixedName:"High E",freq:1319},69:{name:"F",prefixedName:"High F",freq:1397},70:{name:"F#",prefixedName:"High F#",freq:1478},71:{name:"G",prefixedName:"High G",freq:1568},72:{name:"G#",prefixedName:"High G#",freq:1661},73:{name:"A",prefixedName:"High A",freq:1760},74:{name:"A#",prefixedName:"High A#",freq:1865},75:{name:"B",prefixedName:"High B",freq:1976}},i=/^Note\.(.+)$/,r=function(r){function n(t,o,i){r.call(this,t),this.isFieldCustom_=!0,this.nKeys_=36,this.minNote_=28,this.maxNote_=63,this.eps=2,this.noteFreq_=[],this.noteName_=[],n.superClass_.constructor.call(this,t,i),this.note_=t,o.editorColour&&(this.colour_=e.parseColour(o.editorColour),this.colourBorder_=goog.color.rgbArrayToHex(goog.color.darken(goog.color.hexToRgb(this.colour_),.2)));var l=parseInt(o.minNote)||this.minNote_,a=parseInt(o.maxNote)||this.maxNote_;l>=28&&a<=76&&a>l&&(this.minNote_=l,this.maxNote_=a,this.nKeys_=this.maxNote_-this.minNote_+1)}return __extends(n,r),n.prototype.classValidator=function(e){if(null===e)return null;e=String(e);var t=parseFloat(e||"0");return isNaN(t)||t<0?null:String(t)},n.prototype.init=function(){n.superClass_.init.call(this),this.noteFreq_.length=0,this.noteName_.length=0;var e=this;!function(){for(var t=e.minNote_;t<=e.maxNote_;t++){var i=o[t].prefixedName;e.nKeys_<13?i=o[t].name:e.minNote_>=28&&e.maxNote_<=63&&(i=o[t].altPrefixedName||i),e.noteName_.push(i),e.noteFreq_.push(o[t].freq)}}(),this.setValue(this.callValidator(this.getValue()))},n.prototype.getValue=function(){return this.note_},n.prototype.setValue=function(e){var o=i.exec(e),r=o&&o.length>1?o[1]:null;e=t[r]?t[r]:String(parseFloat(e||"0")),isNaN(Number(e))||Number(e)<0||(this.sourceBlock_&&Blockly.Events.isEnabled()&&this.note_!=e&&Blockly.Events.fire(new Blockly.Events.Change(this.sourceBlock_,"field",this.name,String(this.note_),String(e))),this.note_=this.callValidator(e),this.setText(this.getNoteName_()))},n.prototype.getText=function(){return Math.floor(Number(this.note_))==Number(this.note_)?Number(this.note_).toFixed(0):Number(this.note_).toFixed(2)},n.prototype.setText=function(e){null!==e&&(e=String(e),isNaN(Number(e))||(e=this.getNoteName_()),e!==this.text_&&Blockly.Field.prototype.setText.call(this,e))},n.prototype.getNoteName_=function(){for(var e=this.getValue(),t=e.toString(),o=0;o<this.nKeys_;o++)if(Math.abs(this.noteFreq_[o]-Number(e))<this.eps)return this.noteName_[o];return isNaN(Number(e))||(t+=" Hz"),t},n.prototype.setNumberOfKeys=function(e){return this.nKeys_=e,this},n.prototype.onHtmlInputChange_=function(e){r.prototype.onHtmlInputChange_.call(this,e),Blockly.DropDownDiv.hideWithoutAnimation()},n.prototype.showEditor_=function(t){function o(){var t,o=++f,i=this.getContent().getAttribute("tag");null!=E&&((t=E.getContent()).style.backgroundColor=T),t=this.getContent(),E!==this&&(T=t.style.backgroundColor,g.setValue(g.callValidator(i)),g.setText(g.callValidator(i))),E=this,t.style.backgroundColor=m,Blockly.FieldTextInput.htmlInput_.value=g.getText(),e.AudioContextManager.tone(i),setTimeout(function(){f==o&&e.AudioContextManager.stop()},300),n.superClass_.dispose.call(this)}function i(e,t,o,i){var r=(o?0:a/2)+t,n=u+p+e;i&&(n=u+e);var l=goog.dom.createDom("div",{style:"top: "+n+"px; left: "+r+"px; ;"+(i?"height: "+d+"px; font-size:"+(d-10)+"px;":"")+"width: "+Math.ceil(a/2)+"px;background-color: "+g.colour_+";"+(o?"border-left-color: ":"border-right-color: ")+g.colour_+";"+(i?"":"border-bottom-color: "+g.colour_)+";"});return l.className="blocklyNotePrevNext",l}function r(e){var t=e%12;return 1!=t&&3!=t&&6!=t&&8!=t&&10!=t}this.colour_||(this.colour_=this.sourceBlock_.isShadow()?this.sourceBlock_.parentBlock_.getColour():this.sourceBlock_.getColour(),this.colourBorder_=this.sourceBlock_.isShadow()?this.sourceBlock_.parentBlock_.getColourTertiary():this.sourceBlock_.getColourTertiary()),Blockly.DropDownDiv.hideWithoutAnimation(),Blockly.DropDownDiv.clearContent();var l=Blockly.DropDownDiv.getContentDiv();Blockly.FieldNumber.prototype.setText.call(this,this.getText()),n.superClass_.showEditor_.call(this,!0);var a,s,c=22,u=90,p=24,d=20,h=0,m="yellowgreen",f=0,g=this,b=!1,k=!1,y=goog.dom.getViewportSize().width,v=[];a=c*(this.nKeys_-this.nKeys_/12*5),s=u+p;for(B=0;B<this.nKeys_;B++)v.push(new goog.ui.CustomButton);y<a&&(b=!0,a=7*c,s=u+p+d),t||!1||!goog.userAgent.MOBILE&&!goog.userAgent.ANDROID||(b=!0,k=!0,a=7*(c*=2),s=(u*=2)+(p*=1.2)+(d*=2));var _=goog.dom.createDom("div",{});_.className="blocklyPianoDiv",l.appendChild(_);goog.style.getViewportPageOffset(document),this.getAbsoluteXY_(),this.getScaledBBox_();Blockly.Events.setGroup(!0);for(var T,x=0,E=null,B=0;B<this.nKeys_;B++){B>0&&B%12==0&&x++;var A=v[B],C=r(B)?"white":"black",N=function(e){return r(e)?c:c/2}(B),w=function(e){return r(e)?u:u/2}(B),I=function(e){var t=h*c;return r(e)?t:t-c/4}(B);b&&B>=12&&(I-=7*x*c);var S=function(e,t,o,i,r,n,l,a){var s=goog.dom.createDom("div",{style:"background-color: "+e+"; width: "+t+"px; height: "+o+"px; left: "+i+"px; top: "+r+"px; z-index: "+n+";   border-color: "+l+";"});return s.className="blocklyNote",s}(C,N,w,I+0,0,r(B)?1e3:1001,r(B)?this.colour_:"black");A.setContent(S),A.setId(this.noteName_[B]),A.render(_),(V=A.getContent()).setAttribute("tag",this.noteFreq_[B].toString()),Math.abs(this.noteFreq_[B]-Number(this.getValue()))<this.eps&&(T=V.style.backgroundColor,V.style.backgroundColor=m,E=A),k?goog.events.listen(A.getElement(),goog.events.EventType.TOUCHSTART,o,!1,A):goog.events.listen(A.getElement(),goog.events.EventType.MOUSEDOWN,o,!1,A),goog.events.listen(A.getElement(),goog.events.EventType.MOUSEOVER,function(){D.getContent().textContent=this.getId()},!1,A),r(B)&&h++,b&&B>11&&A.setVisible(!1)}var D=new goog.ui.CustomButton,O=function(e,t,o){e+=u,o&&(e+=d);var i=goog.dom.createDom("div",{style:"top: "+e+"px; left: "+t+"px; background-color: "+g.colour_+"; width: "+a+"px; border-color: "+g.colour_+";"+(o?" font-size: "+(p-10)+"px; height: "+p+"px;":"")});return i.className="blocklyNoteLabel",i}(0,0,k);D.setContent(O),D.render(_);var L=D.getContent();L.textContent="-";var F=new goog.ui.CustomButton,R=new goog.ui.CustomButton,P=i(0,0,!0,k),M=i(0,0,!1,k);if(b){L.textContent="Octave #1";var V=void 0;F.setContent(P),F.render(_),(V=F.getContent()).textContent="<",R.setContent(M),R.render(_),(V=R.getContent()).textContent=">";var U=this.nKeys_/12,H=0;goog.events.listen(F.getElement(),goog.events.EventType.MOUSEDOWN,function(){if(0!=H){for(var e=12*H,t=12*H-12,o=0;o<12;o++)v[o+e].setVisible(!1);for(o=0;o<12;o++)v[o+t].setVisible(!0);H--,L.textContent="Octave #"+(H+1)}else L.textContent="Octave #"+(H+1)},!1,F),goog.events.listen(R.getElement(),goog.events.EventType.MOUSEDOWN,function(){if(H!=U-1){for(var e=12*H,t=12*H+12,o=0;o<12;o++)v[o+e].setVisible(!1);for(o=0;o<12;o++)v[o+t].setVisible(!0);H++,L.textContent="Octave #"+(H+1)}else L.textContent="Octave #"+(H+1)},!1,R)}_.style.width=a+"px",_.style.height=s+1+"px",Blockly.DropDownDiv.setColour(this.colour_,this.colourBorder_);var G=this.sourceBlock_.workspace.scale,W={width:this.size_.width,height:this.size_.height};W.width*=G,W.height*=G;var X=this.fieldGroup_.getBoundingClientRect(),q=X.left+W.width/2,Y=X.top+W.height,j=q,z=X.top;Blockly.DropDownDiv.setBoundsElement(this.sourceBlock_.workspace.getParentSvg().parentNode),Blockly.DropDownDiv.show(this,q,Y,j,z,this.onHide.bind(this))},n.prototype.onHide=function(){},n.prototype.dispose=function(){Blockly.DropDownDiv.hideIfOwner(this),Blockly.FieldTextInput.superClass_.dispose.call(this)},n}(Blockly.FieldNumber);e.FieldNote=r}(pxtblockly||(pxtblockly={}));var pxtblockly;!function(e){var t=function(e){function t(t,o,i){e.call(this,t,o.data,o.min,o.max,o.precision,i),this.isFieldCustom_=!0}return __extends(t,e),t.prototype.getOptions=function(){var e;return this.menuGenerator_&&(e=JSON.parse(this.menuGenerator_).map(function(e){return"object"==typeof e?e:[String(e),String(e)]})),e},t}(Blockly.FieldNumberDropdown);e.FieldNumberDropdown=t}(pxtblockly||(pxtblockly={}));var pxtblockly;!function(e){var t=function(e){function t(t,o){e.call(this,null,o),this.setValue(t||"")}return __extends(t,e),t.prototype.getOptions=function(){return this.dropdownCreate()},t.prototype.init=function(){this.fieldGroup_||e.prototype.init.call(this)},t.prototype.setSourceBlock=function(t){goog.asserts.assert(!t.isShadow(),"Procedure fields are not allowed to exist on shadow blocks."),e.prototype.setSourceBlock.call(this,t)},t.prototype.getValue=function(){return this.getText()},t.prototype.setValue=function(e){this.sourceBlock_&&Blockly.Events.isEnabled()&&Blockly.Events.fire(new Blockly.Events.Change(this.sourceBlock_,"field",this.name,this.value_,e)),this.value_=e,this.setText(e)},t.prototype.dropdownCreate=function(){var e=[];if(this.sourceBlock_&&this.sourceBlock_.workspace)for(var t=this.sourceBlock_.workspace.getAllBlocks(),o=0;o<t.length;o++)if(t[o].getProcedureDef){var i=t[o].getProcedureDef();e.push(i[0])}var r=this.getText();r&&-1==e.indexOf(r)&&e.push(r),e.sort(goog.string.caseInsensitiveCompare),e.length||e.push("Temp");for(var n=[],o=0;o<e.length;o++)n[o]=[e[o],e[o]];return n},t.prototype.onItemSelected=function(e,t){var o=t.getValue();this.sourceBlock_&&(o=this.callValidator(o)),null!==o&&this.setValue(o)},t}(Blockly.FieldDropdown);e.FieldProcedure=t}(pxtblockly||(pxtblockly={}));var pxtblockly;!function(e){var t=function(e){function t(t,o,i){e.call(this,t,o.values,i),this.isFieldCustom_=!0}return __extends(t,e),t}(Blockly.FieldTextDropdown);e.FieldTextDropdown=t}(pxtblockly||(pxtblockly={}));var pxtblockly;!function(e){var t=function(e){function t(t,o,i){e.call(this,t,i),this.isFieldCustom_=!0}return __extends(t,e),t}(Blockly.FieldTextInput);e.FieldTextInput=t}(pxtblockly||(pxtblockly={}));var pxtblockly;!function(e){var t=function(t){function o(e,o,i){t.call(this,e,i),this.isFieldCustom_=!0,this.CURSOR="pointer",this.params=o,this.setValue(e),this.addArgType("toggle"),this.type_=o.type}return __extends(o,t),o.prototype.init=function(){if(!this.fieldGroup_){this.fieldGroup_=Blockly.utils.createSvgElement("g",{},null),this.visible_||(this.fieldGroup_.style.display="none"),null!==this.getArgTypes()&&(this.sourceBlock_.isShadow()?this.sourceBlock_.svgGroup_.setAttribute("data-argument-type",this.getArgTypes()):this.fieldGroup_.setAttribute("data-argument-type",this.getArgTypes())),!this.sourceBlock_.isShadow()&&this.sourceBlock_.inputList&&this.sourceBlock_.inputList.length>1&&(this.box_=Blockly.utils.createSvgElement("rect",{rx:Blockly.BlockSvg.CORNER_RADIUS,ry:Blockly.BlockSvg.CORNER_RADIUS,x:0,y:0,width:this.size_.width,height:this.size_.height,fill:Blockly.Colours.textField,stroke:this.sourceBlock_.getColourTertiary()}),this.fieldGroup_.insertBefore(this.box_,this.textElement_));var e=this.getSize();switch(this.checkElement_=Blockly.utils.createSvgElement("g",{class:"blocklyToggle "+(this.state_?"blocklyToggleOn":"blocklyToggleOff"),transform:"translate(8, "+e.height/2+")"},this.fieldGroup_),this.getOutputShape()){case Blockly.OUTPUT_SHAPE_HEXAGONAL:this.toggleThumb_=Blockly.utils.createSvgElement("polygon",{class:"blocklyToggleRect",points:"-7,-14 -21,0 -7,14 7,14 21,0 7,-14",cursor:"pointer"},this.checkElement_);break;case Blockly.OUTPUT_SHAPE_ROUND:this.toggleThumb_=Blockly.utils.createSvgElement("rect",{class:"blocklyToggleCircle",x:-6,y:-14,height:28,width:28,rx:14,ry:14,cursor:"pointer"},this.checkElement_);break;case Blockly.OUTPUT_SHAPE_SQUARE:this.toggleThumb_=Blockly.utils.createSvgElement("rect",{class:"blocklyToggleRect",x:-6,y:-14,height:28,width:28,rx:3,ry:3,cursor:"pointer"},this.checkElement_)}var t=this.sourceBlock_.RTL?-e.width/2:e.width/2;this.textElement_=Blockly.utils.createSvgElement("text",{class:"blocklyText",x:t,dy:"0.6ex",y:e.height/2},this.fieldGroup_),this.updateEditable(),this.sourceBlock_.getSvgRoot().appendChild(this.fieldGroup_),this.switchToggle(this.state_),this.setValue(this.getValue()),this.render_(),this.size_.width=0,this.mouseDownWrapper_=Blockly.bindEventWithChecks_(this.getClickTarget_(),"mousedown",this,this.onMouseDown_)}},o.prototype.getDisplayText_=function(){return this.state_?this.getTrueText():this.getFalseText()},o.prototype.getTrueText=function(){return lf("True")},o.prototype.getFalseText=function(){return lf("False")},o.prototype.updateWidth=function(){this.getInnerWidth();switch(this.getOutputShape()){case Blockly.OUTPUT_SHAPE_ROUND:this.size_.width=2*this.getInnerWidth()-7;break;case Blockly.OUTPUT_SHAPE_HEXAGONAL:this.size_.width=2*this.getInnerWidth()+8-Math.floor(this.getInnerWidth()/2);break;case Blockly.OUTPUT_SHAPE_SQUARE:this.size_.width=9+2*this.getInnerWidth()}this.arrowWidth_=0},o.prototype.getInnerWidth=function(){return 10*this.getMaxLength()},o.prototype.getMaxLength=function(){return Math.max(this.getTrueText().length,this.getFalseText().length)},o.prototype.getOutputShape=function(){return this.sourceBlock_.isShadow()?this.sourceBlock_.getOutputShape():Blockly.OUTPUT_SHAPE_SQUARE},o.prototype.getValue=function(){return this.toVal(this.state_)},o.prototype.setValue=function(e){var t=this.fromVal(e);this.state_!==t&&(this.sourceBlock_&&Blockly.Events.isEnabled()&&Blockly.Events.fire(new Blockly.Events.BlockChange(this.sourceBlock_,"field",this.name,this.state_,t)),this.state_=t,this.switchToggle(this.state_),this.setText(this.getDisplayText_()))},o.prototype.switchToggle=function(t){if(this.checkElement_){this.updateWidth();var o=this.getSize(),i=this.getInnerWidth();t?(e.svg.addClass(this.checkElement_,"blocklyToggleOn"),e.svg.removeClass(this.checkElement_,"blocklyToggleOff")):(e.svg.removeClass(this.checkElement_,"blocklyToggleOn"),e.svg.addClass(this.checkElement_,"blocklyToggleOff"));var r=this.getOutputShape(),n=0,l=0,a=0,s=0;switch(r){case Blockly.OUTPUT_SHAPE_HEXAGONAL:var c=(l=(n=i)/2)/2;a=this.getMaxLength()>3?-4:1,s=-c;var u=-c,p=c;this.toggleThumb_.setAttribute("points",u+",-14 "+(u-14)+",0 "+u+",14 "+p+",14 "+(p+14)+",0 "+p+",-14");break;case Blockly.OUTPUT_SHAPE_ROUND:case Blockly.OUTPUT_SHAPE_SQUARE:l=(n=5+i)/2,this.toggleThumb_.setAttribute("width",n),this.toggleThumb_.setAttribute("x","-"+l),a=s=r==Blockly.OUTPUT_SHAPE_SQUARE?2:-6}this.checkElement_.setAttribute("transform","translate("+(t?s+i+l:l+a)+", "+o.height/2+")")}},o.prototype.updateTextNode_=function(){t.prototype.updateTextNode_.call(this),this.textElement_&&e.svg.addClass(this.textElement_,"blocklyToggleText")},o.prototype.render_=function(){if(this.visible_&&this.textElement_){goog.dom.removeChildren(this.textElement_);var t=document.createTextNode(this.getDisplayText_());this.textElement_.appendChild(t),e.svg.addClass(this.textElement_,"blocklyToggleText"),this.updateWidth();var o=this.size_.width/2,i=(this.state_?o+o/2:o/2)-Blockly.Field.getCachedWidth(this.textElement_)/2;this.textElement_.setAttribute("x",""+i)}this.box_&&(this.box_.setAttribute("width",""+this.size_.width),this.box_.setAttribute("height",""+this.size_.height))},o.prototype.showEditor_=function(){var e=!this.state_;null!==e&&this.setValue(this.toVal(e))},o.prototype.toVal=function(e){return"number"==this.type_?String(e?"1":"0"):String(e?"true":"false")},o.prototype.fromVal=function(e){return"string"==typeof e?"1"==e||"TRUE"==e.toUpperCase():!!e},o}(Blockly.FieldNumber);e.FieldToggle=t}(pxtblockly||(pxtblockly={}));var pxtblockly;!function(e){var t=function(e){function t(t,o,i){e.call(this,t,o,i),this.isFieldCustom_=!0}return __extends(t,e),t.prototype.getTrueText=function(){return lf("ON")},t.prototype.getFalseText=function(){return lf("OFF")},t}(e.FieldToggle);e.FieldToggleOnOff=t}(pxtblockly||(pxtblockly={}));var pxtblockly;!function(e){var t=function(e){function t(t,o,i){e.call(this,t,o,i),this.isFieldCustom_=!0}return __extends(t,e),t.prototype.getTrueText=function(){return lf("Yes")},t.prototype.getFalseText=function(){return lf("No")},t}(e.FieldToggle);e.FieldToggleYesNo=t}(pxtblockly||(pxtblockly={}));var pxtblockly;!function(e){var t=function(e){function t(){e.apply(this,arguments),this.isFieldCustom_=!0}return __extends(t,e),t.prototype.updateEditable=function(){var e=this.fieldGroup_;this.EDITABLE&&e&&(this.sourceBlock_.isEditable()?(Blockly.utils.addClass(e,"blocklyEditableText"),Blockly.utils.removeClass(e,"blocklyGreyExpressionBlockText"),this.fieldGroup_.style.cursor=this.CURSOR):(Blockly.utils.addClass(e,"blocklyGreyExpressionBlockText"),Blockly.utils.removeClass(e,"blocklyEditableText"),this.fieldGroup_.style.cursor=""))},t}(Blockly.FieldTextInput);e.FieldTsExpression=t}(pxtblockly||(pxtblockly={}));var pxtblockly;!function(e){!function(e){e.hasClass=function(e,t){return e.classList?e.classList.contains(t):e.className.baseVal.indexOf(t)>-1},e.addClass=function(e,t){e.classList?e.classList.add(t):e.className.baseVal.indexOf(t)<0&&(e.className.baseVal+=" "+t)},e.removeClass=function(e,t){e.classList?e.classList.remove(t):e.className.baseVal=e.className.baseVal.replace(t,"").replace(/\s{2,}/," ")}}(e.svg||(e.svg={})),e.parseColour=function(e){var t=Number(e);return isNaN(t)?goog.isString(e)&&e.match(/^#[0-9a-fA-F]{6}$/)?e:"#000":Blockly.hueToRgb(t)};!function(e){function t(){return r||(r=o()),r}function o(){if(window.AudioContext=window.AudioContext||window.webkitAudioContext,window.AudioContext)try{return new window.AudioContext}catch(e){}}function i(){r&&(n.disconnect(),l=0)}var r,n,l=0,a=!1;e.mute=function(e){r&&(a=e,i())},e.stop=i,e.frequency=function(){return l},e.tone=function(e){if(!(a||e<=0)){l=e;var o=t();if(o)try{n&&(n.disconnect(),n=void 0),(n=o.createOscillator()).frequency.value=e,n.type="triangle",n.connect(o.destination),n.start(0)}catch(e){return void(n=void 0)}}}}(e.AudioContextManager||(e.AudioContextManager={}))}(pxtblockly||(pxtblockly={}));
+var __extends = (this && this.__extends) || function (d, b) {
+    for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
+    function __() { this.constructor = d; }
+    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+};
+///<reference path='../localtypings/pxtblockly.d.ts'/>
+/// <reference path="../built/pxtlib.d.ts" />
+///////////////////////////////////////////////////////////////////////////////
+//                A compiler from Blocky to TouchDevelop                     //
+///////////////////////////////////////////////////////////////////////////////
+var B = Blockly;
+var iface;
+var pxt;
+(function (pxt) {
+    var blocks;
+    (function (blocks) {
+        function workerOpAsync(op, arg) {
+            return pxt.worker.getWorker(pxt.webConfig.workerjs).opAsync(op, arg);
+        }
+        blocks.workerOpAsync = workerOpAsync;
+        var placeholders = {};
+        var MAX_COMMENT_LINE_LENGTH = 50;
+        ///////////////////////////////////////////////////////////////////////////////
+        // Miscellaneous utility functions
+        ///////////////////////////////////////////////////////////////////////////////
+        // Mutate [a1] in place and append to it the elements from [a2].
+        function append(a1, a2) {
+            a1.push.apply(a1, a2);
+        }
+        // A few wrappers for basic Block operations that throw errors when compilation
+        // is not possible. (The outer code catches these and highlights the relevant
+        // block.)
+        // Internal error (in our code). Compilation shouldn't proceed.
+        function assert(x) {
+            if (!x)
+                throw new Error("Assertion failure");
+        }
+        function throwBlockError(msg, block) {
+            var e = new Error(msg);
+            e.block = block;
+            throw e;
+        }
+        ///////////////////////////////////////////////////////////////////////////////
+        // Types
+        //
+        // We slap a very simple type system on top of Blockly. This is needed to ensure
+        // we generate valid TouchDevelop code (otherwise compilation from TD to C++
+        // would not work).
+        ///////////////////////////////////////////////////////////////////////////////
+        // There are several layers of abstraction for the type system.
+        // - Block are annotated with a string return type, and a string type for their
+        //   input blocks (see blocks-custom.js). We use that as the reference semantics
+        //   for the blocks.
+        // - In this "type system", we use the enum Type. Using an enum rules out more
+        //   mistakes.
+        // - When emitting code, we target the "TouchDevelop types".
+        //
+        // Type inference / checking is done as follows. First, we try to assign a type
+        // to all variables. We do this by examining all variable assignments and
+        // figuring out the type from the right-hand side. There's a fixpoint computation
+        // (see [mkEnv]). Then, we propagate down the expected type when doing code
+        // generation; when generating code for a variable dereference, if the expected
+        // type doesn't match the inferred type, it's an error. If the type was
+        // undetermined as of yet, the type of the variable becomes the expected type.
+        var Point = (function () {
+            function Point(link, type, parentType, childType) {
+                this.link = link;
+                this.type = type;
+                this.parentType = parentType;
+                this.childType = childType;
+            }
+            return Point;
+        }());
+        blocks.Point = Point;
+        function find(p) {
+            if (p.link)
+                return find(p.link);
+            return p;
+        }
+        function union(p1, p2) {
+            var _p1 = find(p1);
+            var _p2 = find(p2);
+            assert(_p1.link == null && _p2.link == null);
+            if (_p1 == _p2)
+                return;
+            if (_p1.childType && _p2.childType) {
+                var ct = _p1.childType;
+                _p1.childType = null;
+                union(ct, _p2.childType);
+            }
+            else if (_p1.childType && !_p2.childType) {
+                _p2.childType = _p1.childType;
+            }
+            if (_p1.parentType && _p2.parentType) {
+                var pt = _p1.parentType;
+                _p1.parentType = null;
+                union(pt, _p2.parentType);
+            }
+            else if (_p1.parentType && !_p2.parentType) {
+                _p2.parentType = _p1.parentType;
+            }
+            var t = unify(_p1.type, _p2.type);
+            p1.link = _p2;
+            _p1.link = _p2;
+            p1.type = null;
+            p2.type = t;
+        }
+        // Ground types.
+        function mkPoint(t) {
+            return new Point(null, t);
+        }
+        var pNumber = mkPoint("number");
+        var pBoolean = mkPoint("boolean");
+        var pString = mkPoint("string");
+        var pUnit = mkPoint("void");
+        function ground(t) {
+            if (!t)
+                return mkPoint(t);
+            switch (t.toLowerCase()) {
+                case "number": return pNumber;
+                case "boolean": return pBoolean;
+                case "string": return pString;
+                case "void": return pUnit;
+                default:
+                    // Unification variable.
+                    return mkPoint(t);
+            }
+        }
+        ///////////////////////////////////////////////////////////////////////////////
+        // Type inference
+        //
+        // Expressions are now directly compiled as a tree. This requires knowing, for
+        // each property ref, the right value for its [parent] property.
+        ///////////////////////////////////////////////////////////////////////////////
+        // Infers the expected type of an expression by looking at the untranslated
+        // block and figuring out, from the look of it, what type of expression it
+        // holds.
+        function returnType(e, b) {
+            assert(b != null);
+            if (b.type == "placeholder" || b.type === pxtc.TS_OUTPUT_TYPE)
+                return find(b.p);
+            if (b.type == "variables_get")
+                return find(lookup(e, escapeVarName(b.getFieldValue("VAR"), e)).type);
+            if (!b.outputConnection) {
+                return ground(pUnit.type);
+            }
+            var check = b.outputConnection.check_ && b.outputConnection.check_.length ? b.outputConnection.check_[0] : "T";
+            if (check === "Array") {
+                // The only block that hits this case should be lists_create_with, so we
+                // can safely infer the type from the first input that has a return type
+                var tp = void 0;
+                if (b.inputList && b.inputList.length) {
+                    for (var _i = 0, _a = b.inputList; _i < _a.length; _i++) {
+                        var input = _a[_i];
+                        if (input.connection && input.connection.targetBlock()) {
+                            var t = find(returnType(e, input.connection.targetBlock()));
+                            if (t) {
+                                if (t.parentType) {
+                                    return t.parentType;
+                                }
+                                tp = ground(t.type + "[]");
+                                genericLink(tp, t);
+                                break;
+                            }
+                        }
+                    }
+                }
+                return tp || ground("Array");
+            }
+            else if (check === "T") {
+                var func_1 = e.stdCallTable[b.type];
+                var isArrayGet = b.type === "lists_index_get";
+                if (isArrayGet || func_1 && func_1.args.length) {
+                    var parentInput = void 0;
+                    if (isArrayGet) {
+                        parentInput = b.inputList.filter(function (i) { return i.name === "LIST"; })[0];
+                    }
+                    else {
+                        parentInput = b.inputList.filter(function (i) { return i.name === func_1.args[0].field; })[0];
+                    }
+                    if (parentInput.connection && parentInput.connection.targetBlock()) {
+                        var parentType = returnType(e, parentInput.connection.targetBlock());
+                        if (parentType.childType) {
+                            return parentType.childType;
+                        }
+                        var p = isArrayType(parentType.type) ? mkPoint(parentType.type.substr(-2)) : mkPoint(null);
+                        genericLink(parentType, p);
+                        return p;
+                    }
+                }
+                return mkPoint(null);
+            }
+            return ground(check);
+        }
+        // Basic type unification routine; easy, because there's no structural types.
+        // FIXME: Generics are not supported
+        function unify(t1, t2) {
+            if (t1 == null || t1 === "Array" && isArrayType(t2))
+                return t2;
+            else if (t2 == null || t2 === "Array" && isArrayType(t1))
+                return t1;
+            else if (t1 == t2)
+                return t1;
+            else
+                throw new Error("cannot mix " + t1 + " with " + t2);
+        }
+        function isArrayType(type) {
+            return type && type.indexOf("[]") !== -1;
+        }
+        function mkPlaceholderBlock(e, parent, type) {
+            // XXX define a proper placeholder block type
+            return {
+                type: "placeholder",
+                p: mkPoint(type || null),
+                workspace: e.workspace,
+                parentBlock_: parent
+            };
+        }
+        function attachPlaceholderIf(e, b, n, type) {
+            // Ugly hack to keep track of the type we want there.
+            var target = b.getInputTargetBlock(n);
+            if (!target) {
+                if (!placeholders[b.id]) {
+                    placeholders[b.id] = {};
+                }
+                if (!placeholders[b.id][n]) {
+                    placeholders[b.id][n] = mkPlaceholderBlock(e, b, type);
+                }
+            }
+            else if (target.type === pxtc.TS_OUTPUT_TYPE && !(target.p)) {
+                target.p = mkPoint(null);
+            }
+        }
+        function getInputTargetBlock(b, n) {
+            var res = b.getInputTargetBlock(n);
+            if (!res) {
+                return placeholders[b.id] && placeholders[b.id][n];
+            }
+            else {
+                return res;
+            }
+        }
+        function removeAllPlaceholders() {
+            placeholders = {};
+        }
+        // Unify the *return* type of the parameter [n] of block [b] with point [p].
+        function unionParam(e, b, n, p) {
+            try {
+                attachPlaceholderIf(e, b, n);
+                union(returnType(e, getInputTargetBlock(b, n)), p);
+            }
+            catch (e) {
+                throwBlockError("The parameter " + n + " of this block is of the wrong type. More precisely: " + e, b);
+            }
+        }
+        function infer(e, w) {
+            if (w)
+                w.getAllBlocks().filter(function (b) { return !b.disabled; }).forEach(function (b) {
+                    try {
+                        switch (b.type) {
+                            case "math_op2":
+                                unionParam(e, b, "x", ground(pNumber.type));
+                                unionParam(e, b, "y", ground(pNumber.type));
+                                break;
+                            case "math_op3":
+                                unionParam(e, b, "x", ground(pNumber.type));
+                                break;
+                            case "math_arithmetic":
+                            case "logic_compare":
+                                switch (b.getFieldValue("OP")) {
+                                    case "ADD":
+                                    case "MINUS":
+                                    case "MULTIPLY":
+                                    case "DIVIDE":
+                                    case "LT":
+                                    case "LTE":
+                                    case "GT":
+                                    case "GTE":
+                                    case "POWER":
+                                        unionParam(e, b, "A", ground(pNumber.type));
+                                        unionParam(e, b, "B", ground(pNumber.type));
+                                        break;
+                                    case "AND":
+                                    case "OR":
+                                        attachPlaceholderIf(e, b, "A", pBoolean.type);
+                                        attachPlaceholderIf(e, b, "B", pBoolean.type);
+                                        break;
+                                    case "EQ":
+                                    case "NEQ":
+                                        attachPlaceholderIf(e, b, "A");
+                                        attachPlaceholderIf(e, b, "B");
+                                        var p1_1 = returnType(e, getInputTargetBlock(b, "A"));
+                                        var p2 = returnType(e, getInputTargetBlock(b, "B"));
+                                        try {
+                                            union(p1_1, p2);
+                                        }
+                                        catch (e) {
+                                            throwBlockError("Comparing objects of different types", b);
+                                        }
+                                        var t = find(p1_1).type;
+                                        if (t != pString.type && t != pBoolean.type && t != pNumber.type && t != null)
+                                            throwBlockError("I can only compare strings, booleans and numbers", b);
+                                        break;
+                                }
+                                break;
+                            case "logic_operation":
+                                attachPlaceholderIf(e, b, "A", pBoolean.type);
+                                attachPlaceholderIf(e, b, "B", pBoolean.type);
+                                break;
+                            case "logic_negate":
+                                attachPlaceholderIf(e, b, "BOOL", pBoolean.type);
+                                break;
+                            case "controls_if":
+                                for (var i = 0; i <= b.elseifCount_; ++i)
+                                    attachPlaceholderIf(e, b, "IF" + i, pBoolean.type);
+                                break;
+                            case "controls_simple_for":
+                                unionParam(e, b, "TO", ground(pNumber.type));
+                                break;
+                            case "controls_for_of":
+                                unionParam(e, b, "LIST", ground("Array"));
+                                var listTp = returnType(e, getInputTargetBlock(b, "LIST"));
+                                var elementTp = lookup(e, escapeVarName(b.getFieldValue("VAR"), e)).type;
+                                genericLink(listTp, elementTp);
+                                break;
+                            case "variables_set":
+                            case "variables_change":
+                                var x = escapeVarName(b.getFieldValue("VAR"), e);
+                                var p1 = lookup(e, x).type;
+                                attachPlaceholderIf(e, b, "VALUE");
+                                var rhs = getInputTargetBlock(b, "VALUE");
+                                if (rhs) {
+                                    var tr = returnType(e, rhs);
+                                    try {
+                                        union(p1, tr);
+                                    }
+                                    catch (e) {
+                                        throwBlockError("Assigning a value of the wrong type to variable " + x, b);
+                                    }
+                                }
+                                break;
+                            case "controls_repeat_ext":
+                                unionParam(e, b, "TIMES", ground(pNumber.type));
+                                break;
+                            case "device_while":
+                                attachPlaceholderIf(e, b, "COND", pBoolean.type);
+                                break;
+                            case "lists_index_get":
+                                unionParam(e, b, "LIST", ground("Array"));
+                                unionParam(e, b, "INDEX", ground(pNumber.type));
+                                var listType = returnType(e, getInputTargetBlock(b, "LIST"));
+                                var ret = returnType(e, b);
+                                genericLink(listType, ret);
+                                break;
+                            case "lists_index_set":
+                                unionParam(e, b, "LIST", ground("Array"));
+                                attachPlaceholderIf(e, b, "VALUE");
+                                handleGenericType(b, "LIST");
+                                unionParam(e, b, "INDEX", ground(pNumber.type));
+                                break;
+                            default:
+                                if (b.type in e.stdCallTable) {
+                                    var call_1 = e.stdCallTable[b.type];
+                                    call_1.args.forEach(function (p, i) {
+                                        var isInstance = call_1.isExtensionMethod && i === 0;
+                                        if (p.field && !b.getFieldValue(p.field)) {
+                                            var i_1 = b.inputList.filter(function (i) { return i.name == p.field; })[0];
+                                            if (i_1.connection && i_1.connection.check_) {
+                                                if (isInstance && connectionCheck(i_1) === "Array") {
+                                                    var gen = handleGenericType(b, p.field);
+                                                    if (gen) {
+                                                        return;
+                                                    }
+                                                }
+                                                // All of our injected blocks have single output checks, but the builtin
+                                                // blockly ones like string.length and array.length might have multiple
+                                                for (var j = 0; j < i_1.connection.check_.length; j++) {
+                                                    try {
+                                                        var t = i_1.connection.check_[j];
+                                                        unionParam(e, b, p.field, ground(t));
+                                                        break;
+                                                    }
+                                                    catch (e) {
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    });
+                                }
+                        }
+                    }
+                    catch (err) {
+                        var be = err.block || b;
+                        be.setWarningText(err + "");
+                        e.errors.push(be);
+                    }
+                });
+            // Last pass: if some variable has no type (because it was never used or
+            // assigned to), just unify it with int...
+            e.bindings.forEach(function (b) {
+                if (getConcreteType(b.type).type == null)
+                    union(b.type, ground(pNumber.type));
+            });
+            function connectionCheck(i) {
+                return i.name ? i.connection && i.connection.check_ && i.connection.check_.length ? i.connection.check_[0] : "T" : undefined;
+            }
+            function handleGenericType(b, name) {
+                var genericArgs = b.inputList.filter(function (input) { return connectionCheck(input) === "T"; });
+                if (genericArgs.length) {
+                    var gen = getInputTargetBlock(b, genericArgs[0].name);
+                    if (gen) {
+                        var arg = returnType(e, gen);
+                        var arrayType = arg.type ? ground(returnType(e, gen).type + "[]") : ground(null);
+                        genericLink(arrayType, arg);
+                        unionParam(e, b, name, arrayType);
+                        return true;
+                    }
+                }
+                return false;
+            }
+        }
+        function genericLink(parent, child) {
+            var p = find(parent);
+            var c = find(child);
+            if (p.childType) {
+                union(p.childType, c);
+            }
+            else {
+                p.childType = c;
+            }
+            if (c.parentType) {
+                union(c.parentType, p);
+            }
+            else {
+                c.parentType = p;
+            }
+        }
+        function getConcreteType(point, found) {
+            if (found === void 0) { found = []; }
+            var t = find(point);
+            if (found.indexOf(t) === -1) {
+                found.push(t);
+                if (!t.type || t.type === "Array") {
+                    if (t.parentType) {
+                        var parent_1 = getConcreteType(t.parentType, found);
+                        if (parent_1.type && parent_1.type !== "Array") {
+                            t.type = parent_1.type.substr(0, parent_1.type.length - 2);
+                            return t;
+                        }
+                    }
+                    if (t.childType) {
+                        var child = getConcreteType(t.childType, found);
+                        if (child.type) {
+                            t.type = child.type + "[]";
+                            return t;
+                        }
+                    }
+                }
+            }
+            return t;
+        }
+        ///////////////////////////////////////////////////////////////////////////////
+        // Expressions
+        //
+        // Expressions are now directly compiled as a tree. This requires knowing, for
+        // each property ref, the right value for its [parent] property.
+        ///////////////////////////////////////////////////////////////////////////////
+        function extractNumber(b) {
+            var v = b.getFieldValue(b.type === "math_number_minmax" ? "SLIDER" : "NUM");
+            var parsed = parseFloat(v);
+            checkNumber(parsed, b);
+            return parsed;
+        }
+        function checkNumber(n, b) {
+            if (n === Infinity || isNaN(n)) {
+                throwBlockError(lf("Number entered is either too large or too small"), b);
+            }
+        }
+        function extractTsExpression(e, b, comments) {
+            return blocks.mkText(b.getFieldValue("EXPRESSION").trim());
+        }
+        function compileNumber(e, b, comments) {
+            return blocks.H.mkNumberLiteral(extractNumber(b));
+        }
+        var opToTok = {
+            // POWER gets a special treatment because there's no operator for it in
+            // TouchDevelop
+            "ADD": "+",
+            "MINUS": "-",
+            "MULTIPLY": "*",
+            "DIVIDE": "/",
+            "LT": "<",
+            "LTE": "<=",
+            "GT": ">",
+            "GTE": ">=",
+            "AND": "&&",
+            "OR": "||",
+            "EQ": "==",
+            "NEQ": "!=",
+        };
+        function compileArithmetic(e, b, comments) {
+            var bOp = b.getFieldValue("OP");
+            var left = getInputTargetBlock(b, "A");
+            var right = getInputTargetBlock(b, "B");
+            var args = [compileExpression(e, left, comments), compileExpression(e, right, comments)];
+            var t = returnType(e, left).type;
+            if (t == pString.type) {
+                if (bOp == "EQ")
+                    return blocks.H.mkSimpleCall("==", args);
+                else if (bOp == "NEQ")
+                    return blocks.H.mkSimpleCall("!=", args);
+            }
+            else if (t == pBoolean.type)
+                return blocks.H.mkSimpleCall(opToTok[bOp], args);
+            // Compilation of math operators.
+            if (bOp == "POWER")
+                return blocks.H.mathCall("pow", args);
+            else {
+                assert(bOp in opToTok);
+                return blocks.H.mkSimpleCall(opToTok[bOp], args);
+            }
+        }
+        function compileModulo(e, b, comments) {
+            var left = getInputTargetBlock(b, "DIVIDEND");
+            var right = getInputTargetBlock(b, "DIVISOR");
+            var args = [compileExpression(e, left, comments), compileExpression(e, right, comments)];
+            return blocks.H.mkSimpleCall("%", args);
+        }
+        function compileMathOp2(e, b, comments) {
+            var op = b.getFieldValue("op");
+            var x = compileExpression(e, getInputTargetBlock(b, "x"), comments);
+            var y = compileExpression(e, getInputTargetBlock(b, "y"), comments);
+            return blocks.H.mathCall(op, [x, y]);
+        }
+        function compileMathOp3(e, b, comments) {
+            var x = compileExpression(e, getInputTargetBlock(b, "x"), comments);
+            return blocks.H.mathCall("abs", [x]);
+        }
+        function compileText(e, b, comments) {
+            return blocks.H.mkStringLiteral(b.getFieldValue("TEXT"));
+        }
+        function compileTextJoin(e, b, comments) {
+            var last;
+            var i = 0;
+            while (true) {
+                var val = getInputTargetBlock(b, "ADD" + i);
+                i++;
+                if (!val) {
+                    if (i < b.inputList.length) {
+                        continue;
+                    }
+                    else {
+                        break;
+                    }
+                }
+                var compiled = compileExpression(e, val, comments);
+                if (!last) {
+                    if (val.type.indexOf("text") === 0) {
+                        last = compiled;
+                    }
+                    else {
+                        // If we don't start with a string, then the TS won't match
+                        // the implied semantics of the blocks
+                        last = blocks.H.mkSimpleCall("+", [blocks.H.mkStringLiteral(""), compiled]);
+                    }
+                }
+                else {
+                    last = blocks.H.mkSimpleCall("+", [last, compiled]);
+                }
+            }
+            if (!last) {
+                return blocks.H.mkStringLiteral("");
+            }
+            return last;
+        }
+        function compileBoolean(e, b, comments) {
+            return blocks.H.mkBooleanLiteral(b.getFieldValue("BOOL") == "TRUE");
+        }
+        function compileNot(e, b, comments) {
+            var expr = compileExpression(e, getInputTargetBlock(b, "BOOL"), comments);
+            return blocks.mkPrefix("!", [blocks.H.mkParenthesizedExpression(expr)]);
+        }
+        function compileCreateList(e, b, comments) {
+            // collect argument
+            var args = b.inputList.map(function (input) { return input.connection && input.connection.targetBlock() ? compileExpression(e, input.connection.targetBlock(), comments) : undefined; })
+                .filter(function (e) { return !!e; });
+            return blocks.H.mkArrayLiteral(args);
+        }
+        function compileListGet(e, b, comments) {
+            var listBlock = getInputTargetBlock(b, "LIST");
+            var listExpr = compileExpression(e, listBlock, comments);
+            var index = compileExpression(e, getInputTargetBlock(b, "INDEX"), comments);
+            var res = blocks.mkGroup([listExpr, blocks.mkText("["), index, blocks.mkText("]")]);
+            return res;
+        }
+        function compileListSet(e, b, comments) {
+            var listBlock = getInputTargetBlock(b, "LIST");
+            var listExpr = compileExpression(e, listBlock, comments);
+            var index = compileExpression(e, getInputTargetBlock(b, "INDEX"), comments);
+            var value = compileExpression(e, getInputTargetBlock(b, "VALUE"), comments);
+            var res = blocks.mkGroup([listExpr, blocks.mkText("["), index, blocks.mkText("] = "), value]);
+            return listBlock.type === "lists_create_with" ? prefixWithSemicolon(res) : res;
+        }
+        function compileProcedure(e, b, comments) {
+            var name = escapeVarName(b.getFieldValue("NAME"), e, true);
+            var stmts = getInputTargetBlock(b, "STACK");
+            return [
+                blocks.mkText("function " + name + "() "),
+                compileStatements(e, stmts)
+            ];
+        }
+        function compileProcedureCall(e, b, comments) {
+            var name = escapeVarName(b.getFieldValue("NAME"), e, true);
+            return blocks.mkStmt(blocks.mkText(name + "()"));
+        }
+        function defaultValueForType(t) {
+            if (t.type == null) {
+                union(t, ground(pNumber.type));
+                t = find(t);
+            }
+            if (isArrayType(t.type)) {
+                return blocks.mkText("[]");
+            }
+            switch (t.type) {
+                case "boolean":
+                    return blocks.H.mkBooleanLiteral(false);
+                case "number":
+                    return blocks.H.mkNumberLiteral(0);
+                case "string":
+                    return blocks.H.mkStringLiteral("");
+                default:
+                    return blocks.mkText("null");
+            }
+        }
+        // [t] is the expected type; we assume that we never null block children
+        // (because placeholder blocks have been inserted by the type-checking phase
+        // whenever a block was actually missing).
+        function compileExpression(e, b, comments) {
+            assert(b != null);
+            e.stats[b.type] = (e.stats[b.type] || 0) + 1;
+            maybeAddComment(b, comments);
+            var expr;
+            if (b.disabled || b.type == "placeholder") {
+                var ret = find(returnType(e, b));
+                if (ret.type === "Array") {
+                    // FIXME: Can't use default type here because TS complains about
+                    // the array having an implicit any type. However, forcing this
+                    // to be a number array may cause type issues. Also, potential semicolon
+                    // issues if we ever have a block where the array is not the first argument...
+                    var isExpression = b.parentBlock_.type === "lists_index_get";
+                    if (!isExpression) {
+                        var call = e.stdCallTable[b.parentBlock_.type];
+                        isExpression = call && call.isExpression;
+                    }
+                    var arrayNode = blocks.mkText("[0]");
+                    expr = isExpression ? arrayNode : prefixWithSemicolon(arrayNode);
+                }
+                else {
+                    expr = defaultValueForType(returnType(e, b));
+                }
+            }
+            else
+                switch (b.type) {
+                    case "math_number":
+                        expr = compileNumber(e, b, comments);
+                        break;
+                    case "math_number_minmax":
+                        expr = compileNumber(e, b, comments);
+                        break;
+                    case "math_op2":
+                        expr = compileMathOp2(e, b, comments);
+                        break;
+                    case "math_op3":
+                        expr = compileMathOp3(e, b, comments);
+                        break;
+                    case "math_arithmetic":
+                    case "logic_compare":
+                    case "logic_operation":
+                        expr = compileArithmetic(e, b, comments);
+                        break;
+                    case "math_modulo":
+                        expr = compileModulo(e, b, comments);
+                        break;
+                    case "logic_boolean":
+                        expr = compileBoolean(e, b, comments);
+                        break;
+                    case "logic_negate":
+                        expr = compileNot(e, b, comments);
+                        break;
+                    case "variables_get":
+                        expr = compileVariableGet(e, b);
+                        break;
+                    case "text":
+                        expr = compileText(e, b, comments);
+                        break;
+                    case "text_join":
+                        expr = compileTextJoin(e, b, comments);
+                        break;
+                    case "lists_create_with":
+                        expr = compileCreateList(e, b, comments);
+                        break;
+                    case "lists_index_get":
+                        expr = compileListGet(e, b, comments);
+                        break;
+                    case "lists_index_set":
+                        expr = compileListSet(e, b, comments);
+                        break;
+                    case pxtc.TS_OUTPUT_TYPE:
+                        expr = extractTsExpression(e, b, comments);
+                        break;
+                    default:
+                        var call = e.stdCallTable[b.type];
+                        if (call) {
+                            if (call.imageLiteral)
+                                expr = compileImage(e, b, call.imageLiteral, call.namespace, call.f, call.args.map(function (ar) { return compileArgument(e, b, ar, comments); }));
+                            else
+                                expr = compileStdCall(e, b, call, comments);
+                        }
+                        else {
+                            pxt.reportError("blocks", "unabled compile expression", { "details": b.type });
+                            expr = defaultValueForType(returnType(e, b));
+                        }
+                        break;
+                }
+            expr.id = b.id;
+            return expr;
+        }
+        blocks.compileExpression = compileExpression;
+        (function (VarUsage) {
+            VarUsage[VarUsage["Unknown"] = 0] = "Unknown";
+            VarUsage[VarUsage["Read"] = 1] = "Read";
+            VarUsage[VarUsage["Assign"] = 2] = "Assign";
+        })(blocks.VarUsage || (blocks.VarUsage = {}));
+        var VarUsage = blocks.VarUsage;
+        function isCompiledAsLocalVariable(b) {
+            return b.declaredInLocalScope && !b.mustBeGlobal;
+        }
+        function extend(e, x, t) {
+            assert(lookup(e, x) == null);
+            return {
+                workspace: e.workspace,
+                bindings: [{ name: x, type: ground(t), declaredInLocalScope: 0 }].concat(e.bindings),
+                stdCallTable: e.stdCallTable,
+                errors: e.errors,
+                renames: e.renames,
+                stats: e.stats
+            };
+        }
+        function lookup(e, n) {
+            for (var i = 0; i < e.bindings.length; ++i)
+                if (e.bindings[i].name == n)
+                    return e.bindings[i];
+            return null;
+        }
+        function fresh(e, s) {
+            var i = 0;
+            var unique = s;
+            while (lookup(e, unique) != null)
+                unique = s + i++;
+            return unique;
+        }
+        function emptyEnv(w) {
+            return {
+                workspace: w,
+                bindings: [],
+                stdCallTable: {},
+                errors: [],
+                renames: {
+                    oldToNew: {},
+                    takenNames: {},
+                    oldToNewFunctions: {}
+                },
+                stats: {}
+            };
+        }
+        ;
+        ///////////////////////////////////////////////////////////////////////////////
+        // Statements
+        ///////////////////////////////////////////////////////////////////////////////
+        function compileControlsIf(e, b, comments) {
+            var stmts = [];
+            // Notice the <= (if there's no else-if, we still compile the primary if).
+            for (var i = 0; i <= b.elseifCount_; ++i) {
+                var cond = compileExpression(e, getInputTargetBlock(b, "IF" + i), comments);
+                var thenBranch = compileStatements(e, getInputTargetBlock(b, "DO" + i));
+                var startNode = blocks.mkText("if (");
+                if (i > 0) {
+                    startNode = blocks.mkText("else if (");
+                    startNode.glueToBlock = blocks.GlueMode.WithSpace;
+                }
+                append(stmts, [
+                    startNode,
+                    cond,
+                    blocks.mkText(")"),
+                    thenBranch
+                ]);
+            }
+            if (b.elseCount_) {
+                var elseNode = blocks.mkText("else");
+                elseNode.glueToBlock = blocks.GlueMode.WithSpace;
+                append(stmts, [
+                    elseNode,
+                    compileStatements(e, getInputTargetBlock(b, "ELSE"))
+                ]);
+            }
+            return stmts;
+        }
+        function compileControlsFor(e, b, comments) {
+            var bVar = escapeVarName(b.getFieldValue("VAR"), e);
+            var bTo = getInputTargetBlock(b, "TO");
+            var bDo = getInputTargetBlock(b, "DO");
+            var bBy = getInputTargetBlock(b, "BY");
+            var bFrom = getInputTargetBlock(b, "FROM");
+            var incOne = !bBy || (bBy.type.match(/^math_number/) && extractNumber(bBy) == 1);
+            var binding = lookup(e, bVar);
+            assert(binding.declaredInLocalScope > 0);
+            return [
+                blocks.mkText("for (let " + bVar + " = "),
+                bFrom ? compileExpression(e, bFrom, comments) : blocks.mkText("0"),
+                blocks.mkText("; "),
+                blocks.mkInfix(blocks.mkText(bVar), "<=", compileExpression(e, bTo, comments)),
+                blocks.mkText("; "),
+                incOne ? blocks.mkText(bVar + "++") : blocks.mkInfix(blocks.mkText(bVar), "+=", compileExpression(e, bBy, comments)),
+                blocks.mkText(")"),
+                compileStatements(e, bDo)
+            ];
+        }
+        function compileControlsRepeat(e, b, comments) {
+            var bound = compileExpression(e, getInputTargetBlock(b, "TIMES"), comments);
+            var body = compileStatements(e, getInputTargetBlock(b, "DO"));
+            var valid = function (x) { return !lookup(e, x); };
+            var name = "i";
+            for (var i = 0; !valid(name); i++)
+                name = "i" + i;
+            return [
+                blocks.mkText("for (let " + name + " = 0; "),
+                blocks.mkInfix(blocks.mkText(name), "<", bound),
+                blocks.mkText("; " + name + "++)"),
+                body
+            ];
+        }
+        function compileWhile(e, b, comments) {
+            var cond = compileExpression(e, getInputTargetBlock(b, "COND"), comments);
+            var body = compileStatements(e, getInputTargetBlock(b, "DO"));
+            return [
+                blocks.mkText("while ("),
+                cond,
+                blocks.mkText(")"),
+                body
+            ];
+        }
+        function compileControlsForOf(e, b, comments) {
+            var bVar = escapeVarName(b.getFieldValue("VAR"), e);
+            var bOf = getInputTargetBlock(b, "LIST");
+            var bDo = getInputTargetBlock(b, "DO");
+            var binding = lookup(e, bVar);
+            assert(binding.declaredInLocalScope > 0);
+            return [
+                blocks.mkText("for (let " + bVar + " of "),
+                compileExpression(e, bOf, comments),
+                blocks.mkText(")"),
+                compileStatements(e, bDo)
+            ];
+        }
+        function compileForever(e, b) {
+            var bBody = getInputTargetBlock(b, "HANDLER");
+            var body = compileStatements(e, bBody);
+            return mkCallWithCallback(e, "basic", "forever", [], body);
+        }
+        // convert to javascript friendly name
+        function escapeVarName(name, e, isFunction) {
+            if (isFunction === void 0) { isFunction = false; }
+            if (!name)
+                return '_';
+            if (isFunction) {
+                if (e.renames.oldToNewFunctions[name]) {
+                    return e.renames.oldToNewFunctions[name];
+                }
+            }
+            else if (e.renames.oldToNew[name]) {
+                return e.renames.oldToNew[name];
+            }
+            var n = ts.pxtc.escapeIdentifier(name);
+            if (e.renames.takenNames[n]) {
+                var i = 2;
+                while (e.renames.takenNames[n + i]) {
+                    i++;
+                }
+                n += i;
+            }
+            if (isFunction) {
+                e.renames.oldToNewFunctions[name] = n;
+            }
+            else {
+                e.renames.oldToNew[name] = n;
+            }
+            e.renames.takenNames[n] = true;
+            return n;
+        }
+        blocks.escapeVarName = escapeVarName;
+        function compileVariableGet(e, b) {
+            var name = escapeVarName(b.getFieldValue("VAR"), e);
+            var binding = lookup(e, name);
+            if (!binding.assigned)
+                binding.assigned = VarUsage.Read;
+            assert(binding != null && binding.type != null);
+            return blocks.mkText(name);
+        }
+        function compileSet(e, b, comments) {
+            var bVar = escapeVarName(b.getFieldValue("VAR"), e);
+            var bExpr = getInputTargetBlock(b, "VALUE");
+            var binding = lookup(e, bVar);
+            var isDef = false;
+            if (!binding.assigned)
+                if (b.getSurroundParent()) {
+                    // need to define this variable in the top-scope
+                    binding.assigned = VarUsage.Read;
+                }
+                else {
+                    binding.assigned = VarUsage.Assign;
+                    isDef = true;
+                }
+            var expr = compileExpression(e, bExpr, comments);
+            return blocks.mkStmt(blocks.mkText(isDef ? "let " : ""), blocks.mkText(bVar + " = "), expr);
+        }
+        function compileChange(e, b, comments) {
+            var bVar = escapeVarName(b.getFieldValue("VAR"), e);
+            var bExpr = getInputTargetBlock(b, "VALUE");
+            var binding = lookup(e, bVar);
+            if (!binding.assigned)
+                binding.assigned = VarUsage.Read;
+            var expr = compileExpression(e, bExpr, comments);
+            var ref = blocks.mkText(bVar);
+            return blocks.mkStmt(blocks.mkInfix(ref, "+=", expr));
+        }
+        function eventArgs(call) {
+            return call.args.map(function (ar) { return ar.field; }).filter(function (ar) { return !!ar; });
+        }
+        function compileCall(e, b, comments) {
+            var call = e.stdCallTable[b.type];
+            if (call.imageLiteral)
+                return blocks.mkStmt(compileImage(e, b, call.imageLiteral, call.namespace, call.f, call.args.map(function (ar) { return compileArgument(e, b, ar, comments); })));
+            else if (call.hasHandler)
+                return compileEvent(e, b, call, eventArgs(call), call.namespace, comments);
+            else
+                return blocks.mkStmt(compileStdCall(e, b, call, comments));
+        }
+        function compileArgument(e, b, p, comments, beginningOfStatement) {
+            if (beginningOfStatement === void 0) { beginningOfStatement = false; }
+            var lit = p.literal;
+            if (lit)
+                return lit instanceof String ? blocks.H.mkStringLiteral(lit) : blocks.H.mkNumberLiteral(lit);
+            var f = b.getFieldValue(p.field);
+            if (f != null) {
+                if (b.getField(p.field) instanceof pxtblockly.FieldTextInput) {
+                    return blocks.H.mkStringLiteral(f);
+                }
+                return blocks.mkText(f);
+            }
+            else {
+                attachPlaceholderIf(e, b, p.field);
+                var target = getInputTargetBlock(b, p.field);
+                if (beginningOfStatement && target.type === "lists_create_with") {
+                    // We have to be careful of array literals at the beginning of a statement
+                    // because they can cause errors (i.e. they get parsed as an index). Add a
+                    // semicolon to the previous statement just in case.
+                    // FIXME: No need to do this if the previous statement was a code block
+                    return prefixWithSemicolon(compileExpression(e, target, comments));
+                }
+                return compileExpression(e, target, comments);
+            }
+        }
+        function compileStdCall(e, b, func, comments) {
+            var args;
+            if (isMutatingBlock(b) && b.mutation.getMutationType() === blocks.MutatorTypes.RestParameterMutator) {
+                args = b.mutation.compileMutation(e, comments).children;
+            }
+            else {
+                args = func.args.map(function (p, i) { return compileArgument(e, b, p, comments, func.isExtensionMethod && i === 0 && !func.isExpression); });
+            }
+            var externalInputs = !b.getInputsInline();
+            if (func.isIdentity)
+                return args[0];
+            else if (func.property) {
+                return blocks.H.mkPropertyAccess(func.f, args[0]);
+            }
+            else if (func.isExtensionMethod) {
+                if (func.attrs.defaultInstance) {
+                    var instance = void 0;
+                    if (isMutatingBlock(b) && b.mutation.getMutationType() === blocks.MutatorTypes.DefaultInstanceMutator) {
+                        instance = b.mutation.compileMutation(e, comments);
+                    }
+                    if (instance) {
+                        args.unshift(instance);
+                    }
+                    else {
+                        args.unshift(blocks.mkText(func.attrs.defaultInstance));
+                    }
+                }
+                return blocks.H.extensionCall(func.f, args, externalInputs);
+            }
+            else if (func.namespace) {
+                return blocks.H.namespaceCall(func.namespace, func.f, args, externalInputs);
+            }
+            else {
+                return blocks.H.stdCall(func.f, args, externalInputs);
+            }
+        }
+        function compileStdBlock(e, b, f, comments) {
+            return blocks.mkStmt(compileStdCall(e, b, f, comments));
+        }
+        function mkCallWithCallback(e, n, f, args, body, argumentDeclaration, isExtension) {
+            if (isExtension === void 0) { isExtension = false; }
+            body.noFinalNewline = true;
+            var callback;
+            if (argumentDeclaration) {
+                callback = blocks.mkGroup([argumentDeclaration, body]);
+            }
+            else {
+                callback = blocks.mkGroup([blocks.mkText("function ()"), body]);
+            }
+            if (isExtension)
+                return blocks.mkStmt(blocks.H.extensionCall(f, args.concat([callback]), false));
+            else
+                return blocks.mkStmt(blocks.H.namespaceCall(n, f, args.concat([callback]), false));
+        }
+        function compileArg(e, b, arg, comments) {
+            // b.getFieldValue may be string, numbers
+            var argb = getInputTargetBlock(b, arg);
+            if (argb)
+                return compileExpression(e, argb, comments);
+            if (b.getField(arg) instanceof pxtblockly.FieldTextInput)
+                return blocks.H.mkStringLiteral(b.getFieldValue(arg));
+            return blocks.mkText(b.getFieldValue(arg));
+        }
+        function compileStartEvent(e, b) {
+            var bBody = getInputTargetBlock(b, "HANDLER");
+            var body = compileStatements(e, bBody);
+            if (pxt.appTarget.compile && pxt.appTarget.compile.onStartText && body && body.children) {
+                body.children.unshift(blocks.mkStmt(blocks.mkText("// " + pxtc.ON_START_COMMENT + "\n")));
+            }
+            return body;
+        }
+        function compileEvent(e, b, stdfun, args, ns, comments) {
+            var compiledArgs = args.map(function (arg) { return compileArg(e, b, arg, comments); });
+            var bBody = getInputTargetBlock(b, "HANDLER");
+            var body = compileStatements(e, bBody);
+            if (pxt.appTarget.compile && pxt.appTarget.compile.emptyEventHandlerComments && body.children.length === 0) {
+                body.children.unshift(blocks.mkStmt(blocks.mkText("// " + pxtc.HANDLER_COMMENT)));
+            }
+            var argumentDeclaration;
+            if (isMutatingBlock(b) && b.mutation.getMutationType() === blocks.MutatorTypes.ObjectDestructuringMutator) {
+                argumentDeclaration = b.mutation.compileMutation(e, comments);
+            }
+            else if (stdfun.handlerArgs.length) {
+                var handlerArgs = []; // = stdfun.handlerArgs.map(arg => escapeVarName(b.getFieldValue("HANDLER_" + arg.name), e));
+                for (var i = 0; i < stdfun.handlerArgs.length; i++) {
+                    var arg = stdfun.handlerArgs[i];
+                    var varName = b.getFieldValue("HANDLER_" + arg.name);
+                    if (varName !== null) {
+                        handlerArgs.push(escapeVarName(varName, e));
+                    }
+                    else {
+                        break;
+                    }
+                }
+                argumentDeclaration = blocks.mkText("function (" + handlerArgs.join(", ") + ")");
+            }
+            return mkCallWithCallback(e, ns, stdfun.f, compiledArgs, body, argumentDeclaration, stdfun.isExtensionMethod);
+        }
+        function isMutatingBlock(b) {
+            return !!b.mutation;
+        }
+        function compileImage(e, b, frames, n, f, args) {
+            args = args === undefined ? [] : args;
+            var state = "\n";
+            var rows = 5;
+            var columns = frames * 5;
+            for (var i = 0; i < rows; ++i) {
+                for (var j = 0; j < columns; ++j) {
+                    if (j > 0)
+                        state += ' ';
+                    state += /TRUE/.test(b.getFieldValue("LED" + j + i)) ? "#" : ".";
+                }
+                state += '\n';
+            }
+            var lit = blocks.H.mkStringLiteral(state);
+            lit.canIndentInside = true;
+            return blocks.H.namespaceCall(n, f, [lit].concat(args), false);
+        }
+        function compileStatementBlock(e, b) {
+            var r;
+            var comments = [];
+            e.stats[b.type] = (e.stats[b.type] || 0) + 1;
+            maybeAddComment(b, comments);
+            switch (b.type) {
+                case 'controls_if':
+                    r = compileControlsIf(e, b, comments);
+                    break;
+                case 'controls_for':
+                case 'controls_simple_for':
+                    r = compileControlsFor(e, b, comments);
+                    break;
+                case 'controls_for_of':
+                    r = compileControlsForOf(e, b, comments);
+                    break;
+                case 'variables_set':
+                    r = [compileSet(e, b, comments)];
+                    break;
+                case 'variables_change':
+                    r = [compileChange(e, b, comments)];
+                    break;
+                case 'controls_repeat_ext':
+                    r = compileControlsRepeat(e, b, comments);
+                    break;
+                case 'device_while':
+                    r = compileWhile(e, b, comments);
+                    break;
+                case 'procedures_defnoreturn':
+                    r = compileProcedure(e, b, comments);
+                    break;
+                case 'procedures_callnoreturn':
+                    r = [compileProcedureCall(e, b, comments)];
+                    break;
+                case ts.pxtc.ON_START_TYPE:
+                    r = compileStartEvent(e, b).children;
+                    break;
+                case pxtc.TS_STATEMENT_TYPE:
+                    r = compileTypescriptBlock(e, b);
+                    break;
+                default:
+                    var call = e.stdCallTable[b.type];
+                    if (call)
+                        r = [compileCall(e, b, comments)];
+                    else
+                        r = [blocks.mkStmt(compileExpression(e, b, comments))];
+                    break;
+            }
+            var l = r[r.length - 1];
+            if (l)
+                l.id = b.id;
+            if (comments.length) {
+                addCommentNodes(comments, r);
+            }
+            r.forEach(function (l) {
+                if (l.type === blocks.NT.Block || l.type === blocks.NT.Prefix && pxt.Util.startsWith(l.op, "//")) {
+                    l.id = b.id;
+                }
+            });
+            return r;
+        }
+        function compileStatements(e, b) {
+            var stmts = [];
+            while (b) {
+                if (!b.disabled)
+                    append(stmts, compileStatementBlock(e, b));
+                b = b.getNextBlock();
+            }
+            return blocks.mkBlock(stmts);
+        }
+        function compileTypescriptBlock(e, b) {
+            var res = [];
+            var i = 0;
+            while (true) {
+                var value = b.getFieldValue("LINE" + i);
+                i++;
+                if (value !== null) {
+                    res.push(blocks.mkText(value + "\n"));
+                    var declaredVars = b.declaredVariables;
+                    if (declaredVars) {
+                        var varNames = declaredVars.split(",");
+                        varNames.forEach(function (n) {
+                            var existing = lookup(e, n);
+                            if (existing) {
+                                existing.assigned = VarUsage.Assign;
+                                existing.mustBeGlobal = false;
+                            }
+                            else {
+                                e.bindings.push({
+                                    name: n,
+                                    type: mkPoint(null),
+                                    assigned: VarUsage.Assign,
+                                    declaredInLocalScope: 1,
+                                    mustBeGlobal: false
+                                });
+                            }
+                        });
+                    }
+                }
+                else {
+                    break;
+                }
+            }
+            return res;
+        }
+        function prefixWithSemicolon(n) {
+            var emptyStatement = blocks.mkStmt(blocks.mkText(";"));
+            emptyStatement.glueToBlock = blocks.GlueMode.NoSpace;
+            return blocks.mkGroup([emptyStatement, n]);
+        }
+        // This function creates an empty environment where type inference has NOT yet
+        // been performed.
+        // - All variables have been assigned an initial [Point] in the union-find.
+        // - Variables have been marked to indicate if they are compatible with the
+        //   TouchDevelop for-loop model.
+        function mkEnv(w, blockInfo, skipVariables) {
+            // The to-be-returned environment.
+            var e = emptyEnv(w);
+            // append functions in stdcalltable
+            if (blockInfo) {
+                // Enums are not enclosed in namespaces, so add them to the taken names
+                // to avoid collision
+                Object.keys(blockInfo.apis.byQName).forEach(function (name) {
+                    var info = blockInfo.apis.byQName[name];
+                    if (info.kind === pxtc.SymbolKind.Enum) {
+                        e.renames.takenNames[info.qName] = true;
+                    }
+                });
+                blockInfo.blocks
+                    .forEach(function (fn) {
+                    if (e.stdCallTable[fn.attributes.blockId]) {
+                        pxt.reportError("blocks", "function already defined", { "details": fn.attributes.blockId });
+                        return;
+                    }
+                    e.renames.takenNames[fn.namespace] = true;
+                    var _a = pxt.blocks.parameterNames(fn), attrNames = _a.attrNames, handlerArgs = _a.handlerArgs;
+                    var instance = fn.kind == pxtc.SymbolKind.Method || fn.kind == pxtc.SymbolKind.Property;
+                    var args = (fn.parameters || []).map(function (p) {
+                        if (attrNames[p.name] && attrNames[p.name].name)
+                            return { field: attrNames[p.name].name };
+                        else
+                            return null;
+                    }).filter(function (a) { return !!a; });
+                    if (instance && !fn.attributes.defaultInstance) {
+                        args.unshift({
+                            field: attrNames["this"].name
+                        });
+                    }
+                    e.stdCallTable[fn.attributes.blockId] = {
+                        namespace: fn.namespace,
+                        f: fn.name,
+                        args: args,
+                        attrs: fn.attributes,
+                        handlerArgs: handlerArgs,
+                        isExtensionMethod: instance,
+                        isExpression: fn.retType && fn.retType !== "void",
+                        imageLiteral: fn.attributes.imageLiteral,
+                        hasHandler: !!handlerArgs.length || fn.parameters && fn.parameters.some(function (p) { return (p.type == "() => void" || !!p.properties); }),
+                        property: !fn.parameters,
+                        isIdentity: fn.attributes.shim == "TD_ID"
+                    };
+                });
+            }
+            if (skipVariables)
+                return e;
+            var variableIsScoped = function (b, name) {
+                if (!b)
+                    return false;
+                else if ((b.type == "controls_for" || b.type == "controls_simple_for" || b.type == "controls_for_of")
+                    && escapeVarName(b.getFieldValue("VAR"), e) == name)
+                    return true;
+                else if (isMutatingBlock(b) && b.mutation.isDeclaredByMutation(name))
+                    return true;
+                var stdFunc = e.stdCallTable[b.type];
+                if (stdFunc && stdFunc.handlerArgs.length) {
+                    var foundIt_1 = false;
+                    stdFunc.handlerArgs.forEach(function (arg) {
+                        if (foundIt_1)
+                            return;
+                        var varName = b.getFieldValue("HANDLER_" + arg.name);
+                        if (varName != null && escapeVarName(varName, e) === name) {
+                            foundIt_1 = true;
+                        }
+                    });
+                    if (foundIt_1) {
+                        return true;
+                    }
+                }
+                return variableIsScoped(b.getSurroundParent(), name);
+            };
+            function trackLocalDeclaration(name, type) {
+                // It's ok for two loops to share the same variable.
+                if (lookup(e, name) == null)
+                    e = extend(e, name, type);
+                lookup(e, name).declaredInLocalScope++;
+                // If multiple loops share the same
+                // variable, that means there's potential race conditions in concurrent
+                // code, so faithfully compile this as a global variable.
+                if (lookup(e, name).declaredInLocalScope > 1)
+                    lookup(e, name).mustBeGlobal = true;
+            }
+            // collect local variables.
+            if (w)
+                w.getAllBlocks().filter(function (b) { return !b.disabled; }).forEach(function (b) {
+                    if (b.type == "controls_for" || b.type == "controls_simple_for" || b.type == "controls_for_of") {
+                        var x = escapeVarName(b.getFieldValue("VAR"), e);
+                        if (b.type == "controls_for_of") {
+                            trackLocalDeclaration(x, null);
+                        }
+                        else {
+                            trackLocalDeclaration(x, pNumber.type);
+                        }
+                    }
+                    else if (isMutatingBlock(b)) {
+                        var declarations = b.mutation.getDeclaredVariables();
+                        if (declarations) {
+                            for (var varName in declarations) {
+                                trackLocalDeclaration(escapeVarName(varName, e), declarations[varName]);
+                            }
+                        }
+                    }
+                    var stdFunc = e.stdCallTable[b.type];
+                    if (stdFunc && stdFunc.handlerArgs.length) {
+                        stdFunc.handlerArgs.forEach(function (arg) {
+                            var varName = b.getFieldValue("HANDLER_" + arg.name);
+                            if (varName != null) {
+                                trackLocalDeclaration(escapeVarName(varName, e), arg.type);
+                            }
+                        });
+                    }
+                });
+            // determine for-loop compatibility: for each get or
+            // set block, 1) make sure that the variable is bound, then 2) mark the variable if needed.
+            if (w)
+                w.getAllBlocks().filter(function (b) { return !b.disabled; }).forEach(function (b) {
+                    if (b.type == "variables_get" || b.type == "variables_set" || b.type == "variables_change") {
+                        var x = escapeVarName(b.getFieldValue("VAR"), e);
+                        if (lookup(e, x) == null)
+                            e = extend(e, x, null);
+                        var binding = lookup(e, x);
+                        if (binding.declaredInLocalScope && !variableIsScoped(b, x))
+                            // loop index is read outside the loop.
+                            binding.mustBeGlobal = true;
+                    }
+                });
+            return e;
+        }
+        blocks.mkEnv = mkEnv;
+        function compileBlockAsync(b, blockInfo) {
+            var w = b.workspace;
+            var e = mkEnv(w, blockInfo);
+            infer(e, w);
+            var compiled = compileStatementBlock(e, b);
+            removeAllPlaceholders();
+            return tdASTtoTS(e, compiled);
+        }
+        blocks.compileBlockAsync = compileBlockAsync;
+        function eventWeight(b, e) {
+            if (b.type === ts.pxtc.ON_START_TYPE) {
+                return 0;
+            }
+            var api = e.stdCallTable[b.type];
+            if (api && api.attrs.afterOnStart) {
+                return 1;
+            }
+            else {
+                return -1;
+            }
+        }
+        function compileWorkspace(e, w, blockInfo) {
+            try {
+                infer(e, w);
+                var stmtsMain_1 = [];
+                // all compiled top level blocks are events
+                var topblocks = w.getTopBlocks(true).sort(function (a, b) {
+                    return eventWeight(a, e) - eventWeight(b, e);
+                });
+                updateDisabledBlocks(e, w.getAllBlocks(), topblocks);
+                topblocks.forEach(function (b) {
+                    if (b.type == ts.pxtc.ON_START_TYPE)
+                        append(stmtsMain_1, compileStartEvent(e, b).children);
+                    else {
+                        var compiled = compileStatements(e, b);
+                        if (compiled.type == blocks.NT.Block)
+                            append(stmtsMain_1, compiled.children);
+                        else
+                            stmtsMain_1.push(compiled);
+                    }
+                });
+                // All variables in this script are compiled as locals within main unless loop or previsouly assigned
+                var stmtsVariables = e.bindings.filter(function (b) { return !isCompiledAsLocalVariable(b) && b.assigned != VarUsage.Assign; })
+                    .map(function (b) {
+                    var t = getConcreteType(b.type);
+                    var defl;
+                    if (t.type === "Array") {
+                        defl = blocks.mkText("[]");
+                    }
+                    else {
+                        defl = defaultValueForType(t);
+                    }
+                    var tp = "";
+                    if (defl.op == "null" || defl.op == "[]") {
+                        var tpname = t.type;
+                        // If the type is "Array" or null[] it means that we failed to narrow the type of array.
+                        // Best we can do is just default to number[]
+                        if (tpname === "Array" || tpname === "null[]") {
+                            tpname = "number[]";
+                        }
+                        var tpinfo = blockInfo.apis.byQName[tpname];
+                        if (tpinfo && tpinfo.attributes.autoCreate)
+                            defl = blocks.mkText(tpinfo.attributes.autoCreate + "()");
+                        else
+                            tp = ": " + tpname;
+                    }
+                    return blocks.mkStmt(blocks.mkText("let " + b.name + tp + " = "), defl);
+                });
+                return stmtsVariables.concat(stmtsMain_1);
+            }
+            catch (err) {
+                var be = err.block;
+                if (be) {
+                    be.setWarningText(err + "");
+                    e.errors.push(be);
+                }
+                else {
+                    throw err;
+                }
+            }
+            finally {
+                removeAllPlaceholders();
+            }
+            return []; // unreachable
+        }
+        function callKey(e, b) {
+            if (b.type == ts.pxtc.ON_START_TYPE)
+                return JSON.stringify({ name: ts.pxtc.ON_START_TYPE });
+            var call = e.stdCallTable[b.type];
+            if (call) {
+                // detect if same event is registered already
+                var compiledArgs = eventArgs(call).map(function (arg) { return compileArg(e, b, arg, []); });
+                var key = JSON.stringify({ name: call.f, ns: call.namespace, compiledArgs: compiledArgs })
+                    .replace(/"id"\s*:\s*"[^"]+"/g, ''); // remove blockly ids
+                return key;
+            }
+            return undefined;
+        }
+        blocks.callKey = callKey;
+        function updateDisabledBlocks(e, allBlocks, topBlocks) {
+            // unset disabled
+            allBlocks.forEach(function (b) { return b.setDisabled(false); });
+            // update top blocks
+            var events = {};
+            function flagDuplicate(key, block) {
+                var otherEvent = events[key];
+                if (otherEvent) {
+                    // another block is already registered
+                    block.setDisabled(true);
+                }
+                else {
+                    block.setDisabled(false);
+                    events[key] = block;
+                }
+            }
+            topBlocks.forEach(function (b) {
+                var call = e.stdCallTable[b.type];
+                // multiple calls allowed
+                if (b.type == ts.pxtc.ON_START_TYPE)
+                    flagDuplicate(ts.pxtc.ON_START_TYPE, b);
+                else if (b.type === "procedures_defnoreturn" || call && call.attrs.blockAllowMultiple && !call.attrs.handlerStatement)
+                    return;
+                else if (call && call.hasHandler && !call.attrs.handlerStatement) {
+                    // compute key that identifies event call
+                    // detect if same event is registered already
+                    var key = callKey(e, b);
+                    flagDuplicate(key, b);
+                }
+                else {
+                    // all non-events are disabled
+                    var t = b;
+                    while (t) {
+                        t.setDisabled(true);
+                        t = t.getNextBlock();
+                    }
+                }
+            });
+        }
+        function findBlockId(sourceMap, loc) {
+            if (!loc)
+                return undefined;
+            var bestChunk;
+            var bestChunkLength;
+            for (var i = 0; i < sourceMap.length; ++i) {
+                var chunk = sourceMap[i];
+                if (chunk.start <= loc.start && chunk.end > loc.start + loc.length && (!bestChunk || bestChunkLength > chunk.end - chunk.start)) {
+                    bestChunk = chunk;
+                    bestChunkLength = chunk.end - chunk.start;
+                }
+            }
+            if (bestChunk) {
+                return bestChunk.id;
+            }
+            return undefined;
+        }
+        blocks.findBlockId = findBlockId;
+        function compileAsync(b, blockInfo) {
+            var e = mkEnv(b, blockInfo);
+            var nodes = compileWorkspace(e, b, blockInfo);
+            var result = tdASTtoTS(e, nodes);
+            return result;
+        }
+        blocks.compileAsync = compileAsync;
+        function tdASTtoTS(env, app) {
+            var res = blocks.flattenNode(app);
+            // Note: the result of format is not used!
+            return workerOpAsync("format", { format: { input: res.output, pos: 1 } }).then(function () {
+                return {
+                    source: res.output,
+                    sourceMap: res.sourceMap,
+                    stats: env.stats
+                };
+            });
+        }
+        function maybeAddComment(b, comments) {
+            if (b.comment) {
+                if ((typeof b.comment) === "string") {
+                    comments.push(b.comment);
+                }
+                else {
+                    comments.push(b.comment.getText());
+                }
+            }
+        }
+        function addCommentNodes(comments, r) {
+            var commentNodes = [];
+            var paragraphs = [];
+            for (var _i = 0, comments_1 = comments; _i < comments_1.length; _i++) {
+                var comment = comments_1[_i];
+                for (var _a = 0, _b = comment.split("\n"); _a < _b.length; _a++) {
+                    var paragraph = _b[_a];
+                    paragraphs.push(paragraph);
+                }
+            }
+            for (var i = 0; i < paragraphs.length; i++) {
+                // Wrap paragraph lines
+                var words = paragraphs[i].split(/\s/);
+                var currentLine = void 0;
+                for (var _c = 0, words_1 = words; _c < words_1.length; _c++) {
+                    var word = words_1[_c];
+                    if (!currentLine) {
+                        currentLine = word;
+                    }
+                    else if (currentLine.length + word.length > MAX_COMMENT_LINE_LENGTH) {
+                        commentNodes.push(blocks.mkText("// " + currentLine));
+                        commentNodes.push(blocks.mkNewLine());
+                        currentLine = word;
+                    }
+                    else {
+                        currentLine += " " + word;
+                    }
+                }
+                if (currentLine) {
+                    commentNodes.push(blocks.mkText("// " + currentLine));
+                    commentNodes.push(blocks.mkNewLine());
+                }
+                // The decompiler expects an empty comment line between paragraphs
+                if (i !== paragraphs.length - 1) {
+                    commentNodes.push(blocks.mkText("//"));
+                    commentNodes.push(blocks.mkNewLine());
+                }
+            }
+            for (var _d = 0, _e = commentNodes.reverse(); _d < _e.length; _d++) {
+                var commentNode = _e[_d];
+                r.unshift(commentNode);
+            }
+        }
+        function endsWith(text, suffix) {
+            if (text.length < suffix.length) {
+                return false;
+            }
+            return text.substr(text.length - suffix.length) === suffix;
+        }
+    })(blocks = pxt.blocks || (pxt.blocks = {}));
+})(pxt || (pxt = {}));
+var pxt;
+(function (pxt) {
+    var blocks;
+    (function (blocks) {
+        var registeredFieldEditors = {};
+        function initFieldEditors() {
+            // Initialize PXT custom editors
+            var noteValidator = function (text) {
+                if (text === null) {
+                    return null;
+                }
+                text = String(text);
+                var n = parseFloat(text || '0');
+                if (isNaN(n) || n < 0) {
+                    // Invalid number.
+                    return null;
+                }
+                // Get the value in range.
+                return String(Math.round(Number(text)));
+            };
+            registerFieldEditor('text', pxtblockly.FieldTextInput);
+            registerFieldEditor('note', pxtblockly.FieldNote, noteValidator);
+            registerFieldEditor('gridpicker', pxtblockly.FieldGridPicker);
+            registerFieldEditor('textdropdown', pxtblockly.FieldTextDropdown);
+            registerFieldEditor('numberdropdown', pxtblockly.FieldNumberDropdown);
+            registerFieldEditor('imagedropdown', pxtblockly.FieldImageDropdown);
+            registerFieldEditor('colorwheel', pxtblockly.FieldColorWheel);
+            registerFieldEditor('toggle', pxtblockly.FieldToggle);
+            registerFieldEditor('toggleonoff', pxtblockly.FieldToggleOnOff);
+            registerFieldEditor('toggleyesno', pxtblockly.FieldToggleYesNo);
+            registerFieldEditor('colornumber', pxtblockly.FieldColorNumber);
+        }
+        blocks.initFieldEditors = initFieldEditors;
+        function registerFieldEditor(selector, field, validator) {
+            if (registeredFieldEditors[selector] == undefined) {
+                registeredFieldEditors[selector] = {
+                    field: field,
+                    validator: validator
+                };
+            }
+        }
+        blocks.registerFieldEditor = registerFieldEditor;
+        function createFieldEditor(selector, text, params) {
+            if (registeredFieldEditors[selector] == undefined) {
+                console.error("Field editor " + selector + " not registered");
+                return null;
+            }
+            var customField = registeredFieldEditors[selector];
+            var instance = new customField.field(text, params, customField.validator);
+            return instance;
+        }
+        blocks.createFieldEditor = createFieldEditor;
+    })(blocks = pxt.blocks || (pxt.blocks = {}));
+})(pxt || (pxt = {}));
+///<reference path='../localtypings/pxtblockly.d.ts'/>
+/// <reference path="../built/pxtlib.d.ts" />
+var pxt;
+(function (pxt) {
+    var blocks;
+    (function (blocks_1) {
+        function saveWorkspaceXml(ws) {
+            var xml = Blockly.Xml.workspaceToDom(ws);
+            var text = Blockly.Xml.domToPrettyText(xml);
+            return text;
+        }
+        blocks_1.saveWorkspaceXml = saveWorkspaceXml;
+        function getDirectChildren(parent, tag) {
+            var res = [];
+            for (var i = 0; i < parent.childNodes.length; i++) {
+                var n = parent.childNodes.item(i);
+                if (n.tagName === tag) {
+                    res.push(n);
+                }
+            }
+            return res;
+        }
+        blocks_1.getDirectChildren = getDirectChildren;
+        function getBlocksWithType(parent, type) {
+            return getChildrenWithAttr(parent, "block", "type", type);
+        }
+        blocks_1.getBlocksWithType = getBlocksWithType;
+        function getChildrenWithAttr(parent, tag, attr, value) {
+            return pxt.Util.toArray(parent.getElementsByTagName(tag)).filter(function (b) { return b.getAttribute(attr) === value; });
+        }
+        blocks_1.getChildrenWithAttr = getChildrenWithAttr;
+        function getFirstChildWithAttr(parent, tag, attr, value) {
+            var res = getChildrenWithAttr(parent, tag, attr, value);
+            return res.length ? res[0] : undefined;
+        }
+        blocks_1.getFirstChildWithAttr = getFirstChildWithAttr;
+        /**
+         * Loads the xml into a off-screen workspace (not suitable for size computations)
+         */
+        function loadWorkspaceXml(xml, skipReport) {
+            if (skipReport === void 0) { skipReport = false; }
+            var workspace = new Blockly.Workspace();
+            try {
+                var dom = Blockly.Xml.textToDom(xml);
+                Blockly.Xml.domToWorkspace(dom, workspace);
+                return workspace;
+            }
+            catch (e) {
+                if (!skipReport)
+                    pxt.reportException(e);
+                return null;
+            }
+        }
+        blocks_1.loadWorkspaceXml = loadWorkspaceXml;
+        function patchFloatingBlocks(dom, info) {
+            var onstarts = getBlocksWithType(dom, ts.pxtc.ON_START_TYPE);
+            var onstart = onstarts.length ? onstarts[0] : undefined;
+            if (onstart) {
+                onstart.removeAttribute("deletable");
+                return;
+            }
+            var newnodes = [];
+            var blocks = {};
+            info.blocks.forEach(function (b) { return blocks[b.attributes.blockId] = b; });
+            // walk top level blocks
+            var node = dom.firstElementChild;
+            var insertNode = undefined;
+            while (node) {
+                var nextNode = node.nextElementSibling;
+                // does this block is disable or have s nested statement block?
+                var nodeType = node.getAttribute("type");
+                if (!node.getAttribute("disabled") && !node.getElementsByTagName("statement").length
+                    && (pxt.blocks.buildinBlockStatements[nodeType] ||
+                        (blocks[nodeType] && blocks[nodeType].retType == "void" && !blocks_1.hasArrowFunction(blocks[nodeType])))) {
+                    // old block, needs to be wrapped in onstart
+                    if (!insertNode) {
+                        insertNode = dom.ownerDocument.createElement("statement");
+                        insertNode.setAttribute("name", "HANDLER");
+                        if (!onstart) {
+                            onstart = dom.ownerDocument.createElement("block");
+                            onstart.setAttribute("type", ts.pxtc.ON_START_TYPE);
+                            newnodes.push(onstart);
+                        }
+                        onstart.appendChild(insertNode);
+                        insertNode.appendChild(node);
+                        node.removeAttribute("x");
+                        node.removeAttribute("y");
+                        insertNode = node;
+                    }
+                    else {
+                        // event, add nested statement
+                        var next = dom.ownerDocument.createElement("next");
+                        next.appendChild(node);
+                        insertNode.appendChild(next);
+                        node.removeAttribute("x");
+                        node.removeAttribute("y");
+                        insertNode = node;
+                    }
+                }
+                node = nextNode;
+            }
+            newnodes.forEach(function (n) { return dom.appendChild(n); });
+        }
+        function importXml(xml, info, skipReport) {
+            if (skipReport === void 0) { skipReport = false; }
+            try {
+                var parser = new DOMParser();
+                var doc_1 = parser.parseFromString(xml, "application/xml");
+                if (pxt.appTarget.compile) {
+                    var upgrades = pxt.appTarget.compile.upgrades || [];
+                    // patch block types
+                    upgrades.filter(function (up) { return up.type == "blockId"; })
+                        .forEach(function (up) { return Object.keys(up.map).forEach(function (type) {
+                        getBlocksWithType(doc_1, type)
+                            .forEach(function (blockNode) {
+                            blockNode.setAttribute("type", up.map[type]);
+                            pxt.debug("patched block " + type + " -> " + up.map[type]);
+                        });
+                    }); });
+                    // patch block value
+                    upgrades.filter(function (up) { return up.type == "blockValue"; })
+                        .forEach(function (up) { return Object.keys(up.map).forEach(function (k) {
+                        var m = k.split('.');
+                        var type = m[0];
+                        var name = m[1];
+                        getBlocksWithType(doc_1, type)
+                            .reduce(function (prev, current) { return prev.concat(getDirectChildren(current, "value")); }, [])
+                            .forEach(function (blockNode) {
+                            blockNode.setAttribute("name", up.map[k]);
+                            pxt.debug("patched block value " + k + " -> " + up.map[k]);
+                        });
+                    }); });
+                }
+                // build upgrade map
+                var enums = {};
+                for (var k in info.apis.byQName) {
+                    var api = info.apis.byQName[k];
+                    if (api.kind == pxtc.SymbolKind.EnumMember)
+                        enums[api.namespace + '.' + (api.attributes.blockImportId || api.attributes.block || api.attributes.blockId || api.name)]
+                            = api.namespace + '.' + api.name;
+                }
+                // walk through blocks and patch enums
+                var blocks_2 = doc_1.getElementsByTagName("block");
+                for (var i = 0; i < blocks_2.length; ++i)
+                    patchBlock(info, enums, blocks_2[i]);
+                // patch floating blocks
+                patchFloatingBlocks(doc_1.documentElement, info);
+                // serialize and return
+                return new XMLSerializer().serializeToString(doc_1);
+            }
+            catch (e) {
+                if (!skipReport)
+                    pxt.reportException(e);
+                return xml;
+            }
+        }
+        blocks_1.importXml = importXml;
+        function patchBlock(info, enums, block) {
+            var type = block.getAttribute("type");
+            var b = Blockly.Blocks[type];
+            var symbol = blocks_1.blockSymbol(type);
+            if (!symbol || !b)
+                return;
+            var params = blocks_1.parameterNames(symbol).attrNames;
+            symbol.parameters.forEach(function (p, i) {
+                var ptype = info.apis.byQName[p.type];
+                if (ptype && ptype.kind == pxtc.SymbolKind.Enum) {
+                    var field = getFirstChildWithAttr(block, "field", "name", params[p.name].name);
+                    if (field) {
+                        var en = enums[ptype.name + '.' + field.textContent];
+                        if (en)
+                            field.textContent = en;
+                    }
+                }
+            });
+        }
+        /**
+         * Convert blockly hue to rgb
+         */
+        function convertColour(colour) {
+            var hue = parseInt(colour);
+            if (!isNaN(hue)) {
+                return Blockly.hueToRgb(hue);
+            }
+            return colour;
+        }
+        blocks_1.convertColour = convertColour;
+    })(blocks = pxt.blocks || (pxt.blocks = {}));
+})(pxt || (pxt = {}));
+var pxt;
+(function (pxt) {
+    var blocks;
+    (function (blocks_3) {
+        var layout;
+        (function (layout) {
+            function patchBlocksFromOldWorkspace(blockInfo, oldWs, newXml) {
+                var newWs = pxt.blocks.loadWorkspaceXml(newXml, true);
+                // position blocks
+                alignBlocks(blockInfo, oldWs, newWs);
+                // inject disabled blocks
+                return injectDisabledBlocks(oldWs, newWs);
+            }
+            layout.patchBlocksFromOldWorkspace = patchBlocksFromOldWorkspace;
+            function injectDisabledBlocks(oldWs, newWs) {
+                var oldDom = Blockly.Xml.workspaceToDom(oldWs);
+                var newDom = Blockly.Xml.workspaceToDom(newWs);
+                pxt.Util.toArray(oldDom.childNodes)
+                    .filter(function (n) { return n.nodeType == Node.ELEMENT_NODE && n.localName == "block" && n.getAttribute("disabled") == "true"; })
+                    .forEach(function (n) { return newDom.appendChild(newDom.ownerDocument.importNode(n, true)); });
+                var updatedXml = Blockly.Xml.domToPrettyText(newDom);
+                return updatedXml;
+            }
+            function alignBlocks(blockInfo, oldWs, newWs) {
+                var env;
+                var newBlocks; // support for multiple events with similar name
+                oldWs.getTopBlocks(false).filter(function (ob) { return !ob.disabled; })
+                    .forEach(function (ob) {
+                    var otp = ob.xy_;
+                    if (otp && otp.x != 0 && otp.y != 0) {
+                        if (!env) {
+                            env = pxt.blocks.mkEnv(oldWs, blockInfo, true);
+                            newBlocks = {};
+                            newWs.getTopBlocks(false).forEach(function (b) {
+                                var nkey = pxt.blocks.callKey(env, b);
+                                var nbs = newBlocks[nkey] || [];
+                                nbs.push(b);
+                                newBlocks[nkey] = nbs;
+                            });
+                        }
+                        var oldKey = pxt.blocks.callKey(env, ob);
+                        var newBlock = (newBlocks[oldKey] || []).shift();
+                        if (newBlock)
+                            newBlock.xy_ = otp.clone();
+                    }
+                });
+            }
+            function verticalAlign(ws, emPixels) {
+                var blocks = ws.getTopBlocks(true);
+                var y = 0;
+                blocks.forEach(function (block) {
+                    block.moveBy(0, y);
+                    y += block.getHeightWidth().height;
+                    y += emPixels; //buffer
+                });
+            }
+            layout.verticalAlign = verticalAlign;
+            ;
+            function flow(ws, opts) {
+                if (opts) {
+                    if (opts.useViewWidth) {
+                        var metrics = ws.getMetrics();
+                        // Only use the width if in portrait, otherwise the blocks are too spread out
+                        if (metrics.viewHeight > metrics.viewWidth) {
+                            flowBlocks(ws.getTopBlocks(true), undefined, metrics.viewWidth);
+                            return;
+                        }
+                    }
+                    flowBlocks(ws.getTopBlocks(true), opts.ratio);
+                }
+                else {
+                    flowBlocks(ws.getTopBlocks(true));
+                }
+            }
+            layout.flow = flow;
+            function screenshotEnabled() {
+                return !pxt.BrowserUtils.isIE()
+                    && !pxt.BrowserUtils.isUwpEdge(); // TODO figure out why screenshots are not working in UWP; disable for now
+            }
+            layout.screenshotEnabled = screenshotEnabled;
+            function screenshotAsync(ws) {
+                return toPngAsync(ws);
+            }
+            layout.screenshotAsync = screenshotAsync;
+            function toPngAsync(ws) {
+                return toSvgAsync(ws)
+                    .then(function (sg) {
+                    if (!sg)
+                        return Promise.resolve(undefined);
+                    return toPngAsyncInternal(sg.width, sg.height, 4, sg.xml);
+                });
+            }
+            layout.toPngAsync = toPngAsync;
+            function svgToPngAsync(svg, x, y, width, height, pixelDensity) {
+                return blocklyToSvgAsync(svg, x, y, width, height)
+                    .then(function (sg) {
+                    if (!sg)
+                        return Promise.resolve(undefined);
+                    return toPngAsyncInternal(sg.width, sg.height, pixelDensity, sg.xml);
+                });
+            }
+            layout.svgToPngAsync = svgToPngAsync;
+            function toPngAsyncInternal(width, height, pixelDensity, data) {
+                return new Promise(function (resolve, reject) {
+                    var cvs = document.createElement("canvas");
+                    var ctx = cvs.getContext("2d");
+                    var img = new Image;
+                    cvs.width = width * pixelDensity;
+                    cvs.height = height * pixelDensity;
+                    img.onload = function () {
+                        ctx.drawImage(img, 0, 0, width, height, 0, 0, cvs.width, cvs.height);
+                        var canvasdata = cvs.toDataURL("image/png");
+                        resolve(canvasdata);
+                    };
+                    img.onerror = function (ev) {
+                        pxt.reportError("blocks", "blocks screenshot failed");
+                        resolve(undefined);
+                    };
+                    img.src = data;
+                });
+            }
+            var XLINK_NAMESPACE = "http://www.w3.org/1999/xlink";
+            function toSvgAsync(ws) {
+                if (!ws)
+                    return Promise.resolve(undefined);
+                var bbox = document.getElementsByClassName("blocklyBlockCanvas")[0].getBBox();
+                var sg = ws.svgBlockCanvas_.cloneNode(true);
+                return blocklyToSvgAsync(sg, bbox.x, bbox.y, bbox.width, bbox.height);
+            }
+            layout.toSvgAsync = toSvgAsync;
+            function blocklyToSvgAsync(sg, x, y, width, height) {
+                if (!sg.childNodes[0])
+                    return Promise.resolve(undefined);
+                sg.removeAttribute("width");
+                sg.removeAttribute("height");
+                sg.removeAttribute("transform");
+                var xsg = new DOMParser().parseFromString("<svg version=\"1.1\" xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"" + XLINK_NAMESPACE + "\" width=\"" + width + "\" height=\"" + height + "\" viewBox=\"" + x + " " + y + " " + width + " " + height + "\">\n            " + new XMLSerializer().serializeToString(sg) + "\n            </svg>", "image/svg+xml");
+                var cssLink = xsg.createElementNS("http://www.w3.org/1999/xhtml", "style");
+                var customCssHref = document.getElementById("blocklycss").href;
+                return pxt.BrowserUtils.loadAjaxAsync(customCssHref)
+                    .then(function (customCss) {
+                    var blocklySvg = pxt.Util.toArray(document.head.querySelectorAll("style"))
+                        .filter(function (el) { return /\.blocklySvg/.test(el.innerText); })[0];
+                    // CSS may contain <, > which need to be stored in CDATA section
+                    cssLink.appendChild(xsg.createCDATASection((blocklySvg ? blocklySvg.innerText : "") + '\n\n' + customCss + '\n\n'));
+                    xsg.documentElement.insertBefore(cssLink, xsg.documentElement.firstElementChild);
+                    return expandImagesAsync(xsg)
+                        .then(function () {
+                        return { width: width, height: height, svg: new XMLSerializer().serializeToString(xsg), xml: documentToSvg(xsg) };
+                    });
+                });
+            }
+            layout.blocklyToSvgAsync = blocklyToSvgAsync;
+            function documentToSvg(xsg) {
+                var xml = new XMLSerializer().serializeToString(xsg);
+                var data = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(xml)));
+                return data;
+            }
+            layout.documentToSvg = documentToSvg;
+            var imageXLinkCache;
+            function expandImagesAsync(xsg) {
+                if (!imageXLinkCache)
+                    imageXLinkCache = {};
+                var images = xsg.getElementsByTagName("image");
+                var p = pxt.Util.toArray(images)
+                    .filter(function (image) { return !/^data:/.test(image.getAttributeNS(XLINK_NAMESPACE, "href")); })
+                    .map(function (image) {
+                    var href = image.getAttributeNS(XLINK_NAMESPACE, "href");
+                    var dataUri = imageXLinkCache[href];
+                    return (dataUri ? Promise.resolve(imageXLinkCache[href])
+                        : pxt.BrowserUtils.loadImageAsync(image.getAttributeNS(XLINK_NAMESPACE, "href"))
+                            .then(function (img) {
+                            var cvs = document.createElement("canvas");
+                            var ctx = cvs.getContext("2d");
+                            cvs.width = img.width;
+                            cvs.height = img.height;
+                            ctx.drawImage(img, 0, 0, img.width, img.height, 0, 0, cvs.width, cvs.height);
+                            imageXLinkCache[href] = dataUri = cvs.toDataURL("image/png");
+                            return dataUri;
+                        }).catch(function (e) {
+                            // ignore load error
+                            pxt.debug("svg render: failed to load " + href);
+                        }))
+                        .then(function (href) { image.setAttributeNS(XLINK_NAMESPACE, "href", href); });
+                });
+                return Promise.all(p).then(function () { });
+            }
+            function flowBlocks(blocks, ratio, maxWidth) {
+                if (ratio === void 0) { ratio = 1.62; }
+                var gap = 16;
+                var marginx = 20;
+                var marginy = 20;
+                var maxx;
+                if (maxWidth > marginx) {
+                    maxx = maxWidth - marginx;
+                }
+                else {
+                    // compute total block surface and infer width
+                    var surface = 0;
+                    for (var _i = 0, blocks_4 = blocks; _i < blocks_4.length; _i++) {
+                        var block = blocks_4[_i];
+                        var s = block.getHeightWidth();
+                        surface += s.width * s.height;
+                    }
+                    maxx = Math.sqrt(surface) * ratio;
+                }
+                var insertx = marginx;
+                var inserty = marginy;
+                var endy = 0;
+                for (var _a = 0, blocks_5 = blocks; _a < blocks_5.length; _a++) {
+                    var block = blocks_5[_a];
+                    var r = block.getBoundingRectangle();
+                    var s = block.getHeightWidth();
+                    // move block to insertion point
+                    block.moveBy(insertx - r.topLeft.x, inserty - r.topLeft.y);
+                    insertx += s.width + gap;
+                    endy = Math.max(endy, inserty + s.height + gap);
+                    if (insertx > maxx) {
+                        insertx = marginx;
+                        inserty = endy;
+                    }
+                }
+            }
+        })(layout = blocks_3.layout || (blocks_3.layout = {}));
+    })(blocks = pxt.blocks || (pxt.blocks = {}));
+})(pxt || (pxt = {}));
+/// <reference path="../localtypings/blockly.d.ts" />
+/// <reference path="../built/pxtlib.d.ts" />
+var Util = pxt.Util;
+var lf = Util.lf;
+var pxt;
+(function (pxt) {
+    var blocks;
+    (function (blocks_6) {
+        blocks_6.blockColors = {
+            loops: '#107c10',
+            logic: '#006970',
+            math: '#712672',
+            images: '#5C2D91',
+            variables: '#A80000',
+            functions: '#005a9e',
+            text: '#996600',
+            arrays: '#A94400',
+            advanced: '#3c3c3c'
+        };
+        (function (CategoryMode) {
+            CategoryMode[CategoryMode["All"] = 0] = "All";
+            CategoryMode[CategoryMode["None"] = 1] = "None";
+            CategoryMode[CategoryMode["Basic"] = 2] = "Basic";
+        })(blocks_6.CategoryMode || (blocks_6.CategoryMode = {}));
+        var CategoryMode = blocks_6.CategoryMode;
+        var typeDefaults = {
+            "string": {
+                field: "TEXT",
+                block: "text",
+                defaultValue: ""
+            },
+            "number": {
+                field: "NUM",
+                block: "math_number",
+                defaultValue: "0"
+            },
+            "boolean": {
+                field: "BOOL",
+                block: "logic_boolean",
+                defaultValue: "false"
+            },
+            "Array": {
+                field: "VAR",
+                block: "variables_get",
+                defaultValue: "list"
+            }
+        };
+        function advancedTitle() { return pxt.Util.lf("{id:category}Advanced"); }
+        blocks_6.advancedTitle = advancedTitle;
+        function addPackageTitle() { return pxt.Util.lf("{id:category}Extensions"); }
+        blocks_6.addPackageTitle = addPackageTitle;
+        // Matches arrays and tuple types
+        var arrayTypeRegex = /^(?:Array<.+>)|(?:.+\[\])|(?:\[.+\])$/;
+        var usedBlocks = {};
+        var updateUsedBlocks = false;
+        // list of built-in blocks, should be touched.
+        var builtinBlocks = {};
+        Object.keys(Blockly.Blocks)
+            .forEach(function (k) { return builtinBlocks[k] = { block: Blockly.Blocks[k] }; });
+        blocks_6.buildinBlockStatements = {
+            "controls_if": true,
+            "controls_for": true,
+            "controls_simple_for": true,
+            "controls_repeat_ext": true,
+            "variables_set": true,
+            "variables_change": true,
+            "device_while": true
+        };
+        var cachedBlocks = {};
+        var searchElementCache = {};
+        function blockSymbol(type) {
+            var b = cachedBlocks[type];
+            return b ? b.fn : undefined;
+        }
+        blocks_6.blockSymbol = blockSymbol;
+        function createShadowValue(name, type, v, shadowType) {
+            if (v && v.slice(0, 1) == "\"")
+                v = JSON.parse(v);
+            if (type == "number" && shadowType == "value") {
+                var field = document.createElement("field");
+                field.setAttribute("name", name);
+                field.appendChild(document.createTextNode("0"));
+                return field;
+            }
+            var isVariable = shadowType == "variables_get";
+            var value = document.createElement("value");
+            value.setAttribute("name", name);
+            var shadow = document.createElement(isVariable ? "block" : "shadow");
+            value.appendChild(shadow);
+            var typeInfo = typeDefaults[type];
+            shadow.setAttribute("type", shadowType || typeInfo && typeInfo.block || type);
+            shadow.setAttribute("colour", Blockly.Colours.textField);
+            if (typeInfo) {
+                var field = document.createElement("field");
+                shadow.appendChild(field);
+                var fieldName = void 0;
+                switch (shadowType) {
+                    case "variables_get":
+                        fieldName = "VAR";
+                        break;
+                    case "math_number_minmax":
+                        fieldName = "SLIDER";
+                        break;
+                    default:
+                        fieldName = typeInfo.field;
+                        break;
+                }
+                field.setAttribute("name", fieldName);
+                var value_1;
+                if (type == "boolean") {
+                    value_1 = document.createTextNode((v || typeInfo.defaultValue).toUpperCase());
+                }
+                else {
+                    value_1 = document.createTextNode(v || typeInfo.defaultValue);
+                }
+                field.appendChild(value_1);
+            }
+            else if (isVariable && v) {
+                var field = document.createElement("field");
+                shadow.appendChild(field);
+                field.setAttribute("name", "VAR");
+                field.textContent = v;
+            }
+            return value;
+        }
+        function createToolboxBlock(info, fn, params) {
+            //
+            // toolbox update
+            //
+            var attrNames = params.attrNames, handlerArgs = params.handlerArgs;
+            var block = document.createElement("block");
+            block.setAttribute("type", fn.attributes.blockId);
+            if (fn.attributes.blockGap)
+                block.setAttribute("gap", fn.attributes.blockGap);
+            else if (pxt.appTarget.appTheme && pxt.appTarget.appTheme.defaultBlockGap)
+                block.setAttribute("gap", pxt.appTarget.appTheme.defaultBlockGap.toString());
+            if ((fn.kind == pxtc.SymbolKind.Method || fn.kind == pxtc.SymbolKind.Property)
+                && attrNames["this"]) {
+                var attr = attrNames["this"];
+                block.appendChild(createShadowValue(attr.name, attr.type, attr.shadowValue || attr.name, attr.shadowType || "variables_get"));
+            }
+            if (fn.parameters) {
+                fn.parameters.filter(function (pr) { return !!attrNames[pr.name].name &&
+                    (/^(string|number|boolean)$/.test(attrNames[pr.name].type)
+                        || !!attrNames[pr.name].shadowType
+                        || !!attrNames[pr.name].shadowValue); })
+                    .forEach(function (pr) {
+                    var attr = attrNames[pr.name];
+                    var shadowValue;
+                    var container;
+                    if (pr.options && pr.options['min'] && pr.options['max']) {
+                        shadowValue = createShadowValue(attr.name, attr.type, attr.shadowValue, 'math_number_minmax');
+                        container = document.createElement('mutation');
+                        container.setAttribute('min', pr.options['min'].value);
+                        container.setAttribute('max', pr.options['max'].value);
+                        container.setAttribute('label', pr.name.charAt(0).toUpperCase() + pr.name.slice(1));
+                        if (pr.options['fieldEditorOptions']) {
+                            if (pr.options['fieldEditorOptions'].value['step'])
+                                container.setAttribute('step', pr.options['fieldEditorOptions'].value['step']);
+                            if (pr.options['fieldEditorOptions'].value['color'])
+                                container.setAttribute('color', pr.options['fieldEditorOptions'].value['color']);
+                        }
+                    }
+                    else {
+                        shadowValue = createShadowValue(attr.name, attr.type, attr.shadowValue, attr.shadowType);
+                    }
+                    if (pr.options && pr.options['fieldEditorOptions']) {
+                        if (!container)
+                            container = document.createElement('mutation');
+                        container.setAttribute("customfield", JSON.stringify(pr.options['fieldEditorOptions'].value));
+                    }
+                    if (shadowValue && container)
+                        shadowValue.firstChild.appendChild(container);
+                    block.appendChild(shadowValue);
+                });
+                handlerArgs.forEach(function (arg) {
+                    var field = document.createElement("field");
+                    field.setAttribute("name", "HANDLER_" + arg.name);
+                    field.textContent = arg.name;
+                    block.appendChild(field);
+                });
+            }
+            searchElementCache[fn.attributes.blockId] = block.cloneNode(true);
+            return block;
+        }
+        function createCategoryElement(name, nameid, weight, colour, iconClass) {
+            var result = document.createElement("category");
+            result.setAttribute("name", name);
+            result.setAttribute("nameid", nameid.toLowerCase());
+            result.setAttribute("weight", weight.toString());
+            if (colour) {
+                result.setAttribute("colour", colour);
+            }
+            if (iconClass) {
+                result.setAttribute("iconclass", iconClass);
+                result.setAttribute("expandedclass", iconClass);
+            }
+            return result;
+        }
+        function injectToolbox(tb, info, fn, block, showCategories, pnames) {
+            if (showCategories === void 0) { showCategories = CategoryMode.Basic; }
+            // identity function are just a trick to get an enum drop down in the block
+            // while allowing the parameter to be a number
+            if (fn.attributes.blockHidden)
+                return;
+            if (!fn.attributes.deprecated) {
+                var ns = (fn.attributes.blockNamespace || fn.namespace).split('.')[0];
+                var nsn = info.apis.byQName[ns];
+                var isAdvanced = nsn && nsn.attributes.advanced;
+                if (nsn)
+                    ns = nsn.attributes.block || ns;
+                var catName = ts.pxtc.blocksCategory(fn);
+                if (nsn && nsn.name)
+                    catName = pxt.Util.capitalize(nsn.name);
+                var category_1 = categoryElement(tb, catName);
+                if (showCategories === CategoryMode.All || showCategories == CategoryMode.Basic && !isAdvanced) {
+                    if (!category_1) {
+                        var categories = getChildCategories(tb);
+                        var parentCategoryList = tb;
+                        pxt.debug('toolbox: adding category ' + ns);
+                        var nsWeight = (nsn ? nsn.attributes.weight : 50) || 50;
+                        var locCatName = pxt.Util.capitalize((nsn ? nsn.attributes.block : "") || catName);
+                        category_1 = createCategoryElement(locCatName, catName, nsWeight);
+                        if (nsn && nsn.attributes.color) {
+                            category_1.setAttribute("colour", nsn.attributes.color);
+                        }
+                        else if (getNamespaceColor(ns)) {
+                            category_1.setAttribute("colour", getNamespaceColor(ns));
+                        }
+                        if (nsn && nsn.attributes.icon) {
+                            var nsnIconClassName = ("blocklyTreeIcon" + nsn.name.toLowerCase()).replace(/\s/g, '');
+                            appendToolboxIconCss(nsnIconClassName, nsn.attributes.icon);
+                            category_1.setAttribute("iconclass", nsnIconClassName);
+                            category_1.setAttribute("expandedclass", nsnIconClassName);
+                            category_1.setAttribute("web-icon", nsn.attributes.icon);
+                        }
+                        else {
+                            category_1.setAttribute("iconclass", "blocklyTreeIconDefault");
+                            category_1.setAttribute("expandedclass", "blocklyTreeIconDefault");
+                            category_1.setAttribute("web-icon", "\uf12e");
+                        }
+                        if (nsn && nsn.attributes.groups) {
+                            category_1.setAttribute("groups", nsn.attributes.groups.join(', '));
+                        }
+                        if (nsn && nsn.attributes.labelLineWidth) {
+                            category_1.setAttribute("labellinewidth", nsn.attributes.labelLineWidth);
+                        }
+                        insertTopLevelCategory(category_1, tb, nsWeight, isAdvanced);
+                    }
+                    if (fn.attributes.advanced) {
+                        category_1 = getOrAddSubcategoryByWeight(category_1, lf("More"), "More", 1, category_1.getAttribute("colour"), 'blocklyTreeIconmore');
+                    }
+                    else if (fn.attributes.subcategory) {
+                        var sub = fn.attributes.subcategory;
+                        var all = nsn.attributes.subcategories;
+                        if (all && all.indexOf(sub) !== -1) {
+                            // Respect the weights given by the package
+                            var weight = 10000 - all.indexOf(sub);
+                            category_1 = getOrAddSubcategoryByWeight(category_1, sub, sub, weight, category_1.getAttribute("colour"), 'blocklyTreeIconmore');
+                        }
+                        else {
+                            // If no weight is specified, insert alphabetically after the weighted subcategories but above "More"
+                            category_1 = getOrAddSubcategoryByName(category_1, sub, sub, category_1.getAttribute("colour"), 'blocklyTreeIconmore');
+                        }
+                        if (nsn && nsn.attributes.groups) {
+                            category_1.setAttribute("groups", nsn.attributes.groups.join(', '));
+                        }
+                    }
+                }
+                if (showCategories === CategoryMode.Basic && isAdvanced) {
+                    var type = block.getAttribute("type");
+                    usedBlocks[type] = true;
+                }
+                if (fn.attributes.optionalVariableArgs && fn.attributes.toolboxVariableArgs) {
+                    var handlerArgs_1 = pnames.handlerArgs;
+                    var mutationValues = fn.attributes.toolboxVariableArgs.split(";")
+                        .map(function (v) { return parseInt(v); })
+                        .filter(function (v) { return v <= handlerArgs_1.length && v >= 0; });
+                    mutationValues.forEach(function (v) {
+                        var mutatedBlock = block.cloneNode(true);
+                        var mutation = document.createElement("mutation");
+                        mutation.setAttribute("numargs", v.toString());
+                        for (var i = 0; i < v; i++) {
+                            mutation.setAttribute("arg" + i, handlerArgs_1[i].name);
+                        }
+                        mutatedBlock.appendChild(mutation);
+                        if (showCategories !== CategoryMode.None) {
+                            insertBlock(mutatedBlock, category_1, fn.attributes.weight);
+                        }
+                        else {
+                            tb.appendChild(mutatedBlock);
+                        }
+                    });
+                }
+                else if (fn.attributes.mutateDefaults) {
+                    var mutationValues = fn.attributes.mutateDefaults.split(";");
+                    mutationValues.forEach(function (mutation) {
+                        var mutatedBlock = block.cloneNode(true);
+                        blocks_6.mutateToolboxBlock(mutatedBlock, fn.attributes.mutate, mutation);
+                        if (showCategories !== CategoryMode.None) {
+                            insertBlock(mutatedBlock, category_1, fn.attributes.weight);
+                        }
+                        else {
+                            tb.appendChild(mutatedBlock);
+                        }
+                    });
+                }
+                else {
+                    if (showCategories !== CategoryMode.None && !(showCategories === CategoryMode.Basic && isAdvanced)) {
+                        insertBlock(block, category_1, fn.attributes.weight, fn.attributes.group);
+                        injectToolboxIconCss();
+                    }
+                    else if (showCategories === CategoryMode.None) {
+                        tb.appendChild(block);
+                    }
+                }
+            }
+        }
+        function insertBlock(bl, cat, weight, group) {
+            var isBuiltin = !!blocks_6.blockColors[cat.getAttribute("nameid")];
+            if (group) {
+                bl.setAttribute("group", group);
+            }
+            if (isBuiltin && weight > 50) {
+                bl.setAttribute("loaded", "true");
+                var first = void 0;
+                for (var i = 0; i < cat.childNodes.length; i++) {
+                    var n = cat.childNodes.item(i);
+                    if (n.tagName === "block" && !n.getAttribute("loaded")) {
+                        first = n;
+                        break;
+                    }
+                }
+                if (first) {
+                    cat.insertBefore(bl, first);
+                }
+                else {
+                    cat.appendChild(bl);
+                }
+            }
+            else {
+                cat.appendChild(bl);
+            }
+        }
+        var toolboxStyle;
+        var toolboxStyleBuffer = '';
+        function appendToolboxIconCss(className, i) {
+            if (toolboxStyleBuffer.indexOf(className) > -1)
+                return;
+            if (i.length === 1) {
+                var icon = pxt.Util.unicodeToChar(i);
+                toolboxStyleBuffer += "\n                .blocklyTreeIcon." + className + "::before {\n                    content: \"" + icon + "\";\n                }\n            ";
+            }
+            else {
+                toolboxStyleBuffer += "\n                .blocklyTreeIcon." + className + " {\n                    background-image: url(\"" + pxt.Util.pathJoin(pxt.webConfig.commitCdnUrl, encodeURI(i)) + "\")!important;\n                    width: 30px;\n                    height: 100%;\n                    background-size: 20px !important;\n                    background-repeat: no-repeat !important;\n                    background-position: 50% 50% !important;\n                }\n            ";
+            }
+        }
+        blocks_6.appendToolboxIconCss = appendToolboxIconCss;
+        function injectToolboxIconCss() {
+            if (!toolboxStyle) {
+                toolboxStyle = document.createElement('style');
+                toolboxStyle.id = "blocklyToolboxIcons";
+                toolboxStyle.type = 'text/css';
+                var head = document.head || document.getElementsByTagName('head')[0];
+                head.appendChild(toolboxStyle);
+            }
+            if (toolboxStyle.sheet) {
+                toolboxStyle.textContent = toolboxStyleBuffer + namespaceStyleBuffer;
+            }
+            else {
+                toolboxStyle.appendChild(document.createTextNode(toolboxStyleBuffer + namespaceStyleBuffer));
+            }
+        }
+        blocks_6.injectToolboxIconCss = injectToolboxIconCss;
+        var namespaceStyleBuffer = '';
+        function appendNamespaceCss(namespace, color) {
+            var ns = namespace.toLowerCase();
+            color = color || '#dddddd'; // Default toolbox color
+            if (namespaceStyleBuffer.indexOf(ns) > -1)
+                return;
+            namespaceStyleBuffer += "\n            span.docs." + ns + " {\n                background-color: " + color + " !important;\n                border-color: " + Blockly.PXTUtils.fadeColour(color, 0.2, true) + " !important;\n            }\n        ";
+        }
+        blocks_6.appendNamespaceCss = appendNamespaceCss;
+        function getChildCategories(parent) {
+            var elements = parent.getElementsByTagName("category");
+            var result = [];
+            for (var i = 0; i < elements.length; i++) {
+                if (elements[i].parentNode === parent) {
+                    result.push(elements[i]);
+                }
+            }
+            return result;
+        }
+        function insertTopLevelCategory(category, tb, nsWeight, isAdvanced) {
+            var categories = getChildCategories(tb);
+            if (isAdvanced) {
+                category.setAttribute("advanced", "true");
+            }
+            // Insert the category based on weight
+            var ci = 0;
+            for (ci = 0; ci < categories.length; ++ci) {
+                var cat = categories[ci];
+                var catAdvanced = cat.hasAttribute("advanced") && cat.getAttribute("advanced") !== "false";
+                // Advanced categories always come last
+                if (isAdvanced) {
+                    if (!catAdvanced) {
+                        continue;
+                    }
+                }
+                else if (catAdvanced) {
+                    tb.insertBefore(category, cat);
+                    break;
+                }
+                if (parseInt(cat.getAttribute("weight") || "50") < nsWeight) {
+                    tb.insertBefore(category, cat);
+                    break;
+                }
+            }
+            if (ci == categories.length)
+                tb.appendChild(category);
+        }
+        function getOrAddSubcategoryByWeight(parent, name, nameid, weight, colour, iconClass) {
+            var existing = blocks_6.getFirstChildWithAttr(parent, "category", "nameid", nameid.toLowerCase());
+            if (existing) {
+                return existing;
+            }
+            var newCategory = createCategoryElement(name, nameid, weight, colour, iconClass);
+            var siblings = parent.getElementsByTagName("category");
+            var ci = 0;
+            for (ci = 0; ci < siblings.length; ++ci) {
+                var cat = siblings[ci];
+                if (parseInt(cat.getAttribute("weight") || "50") < weight) {
+                    parent.insertBefore(newCategory, cat);
+                    break;
+                }
+            }
+            if (ci == siblings.length)
+                parent.appendChild(newCategory);
+            return newCategory;
+        }
+        function getOrAddSubcategoryByName(parent, name, nameid, colour, iconClass) {
+            var existing = blocks_6.getFirstChildWithAttr(parent, "category", "nameid", nameid.toLowerCase());
+            if (existing) {
+                return existing;
+            }
+            var newCategory = createCategoryElement(name, nameid, 100, colour, iconClass);
+            var siblings = parent.getElementsByTagName("category");
+            var filtered = [];
+            var ci = 0;
+            var inserted = false;
+            var last = undefined;
+            for (ci = 0; ci < siblings.length; ++ci) {
+                var cat = siblings[ci];
+                var sibWeight = parseInt(cat.getAttribute("weight") || "50");
+                if (sibWeight >= 1000) {
+                    continue;
+                }
+                else if (sibWeight === 1) {
+                    last = cat;
+                    break;
+                }
+                filtered.push(cat);
+                if (!inserted && cat.getAttribute("name").localeCompare(name) >= 0) {
+                    parent.insertBefore(newCategory, cat);
+                    filtered.splice(filtered.length - 1, 0, newCategory);
+                    inserted = true;
+                }
+            }
+            if (!inserted) {
+                filtered.push(newCategory);
+                if (last) {
+                    parent.insertBefore(newCategory, last);
+                }
+                else {
+                    parent.appendChild(newCategory);
+                }
+            }
+            filtered.forEach(function (e, i) {
+                e.setAttribute("weight", (200 - i).toString());
+            });
+            return newCategory;
+        }
+        function injectBlockDefinition(info, fn, params, blockXml) {
+            var id = fn.attributes.blockId;
+            if (builtinBlocks[id]) {
+                pxt.reportError("blocks", 'trying to override builtin block', { "details": id });
+                return false;
+            }
+            var hash = JSON.stringify(fn);
+            if (cachedBlocks[id] && cachedBlocks[id].hash == hash) {
+                return true;
+            }
+            if (Blockly.Blocks[fn.attributes.blockId]) {
+                console.error("duplicate block definition: " + id);
+                return false;
+            }
+            var cachedBlock = {
+                hash: hash,
+                fn: fn,
+                block: {
+                    codeCard: mkCard(fn, blockXml),
+                    init: function () { initBlock(this, info, fn, params); }
+                }
+            };
+            cachedBlocks[id] = cachedBlock;
+            Blockly.Blocks[id] = cachedBlock.block;
+            return true;
+        }
+        function initField(i, ni, fn, ns, pre, right, type, nsinfo) {
+            if (pre && pre.indexOf('`') > -1) {
+                // parse and create icon fields for every inline icon
+                var regex = /([^`]+|(`([^`]+)`))/gi;
+                var match = void 0;
+                while (match = regex.exec(pre)) {
+                    var img = void 0;
+                    if (match[3] && (img = iconToFieldImage(match[3]))) {
+                        i.appendField(img);
+                    }
+                    else {
+                        i.appendField(match[1]);
+                    }
+                }
+            }
+            else if (pre)
+                i.appendField(pre);
+            if (right)
+                i.setAlign(Blockly.ALIGN_LEFT);
+            // Ignore generic types
+            if (type && type != "T") {
+                if (arrayTypeRegex.test(type)) {
+                    // All array types get the same check regardless of their subtype
+                    i.setCheck("Array");
+                }
+                else {
+                    i.setCheck(type);
+                }
+            }
+            return i;
+        }
+        function cleanOuterHTML(el) {
+            // remove IE11 junk
+            return el.outerHTML.replace(/^<\?[^>]*>/, '');
+        }
+        function mkCard(fn, blockXml) {
+            return {
+                name: fn.namespace + '.' + fn.name,
+                shortName: fn.name,
+                description: fn.attributes.jsDoc,
+                url: fn.attributes.help ? 'reference/' + fn.attributes.help.replace(/^\//, '') : undefined,
+                blocksXml: "<xml xmlns=\"http://www.w3.org/1999/xhtml\">" + cleanOuterHTML(blockXml) + "</xml>",
+            };
+        }
+        function isSubtype(apis, specific, general) {
+            if (specific == general)
+                return true;
+            var inf = apis.byQName[specific];
+            if (inf && inf.extendsTypes)
+                return inf.extendsTypes.indexOf(general) >= 0;
+            return false;
+        }
+        function initBlock(block, info, fn, params) {
+            var _this = this;
+            var attrNames = params.attrNames, handlerArgs = params.handlerArgs;
+            var ns = (fn.attributes.blockNamespace || fn.namespace).split('.')[0];
+            var instance = fn.kind == pxtc.SymbolKind.Method || fn.kind == pxtc.SymbolKind.Property;
+            var nsinfo = info.apis.byQName[ns];
+            var color = fn.attributes.color
+                || (nsinfo ? nsinfo.attributes.color : undefined)
+                || getNamespaceColor(ns.toLowerCase())
+                || 255;
+            if (fn.attributes.help)
+                block.setHelpUrl("/reference/" + fn.attributes.help.replace(/^\//, ''));
+            else if (fn.pkg && !pxt.appTarget.bundledpkgs[fn.pkg]) {
+                var anchor = fn.qName.toLowerCase().split('.');
+                if (anchor[0] == fn.pkg)
+                    anchor.shift();
+                block.setHelpUrl("/pkg/" + fn.pkg + "#" + encodeURIComponent(anchor.join('-')));
+            }
+            block.setTooltip(fn.attributes.jsDoc);
+            block.setColour(color, fn.attributes.colorSecondary, fn.attributes.colorTertiary);
+            var blockShape = Blockly.OUTPUT_SHAPE_ROUND;
+            if (fn.retType == "boolean")
+                blockShape = Blockly.OUTPUT_SHAPE_HEXAGONAL;
+            block.setOutputShape(blockShape);
+            if (fn.attributes.undeletable)
+                block.setDeletable(false);
+            blocks_6.parseFields(fn.attributes.block).map(function (field) {
+                var i;
+                if (!field.p) {
+                    i = initField(block.appendDummyInput(), field.ni, fn, nsinfo, field.n);
+                }
+                else {
+                    // find argument
+                    var pre = field.pre;
+                    var p_1 = field.p;
+                    var n = Object.keys(attrNames).filter(function (k) { return attrNames[k].name == p_1; })[0];
+                    if (!n) {
+                        console.error("block " + fn.attributes.blockId + ": unkown parameter " + p_1);
+                        return;
+                    }
+                    var pr_1 = attrNames[n];
+                    var typeInfo_1 = pxt.U.lookup(info.apis.byQName, pr_1.type);
+                    var isEnum_1 = typeInfo_1 && typeInfo_1.kind == pxtc.SymbolKind.Enum;
+                    var isFixed = typeInfo_1 && !!typeInfo_1.attributes.fixedInstances && !pr_1.shadowType;
+                    var customField = (fn.attributes.paramFieldEditor && fn.attributes.paramFieldEditor[p_1]);
+                    var fieldLabel = pr_1.name.charAt(0).toUpperCase() + pr_1.name.slice(1);
+                    var fieldType = pr_1.type;
+                    if (isEnum_1 || isFixed) {
+                        var syms = pxt.Util.values(info.apis.byQName)
+                            .filter(function (e) {
+                            return isEnum_1 ? e.namespace == pr_1.type
+                                : (e.kind == pxtc.SymbolKind.Variable
+                                    && e.attributes.fixedInstance
+                                    && isSubtype(info.apis, e.retType, typeInfo_1.qName));
+                        });
+                        if (syms.length == 0) {
+                            console.error("no instances of " + typeInfo_1.qName + " found");
+                        }
+                        var dd = syms.map(function (v) {
+                            var k = v.attributes.block || v.attributes.blockId || v.name;
+                            return [
+                                v.attributes.iconURL || v.attributes.blockImage ? {
+                                    src: v.attributes.iconURL || pxt.Util.pathJoin(pxt.webConfig.commitCdnUrl, "blocks/" + v.namespace.toLowerCase() + "/" + v.name.toLowerCase() + ".png"),
+                                    alt: k,
+                                    width: 36,
+                                    height: 36,
+                                    value: v.name
+                                } : k,
+                                v.namespace + "." + v.name
+                            ];
+                        });
+                        i = initField(block.appendDummyInput(), field.ni, fn, nsinfo, pre, true);
+                        // if a value is provided, move it first
+                        if (pr_1.shadowValue) {
+                            var shadowValueIndex_1 = -1;
+                            dd.some(function (v, i) {
+                                if (v[1] === pr_1.shadowValue) {
+                                    shadowValueIndex_1 = i;
+                                    return true;
+                                }
+                                return false;
+                            });
+                            if (shadowValueIndex_1 > -1) {
+                                var shadowValue = dd.splice(shadowValueIndex_1, 1)[0];
+                                dd.unshift(shadowValue);
+                            }
+                        }
+                        if (customField) {
+                            var defl = fn.attributes.paramDefl[pr_1.name] || "";
+                            var options_1 = {
+                                data: dd,
+                                colour: color,
+                                label: fieldLabel,
+                                type: fieldType
+                            };
+                            pxt.Util.jsonMergeFrom(options_1, fn.attributes.paramFieldEditorOptions && fn.attributes.paramFieldEditorOptions[pr_1.name] || {});
+                            i.appendField(blocks_6.createFieldEditor(customField, defl, options_1), attrNames[n].name);
+                        }
+                        else
+                            i.appendField(new Blockly.FieldDropdown(dd), attrNames[n].name);
+                    }
+                    else if (customField) {
+                        i = initField(block.appendDummyInput(), field.ni, fn, nsinfo, pre, true);
+                        var defl = fn.attributes.paramDefl[pr_1.name] || "";
+                        var options_2 = {
+                            colour: color,
+                            label: fieldLabel,
+                            type: fieldType
+                        };
+                        pxt.Util.jsonMergeFrom(options_2, fn.attributes.paramFieldEditorOptions && fn.attributes.paramFieldEditorOptions[pr_1.name] || {});
+                        i.appendField(blocks_6.createFieldEditor(customField, defl, options_2), attrNames[n].name);
+                    }
+                    else if (instance && n == "this") {
+                        if (!fn.attributes.defaultInstance) {
+                            i = initField(block.appendValueInput(p_1), field.ni, fn, nsinfo, pre, true, pr_1.type);
+                        }
+                    }
+                    else if (pr_1.type == "number") {
+                        if (pr_1.shadowType && pr_1.shadowType == "value") {
+                            i = block.appendDummyInput();
+                            if (pre)
+                                i.appendField(pre);
+                            i.appendField(new Blockly.FieldTextInput("0", Blockly.FieldTextInput.numberValidator), p_1);
+                        }
+                        else
+                            i = initField(block.appendValueInput(p_1), field.ni, fn, nsinfo, pre, true, "Number");
+                    }
+                    else if (pr_1.type == "boolean") {
+                        i = initField(block.appendValueInput(p_1), field.ni, fn, nsinfo, pre, true, "Boolean");
+                    }
+                    else if (pr_1.type == "string") {
+                        i = initField(block.appendValueInput(p_1), field.ni, fn, nsinfo, pre, true, "String");
+                    }
+                    else {
+                        i = initField(block.appendValueInput(p_1), field.ni, fn, nsinfo, pre, true, pr_1.type);
+                    }
+                }
+            });
+            var hasHandler = false;
+            if (handlerArgs.length) {
+                hasHandler = true;
+                if (fn.attributes.optionalVariableArgs) {
+                    initVariableArgsBlock(block, handlerArgs);
+                }
+                else {
+                    var i_2 = block.appendDummyInput();
+                    handlerArgs.forEach(function (arg) {
+                        i_2.appendField(new Blockly.FieldVariable(arg.name), "HANDLER_" + arg.name);
+                    });
+                }
+            }
+            if (fn.attributes.mutate) {
+                blocks_6.addMutation(block, fn, fn.attributes.mutate);
+            }
+            else if (fn.attributes.defaultInstance) {
+                blocks_6.addMutation(block, fn, blocks_6.MutatorTypes.DefaultInstanceMutator);
+            }
+            var oldMutationToDom = block.mutationToDom;
+            var oldDomToMutation = block.domToMutation;
+            block.mutationToDom = function () {
+                var retVal = oldMutationToDom ? oldMutationToDom.call(_this) : document.createElement('mutation');
+                block.inputList.forEach(function (input) {
+                    input.fieldRow.forEach(function (fieldRow) {
+                        if (fieldRow.isFieldCustom_ && fieldRow.saveOptions) {
+                            var getOptions = fieldRow.saveOptions();
+                            retVal.setAttribute("customfield", JSON.stringify(getOptions));
+                        }
+                    });
+                });
+                return retVal;
+            };
+            block.domToMutation = function (mutation) {
+                if (oldDomToMutation)
+                    oldDomToMutation.call(_this, mutation);
+                block.inputList.forEach(function (input) {
+                    input.fieldRow.forEach(function (fieldRow) {
+                        if (fieldRow.isFieldCustom_ && fieldRow.restoreOptions) {
+                            var options_3 = JSON.parse(mutation.getAttribute("customfield"));
+                            fieldRow.restoreOptions(options_3);
+                        }
+                    });
+                });
+            };
+            if (fn.attributes.imageLiteral) {
+                for (var r = 0; r < 5; ++r) {
+                    var ri = block.appendDummyInput();
+                    for (var c = 0; c < fn.attributes.imageLiteral * 5; ++c) {
+                        if (c > 0 && c % 5 == 0)
+                            ri.appendField("  ");
+                        else if (c > 0)
+                            ri.appendField(" ");
+                        ri.appendField(new Blockly.FieldCheckbox("FALSE"), "LED" + c + r);
+                    }
+                }
+            }
+            if (fn.attributes.inlineInputMode === "external") {
+                block.setInputsInline(false);
+            }
+            else if (fn.attributes.inlineInputMode === "inline") {
+                block.setInputsInline(true);
+            }
+            else {
+                block.setInputsInline(fn.parameters.length < 4 && !fn.attributes.imageLiteral);
+            }
+            var body = fn.parameters ? fn.parameters.filter(function (pr) { return pr.type == "() => void"; })[0] : undefined;
+            if (body || hasHandler) {
+                block.appendStatementInput("HANDLER")
+                    .setCheck("null");
+                block.setInputsInline(true);
+            }
+            switch (fn.retType) {
+                case "number":
+                    block.setOutput(true, "Number");
+                    break;
+                case "string":
+                    block.setOutput(true, "String");
+                    break;
+                case "boolean":
+                    block.setOutput(true, "Boolean");
+                    break;
+                case "void": break; // do nothing
+                //TODO
+                default:
+                    if (arrayTypeRegex.test(fn.retType)) {
+                        block.setOutput(true, "Array");
+                    }
+                    else {
+                        block.setOutput(true, fn.retType !== "T" ? fn.retType : undefined);
+                    }
+            }
+            // hook up/down if return value is void
+            var hasHandlers = hasArrowFunction(fn);
+            block.setPreviousStatement(!(hasHandlers && !fn.attributes.handlerStatement) && fn.retType == "void");
+            block.setNextStatement(!(hasHandlers && !fn.attributes.handlerStatement) && fn.retType == "void");
+            block.setTooltip(fn.attributes.jsDoc);
+        }
+        function hasArrowFunction(fn) {
+            var r = fn.parameters
+                ? fn.parameters.filter(function (pr) { return /^\([^\)]*\)\s*=>/.test(pr.type); })[0]
+                : undefined;
+            return !!r;
+        }
+        blocks_6.hasArrowFunction = hasArrowFunction;
+        function removeCategory(tb, name) {
+            var e = categoryElement(tb, name);
+            if (e && e.parentNode)
+                e.parentNode.removeChild(e);
+        }
+        function initVariableArgsBlock(b, handlerArgs) {
+            pxt.U.assert(!b.domToMutation);
+            pxt.U.assert(!b.mutationToDom);
+            var currentlyVisible = 0;
+            var actuallyVisible = 0;
+            var i = b.appendDummyInput();
+            var updateShape = function () {
+                if (currentlyVisible === actuallyVisible) {
+                    return;
+                }
+                if (currentlyVisible > actuallyVisible) {
+                    var diff = currentlyVisible - actuallyVisible;
+                    for (var j = 0; j < diff; j++) {
+                        var arg = handlerArgs[actuallyVisible + j];
+                        i.insertFieldAt(i.fieldRow.length - 1, new Blockly.FieldVariable(arg.name), "HANDLER_" + arg.name);
+                    }
+                }
+                else {
+                    var diff = actuallyVisible - currentlyVisible;
+                    for (var j = 0; j < diff; j++) {
+                        var arg = handlerArgs[actuallyVisible - j - 1];
+                        i.removeField("HANDLER_" + arg.name);
+                    }
+                }
+                if (currentlyVisible >= handlerArgs.length) {
+                    i.removeField("_HANDLER_ADD");
+                }
+                else if (actuallyVisible >= handlerArgs.length) {
+                    addPlusButton();
+                }
+                actuallyVisible = currentlyVisible;
+            };
+            Blockly.Extensions.apply('inline-svgs', b, false);
+            addPlusButton();
+            b.domToMutation = function (element) {
+                var numArgs = parseInt(element.getAttribute("numargs"));
+                currentlyVisible = Math.min(isNaN(numArgs) ? 0 : numArgs, handlerArgs.length);
+                updateShape();
+                for (var j = 0; j < currentlyVisible; j++) {
+                    var varName = element.getAttribute("arg" + j);
+                    b.setFieldValue(varName, "HANDLER_" + handlerArgs[j].name);
+                }
+            };
+            b.mutationToDom = function () {
+                var mut = document.createElement("mutation");
+                mut.setAttribute("numArgs", currentlyVisible.toString());
+                for (var j = 0; j < currentlyVisible; j++) {
+                    var varName = b.getFieldValue("HANDLER_" + handlerArgs[j].name);
+                    mut.setAttribute("arg" + j, varName);
+                }
+                return mut;
+            };
+            function addPlusButton() {
+                i.appendField(new Blockly.FieldImage(b.ADD_IMAGE_DATAURI, 24, 24, false, lf("Add argument"), function () {
+                    currentlyVisible = Math.min(currentlyVisible + 1, handlerArgs.length);
+                    updateShape();
+                }), "_HANDLER_ADD");
+            }
+        }
+        (function (FilterState) {
+            FilterState[FilterState["Hidden"] = 0] = "Hidden";
+            FilterState[FilterState["Visible"] = 1] = "Visible";
+            FilterState[FilterState["Disabled"] = 2] = "Disabled";
+        })(blocks_6.FilterState || (blocks_6.FilterState = {}));
+        var FilterState = blocks_6.FilterState;
+        function createToolbox(blockInfo, toolbox, showCategories, filters, extensions) {
+            if (showCategories === void 0) { showCategories = CategoryMode.Basic; }
+            init();
+            // create new toolbox and update block definitions
+            var tb = toolbox ? toolbox.cloneNode(true) : undefined;
+            blockInfo.blocks.sort(function (f1, f2) {
+                var ns1 = blockInfo.apis.byQName[f1.attributes.blockNamespace || f1.namespace.split('.')[0]];
+                var ns2 = blockInfo.apis.byQName[f2.attributes.blockNamespace || f2.namespace.split('.')[0]];
+                if (ns1 && !ns2)
+                    return -1;
+                if (ns2 && !ns1)
+                    return 1;
+                var c = 0;
+                if (ns1 && ns2) {
+                    c = (ns2.attributes.weight || 50) - (ns1.attributes.weight || 50);
+                    if (c != 0)
+                        return c;
+                }
+                c = (f2.attributes.weight || 50) - (f1.attributes.weight || 50);
+                return c;
+            });
+            searchElementCache = {};
+            usedBlocks = {};
+            var currentBlocks = {};
+            var showAdvanced = false;
+            var dbg = pxt.options.debug;
+            // create new toolbox and update block definitions
+            blockInfo.blocks
+                .filter(function (fn) { return !tb || !blocks_6.getFirstChildWithAttr(tb, "block", "type", fn.attributes.blockId); })
+                .forEach(function (fn) {
+                if (fn.attributes.blockBuiltin) {
+                    pxt.Util.assert(!!builtinBlocks[fn.attributes.blockId]);
+                    builtinBlocks[fn.attributes.blockId].symbol = fn;
+                }
+                else {
+                    var pnames = blocks_6.parameterNames(fn);
+                    var block = createToolboxBlock(blockInfo, fn, pnames);
+                    if (injectBlockDefinition(blockInfo, fn, pnames, block)) {
+                        if (tb && (!fn.attributes.debug || dbg))
+                            injectToolbox(tb, blockInfo, fn, block, showCategories, pnames);
+                        currentBlocks[fn.attributes.blockId] = 1;
+                        if (!showAdvanced && !fn.attributes.blockHidden && !fn.attributes.deprecated) {
+                            var ns = (fn.attributes.blockNamespace || fn.namespace).split('.')[0];
+                            var nsn = blockInfo.apis.byQName[ns];
+                            showAdvanced = showAdvanced || (nsn && nsn.attributes.advanced);
+                        }
+                    }
+                }
+            });
+            // remove unused blocks
+            Object
+                .keys(cachedBlocks).filter(function (k) { return !currentBlocks[k]; })
+                .forEach(function (k) { return removeBlock(cachedBlocks[k].fn); });
+            // add extra blocks
+            if (tb && pxt.appTarget.runtime) {
+                var extraBlocks = pxt.appTarget.runtime.extraBlocks || [];
+                extraBlocks.push({
+                    namespace: pxt.appTarget.runtime.onStartNamespace || "loops",
+                    weight: pxt.appTarget.runtime.onStartWeight || 10,
+                    type: ts.pxtc.ON_START_TYPE
+                });
+                extraBlocks.forEach(function (eb) {
+                    var el = document.createElement("block");
+                    el.setAttribute("type", eb.type);
+                    el.setAttribute("weight", (eb.weight || 50).toString());
+                    if (eb.gap)
+                        el.setAttribute("gap", eb.gap.toString());
+                    if (eb.fields) {
+                        for (var f in eb.fields) {
+                            var fe = document.createElement("field");
+                            fe.setAttribute("name", f);
+                            fe.appendChild(document.createTextNode(eb.fields[f]));
+                            el.appendChild(fe);
+                        }
+                    }
+                    if (showCategories !== CategoryMode.None) {
+                        var cat = categoryElement(tb, eb.namespace);
+                        if (cat) {
+                            insertBlock(el, cat, eb.weight);
+                        }
+                        else {
+                            console.error("trying to add block " + eb.type + " to unknown category " + eb.namespace);
+                        }
+                    }
+                    else {
+                        tb.appendChild(el);
+                    }
+                });
+            }
+            // Add extension categories
+            if (tb && extensions && extensions.length > 0) {
+                // Add extensions buttons
+                extensions.forEach(function (config) {
+                    var name = config.name;
+                    var color = config.extension.color || '#7f8c8d';
+                    var label = config.extension.label ? pxt.Util.rlf(config.extension.label) : pxt.Util.lf("Editor");
+                    var button = goog.dom.createDom('button');
+                    button.setAttribute('text', label);
+                    button.setAttribute('callbackkey', "EXT" + name + "_BUTTON");
+                    var namespace = config.extension.namespace || name;
+                    var isAdvanced = config.extension.advanced || false;
+                    var insertButtonAtTop = function (button, cat) {
+                        var first;
+                        for (var i = 0; i < cat.childNodes.length; i++) {
+                            var n = cat.childNodes.item(i);
+                            if (n.tagName === "block") {
+                                first = n;
+                                break;
+                            }
+                        }
+                        if (first) {
+                            cat.insertBefore(button, first);
+                        }
+                        else {
+                            cat.appendChild(button);
+                        }
+                    };
+                    if (showCategories !== CategoryMode.None) {
+                        if (showCategories === CategoryMode.All || showCategories == CategoryMode.Basic && !isAdvanced) {
+                            var cat = categoryElement(tb, namespace);
+                            if (cat) {
+                                insertButtonAtTop(button, cat);
+                            }
+                            else {
+                                // Create a new category
+                                var cat_1 = createCategoryElement(pxt.Util.rlf("{id:category}" + name), name, 55, color, 'blocklyTreeIconextensions');
+                                insertTopLevelCategory(cat_1, tb, 55, false);
+                                insertButtonAtTop(button, cat_1);
+                            }
+                        }
+                    }
+                    else {
+                        tb.appendChild(button);
+                    }
+                });
+            }
+            if (tb && showCategories !== CategoryMode.None) {
+                // remove unused categories
+                var config = pxt.appTarget.runtime || {};
+                initBuiltinCategoryXml("Math", !config.mathBlocks);
+                initBuiltinCategoryXml("Variables", !config.variablesBlocks);
+                initBuiltinCategoryXml("Logic", !config.logicBlocks);
+                initBuiltinCategoryXml("Loops", !config.loopsBlocks);
+                initBuiltinCategoryXml("Text", !config.textBlocks);
+                initBuiltinCategoryXml("Arrays", !config.listsBlocks);
+                initBuiltinCategoryXml("Functions", !config.functionBlocks);
+                if (!config.listsBlocks && config.loopsBlocks) {
+                    var cat = categoryElement(tb, "Loops");
+                    if (cat) {
+                        cat.removeChild(blocks_6.getFirstChildWithAttr(cat, "block", "type", "controls_for_of"));
+                    }
+                }
+                // Load localized names for default categories
+                var cats = tb.getElementsByTagName('category');
+                for (var i = 0; i < cats.length; i++) {
+                    cats[i].setAttribute('name', pxt.Util.rlf("{id:category}" + cats[i].getAttribute('name'), []));
+                    // Append Namespace CSS
+                    appendNamespaceCss(cats[i].getAttribute('name'), cats[i].getAttribute('colour'));
+                }
+                // update category colors and add heading
+                var topCats = blocks_6.getDirectChildren(tb, "category");
+                for (var i = 0; i < topCats.length; i++) {
+                    var nsColor = getNamespaceColor(topCats[i].getAttribute('nameid'));
+                    if (nsColor && nsColor != "") {
+                        topCats[i].setAttribute('colour', nsColor);
+                        // Update subcategory colours
+                        var subCats = getChildCategories(topCats[i]);
+                        for (var j = 0; j < subCats.length; j++) {
+                            subCats[j].setAttribute('colour', nsColor);
+                        }
+                    }
+                    if (!pxt.appTarget.appTheme.hideFlyoutHeadings) {
+                        // Add the Heading label
+                        var headingLabel = goog.dom.createDom('label');
+                        headingLabel.setAttribute('text', topCats[i].getAttribute('name'));
+                        headingLabel.setAttribute('web-class', 'blocklyFlyoutHeading');
+                        headingLabel.setAttribute('web-icon-color', topCats[i].getAttribute('colour'));
+                        var icon = topCats[i].getAttribute('web-icon');
+                        var iconClass = topCats[i].getAttribute('web-icon-class');
+                        if (icon) {
+                            if (icon.length === 1) {
+                                headingLabel.setAttribute('web-icon', icon);
+                                if (iconClass)
+                                    headingLabel.setAttribute('web-icon-class', iconClass);
+                            }
+                            else {
+                                toolboxStyleBuffer += "\n                                .blocklyFlyoutLabelIcon.blocklyFlyoutIcon" + topCats[i].getAttribute('name') + " {\n                                    display: inline-block !important;\n                                    background-image: url(\"" + pxt.Util.pathJoin(pxt.webConfig.commitCdnUrl, encodeURI(icon)) + "\")!important;\n                                    width: 1em;\n                                    height: 1em;\n                                    background-size: 1em!important;\n                                }\n                            ";
+                                injectToolboxIconCss();
+                                headingLabel.setAttribute('web-icon-class', "blocklyFlyoutIcon" + topCats[i].getAttribute('name'));
+                            }
+                        }
+                        topCats[i].insertBefore(headingLabel, topCats[i].firstChild);
+                        // Add subcategory labels
+                        var subCats = getChildCategories(topCats[i]);
+                        for (var j = 0; j < subCats.length; j++) {
+                            var subHeadingLabel = goog.dom.createDom('label');
+                            subHeadingLabel.setAttribute('text', topCats[i].getAttribute('name') + " > " + subCats[j].getAttribute('name'));
+                            subHeadingLabel.setAttribute('web-class', 'blocklyFlyoutHeading');
+                            subHeadingLabel.setAttribute('web-icon-color', topCats[i].getAttribute('colour'));
+                            subCats[j].insertBefore(subHeadingLabel, subCats[j].firstChild);
+                            if (icon) {
+                                if (icon.length == 1) {
+                                    subHeadingLabel.setAttribute('web-icon', icon);
+                                    if (iconClass)
+                                        subHeadingLabel.setAttribute('web-icon-class', iconClass);
+                                }
+                                else {
+                                    subHeadingLabel.setAttribute('web-icon-class', "blocklyFlyoutIcon" + topCats[i].getAttribute('name'));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            // Do not remove this comment.
+            // These are used for category names.
+            // lf("{id:category}Loops")
+            // lf("{id:category}Logic")
+            // lf("{id:category}Variables")
+            // lf("{id:category}Math")
+            // lf("{id:category}Advanced")
+            // lf("{id:category}Functions")
+            // lf("{id:category}Arrays")
+            // lf("{id:category}Text")
+            // lf("{id:category}Search")
+            // lf("{id:category}More\u2026")
+            // update shadow types
+            if (tb) {
+                $(tb).find('shadow:empty').each(function (i, shadow) {
+                    var type = shadow.getAttribute('type');
+                    var b = $(tb).find("block[type=\"" + type + "\"]")[0];
+                    if (b)
+                        shadow.innerHTML = b.innerHTML;
+                });
+            }
+            // Add the "Advanced" category
+            if (showAdvanced && tb && showCategories !== CategoryMode.None) {
+                var cat = createCategoryElement(advancedTitle(), "Advanced", 1, getNamespaceColor('advanced'), showCategories === CategoryMode.Basic ? 'blocklyTreeIconadvancedcollapsed' : 'blocklyTreeIconadvancedexpanded');
+                insertTopLevelCategory(document.createElement("sep"), tb, 1.5, false);
+                insertTopLevelCategory(cat, tb, 1, false);
+            }
+            if (tb && (!showAdvanced || showCategories === CategoryMode.All) && pxt.appTarget.cloud && pxt.appTarget.cloud.packages) {
+                if (!showAdvanced) {
+                    insertTopLevelCategory(document.createElement("sep"), tb, 1.5, false);
+                }
+                // Add the "Add package" category
+                getOrAddSubcategoryByWeight(tb, addPackageTitle(), "Extensions", 1, "#717171", 'blocklyTreeIconaddpackage');
+            }
+            if (tb) {
+                var blocks_7 = tb.getElementsByTagName("block");
+                for (var i = 0; i < blocks_7.length; i++) {
+                    usedBlocks[blocks_7.item(i).getAttribute("type")] = true;
+                }
+                updateUsedBlocks = true;
+            }
+            // Filter the blocks
+            if (tb && filters) {
+                function filterBlocks(blocks, defaultState) {
+                    var hasChild = false;
+                    for (var bi = 0; bi < blocks.length; ++bi) {
+                        var blk = blocks.item(bi);
+                        var type = blk.getAttribute("type");
+                        var blockState = filters.blocks && filters.blocks[type] != undefined ? filters.blocks[type] : (defaultState != undefined ? defaultState : filters.defaultState);
+                        switch (blockState) {
+                            case FilterState.Hidden:
+                                blk.parentNode.removeChild(blk);
+                                --bi;
+                                break;
+                            case FilterState.Disabled:
+                                blk.setAttribute("disabled", "true");
+                                break;
+                            case FilterState.Visible:
+                                hasChild = true;
+                                break;
+                        }
+                    }
+                    return hasChild;
+                }
+                if (showCategories !== CategoryMode.None) {
+                    // Go through namespaces and keep the ones with an override
+                    var categories = tb.getElementsByTagName("category");
+                    for (var ci = 0; ci < categories.length; ++ci) {
+                        var cat = categories.item(ci);
+                        var catName = cat.getAttribute("nameid");
+                        if (catName === "more" || catName === "advanced") {
+                            continue;
+                        }
+                        // The variables category is special and won't have any children so we
+                        // need to check manually
+                        if (catName === "variables" && (!filters.blocks ||
+                            filters.blocks["variables_set"] ||
+                            filters.blocks["variables_get"] ||
+                            filters.blocks["variables_change"]) &&
+                            (!filters.namespaces || filters.namespaces["variables"] !== FilterState.Disabled)) {
+                            continue;
+                        }
+                        var categoryState = filters.namespaces && filters.namespaces[catName] != undefined ? filters.namespaces[catName] : filters.defaultState;
+                        var blocks_8 = cat.getElementsByTagName("block");
+                        var hasVisibleChildren = (catName == "variables" && filters.blocks)
+                            ? filters.blocks["variables_get"] || filters.blocks["variables_set"]
+                            : filterBlocks(blocks_8, categoryState);
+                        switch (categoryState) {
+                            case FilterState.Disabled:
+                                if (!hasVisibleChildren) {
+                                    cat.setAttribute("disabled", "true");
+                                    // disable sub categories
+                                    var subcategories = cat.getElementsByTagName("category");
+                                    for (var si = 0; si < subcategories.length; ++si) {
+                                        subcategories.item(si).setAttribute("disabled", "true");
+                                    }
+                                }
+                                break;
+                            case FilterState.Visible:
+                            case FilterState.Hidden:
+                                if (!hasVisibleChildren) {
+                                    cat.parentNode.removeChild(cat);
+                                    --ci;
+                                }
+                                break;
+                        }
+                    }
+                    // If advanced has no children, remove the category
+                    for (var ci = 0; ci < categories.length; ++ci) {
+                        var cat = categories.item(ci);
+                        var catName = cat.getAttribute("nameid");
+                        if (catName == "advanced" && cat.childNodes.length == 0) {
+                            cat.parentNode.removeChild(cat);
+                            --ci;
+                            // Remove separator
+                            var sep = tb.getElementsByTagName("sep")[0];
+                            sep.parentNode.removeChild(sep);
+                        }
+                        else {
+                            continue;
+                        }
+                    }
+                }
+                else {
+                    var blocks_9 = tb.getElementsByTagName("block");
+                    filterBlocks(blocks_9);
+                }
+                if (showCategories !== CategoryMode.None) {
+                    // Go through all categories, hide the ones that have no blocks inside
+                    var categories = tb.getElementsByTagName("category");
+                    for (var ci = 0; ci < categories.length; ++ci) {
+                        var cat = categories.item(ci);
+                        var catName = cat.getAttribute("nameid");
+                        // Don't do this for special blockly categories
+                        if (catName == "variables" || catName == "functions" || catName == "advanced")
+                            continue;
+                        var blockCount = cat.getElementsByTagName("block");
+                        if (blockCount.length == 0) {
+                            if (cat.parentNode)
+                                cat.parentNode.removeChild(cat);
+                        }
+                    }
+                }
+            }
+            // Rearrange blocks in the flyout and add group labels
+            if (tb) {
+                var categories = tb.getElementsByTagName("category");
+                var _loop_1 = function(ci) {
+                    var cat = categories.item(ci);
+                    var catName = cat.getAttribute("nameid");
+                    if (catName === "advanced")
+                        return "continue";
+                    var blocks_10 = blocks_6.getDirectChildren(cat, "block");
+                    var groups = cat.getAttribute("groups");
+                    var labelLineWidth = cat.getAttribute("labellinewidth");
+                    var blockGroups = {};
+                    var sortedGroups = [];
+                    if (groups)
+                        sortedGroups = groups.split(', ');
+                    // Organize the blocks into the different groups
+                    for (var bi = 0; bi < blocks_10.length; ++bi) {
+                        var blk = blocks_10[bi];
+                        var group = blk.getAttribute("group") || 'other';
+                        if (!blockGroups[group])
+                            blockGroups[group] = [];
+                        blockGroups[group].push(blk);
+                    }
+                    if (Object.keys(blockGroups).length > 1) {
+                        // Add any missing groups to the sorted groups list
+                        Object.keys(blockGroups).sort().forEach(function (group) {
+                            if (sortedGroups.indexOf(group) == -1) {
+                                sortedGroups.push(group);
+                            }
+                        });
+                        // Add the blocks to the xmlList
+                        var xmlList_1 = [];
+                        for (var bg = 0; bg < sortedGroups.length; ++bg) {
+                            var group = sortedGroups[bg];
+                            // Check if there are any blocks in that group
+                            if (!blockGroups[group] || !blockGroups[group].length)
+                                continue;
+                            // Add the group label
+                            if (group != 'other') {
+                                var groupLabel = goog.dom.createDom('label');
+                                groupLabel.setAttribute('text', pxt.Util.rlf("{id:group}" + group));
+                                groupLabel.setAttribute('web-class', 'blocklyFlyoutGroup');
+                                groupLabel.setAttribute('web-line', '1.5');
+                                if (labelLineWidth)
+                                    groupLabel.setAttribute('web-line-width', labelLineWidth);
+                                xmlList_1.push(groupLabel);
+                            }
+                            // Add the blocks in that group
+                            if (blockGroups[group])
+                                blockGroups[group].forEach(function (groupedBlock) {
+                                    cat.removeChild(groupedBlock);
+                                    xmlList_1.push(groupedBlock);
+                                });
+                        }
+                        // Add the blocks back into the category
+                        xmlList_1.forEach(function (arrangedBlock) {
+                            cat.appendChild(arrangedBlock);
+                        });
+                    }
+                };
+                for (var ci = 0; ci < categories.length; ++ci) {
+                    var state_1 = _loop_1(ci);
+                    if (state_1 === "continue") continue;
+                }
+            }
+            return tb;
+            function initBuiltinCategoryXml(name, remove) {
+                if (remove) {
+                    removeCategory(tb, name);
+                    return;
+                }
+                var cat = categoryElement(tb, name);
+                if (cat) {
+                    var attr = cat.getAttribute("advanced");
+                    if (attr && attr !== "false") {
+                        showAdvanced = true;
+                        // Record all block usages in case this category doesn't show up
+                        // in the toolbox (i.e. advanced is collapsed)
+                        var blockElements = cat.getElementsByTagName("block");
+                        for (var i = 0; i < blockElements.length; i++) {
+                            var b = blockElements.item(i);
+                            usedBlocks[b.getAttribute("type")] = true;
+                        }
+                        if (showCategories === CategoryMode.Basic) {
+                            removeCategory(tb, name);
+                        }
+                    }
+                }
+            }
+        }
+        blocks_6.createToolbox = createToolbox;
+        function initBlocks(blockInfo, toolbox, showCategories, filters, extensions) {
+            if (showCategories === void 0) { showCategories = CategoryMode.Basic; }
+            init();
+            initTooltip(blockInfo);
+            initJresIcons(blockInfo);
+            var tb = createToolbox(blockInfo, toolbox, showCategories, filters, extensions);
+            // add trash icon to toolbox
+            if (!document.getElementById("blocklyTrashIcon")) {
+                var trashDiv = document.createElement('div');
+                trashDiv.id = "blocklyTrashIcon";
+                trashDiv.style.opacity = '0';
+                trashDiv.style.display = 'none';
+                var trashIcon = document.createElement('i');
+                trashIcon.className = 'trash icon';
+                trashDiv.appendChild(trashIcon);
+                var injectionDiv = document.getElementsByClassName('injectionDiv')[0];
+                if (injectionDiv)
+                    injectionDiv.appendChild(trashDiv);
+            }
+            return tb;
+        }
+        blocks_6.initBlocks = initBlocks;
+        function initSearch(workspace, tb, tbAll, searchAsync, updateToolbox) {
+            var blocklySearchInputField = document.getElementById('blocklySearchInputField');
+            var blocklySearchInput = document.getElementById('blocklySearchInput');
+            var blocklyHiddenSearchLabel = document.getElementById('blocklySearchLabel');
+            var origClassName = 'ui fluid icon input';
+            if (!blocklySearchInput) {
+                var blocklySearchArea = document.createElement('div');
+                blocklySearchArea.id = 'blocklySearchArea';
+                blocklySearchInput = document.createElement('div');
+                blocklySearchInput.id = 'blocklySearchInput';
+                blocklySearchInput.className = origClassName;
+                blocklySearchInput.setAttribute("role", "search");
+                blocklySearchInputField = document.createElement('input');
+                blocklySearchInputField.type = 'text';
+                blocklySearchInputField.placeholder = lf("Search...");
+                blocklySearchInputField.id = 'blocklySearchInputField';
+                blocklySearchInputField.className = 'blocklySearchInputField';
+                // Append to dom
+                var blocklySearchInputIcon = document.createElement('i');
+                blocklySearchInputIcon.className = 'search icon';
+                blocklySearchInputIcon.setAttribute("role", "presentation");
+                blocklySearchInputIcon.setAttribute("aria-hidden", "true");
+                blocklyHiddenSearchLabel = document.createElement('div');
+                blocklyHiddenSearchLabel.className = 'accessible-hidden';
+                blocklyHiddenSearchLabel.id = 'blocklySearchLabel';
+                blocklyHiddenSearchLabel.setAttribute('aria-live', "polite");
+                blocklySearchInput.appendChild(blocklySearchInputField);
+                blocklySearchInput.appendChild(blocklySearchInputIcon);
+                blocklySearchInput.appendChild(blocklyHiddenSearchLabel);
+                blocklySearchArea.appendChild(blocklySearchInput);
+                var toolboxDiv = document.getElementsByClassName('blocklyToolboxDiv')[0];
+                if (toolboxDiv)
+                    toolboxDiv.insertBefore(blocklySearchArea, toolboxDiv.firstChild);
+            }
+            var hasSearchFlyout = function () {
+                return document.getElementsByClassName('blocklyTreeIconsearch').length > 0;
+            };
+            var showSearchFlyout = function () {
+                var tree = workspace.toolbox_.tree_;
+                // Show the search flyout
+                tree.setSelectedItem(tree.getChildren()[0]);
+            };
+            pxt.blocks.cachedSearchTb = tb;
+            pxt.blocks.cachedSearchTbAll = tbAll;
+            var previousSearchTerm = '';
+            var searchChangeHandler = pxt.Util.debounce(function () {
+                var searchField = document.getElementById('blocklySearchInputField');
+                var searchFor = searchField.value.toLowerCase();
+                var blocklyHiddenSearchLabel = document.getElementById('blocklySearchLabel');
+                blocklyHiddenSearchLabel.textContent = "";
+                if (searchFor != '') {
+                    blocklySearchInput.className += ' loading';
+                    previousSearchTerm = searchFor;
+                    pxt.tickEvent("blocks.search");
+                    var searchTb_1 = pxt.blocks.cachedSearchTb ? pxt.blocks.cachedSearchTb.cloneNode(true) : undefined;
+                    var catName = 'Search';
+                    var category_2 = categoryElement(searchTb_1, catName);
+                    if (!category_2) {
+                        var categories = getChildCategories(searchTb_1);
+                        var parentCategoryList = searchTb_1;
+                        var nsWeight = 101; // Show search category on top
+                        category_2 = createCategoryElement(lf("{id:category}Search"), catName, nsWeight);
+                        category_2.setAttribute("colour", '#000');
+                        category_2.setAttribute("iconclass", 'blocklyTreeIconsearch');
+                        category_2.setAttribute("expandedclass", 'blocklyTreeIconsearch');
+                        // Insert the category based on weight
+                        var ci = 0;
+                        for (ci = 0; ci < categories.length; ++ci) {
+                            var cat = categories[ci];
+                            if (parseInt(cat.getAttribute("weight") || "50") < nsWeight) {
+                                parentCategoryList.insertBefore(category_2, cat);
+                                break;
+                            }
+                        }
+                        if (ci == categories.length)
+                            parentCategoryList.appendChild(category_2);
+                    }
+                    searchAsync({ term: searchFor, subset: updateUsedBlocks ? usedBlocks : undefined }).then(function (blocks) {
+                        pxt.log("searching for: " + searchFor);
+                        updateUsedBlocks = false;
+                        if (!blocks)
+                            return;
+                        if (blocks.length == 0) {
+                            blocklyHiddenSearchLabel.textContent = lf("No search results...");
+                        }
+                        else {
+                            blocklyHiddenSearchLabel.textContent = lf("{0} result matching '{1}'", blocks.length, blocklySearchInputField.value.toLowerCase());
+                        }
+                        if (blocks.length == 0) {
+                            var label = goog.dom.createDom('label');
+                            label.setAttribute('text', lf("No search results..."));
+                            category_2.appendChild(label);
+                            return;
+                        }
+                        blocks.forEach(function (info) {
+                            if (pxt.blocks.cachedSearchTbAll) {
+                                var type = info.id;
+                                var block = searchElementCache[type];
+                                if (!block) {
+                                    // Catches built-in blocks that aren't loaded dynamically
+                                    var existing = blocks_6.getFirstChildWithAttr(pxt.blocks.cachedSearchTbAll, "block", "type", type);
+                                    if (existing) {
+                                        block = (searchElementCache[type] = existing.cloneNode(true));
+                                    }
+                                }
+                                if (block) {
+                                    category_2.appendChild(block);
+                                }
+                            }
+                        });
+                    }).finally(function () {
+                        if (tb) {
+                            updateToolbox(searchTb_1);
+                            blocklySearchInput.className = origClassName;
+                            showSearchFlyout();
+                        }
+                    });
+                }
+                else if (previousSearchTerm != '') {
+                    // Clearing search
+                    updateToolbox(pxt.blocks.cachedSearchTb);
+                    blocklySearchInput.className = origClassName;
+                }
+                // Search
+            }, 300, false);
+            blocklySearchInputField.oninput = searchChangeHandler;
+            blocklySearchInputField.onfocus = function () {
+                blocklySearchInputField.select();
+                var searchFor = blocklySearchInputField.value.toLowerCase();
+                if (searchFor != '') {
+                    if (hasSearchFlyout())
+                        showSearchFlyout();
+                    else {
+                        previousSearchTerm = '';
+                        searchChangeHandler();
+                    }
+                }
+            };
+            if (pxt.BrowserUtils.isTouchEnabled()) {
+                blocklySearchInputField.ontouchstart = function () {
+                    blocklySearchInputField.focus();
+                };
+            }
+            // Override Blockly's toolbox keydown method to intercept characters typed and move the focus to the search input
+            Blockly.Toolbox.TreeNode.prototype.onKeyDown = function (e) {
+                var keyCode = e.which || e.keyCode;
+                var characterKey = (keyCode > 64 && keyCode < 91); // Letter keys
+                var spaceEnterKey = keyCode == 32 || keyCode == 13; // Spacebar or Enter keys
+                var ctrlCmdKey = (e.ctrlKey || e.metaKey); // Ctrl / Cmd keys
+                if (characterKey && !ctrlCmdKey) {
+                    var searchField = document.getElementById('blocklySearchInputField');
+                    var char = String.fromCharCode(keyCode);
+                    searchField.focus();
+                    searchField.value = searchField.value + char;
+                    return true;
+                }
+                else {
+                    if (this.getTree() && this.getTree().toolbox_.horizontalLayout_) {
+                        var map = {};
+                        var next = goog.events.KeyCodes.DOWN;
+                        var prev = goog.events.KeyCodes.UP;
+                        map[goog.events.KeyCodes.RIGHT] = this.rightToLeft_ ? prev : next;
+                        map[goog.events.KeyCodes.LEFT] = this.rightToLeft_ ? next : prev;
+                        map[goog.events.KeyCodes.UP] = goog.events.KeyCodes.LEFT;
+                        map[goog.events.KeyCodes.DOWN] = goog.events.KeyCodes.RIGHT;
+                        var newKeyCode = map[e.keyCode];
+                        e.keyCode = newKeyCode || e.keyCode;
+                    }
+                    return Blockly.Toolbox.TreeNode.superClass_.onKeyDown.call(this, e);
+                }
+            };
+        }
+        blocks_6.initSearch = initSearch;
+        function removeSearch() {
+            var blocklySearchArea = document.getElementById('blocklySearchArea');
+            if (blocklySearchArea) {
+                blocklySearchArea.parentNode.removeChild(blocklySearchArea);
+            }
+        }
+        blocks_6.removeSearch = removeSearch;
+        function categoryElement(tb, nameid) {
+            return tb ? blocks_6.getFirstChildWithAttr(tb, "category", "nameid", nameid.toLowerCase()) : undefined;
+        }
+        function cleanBlocks() {
+            pxt.debug('removing all custom blocks');
+            for (var b in cachedBlocks)
+                removeBlock(cachedBlocks[b].fn);
+        }
+        blocks_6.cleanBlocks = cleanBlocks;
+        function removeBlock(fn) {
+            delete Blockly.Blocks[fn.attributes.blockId];
+            delete cachedBlocks[fn.attributes.blockId];
+        }
+        var blocklyInitialized = false;
+        function init() {
+            if (blocklyInitialized)
+                return;
+            blocklyInitialized = true;
+            goog.provide('Blockly.Blocks.device');
+            goog.require('Blockly.Blocks');
+            if (window.PointerEvent) {
+                Blockly.bindEvent_.TOUCH_MAP = {
+                    mousedown: 'pointerdown',
+                    mousemove: 'pointermove',
+                    mouseup: 'pointerup'
+                };
+                document.body.style.touchAction = 'none';
+            }
+            Blockly.FieldCheckbox.CHECK_CHAR = '■';
+            Blockly.BlockSvg.START_HAT = !!pxt.appTarget.appTheme.blockHats;
+            blocks_6.initFieldEditors();
+            initContextMenu();
+            initOnStart();
+            initMath();
+            initVariables();
+            initFunctions();
+            initLists();
+            initLoops();
+            initLogic();
+            initText();
+            initDrag();
+        }
+        function setBuiltinHelpInfo(block, id) {
+            var info = pxt.blocks.getBlockDefinition(id);
+            setHelpResources(block, id, info.name, info.tooltip, info.url, getNamespaceColor(info.category));
+        }
+        function installBuiltinHelpInfo(id) {
+            var info = pxt.blocks.getBlockDefinition(id);
+            installHelpResources(id, info.name, info.tooltip, info.url, getNamespaceColor(info.category));
+        }
+        function setHelpResources(block, id, name, tooltip, url, colour, colourSecondary, colourTertiary, undeletable) {
+            if (tooltip && (typeof tooltip === "string" || typeof tooltip === "function"))
+                block.setTooltip(tooltip);
+            if (url)
+                block.setHelpUrl(url);
+            if (colour)
+                block.setColour(colour, colourSecondary, colourTertiary);
+            if (undeletable)
+                block.setDeletable(false);
+            var tb = document.getElementById('blocklyToolboxDefinition');
+            var xml = tb ? blocks_6.getFirstChildWithAttr(tb, "block", "type", id) : undefined;
+            block.codeCard = {
+                header: name,
+                name: name,
+                software: 1,
+                description: goog.isFunction(tooltip) ? tooltip(block) : tooltip,
+                blocksXml: xml ? ("<xml xmlns=\"http://www.w3.org/1999/xhtml\">" + (cleanOuterHTML(xml) || "<block type=\"" + id + "\"></block>") + "</xml>") : undefined,
+                url: url
+            };
+        }
+        function installHelpResources(id, name, tooltip, url, colour, colourSecondary, colourTertiary) {
+            var block = Blockly.Blocks[id];
+            var old = block.init;
+            if (!old)
+                return;
+            block.init = function () {
+                old.call(this);
+                var block = this;
+                setHelpResources(this, id, name, tooltip, url, colour, colourSecondary, colourTertiary);
+            };
+        }
+        function initLists() {
+            var msg = Blockly.Msg;
+            // lists_create_with
+            var listsCreateWithId = "lists_create_with";
+            var listsCreateWithDef = pxt.blocks.getBlockDefinition(listsCreateWithId);
+            msg.LISTS_CREATE_EMPTY_TITLE = listsCreateWithDef.block["LISTS_CREATE_EMPTY_TITLE"];
+            msg.LISTS_CREATE_WITH_INPUT_WITH = listsCreateWithDef.block["LISTS_CREATE_WITH_INPUT_WITH"];
+            msg.LISTS_CREATE_WITH_CONTAINER_TITLE_ADD = listsCreateWithDef.block["LISTS_CREATE_WITH_CONTAINER_TITLE_ADD"];
+            msg.LISTS_CREATE_WITH_ITEM_TITLE = listsCreateWithDef.block["LISTS_CREATE_WITH_ITEM_TITLE"];
+            installBuiltinHelpInfo(listsCreateWithId);
+            // lists_length
+            var listsLengthId = "lists_length";
+            var listsLengthDef = pxt.blocks.getBlockDefinition(listsLengthId);
+            msg.LISTS_LENGTH_TITLE = listsLengthDef.block["LISTS_LENGTH_TITLE"];
+            // We have to override this block definition because the builtin block
+            // allows both Strings and Arrays in its input check and that confuses
+            // our Blockly compiler
+            var block = Blockly.Blocks[listsLengthId];
+            block.init = function () {
+                this.jsonInit({
+                    "message0": msg.LISTS_LENGTH_TITLE,
+                    "args0": [
+                        {
+                            "type": "input_value",
+                            "name": "VALUE",
+                            "check": ['Array']
+                        }
+                    ],
+                    "output": 'Number'
+                });
+            };
+            installBuiltinHelpInfo(listsLengthId);
+        }
+        function initLoops() {
+            var msg = Blockly.Msg;
+            // controls_repeat_ext
+            var controlsRepeatExtId = "controls_repeat_ext";
+            var controlsRepeatExtDef = pxt.blocks.getBlockDefinition(controlsRepeatExtId);
+            msg.CONTROLS_REPEAT_TITLE = controlsRepeatExtDef.block["CONTROLS_REPEAT_TITLE"];
+            msg.CONTROLS_REPEAT_INPUT_DO = controlsRepeatExtDef.block["CONTROLS_REPEAT_INPUT_DO"];
+            installBuiltinHelpInfo(controlsRepeatExtId);
+            // device_while
+            var deviceWhileId = "device_while";
+            var deviceWhileDef = pxt.blocks.getBlockDefinition(deviceWhileId);
+            Blockly.Blocks[deviceWhileId] = {
+                init: function () {
+                    this.jsonInit({
+                        "message0": deviceWhileDef.block["message0"],
+                        "args0": [
+                            {
+                                "type": "input_value",
+                                "name": "COND",
+                                "check": "Boolean"
+                            }
+                        ],
+                        "previousStatement": null,
+                        "nextStatement": null,
+                        "colour": getNamespaceColor('loops')
+                    });
+                    this.appendStatementInput("DO")
+                        .appendField(deviceWhileDef.block["appendField"]);
+                    setBuiltinHelpInfo(this, deviceWhileId);
+                }
+            };
+            // controls_simple_for
+            var controlsSimpleForId = "controls_simple_for";
+            var controlsSimpleForDef = pxt.blocks.getBlockDefinition(controlsSimpleForId);
+            Blockly.Blocks[controlsSimpleForId] = {
+                /**
+                 * Block for 'for' loop.
+                 * @this Blockly.Block
+                 */
+                init: function () {
+                    this.jsonInit({
+                        "message0": controlsSimpleForDef.block["message0"],
+                        "args0": [
+                            {
+                                "type": "field_variable",
+                                "name": "VAR",
+                                "variable": controlsSimpleForDef.block["variable"]
+                            },
+                            {
+                                "type": "input_value",
+                                "name": "TO",
+                                "check": "Number"
+                            }
+                        ],
+                        "previousStatement": null,
+                        "nextStatement": null,
+                        "colour": getNamespaceColor('loops'),
+                        "inputsInline": true
+                    });
+                    this.appendStatementInput('DO')
+                        .appendField(controlsSimpleForDef.block["appendField"]);
+                    var thisBlock = this;
+                    setHelpResources(this, controlsSimpleForId, controlsSimpleForDef.name, function () {
+                        return pxt.U.rlf(controlsSimpleForDef.tooltip, thisBlock.getFieldValue('VAR'));
+                    }, controlsSimpleForDef.url, String(getNamespaceColor('loops')));
+                },
+                /**
+                 * Return all variables referenced by this block.
+                 * @return {!Array.<string>} List of variable names.
+                 * @this Blockly.Block
+                 */
+                getVars: function () {
+                    return [this.getFieldValue('VAR')];
+                },
+                /**
+                 * Notification that a variable is renaming.
+                 * If the name matches one of this block's variables, rename it.
+                 * @param {string} oldName Previous name of variable.
+                 * @param {string} newName Renamed variable.
+                 * @this Blockly.Block
+                 */
+                renameVar: function (oldName, newName) {
+                    if (Blockly.Names.equals(oldName, this.getFieldValue('VAR'))) {
+                        this.setFieldValue(newName, 'VAR');
+                    }
+                },
+                /**
+                 * Add menu option to create getter block for loop variable.
+                 * @param {!Array} options List of menu options to add to.
+                 * @this Blockly.Block
+                 */
+                customContextMenu: function (options) {
+                    if (!this.isCollapsed()) {
+                        var option = { enabled: true };
+                        var name_1 = this.getFieldValue('VAR');
+                        option.text = lf("Create 'get {0}'", name_1);
+                        var xmlField = goog.dom.createDom('field', null, name_1);
+                        xmlField.setAttribute('name', 'VAR');
+                        var xmlBlock = goog.dom.createDom('block', null, xmlField);
+                        xmlBlock.setAttribute('type', 'variables_get');
+                        option.callback = Blockly.ContextMenu.callbackFactory(this, xmlBlock);
+                        options.push(option);
+                    }
+                }
+            };
+        }
+        blocks_6.onShowContextMenu = undefined;
+        /**
+         * The following patch to blockly is to add the Trash icon on top of the toolbox,
+         * the trash icon should only show when a user drags a block that is already in the workspace.
+         */
+        function initDrag() {
+            var calculateDistance = function (elemBounds, mouseX) {
+                return Math.floor(mouseX - (elemBounds.left + (elemBounds.width / 2)));
+            };
+            /**
+             * Execute a step of block dragging, based on the given event.  Update the
+             * display accordingly.
+             * @param {!Event} e The most recent move event.
+             * @param {!goog.math.Coordinate} currentDragDeltaXY How far the pointer has
+             *     moved from the position at the start of the drag, in pixel units.
+             * @package
+             */
+            var blockDrag = Blockly.BlockDragger.prototype.dragBlock;
+            Blockly.BlockDragger.prototype.dragBlock = function (e, currentDragDeltaXY) {
+                var blocklyToolboxDiv = document.getElementsByClassName('blocklyToolboxDiv')[0];
+                var blocklyTreeRoot = document.getElementsByClassName('blocklyTreeRoot')[0];
+                var trashIcon = document.getElementById("blocklyTrashIcon");
+                if (blocklyTreeRoot && trashIcon) {
+                    var distance = calculateDistance(blocklyTreeRoot.getBoundingClientRect(), e.clientX);
+                    if (distance < 200) {
+                        var opacity = distance / 200;
+                        trashIcon.style.opacity = "" + (1 - opacity);
+                        trashIcon.style.display = 'block';
+                        blocklyTreeRoot.style.opacity = "" + opacity;
+                        if (distance < 50) {
+                            blocklyToolboxDiv.classList.add('blocklyToolboxDeleting');
+                        }
+                    }
+                    else {
+                        trashIcon.style.display = 'none';
+                        blocklyTreeRoot.style.opacity = '1';
+                        blocklyToolboxDiv.classList.remove('blocklyToolboxDeleting');
+                    }
+                }
+                return blockDrag.call(this, e, currentDragDeltaXY);
+            };
+            /**
+             * Finish dragging the workspace and put everything back where it belongs.
+             * @param {!goog.math.Coordinate} currentDragDeltaXY How far the pointer has
+             *     moved from the position at the start of the drag, in pixel coordinates.
+             * @package
+             */
+            var blockEndDrag = Blockly.BlockDragger.prototype.endBlockDrag;
+            Blockly.BlockDragger.prototype.endBlockDrag = function (e, currentDragDeltaXY) {
+                blockEndDrag.call(this, e, currentDragDeltaXY);
+                var blocklyToolboxDiv = document.getElementsByClassName('blocklyToolboxDiv')[0];
+                var blocklyTreeRoot = document.getElementsByClassName('blocklyTreeRoot')[0];
+                var trashIcon = document.getElementById("blocklyTrashIcon");
+                if (trashIcon) {
+                    trashIcon.style.display = 'none';
+                    blocklyTreeRoot.style.opacity = '1';
+                    blocklyToolboxDiv.classList.remove('blocklyToolboxDeleting');
+                }
+            };
+        }
+        function initContextMenu() {
+            // Translate the context menu for blocks.
+            var msg = Blockly.Msg;
+            msg.DUPLICATE_BLOCK = lf("{id:block}Duplicate");
+            msg.REMOVE_COMMENT = lf("Remove Comment");
+            msg.ADD_COMMENT = lf("Add Comment");
+            msg.EXTERNAL_INPUTS = lf("External Inputs");
+            msg.INLINE_INPUTS = lf("Inline Inputs");
+            msg.EXPAND_BLOCK = lf("Expand Block");
+            msg.COLLAPSE_BLOCK = lf("Collapse Block");
+            msg.ENABLE_BLOCK = lf("Enable Block");
+            msg.DISABLE_BLOCK = lf("Disable Block");
+            msg.DELETE_BLOCK = lf("Delete Block");
+            msg.DELETE_X_BLOCKS = lf("Delete All Blocks");
+            msg.HELP = lf("Help");
+            // inject hook to handle openings docs
+            Blockly.BlockSvg.prototype.showHelp_ = function () {
+                var url = goog.isFunction(this.helpUrl) ? this.helpUrl() : this.helpUrl;
+                if (url)
+                    (pxt.blocks.openHelpUrl || window.open)(url);
+            };
+            /**
+             * Show the context menu for the workspace.
+             * @param {!Event} e Mouse event.
+             * @private
+             */
+            Blockly.WorkspaceSvg.prototype.showContextMenu_ = function (e) {
+                var _this = this;
+                if (this.options.readOnly || this.isFlyout) {
+                    return;
+                }
+                var menuOptions = [];
+                var topBlocks = this.getTopBlocks(true);
+                var eventGroup = Blockly.utils.genUid();
+                // Add a little animation to collapsing and expanding.
+                var DELAY = 10;
+                if (this.options.collapse) {
+                    var hasCollapsedBlocks = false;
+                    var hasExpandedBlocks = false;
+                    for (var i = 0; i < topBlocks.length; i++) {
+                        var block = topBlocks[i];
+                        while (block) {
+                            if (block.isCollapsed()) {
+                                hasCollapsedBlocks = true;
+                            }
+                            else {
+                                hasExpandedBlocks = true;
+                            }
+                            block = block.getNextBlock();
+                        }
+                    }
+                    /**
+                     * Option to collapse or expand top blocks.
+                     * @param {boolean} shouldCollapse Whether a block should collapse.
+                     * @private
+                     */
+                    var toggleOption_1 = function (shouldCollapse) {
+                        var ms = 0;
+                        for (var i = 0; i < topBlocks.length; i++) {
+                            var block = topBlocks[i];
+                            while (block) {
+                                setTimeout(block.setCollapsed.bind(block, shouldCollapse), ms);
+                                block = block.getNextBlock();
+                                ms += DELAY;
+                            }
+                        }
+                    };
+                    // Option to collapse top blocks.
+                    var collapseOption = { enabled: hasExpandedBlocks };
+                    collapseOption.text = lf("Collapse Block");
+                    collapseOption.callback = function () {
+                        pxt.tickEvent("blocks.context.collapse");
+                        toggleOption_1(true);
+                    };
+                    menuOptions.push(collapseOption);
+                    // Option to expand top blocks.
+                    var expandOption = { enabled: hasCollapsedBlocks };
+                    expandOption.text = lf("Expand Block");
+                    expandOption.callback = function () {
+                        pxt.tickEvent("blocks.context.expand");
+                        toggleOption_1(false);
+                    };
+                    menuOptions.push(expandOption);
+                }
+                // Option to delete all blocks.
+                // Count the number of blocks that are deletable.
+                var deleteList = [];
+                function addDeletableBlocks(block) {
+                    if (block.isDeletable()) {
+                        deleteList = deleteList.concat(block.getDescendants());
+                    }
+                    else {
+                        var children = block.getChildren();
+                        for (var i = 0; i < children.length; i++) {
+                            addDeletableBlocks(children[i]);
+                        }
+                    }
+                }
+                for (var i = 0; i < topBlocks.length; i++) {
+                    addDeletableBlocks(topBlocks[i]);
+                }
+                function deleteNext() {
+                    Blockly.Events.setGroup(eventGroup);
+                    var block = deleteList.shift();
+                    if (block) {
+                        if (block.workspace) {
+                            block.dispose(false, true);
+                            setTimeout(deleteNext, DELAY);
+                        }
+                        else {
+                            deleteNext();
+                        }
+                    }
+                    Blockly.Events.setGroup(false);
+                }
+                var deleteOption = {
+                    text: deleteList.length == 1 ? lf("Delete Block") :
+                        lf("Delete All Blocks", deleteList.length),
+                    enabled: deleteList.length > 0,
+                    callback: function () {
+                        pxt.tickEvent("blocks.context.delete");
+                        if (deleteList.length < 2 ||
+                            window.confirm(lf("Delete all {0} blocks?", deleteList.length))) {
+                            deleteNext();
+                        }
+                    }
+                };
+                menuOptions.push(deleteOption);
+                var formatCodeOption = {
+                    text: lf("Format Code"),
+                    enabled: true,
+                    callback: function () {
+                        pxt.tickEvent("blocks.context.format");
+                        pxt.blocks.layout.flow(_this, { useViewWidth: true });
+                    }
+                };
+                menuOptions.push(formatCodeOption);
+                if (pxt.blocks.layout.screenshotEnabled()) {
+                    var screenshotOption = {
+                        text: lf("Download Screenshot"),
+                        enabled: topBlocks.length > 0,
+                        callback: function () {
+                            pxt.tickEvent("blocks.context.screenshot");
+                            pxt.blocks.layout.screenshotAsync(_this)
+                                .done(function (uri) {
+                                if (pxt.BrowserUtils.isSafari())
+                                    uri = uri.replace(/^data:image\/[^;]/, 'data:application/octet-stream');
+                                pxt.BrowserUtils.browserDownloadDataUri(uri, (pxt.appTarget.nickname || pxt.appTarget.id) + "-" + lf("screenshot") + ".png");
+                            });
+                        }
+                    };
+                    menuOptions.push(screenshotOption);
+                }
+                // custom options...
+                if (blocks_6.onShowContextMenu)
+                    blocks_6.onShowContextMenu(this, menuOptions);
+                Blockly.ContextMenu.show(e, menuOptions, this.RTL);
+            };
+            // We override Blockly's category mouse event handler so that only one
+            // category can be expanded at a time. Also prevent categories from toggling
+            // once openend.
+            Blockly.Toolbox.TreeNode.prototype.onClick_ = function (a) {
+                // Expand icon.
+                var that = this;
+                if (!that.isSelected()) {
+                    // Collapse the currently selected node and its parent nodes
+                    collapseSubcategories(that.getTree().getSelectedItem(), that);
+                }
+                if (that.hasChildren() && that.isUserCollapsible_) {
+                    if (that.isSelected()) {
+                        collapseSubcategories(that.getTree().getSelectedItem(), that);
+                        that.getTree().setSelectedItem(null);
+                    }
+                    else {
+                        that.setExpanded(true);
+                        that.select();
+                    }
+                }
+                else if (that.isSelected()) {
+                    that.getTree().setSelectedItem(null);
+                }
+                else {
+                    that.select();
+                }
+                that.updateRow();
+            };
+            // We also must override this handler to handle the case where no category is selected (e.g. clicking outside the toolbox)
+            var oldSetSelectedItem = Blockly.Toolbox.TreeControl.prototype.setSelectedItem;
+            var editor = this;
+            Blockly.Toolbox.TreeControl.prototype.setSelectedItem = function (a) {
+                var that = this;
+                var toolbox = that.toolbox_;
+                if (a == that.selectedItem_ || a == toolbox.tree_) {
+                    return;
+                }
+                var oldSelectedItem = that.selectedItem_;
+                oldSetSelectedItem.call(that, a);
+                if (a === null) {
+                    collapseSubcategories(oldSelectedItem);
+                }
+            };
+            // TODO: look into porting this code over to pxt-blockly
+            // Fix highlighting bug in edge
+            Blockly.Flyout.prototype.addBlockListeners_ = function (root, block, rect) {
+                this.listeners_.push(Blockly.bindEventWithChecks_(root, 'mousedown', null, this.blockMouseDown_(block)));
+                this.listeners_.push(Blockly.bindEventWithChecks_(rect, 'mousedown', null, this.blockMouseDown_(block)));
+                this.listeners_.push(Blockly.bindEvent_(root, 'mouseover', block, block.addSelect));
+                this.listeners_.push(Blockly.bindEvent_(root, 'mouseout', block, block.removeSelect));
+                this.listeners_.push(Blockly.bindEvent_(rect, 'mouseover', block, block.addSelect));
+                this.listeners_.push(Blockly.bindEvent_(rect, 'mouseout', block, block.removeSelect));
+                var that = this;
+                function select() {
+                    if (that._selectedItem && that._selectedItem.svgGroup_) {
+                        that._selectedItem.removeSelect();
+                    }
+                    that._selectedItem = block;
+                    that._selectedItem.addSelect();
+                }
+            };
+        }
+        function collapseSubcategories(cat, child) {
+            while (cat) {
+                if (cat.isUserCollapsible_ && cat.getTree() && cat != child && (!child || !isChild(child, cat))) {
+                    cat.setExpanded(false);
+                    cat.updateRow();
+                }
+                cat = cat.getParent();
+            }
+        }
+        function isChild(child, parent) {
+            var myParent = child.getParent();
+            if (myParent) {
+                return myParent === parent || isChild(myParent, parent);
+            }
+            return false;
+        }
+        function initOnStart() {
+            // on_start
+            var onStartDef = pxt.blocks.getBlockDefinition(ts.pxtc.ON_START_TYPE);
+            Blockly.Blocks[ts.pxtc.ON_START_TYPE] = {
+                init: function () {
+                    this.jsonInit({
+                        "message0": onStartDef.block["message0"],
+                        "args0": [
+                            {
+                                "type": "input_dummy"
+                            },
+                            {
+                                "type": "input_statement",
+                                "name": "HANDLER"
+                            }
+                        ],
+                        "colour": (pxt.appTarget.runtime ? pxt.appTarget.runtime.onStartColor : '') || getNamespaceColor('loops')
+                    });
+                    setHelpResources(this, ts.pxtc.ON_START_TYPE, onStartDef.name, onStartDef.tooltip, onStartDef.url, String((pxt.appTarget.runtime ? pxt.appTarget.runtime.onStartColor : '') || getNamespaceColor('loops')), undefined, undefined, pxt.appTarget.runtime ? pxt.appTarget.runtime.onStartUnDeletable : false);
+                }
+            };
+            Blockly.Blocks[pxtc.TS_STATEMENT_TYPE] = {
+                init: function () {
+                    var _this = this;
+                    var that = this;
+                    that.setColour("#717171");
+                    that.setPreviousStatement(true);
+                    that.setNextStatement(true);
+                    that.setInputsInline(false);
+                    this.domToMutation = function (element) {
+                        var n = parseInt(element.getAttribute("numlines"));
+                        _this.declaredVariables = element.getAttribute("declaredvars");
+                        for (var i = 0; i < n; i++) {
+                            var line = element.getAttribute("line" + i);
+                            that.appendDummyInput().appendField(line, "LINE" + i);
+                        }
+                    };
+                    this.mutationToDom = function () {
+                        var mutation = document.createElement("mutation");
+                        var i = 0;
+                        while (true) {
+                            var val = that.getFieldValue("LINE" + i);
+                            if (val === null) {
+                                break;
+                            }
+                            mutation.setAttribute("line" + i, val);
+                            i++;
+                        }
+                        mutation.setAttribute("numlines", i.toString());
+                        if (_this.declaredVariables) {
+                            mutation.setAttribute("declaredvars", _this.declaredVariables);
+                        }
+                        return mutation;
+                    };
+                    that.setEditable(false);
+                    setHelpResources(this, pxtc.TS_STATEMENT_TYPE, lf("JavaScript statement"), lf("A JavaScript statement that could not be converted to blocks"), '/blocks/javascript-blocks', '#717171');
+                }
+            };
+            Blockly.Blocks[pxtc.TS_OUTPUT_TYPE] = {
+                init: function () {
+                    var that = this;
+                    that.setColour("#717171");
+                    that.setPreviousStatement(false);
+                    that.setNextStatement(false);
+                    that.setOutput(true);
+                    that.setEditable(false);
+                    that.appendDummyInput().appendField(new pxtblockly.FieldTsExpression(""), "EXPRESSION");
+                    setHelpResources(that, pxtc.TS_OUTPUT_TYPE, lf("JavaScript expression"), lf("A JavaScript expression that could not be converted to blocks"), '/blocks/javascript-blocks', "#717171");
+                }
+            };
+            // controls_for_of
+            var controlsForOfId = "controls_for_of";
+            var controlsForOfDef = pxt.blocks.getBlockDefinition(controlsForOfId);
+            Blockly.Blocks[controlsForOfId] = {
+                init: function () {
+                    this.jsonInit({
+                        "message0": controlsForOfDef.block["message0"],
+                        "args0": [
+                            {
+                                "type": "field_variable",
+                                "name": "VAR",
+                                "variable": controlsForOfDef.block["variable"]
+                            },
+                            {
+                                "type": "input_value",
+                                "name": "LIST",
+                                "check": "Array"
+                            }
+                        ],
+                        "previousStatement": null,
+                        "nextStatement": null,
+                        "colour": blocks_6.blockColors['loops'],
+                        "inputsInline": true
+                    });
+                    this.appendStatementInput('DO')
+                        .appendField(controlsForOfDef.block["appendField"]);
+                    var thisBlock = this;
+                    setHelpResources(this, controlsForOfId, controlsForOfDef.name, function () {
+                        return pxt.U.rlf(controlsForOfDef.tooltip, thisBlock.getFieldValue('VAR'));
+                    }, controlsForOfDef.url, String(getNamespaceColor('loops')));
+                }
+            };
+            // lists_index_get
+            var listsIndexGetId = "lists_index_get";
+            var listsIndexGetDef = pxt.blocks.getBlockDefinition(listsIndexGetId);
+            Blockly.Blocks["lists_index_get"] = {
+                init: function () {
+                    this.jsonInit({
+                        "message0": listsIndexGetDef.block["message0"],
+                        "args0": [
+                            {
+                                "type": "input_value",
+                                "name": "LIST",
+                                "check": "Array"
+                            },
+                            {
+                                "type": "input_value",
+                                "name": "INDEX",
+                                "check": "Number"
+                            }
+                        ],
+                        "colour": blocks_6.blockColors['arrays'],
+                        "inputsInline": true
+                    });
+                    this.setPreviousStatement(false);
+                    this.setNextStatement(false);
+                    this.setOutput(true);
+                    setBuiltinHelpInfo(this, listsIndexGetId);
+                }
+            };
+            // lists_index_set
+            var listsIndexSetId = "lists_index_set";
+            var listsIndexSetDef = pxt.blocks.getBlockDefinition(listsIndexSetId);
+            Blockly.Blocks[listsIndexSetId] = {
+                init: function () {
+                    this.jsonInit({
+                        "message0": listsIndexSetDef.block["message0"],
+                        "args0": [
+                            {
+                                "type": "input_value",
+                                "name": "LIST",
+                                "check": "Array"
+                            },
+                            {
+                                "type": "input_value",
+                                "name": "INDEX",
+                                "check": "Number"
+                            },
+                            {
+                                "type": "input_value",
+                                "name": "VALUE",
+                                "check": null
+                            }
+                        ],
+                        "previousStatement": null,
+                        "nextStatement": null,
+                        "colour": blocks_6.blockColors['arrays'],
+                        "inputsInline": true
+                    });
+                    setBuiltinHelpInfo(this, listsIndexSetId);
+                }
+            };
+        }
+        function initMath() {
+            // math_op2
+            var mathOp2Id = "math_op2";
+            var mathOp2Def = pxt.blocks.getBlockDefinition(mathOp2Id);
+            var mathOp2Tooltips = mathOp2Def.tooltip;
+            Blockly.Blocks[mathOp2Id] = {
+                init: function () {
+                    this.jsonInit({
+                        "message0": lf("%1 of %2 and %3"),
+                        "args0": [
+                            {
+                                "type": "field_dropdown",
+                                "name": "op",
+                                "options": [
+                                    [lf("{id:op}min"), "min"],
+                                    [lf("{id:op}max"), "max"]
+                                ]
+                            },
+                            {
+                                "type": "input_value",
+                                "name": "x",
+                                "check": "Number"
+                            },
+                            {
+                                "type": "input_value",
+                                "name": "y",
+                                "check": "Number"
+                            }
+                        ],
+                        "inputsInline": true,
+                        "output": "Number",
+                        "colour": getNamespaceColor('math')
+                    });
+                    var thisBlock = this;
+                    setHelpResources(this, mathOp2Id, mathOp2Def.name, function (block) {
+                        return mathOp2Tooltips[block.getFieldValue('op')];
+                    }, mathOp2Def.url, getNamespaceColor(mathOp2Def.category));
+                }
+            };
+            // math_op3
+            var mathOp3Id = "math_op3";
+            var mathOp3Def = pxt.blocks.getBlockDefinition(mathOp3Id);
+            Blockly.Blocks[mathOp3Id] = {
+                init: function () {
+                    this.jsonInit({
+                        "message0": mathOp3Def.block["message0"],
+                        "args0": [
+                            {
+                                "type": "input_value",
+                                "name": "x",
+                                "check": "Number"
+                            }
+                        ],
+                        "inputsInline": true,
+                        "output": "Number",
+                        "colour": getNamespaceColor('math')
+                    });
+                    setBuiltinHelpInfo(this, mathOp3Id);
+                }
+            };
+            // builtin math_number
+            //XXX Integer validation needed.
+            var mInfo = pxt.blocks.getBlockDefinition("math_number");
+            installHelpResources('math_number', mInfo.name, (pxt.appTarget.compile && pxt.appTarget.compile.floatingPoint) ? lf("a decimal number") : lf("an integer number"), mInfo.url, Blockly.Colours.textField, Blockly.Colours.textField, Blockly.Colours.textField);
+            // builtin math_number_minmax
+            //XXX Integer validation needed.
+            var mMInfo = pxt.blocks.getBlockDefinition("math_number_minmax");
+            installHelpResources('math_number_minmax', mMInfo.name, (pxt.appTarget.compile && pxt.appTarget.compile.floatingPoint) ? lf("a decimal number") : lf("an integer number"), mMInfo.url, Blockly.Colours.textField, Blockly.Colours.textField, Blockly.Colours.textField);
+            // builtin math_arithmetic
+            var msg = Blockly.Msg;
+            var mathArithmeticId = "math_arithmetic";
+            var mathArithmeticDef = pxt.blocks.getBlockDefinition(mathArithmeticId);
+            var mathArithmeticTooltips = mathArithmeticDef.tooltip;
+            msg.MATH_ADDITION_SYMBOL = mathArithmeticDef.block["MATH_ADDITION_SYMBOL"];
+            msg.MATH_SUBTRACTION_SYMBOL = mathArithmeticDef.block["MATH_SUBTRACTION_SYMBOL"];
+            msg.MATH_MULTIPLICATION_SYMBOL = mathArithmeticDef.block["MATH_MULTIPLICATION_SYMBOL"];
+            msg.MATH_DIVISION_SYMBOL = mathArithmeticDef.block["MATH_DIVISION_SYMBOL"];
+            msg.MATH_POWER_SYMBOL = mathArithmeticDef.block["MATH_POWER_SYMBOL"];
+            installHelpResources(mathArithmeticId, mathArithmeticDef.name, function (block) {
+                return mathArithmeticTooltips[block.getFieldValue('OP')];
+            }, mathArithmeticDef.url, getNamespaceColor(mathArithmeticDef.category));
+            // builtin math_modulo
+            var mathModuloId = "math_modulo";
+            var mathModuloDef = pxt.blocks.getBlockDefinition(mathModuloId);
+            msg.MATH_MODULO_TITLE = mathModuloDef.block["MATH_MODULO_TITLE"];
+            installBuiltinHelpInfo(mathModuloId);
+        }
+        function getNamespaceColor(ns) {
+            if (pxt.appTarget.appTheme.blockColors && pxt.appTarget.appTheme.blockColors[ns])
+                return pxt.appTarget.appTheme.blockColors[ns];
+            if (blocks_6.blockColors[ns])
+                return blocks_6.blockColors[ns];
+            return "";
+        }
+        blocks_6.getNamespaceColor = getNamespaceColor;
+        function initFlyouts(workspace) {
+            workspace.registerToolboxCategoryCallback(Blockly.VARIABLE_CATEGORY_NAME, Blockly.Variables.flyoutCategory);
+            workspace.registerToolboxCategoryCallback(Blockly.PROCEDURE_CATEGORY_NAME, Blockly.Procedures.flyoutCategory);
+        }
+        blocks_6.initFlyouts = initFlyouts;
+        function initExtensions(workspace, extensions, callBack) {
+            extensions.forEach(function (config) {
+                var name = config.name;
+                workspace.registerButtonCallback("EXT" + name + "_BUTTON", function (button) {
+                    callBack(name);
+                });
+            });
+        }
+        blocks_6.initExtensions = initExtensions;
+        function initVariables() {
+            var varname = lf("{id:var}item");
+            Blockly.Variables.flyoutCategory = function (workspace) {
+                var xmlList = [];
+                if (!pxt.appTarget.appTheme.hideFlyoutHeadings) {
+                    // Add the Heading label
+                    var headingLabel = goog.dom.createDom('label');
+                    headingLabel.setAttribute('text', lf("Variables"));
+                    headingLabel.setAttribute('web-class', 'blocklyFlyoutHeading');
+                    headingLabel.setAttribute('web-icon', '\uf039');
+                    headingLabel.setAttribute('web-icon-color', getNamespaceColor('variables'));
+                    xmlList.push(headingLabel);
+                }
+                var button = goog.dom.createDom('button');
+                button.setAttribute('text', lf("Make a Variable"));
+                button.setAttribute('callbackkey', 'CREATE_VARIABLE');
+                workspace.registerButtonCallback('CREATE_VARIABLE', function (button) {
+                    Blockly.Variables.createVariable(button.getTargetWorkspace());
+                });
+                xmlList.push(button);
+                var blockList = Blockly.Variables.flyoutCategoryBlocks(workspace);
+                xmlList = xmlList.concat(blockList);
+                return xmlList;
+            };
+            Blockly.Variables.flyoutCategoryBlocks = function (workspace) {
+                var variableModelList = workspace.getVariablesOfType('');
+                variableModelList.sort(Blockly.VariableModel.compareByName);
+                // In addition to the user's variables, we also want to display the default
+                // variable name at the top.  We also don't want this duplicated if the
+                // user has created a variable of the same name.
+                for (var i = 0, tempVar = void 0; tempVar = variableModelList[i]; i++) {
+                    if (tempVar.name == varname) {
+                        variableModelList.splice(i, 1);
+                        break;
+                    }
+                }
+                var defaultVar = new Blockly.VariableModel(workspace, varname);
+                variableModelList.unshift(defaultVar);
+                var xmlList = [];
+                if (variableModelList.length > 0) {
+                    // variables getters first
+                    for (var i = 0, variable = void 0; variable = variableModelList[i]; i++) {
+                        if (Blockly.Blocks['variables_get']) {
+                            var blockText = '<xml>' +
+                                '<block type="variables_get" gap="8">' +
+                                Blockly.Variables.generateVariableFieldXml_(variable) +
+                                '</block>' +
+                                '</xml>';
+                            var block = Blockly.Xml.textToDom(blockText).firstChild;
+                            xmlList.push(block);
+                        }
+                    }
+                    xmlList[xmlList.length - 1].setAttribute('gap', '24');
+                    var firstVariable = variableModelList[0];
+                    if (Blockly.Blocks['variables_set']) {
+                        var gap = Blockly.Blocks['variables_change'] ? 8 : 24;
+                        var blockText = '<xml>' +
+                            '<block type="variables_set" gap="' + gap + '">' +
+                            Blockly.Variables.generateVariableFieldXml_(firstVariable) +
+                            '</block>' +
+                            '</xml>';
+                        var block = Blockly.Xml.textToDom(blockText).firstChild;
+                        {
+                            var value = goog.dom.createDom('value');
+                            value.setAttribute('name', 'VALUE');
+                            var shadow = goog.dom.createDom('shadow');
+                            shadow.setAttribute("type", "math_number");
+                            value.appendChild(shadow);
+                            var field = goog.dom.createDom('field');
+                            field.setAttribute('name', 'NUM');
+                            field.appendChild(document.createTextNode("0"));
+                            shadow.appendChild(field);
+                            block.appendChild(value);
+                        }
+                        xmlList.push(block);
+                    }
+                    if (Blockly.Blocks['variables_change']) {
+                        var gap = Blockly.Blocks['variables_get'] ? 20 : 8;
+                        var blockText = '<xml>' +
+                            '<block type="variables_change" gap="' + gap + '">' +
+                            Blockly.Variables.generateVariableFieldXml_(firstVariable) +
+                            '<value name="DELTA">' +
+                            '<shadow type="math_number">' +
+                            '<field name="NUM">1</field>' +
+                            '</shadow>' +
+                            '</value>' +
+                            '</block>' +
+                            '</xml>';
+                        var block = Blockly.Xml.textToDom(blockText).firstChild;
+                        {
+                            var value = goog.dom.createDom('value');
+                            value.setAttribute('name', 'VALUE');
+                            var shadow = goog.dom.createDom('shadow');
+                            shadow.setAttribute("type", "math_number");
+                            value.appendChild(shadow);
+                            var field = goog.dom.createDom('field');
+                            field.setAttribute('name', 'NUM');
+                            field.appendChild(document.createTextNode("1"));
+                            shadow.appendChild(field);
+                            block.appendChild(value);
+                        }
+                        xmlList.push(block);
+                    }
+                }
+                return xmlList;
+            };
+            // builtin variables_get
+            var msg = Blockly.Msg;
+            var variablesGetId = "variables_get";
+            var variablesGetDef = pxt.blocks.getBlockDefinition(variablesGetId);
+            msg.VARIABLES_GET_CREATE_SET = variablesGetDef.block["VARIABLES_GET_CREATE_SET"];
+            installBuiltinHelpInfo(variablesGetId);
+            // Dropdown menu of variables_get
+            msg.RENAME_VARIABLE = lf("Rename variable...");
+            msg.DELETE_VARIABLE = lf("Delete the \"%1\" variable");
+            msg.DELETE_VARIABLE_CONFIRMATION = lf("Delete %1 uses of the \"%2\" variable?");
+            // builtin variables_set
+            var variablesSetId = "variables_set";
+            var variablesSetDef = pxt.blocks.getBlockDefinition(variablesSetId);
+            msg.VARIABLES_SET = variablesSetDef.block["VARIABLES_SET"];
+            msg.VARIABLES_DEFAULT_NAME = varname;
+            msg.VARIABLES_SET_CREATE_GET = lf("Create 'get %1'");
+            installBuiltinHelpInfo(variablesSetId);
+            // pxt variables_change
+            var variablesChangeId = "variables_change";
+            var variablesChangeDef = pxt.blocks.getBlockDefinition(variablesChangeId);
+            Blockly.Blocks[variablesChangeId] = {
+                init: function () {
+                    this.jsonInit({
+                        "message0": variablesChangeDef.block["message0"],
+                        "args0": [
+                            {
+                                "type": "field_variable",
+                                "name": "VAR",
+                                "variable": varname
+                            },
+                            {
+                                "type": "input_value",
+                                "name": "VALUE",
+                                "check": "Number"
+                            }
+                        ],
+                        "inputsInline": true,
+                        "previousStatement": null,
+                        "nextStatement": null,
+                        "colour": getNamespaceColor('variables')
+                    });
+                    setBuiltinHelpInfo(this, variablesChangeId);
+                }
+            };
+            // New variable dialog
+            msg.NEW_VARIABLE_TITLE = lf("New variable name:");
+        }
+        function initFunctions() {
+            var msg = Blockly.Msg;
+            // builtin procedures_defnoreturn
+            var proceduresDefId = "procedures_defnoreturn";
+            var proceduresDef = pxt.blocks.getBlockDefinition(proceduresDefId);
+            msg.PROCEDURES_DEFNORETURN_TITLE = proceduresDef.block["PROCEDURES_DEFNORETURN_TITLE"];
+            msg.PROCEDURE_ALREADY_EXISTS = proceduresDef.block["PROCEDURE_ALREADY_EXISTS"];
+            Blockly.Blocks['procedures_defnoreturn'].init = function () {
+                var nameField = new Blockly.FieldTextInput('', Blockly.Procedures.rename);
+                //nameField.setSpellcheck(false); //TODO
+                this.appendDummyInput()
+                    .appendField(Blockly.Msg.PROCEDURES_DEFNORETURN_TITLE)
+                    .appendField(nameField, 'NAME')
+                    .appendField('', 'PARAMS');
+                this.setColour(getNamespaceColor('functions'));
+                this.arguments_ = [];
+                this.setStartHat(true);
+                this.setStatements_(true);
+                this.statementConnection_ = null;
+            };
+            installBuiltinHelpInfo(proceduresDefId);
+            // builtin procedures_defnoreturn
+            var proceduresCallId = "procedures_callnoreturn";
+            var proceduresCallDef = pxt.blocks.getBlockDefinition(proceduresCallId);
+            msg.PROCEDURES_CALLRETURN_TOOLTIP = proceduresDef.tooltip;
+            Blockly.Blocks['procedures_callnoreturn'] = {
+                init: function () {
+                    var nameField = new pxtblockly.FieldProcedure('');
+                    nameField.setSourceBlock(this);
+                    this.appendDummyInput('TOPROW')
+                        .appendField(proceduresCallDef.block['PROCEDURES_CALLNORETURN_TITLE'])
+                        .appendField(nameField, 'NAME');
+                    this.setPreviousStatement(true);
+                    this.setNextStatement(true);
+                    this.setColour(getNamespaceColor('functions'));
+                    this.arguments_ = [];
+                    this.quarkConnections_ = {};
+                    this.quarkIds_ = null;
+                },
+                /**
+                 * Returns the name of the procedure this block calls.
+                 * @return {string} Procedure name.
+                 * @this Blockly.Block
+                 */
+                getProcedureCall: function () {
+                    // The NAME field is guaranteed to exist, null will never be returned.
+                    return (this.getFieldValue('NAME'));
+                },
+                /**
+                 * Notification that a procedure is renaming.
+                 * If the name matches this block's procedure, rename it.
+                 * @param {string} oldName Previous name of procedure.
+                 * @param {string} newName Renamed procedure.
+                 * @this Blockly.Block
+                 */
+                renameProcedure: function (oldName, newName) {
+                    if (Blockly.Names.equals(oldName, this.getProcedureCall())) {
+                        this.setFieldValue(newName, 'NAME');
+                    }
+                },
+                /**
+                 * Procedure calls cannot exist without the corresponding procedure
+                 * definition.  Enforce this link whenever an event is fired.
+                 * @param {!Blockly.Events.Abstract} event Change event.
+                 * @this Blockly.Block
+                 */
+                onchange: function (event) {
+                    if (!this.workspace || this.workspace.isFlyout || this.isInsertionMarker()) {
+                        // Block is deleted or is in a flyout or insertion marker.
+                        return;
+                    }
+                    if (event.type == Blockly.Events.CREATE &&
+                        event.ids.indexOf(this.id) != -1) {
+                        // Look for the case where a procedure call was created (usually through
+                        // paste) and there is no matching definition.  In this case, create
+                        // an empty definition block with the correct signature.
+                        var name_2 = this.getProcedureCall();
+                        var def = Blockly.Procedures.getDefinition(name_2, this.workspace);
+                        if (def && (def.type != this.defType_ ||
+                            JSON.stringify(def.arguments_) != JSON.stringify(this.arguments_))) {
+                            // The signatures don't match.
+                            def = null;
+                        }
+                        if (!def) {
+                            Blockly.Events.setGroup(event.group);
+                            /**
+                             * Create matching definition block.
+                             * <xml>
+                             *   <block type="procedures_defreturn" x="10" y="20">
+                             *     <field name="NAME">test</field>
+                             *   </block>
+                             * </xml>
+                             */
+                            var xml = goog.dom.createDom('xml');
+                            var block = goog.dom.createDom('block');
+                            block.setAttribute('type', this.defType_);
+                            var xy = this.getRelativeToSurfaceXY();
+                            var x = xy.x + Blockly.SNAP_RADIUS * (this.RTL ? -1 : 1);
+                            var y = xy.y + Blockly.SNAP_RADIUS * 2;
+                            block.setAttribute('x', x);
+                            block.setAttribute('y', y);
+                            var field = goog.dom.createDom('field');
+                            field.setAttribute('name', 'NAME');
+                            field.appendChild(document.createTextNode(this.getProcedureCall()));
+                            block.appendChild(field);
+                            xml.appendChild(block);
+                            Blockly.Xml.domToWorkspace(xml, this.workspace);
+                            Blockly.Events.setGroup(false);
+                        }
+                    }
+                    else if (event.type == Blockly.Events.DELETE) {
+                        // Look for the case where a procedure definition has been deleted,
+                        // leaving this block (a procedure call) orphaned.  In this case, delete
+                        // the orphan.
+                        var name_3 = this.getProcedureCall();
+                        var def = Blockly.Procedures.getDefinition(name_3, this.workspace);
+                        if (!def) {
+                            Blockly.Events.setGroup(event.group);
+                            this.dispose(true, false);
+                            Blockly.Events.setGroup(false);
+                        }
+                    }
+                },
+                mutationToDom: function () {
+                    var mutationElement = document.createElement("mutation");
+                    mutationElement.setAttribute("name", this.getProcedureCall());
+                    return mutationElement;
+                },
+                domToMutation: function (element) {
+                    var name = element.getAttribute("name");
+                    this.renameProcedure(this.getProcedureCall(), name);
+                },
+                /**
+                 * Add menu option to find the definition block for this call.
+                 * @param {!Array} options List of menu options to add to.
+                 * @this Blockly.Block
+                 */
+                customContextMenu: function (options) {
+                    var option = { enabled: true };
+                    option.text = Blockly.Msg.PROCEDURES_HIGHLIGHT_DEF;
+                    var name = this.getProcedureCall();
+                    var workspace = this.workspace;
+                    option.callback = function () {
+                        var def = Blockly.Procedures.getDefinition(name, workspace);
+                        def && def.select();
+                    };
+                    options.push(option);
+                },
+                defType_: 'procedures_defnoreturn'
+            };
+            installBuiltinHelpInfo(proceduresCallId);
+            Blockly.Procedures.flyoutCategory = function (workspace) {
+                var xmlList = [];
+                if (!pxt.appTarget.appTheme.hideFlyoutHeadings) {
+                    // Add the Heading label
+                    var headingLabel = goog.dom.createDom('label');
+                    headingLabel.setAttribute('text', lf("Functions"));
+                    headingLabel.setAttribute('web-class', 'blocklyFlyoutHeading');
+                    headingLabel.setAttribute('web-icon', '\uf109');
+                    headingLabel.setAttribute('web-icon-class', 'blocklyFlyoutIconfunctions');
+                    headingLabel.setAttribute('web-icon-color', getNamespaceColor('functions'));
+                    xmlList.push(headingLabel);
+                }
+                var newFunction = lf("Make a Function");
+                var newFunctionTitle = lf("New function name:");
+                // Add the "Make a function" button
+                var button = goog.dom.createDom('button');
+                button.setAttribute('text', newFunction);
+                button.setAttribute('callbackkey', 'CREATE_FUNCTION');
+                var createFunction = function (name) {
+                    /**
+                     * Create matching definition block.
+                     * <xml>
+                     *   <block type="procedures_defreturn" x="10" y="20">
+                     *     <field name="NAME">test</field>
+                     *   </block>
+                     * </xml>
+                     */
+                    var topBlock = workspace.getTopBlocks(true)[0];
+                    var x = 0, y = 0;
+                    if (topBlock) {
+                        var xy = topBlock.getRelativeToSurfaceXY();
+                        x = xy.x + Blockly.SNAP_RADIUS * (topBlock.RTL ? -1 : 1);
+                        y = xy.y + Blockly.SNAP_RADIUS * 2;
+                    }
+                    var xml = goog.dom.createDom('xml');
+                    var block = goog.dom.createDom('block');
+                    block.setAttribute('type', 'procedures_defnoreturn');
+                    block.setAttribute('x', String(x));
+                    block.setAttribute('y', String(y));
+                    var field = goog.dom.createDom('field');
+                    field.setAttribute('name', 'NAME');
+                    field.appendChild(document.createTextNode(name));
+                    block.appendChild(field);
+                    xml.appendChild(block);
+                    var newBlockIds = Blockly.Xml.domToWorkspace(xml, workspace);
+                    // Close flyout and highlight block
+                    workspace.toolbox_.clearSelection();
+                    var newBlock = workspace.getBlockById(newBlockIds[0]);
+                    newBlock.select();
+                };
+                workspace.registerButtonCallback('CREATE_FUNCTION', function (button) {
+                    var promptAndCheckWithAlert = function (defaultName) {
+                        Blockly.prompt(newFunctionTitle, defaultName, function (newFunc) {
+                            // Merge runs of whitespace.  Strip leading and trailing whitespace.
+                            // Beyond this, all names are legal.
+                            if (newFunc) {
+                                newFunc = newFunc.replace(/[\s\xa0]+/g, ' ').replace(/^ | $/g, '');
+                                if (newFunc == newFunction) {
+                                    // Ok, not ALL names are legal...
+                                    newFunc = null;
+                                }
+                            }
+                            if (newFunc) {
+                                if (workspace.getVariable(newFunc)) {
+                                    Blockly.alert(Blockly.Msg.VARIABLE_ALREADY_EXISTS.replace('%1', newFunc.toLowerCase()), function () {
+                                        promptAndCheckWithAlert(newFunc); // Recurse
+                                    });
+                                }
+                                else if (!Blockly.Procedures.isLegalName_(newFunc, workspace)) {
+                                    Blockly.alert(Blockly.Msg.PROCEDURE_ALREADY_EXISTS.replace('%1', newFunc.toLowerCase()), function () {
+                                        promptAndCheckWithAlert(newFunc); // Recurse
+                                    });
+                                }
+                                else {
+                                    createFunction(newFunc);
+                                }
+                            }
+                        });
+                    };
+                    promptAndCheckWithAlert('doSomething');
+                });
+                xmlList.push(button);
+                function populateProcedures(procedureList, templateName) {
+                    for (var i = 0; i < procedureList.length; i++) {
+                        var name_4 = procedureList[i][0];
+                        var args = procedureList[i][1];
+                        // <block type="procedures_callnoreturn" gap="16">
+                        //   <field name="NAME">name</field>
+                        // </block>
+                        var block = goog.dom.createDom('block');
+                        block.setAttribute('type', templateName);
+                        block.setAttribute('gap', '16');
+                        block.setAttribute('colour', getNamespaceColor('functions'));
+                        var field = goog.dom.createDom('field', null, name_4);
+                        field.setAttribute('name', 'NAME');
+                        block.appendChild(field);
+                        xmlList.push(block);
+                    }
+                }
+                var tuple = Blockly.Procedures.allProcedures(workspace);
+                populateProcedures(tuple[0], 'procedures_callnoreturn');
+                return xmlList;
+            };
+        }
+        function initLogic() {
+            var msg = Blockly.Msg;
+            // builtin controls_if
+            var controlsIfId = "controls_if";
+            var controlsIfDef = pxt.blocks.getBlockDefinition(controlsIfId);
+            var controlsIfTooltips = controlsIfDef.tooltip;
+            msg.CONTROLS_IF_MSG_IF = controlsIfDef.block["CONTROLS_IF_MSG_IF"];
+            msg.CONTROLS_IF_MSG_THEN = controlsIfDef.block["CONTROLS_IF_MSG_THEN"];
+            msg.CONTROLS_IF_MSG_ELSE = controlsIfDef.block["CONTROLS_IF_MSG_ELSE"];
+            msg.CONTROLS_IF_MSG_ELSEIF = controlsIfDef.block["CONTROLS_IF_MSG_ELSEIF"];
+            msg.CONTROLS_IF_TOOLTIP_1 = controlsIfTooltips["CONTROLS_IF_TOOLTIP_1"];
+            msg.CONTROLS_IF_TOOLTIP_2 = controlsIfTooltips["CONTROLS_IF_TOOLTIP_2"];
+            msg.CONTROLS_IF_TOOLTIP_3 = controlsIfTooltips["CONTROLS_IF_TOOLTIP_3"];
+            msg.CONTROLS_IF_TOOLTIP_4 = controlsIfTooltips["CONTROLS_IF_TOOLTIP_4"];
+            installBuiltinHelpInfo(controlsIfId);
+            // builtin logic_compare
+            var logicCompareId = "logic_compare";
+            var logicCompareDef = pxt.blocks.getBlockDefinition(logicCompareId);
+            var logicCompareTooltips = logicCompareDef.tooltip;
+            msg.LOGIC_COMPARE_TOOLTIP_EQ = logicCompareTooltips["LOGIC_COMPARE_TOOLTIP_EQ"];
+            msg.LOGIC_COMPARE_TOOLTIP_NEQ = logicCompareTooltips["LOGIC_COMPARE_TOOLTIP_NEQ"];
+            msg.LOGIC_COMPARE_TOOLTIP_LT = logicCompareTooltips["LOGIC_COMPARE_TOOLTIP_LT"];
+            msg.LOGIC_COMPARE_TOOLTIP_LTE = logicCompareTooltips["LOGIC_COMPARE_TOOLTIP_LTE"];
+            msg.LOGIC_COMPARE_TOOLTIP_GT = logicCompareTooltips["LOGIC_COMPARE_TOOLTIP_GT"];
+            msg.LOGIC_COMPARE_TOOLTIP_GTE = logicCompareTooltips["LOGIC_COMPARE_TOOLTIP_GTE"];
+            installBuiltinHelpInfo(logicCompareId);
+            // builtin logic_operation
+            var logicOperationId = "logic_operation";
+            var logicOperationDef = pxt.blocks.getBlockDefinition(logicOperationId);
+            var logicOperationTooltips = logicOperationDef.tooltip;
+            msg.LOGIC_OPERATION_AND = logicOperationDef.block["LOGIC_OPERATION_AND"];
+            msg.LOGIC_OPERATION_OR = logicOperationDef.block["LOGIC_OPERATION_OR"];
+            msg.LOGIC_OPERATION_TOOLTIP_AND = logicOperationTooltips["LOGIC_OPERATION_TOOLTIP_AND"];
+            msg.LOGIC_OPERATION_TOOLTIP_OR = logicOperationTooltips["LOGIC_OPERATION_TOOLTIP_OR"];
+            installBuiltinHelpInfo(logicOperationId);
+            // builtin logic_negate
+            var logicNegateId = "logic_negate";
+            var logicNegateDef = pxt.blocks.getBlockDefinition(logicNegateId);
+            msg.LOGIC_NEGATE_TITLE = logicNegateDef.block["LOGIC_NEGATE_TITLE"];
+            installBuiltinHelpInfo(logicNegateId);
+            // builtin logic_boolean
+            var logicBooleanId = "logic_boolean";
+            var logicBooleanDef = pxt.blocks.getBlockDefinition(logicBooleanId);
+            msg.LOGIC_BOOLEAN_TRUE = logicBooleanDef.block["LOGIC_BOOLEAN_TRUE"];
+            msg.LOGIC_BOOLEAN_FALSE = logicBooleanDef.block["LOGIC_BOOLEAN_FALSE"];
+            installBuiltinHelpInfo(logicBooleanId);
+        }
+        function initText() {
+            // builtin text
+            var textInfo = pxt.blocks.getBlockDefinition('text');
+            installHelpResources('text', textInfo.name, textInfo.tooltip, textInfo.url, Blockly.Colours.textField, Blockly.Colours.textField, Blockly.Colours.textField);
+            // builtin text_length
+            var msg = Blockly.Msg;
+            var textLengthId = "text_length";
+            var textLengthDef = pxt.blocks.getBlockDefinition(textLengthId);
+            msg.TEXT_LENGTH_TITLE = textLengthDef.block["TEXT_LENGTH_TITLE"];
+            // We have to override this block definition because the builtin block
+            // allows both Strings and Arrays in its input check and that confuses
+            // our Blockly compiler
+            var block = Blockly.Blocks[textLengthId];
+            block.init = function () {
+                this.jsonInit({
+                    "message0": msg.TEXT_LENGTH_TITLE,
+                    "args0": [
+                        {
+                            "type": "input_value",
+                            "name": "VALUE",
+                            "check": ['String']
+                        }
+                    ],
+                    "output": 'Number'
+                });
+            };
+            installBuiltinHelpInfo(textLengthId);
+            // builtin text_join
+            var textJoinId = "text_join";
+            var textJoinDef = pxt.blocks.getBlockDefinition(textJoinId);
+            msg.TEXT_JOIN_TITLE_CREATEWITH = textJoinDef.block["TEXT_JOIN_TITLE_CREATEWITH"];
+            installBuiltinHelpInfo(textJoinId);
+        }
+        function initTooltip(blockInfo) {
+            var renderTip = function (el) {
+                if (el.disabled)
+                    return lf("This block is disabled and will not run. Attach this block to an event to enable it.");
+                var tip = el.tooltip;
+                while (goog.isFunction(tip)) {
+                    tip = tip(el);
+                }
+                return tip;
+            };
+            // TODO: update this when pulling new blockly
+            /**
+             * Create the tooltip and show it.
+             * @private
+             */
+            Blockly.Tooltip.show_ = function () {
+                Blockly.Tooltip.poisonedElement_ = Blockly.Tooltip.element_;
+                if (!Blockly.Tooltip.DIV) {
+                    return;
+                }
+                // Erase all existing text.
+                goog.dom.removeChildren(/** @type {!Element} */ (Blockly.Tooltip.DIV));
+                // Get the new text.
+                var card = Blockly.Tooltip.element_.codeCard;
+                function render() {
+                    var rtl = Blockly.Tooltip.element_.RTL;
+                    var windowSize = goog.dom.getViewportSize();
+                    // Display the tooltip.
+                    Blockly.Tooltip.DIV.style.direction = rtl ? 'rtl' : 'ltr';
+                    Blockly.Tooltip.DIV.style.display = 'block';
+                    Blockly.Tooltip.visible = true;
+                    // Move the tooltip to just below the cursor.
+                    var anchorX = Blockly.Tooltip.lastX_;
+                    if (rtl) {
+                        anchorX -= Blockly.Tooltip.OFFSET_X + Blockly.Tooltip.DIV.offsetWidth;
+                    }
+                    else {
+                        anchorX += Blockly.Tooltip.OFFSET_X;
+                    }
+                    var anchorY = Blockly.Tooltip.lastY_ + Blockly.Tooltip.OFFSET_Y;
+                    if (anchorY + Blockly.Tooltip.DIV.offsetHeight >
+                        windowSize.height + window.scrollY) {
+                        // Falling off the bottom of the screen; shift the tooltip up.
+                        anchorY -= Blockly.Tooltip.DIV.offsetHeight + 2 * Blockly.Tooltip.OFFSET_Y;
+                    }
+                    if (rtl) {
+                        // Prevent falling off left edge in RTL mode.
+                        anchorX = Math.max(Blockly.Tooltip.MARGINS - window.scrollX, anchorX);
+                    }
+                    else {
+                        if (anchorX + Blockly.Tooltip.DIV.offsetWidth >
+                            windowSize.width + window.scrollX - 2 * Blockly.Tooltip.MARGINS) {
+                            // Falling off the right edge of the screen;
+                            // clamp the tooltip on the edge.
+                            anchorX = windowSize.width - Blockly.Tooltip.DIV.offsetWidth -
+                                2 * Blockly.Tooltip.MARGINS;
+                        }
+                    }
+                    Blockly.Tooltip.DIV.style.top = anchorY + 'px';
+                    Blockly.Tooltip.DIV.style.left = anchorX + 'px';
+                }
+                if (card) {
+                    var cardEl = pxt.docs.codeCard.render({
+                        header: renderTip(Blockly.Tooltip.element_)
+                    });
+                    Blockly.Tooltip.DIV.appendChild(cardEl);
+                    render();
+                }
+                else {
+                    var tip = renderTip(Blockly.Tooltip.element_);
+                    tip = Blockly.utils.wrap(tip, Blockly.Tooltip.LIMIT);
+                    // Create new text, line by line.
+                    var lines = tip.split('\n');
+                    for (var i = 0; i < lines.length; i++) {
+                        var div = document.createElement('div');
+                        div.appendChild(document.createTextNode(lines[i]));
+                        Blockly.Tooltip.DIV.appendChild(div);
+                    }
+                    render();
+                }
+            };
+        }
+        var jresIconCache = {};
+        function iconToFieldImage(id) {
+            var url = jresIconCache[id];
+            if (!url) {
+                pxt.log("missing jres icon " + id);
+                return undefined;
+            }
+            return new Blockly.FieldImage(url, 56, 56, false, '');
+        }
+        function initJresIcons(blockInfo) {
+            jresIconCache = {}; // clear previous cache
+            var jres = blockInfo.apis.jres;
+            if (!jres)
+                return;
+            Object.keys(jres).forEach(function (jresId) {
+                var jresObject = jres[jresId];
+                if (jresObject && jresObject.icon)
+                    jresIconCache[jresId] = jresObject.icon;
+            });
+        }
+    })(blocks = pxt.blocks || (pxt.blocks = {}));
+})(pxt || (pxt = {}));
+var pxt;
+(function (pxt) {
+    var blocks;
+    (function (blocks) {
+        var MutatorTypes;
+        (function (MutatorTypes) {
+            MutatorTypes.ObjectDestructuringMutator = "objectdestructuring";
+            MutatorTypes.RestParameterMutator = "restparameter";
+            MutatorTypes.DefaultInstanceMutator = "defaultinstance";
+        })(MutatorTypes = blocks.MutatorTypes || (blocks.MutatorTypes = {}));
+        function addMutation(b, info, mutationType) {
+            var m;
+            switch (mutationType) {
+                case MutatorTypes.ObjectDestructuringMutator:
+                    if (!info.parameters || info.parameters.length < 1) {
+                        console.error("Destructuring mutations require at least one parameter");
+                    }
+                    else {
+                        var found = false;
+                        for (var _i = 0, _a = info.parameters; _i < _a.length; _i++) {
+                            var param = _a[_i];
+                            if (param.type.indexOf("=>") !== -1) {
+                                if (!param.properties || param.properties.length === 0) {
+                                    console.error("Destructuring mutations only supported for functions with an event parameter that has multiple properties");
+                                    return;
+                                }
+                                found = true;
+                            }
+                        }
+                        if (!found) {
+                            console.error("Destructuring mutations must have an event parameter");
+                            return;
+                        }
+                    }
+                    m = new DestructuringMutator(b, info);
+                    break;
+                case MutatorTypes.RestParameterMutator:
+                    m = new ArrayMutator(b, info);
+                    break;
+                case MutatorTypes.DefaultInstanceMutator:
+                    m = new DefaultInstanceMutator(b, info);
+                    break;
+                default:
+                    console.warn("Ignoring unknown mutation type: " + mutationType);
+                    return;
+            }
+            b.mutationToDom = m.mutationToDom.bind(m);
+            b.domToMutation = m.domToMutation.bind(m);
+            b.compose = m.compose.bind(m);
+            b.decompose = m.decompose.bind(m);
+            b.mutation = m;
+        }
+        blocks.addMutation = addMutation;
+        function mutateToolboxBlock(block, mutationType, mutation) {
+            var mutationElement = document.createElement("mutation");
+            switch (mutationType) {
+                case MutatorTypes.ObjectDestructuringMutator:
+                    mutationElement.setAttribute(DestructuringMutator.propertiesAttributeName, mutation);
+                    break;
+                case MutatorTypes.RestParameterMutator:
+                    mutationElement.setAttribute(ArrayMutator.countAttributeName, mutation);
+                    break;
+                case MutatorTypes.DefaultInstanceMutator:
+                    mutationElement.setAttribute(DefaultInstanceMutator.attributeName, mutation);
+                default:
+                    console.warn("Ignoring unknown mutation type: " + mutationType);
+                    return;
+            }
+            block.appendChild(mutationElement);
+        }
+        blocks.mutateToolboxBlock = mutateToolboxBlock;
+        var MutatorHelper = (function () {
+            function MutatorHelper(b, info) {
+                this.info = info;
+                this.block = b;
+                this.topBlockType = this.block.type + "_mutator";
+                var subBlocks = this.getSubBlockNames();
+                this.initializeMutatorTopBlock();
+                this.initializeMutatorSubBlocks(subBlocks);
+                var mutatorToolboxTypes = subBlocks.map(function (s) { return s.type; });
+                this.block.setMutator(new Blockly.Mutator(mutatorToolboxTypes));
+            }
+            // Should be set to modify a block after a mutator dialog is updated
+            MutatorHelper.prototype.compose = function (topBlock) {
+                var allBlocks = topBlock.getDescendants().map(function (subBlock) {
+                    return {
+                        type: subBlock.type,
+                        name: subBlock.inputList[0].name
+                    };
+                });
+                // Toss the top block
+                allBlocks.shift();
+                this.updateBlock(allBlocks);
+            };
+            // Should be set to initialize the workspace inside a mutator dialog and return the top block
+            MutatorHelper.prototype.decompose = function (workspace) {
+                // Initialize flyout workspace's top block and add sub-blocks based on visible parameters
+                var topBlock = workspace.newBlock(this.topBlockType);
+                topBlock.initSvg();
+                var _loop_2 = function(input) {
+                    if (input.name === MutatorHelper.mutatorStatmentInput) {
+                        var currentConnection_1 = input.connection;
+                        this_1.getVisibleBlockTypes().forEach(function (sub) {
+                            var subBlock = workspace.newBlock(sub);
+                            subBlock.initSvg();
+                            currentConnection_1.connect(subBlock.previousConnection);
+                            currentConnection_1 = subBlock.nextConnection;
+                        });
+                        return "break";
+                    }
+                };
+                var this_1 = this;
+                for (var _i = 0, _a = topBlock.inputList; _i < _a.length; _i++) {
+                    var input = _a[_i];
+                    var state_2 = _loop_2(input);
+                    if (state_2 === "break") break;
+                }
+                return topBlock;
+            };
+            MutatorHelper.prototype.compileMutation = function (e, comments) {
+                return undefined;
+            };
+            MutatorHelper.prototype.getDeclaredVariables = function () {
+                return undefined;
+            };
+            MutatorHelper.prototype.isDeclaredByMutation = function (varName) {
+                return false;
+            };
+            MutatorHelper.prototype.initializeMutatorSubBlock = function (sub, parameter, colour) {
+                sub.appendDummyInput(parameter)
+                    .appendField(parameter);
+                sub.setColour(colour);
+                sub.setNextStatement(true);
+                sub.setPreviousStatement(true);
+            };
+            MutatorHelper.prototype.initializeMutatorTopBlock = function () {
+                var topBlockTitle = this.info.attributes.mutateText;
+                var colour = this.block.getColour();
+                Blockly.Blocks[this.topBlockType] = Blockly.Blocks[this.topBlockType] || {
+                    init: function () {
+                        var top = this;
+                        top.appendDummyInput()
+                            .appendField(topBlockTitle);
+                        top.setColour(colour);
+                        top.appendStatementInput(MutatorHelper.mutatorStatmentInput);
+                    }
+                };
+            };
+            MutatorHelper.prototype.initializeMutatorSubBlocks = function (subBlocks) {
+                var colour = this.block.getColour();
+                var initializer = this.initializeMutatorSubBlock.bind(this);
+                subBlocks.forEach(function (blockName) {
+                    Blockly.Blocks[blockName.type] = Blockly.Blocks[blockName.type] || {
+                        init: function () { initializer(this, blockName.name, colour); }
+                    };
+                });
+            };
+            MutatorHelper.mutatorStatmentInput = "PROPERTIES";
+            MutatorHelper.mutatedVariableInputName = "properties";
+            return MutatorHelper;
+        }());
+        var DestructuringMutator = (function (_super) {
+            __extends(DestructuringMutator, _super);
+            function DestructuringMutator(b, info) {
+                _super.call(this, b, info);
+                this.currentlyVisible = [];
+                this.parameterRenames = {};
+                this.prefix = this.info.attributes.mutatePrefix;
+                this.block.appendDummyInput(MutatorHelper.mutatedVariableInputName);
+                this.block.appendStatementInput("HANDLER")
+                    .setCheck("null");
+            }
+            DestructuringMutator.prototype.getMutationType = function () {
+                return MutatorTypes.ObjectDestructuringMutator;
+            };
+            DestructuringMutator.prototype.compileMutation = function (e, comments) {
+                var _this = this;
+                if (!this.info.attributes.mutatePropertyEnum && !this.parameters.length) {
+                    return undefined;
+                }
+                var declarationString = this.parameters.map(function (param) {
+                    var declaredName = _this.block.getFieldValue(param);
+                    var escapedParam = blocks.escapeVarName(param, e);
+                    if (declaredName !== param) {
+                        _this.parameterRenames[param] = declaredName;
+                        return param + ": " + blocks.escapeVarName(declaredName, e);
+                    }
+                    return escapedParam;
+                }).join(", ");
+                var functionString = "function ({ " + declarationString + " })";
+                if (this.info.attributes.mutatePropertyEnum) {
+                    return blocks.mkText(" [" + this.parameters.map(function (p) { return (_this.info.attributes.mutatePropertyEnum + "." + p); }).join(", ") + "]," + functionString);
+                }
+                else {
+                    return blocks.mkText(functionString);
+                }
+            };
+            DestructuringMutator.prototype.getDeclaredVariables = function () {
+                var _this = this;
+                var result = {};
+                this.parameters.forEach(function (param) {
+                    result[_this.block.getFieldValue(param)] = _this.parameterTypes[param];
+                });
+                return result;
+            };
+            DestructuringMutator.prototype.isDeclaredByMutation = function (varName) {
+                var _this = this;
+                return this.parameters.some(function (param) { return _this.block.getFieldValue(param) === varName; });
+            };
+            DestructuringMutator.prototype.mutationToDom = function () {
+                var _this = this;
+                // Save the parameters that are currently visible to the DOM along with their names
+                var mutation = document.createElement("mutation");
+                var attr = this.parameters.map(function (param) {
+                    var varName = _this.block.getFieldValue(param);
+                    if (varName !== param) {
+                        _this.parameterRenames[param] = pxt.Util.htmlEscape(varName);
+                    }
+                    return pxt.Util.htmlEscape(param);
+                }).join(",");
+                mutation.setAttribute(DestructuringMutator.propertiesAttributeName, attr);
+                for (var parameter in this.parameterRenames) {
+                    if (parameter === this.parameterRenames[parameter]) {
+                        delete this.parameterRenames[parameter];
+                    }
+                }
+                mutation.setAttribute(DestructuringMutator.renameAttributeName, JSON.stringify(this.parameterRenames));
+                return mutation;
+            };
+            DestructuringMutator.prototype.domToMutation = function (xmlElement) {
+                var _this = this;
+                // Restore visible parameters based on saved DOM
+                var savedParameters = xmlElement.getAttribute(DestructuringMutator.propertiesAttributeName);
+                if (savedParameters) {
+                    var split = savedParameters.split(",");
+                    var properties_1 = [];
+                    if (this.paramIndex === undefined) {
+                        this.paramIndex = this.getParameterIndex();
+                    }
+                    split.forEach(function (saved) {
+                        // Parse the old way of storing renames to maintain backwards compatibility
+                        var parts = saved.split(":");
+                        if (_this.info.parameters[_this.paramIndex].properties.some(function (p) { return p.name === parts[0]; })) {
+                            properties_1.push({
+                                property: parts[0],
+                                newName: parts[1]
+                            });
+                        }
+                    });
+                    this.parameterRenames = undefined;
+                    if (xmlElement.hasAttribute(DestructuringMutator.renameAttributeName)) {
+                        try {
+                            this.parameterRenames = JSON.parse(xmlElement.getAttribute(DestructuringMutator.renameAttributeName));
+                        }
+                        catch (e) {
+                            console.warn("Ignoring invalid rename map in saved block mutation");
+                        }
+                    }
+                    this.parameterRenames = this.parameterRenames || {};
+                    // Create the fields for each property with default variable names
+                    this.parameters = [];
+                    properties_1.forEach(function (prop) {
+                        _this.parameters.push(prop.property);
+                        if (prop.newName && prop.newName !== prop.property) {
+                            _this.parameterRenames[prop.property] === prop.newName;
+                        }
+                    });
+                    this.updateVisibleProperties();
+                    // Override any names that the user has changed
+                    properties_1.filter(function (p) { return !!p.newName; }).forEach(function (p) { return _this.block.setFieldValue(p.newName, p.property); });
+                }
+            };
+            DestructuringMutator.prototype.updateBlock = function (subBlocks) {
+                var _this = this;
+                this.parameters = [];
+                // Ignore duplicate blocks
+                subBlocks.forEach(function (p) {
+                    if (_this.parameters.indexOf(p.name) === -1) {
+                        _this.parameters.push(p.name);
+                    }
+                });
+                this.updateVisibleProperties();
+            };
+            DestructuringMutator.prototype.getSubBlockNames = function () {
+                var _this = this;
+                this.parameters = [];
+                this.parameterTypes = {};
+                if (this.paramIndex === undefined) {
+                    this.paramIndex = this.getParameterIndex();
+                }
+                return this.info.parameters[this.paramIndex].properties.map(function (property) {
+                    // Used when compiling the destructured arguments
+                    _this.parameterTypes[property.name] = property.type;
+                    return {
+                        type: _this.propertyId(property.name),
+                        name: property.name
+                    };
+                });
+            };
+            DestructuringMutator.prototype.getVisibleBlockTypes = function () {
+                var _this = this;
+                return this.currentlyVisible.map(function (p) { return _this.propertyId(p); });
+            };
+            DestructuringMutator.prototype.updateVisibleProperties = function () {
+                var _this = this;
+                if (pxt.Util.listsEqual(this.currentlyVisible, this.parameters)) {
+                    return;
+                }
+                var dummyInput = this.block.inputList.filter(function (i) { return i.name === MutatorHelper.mutatedVariableInputName; })[0];
+                if (this.prefix && this.currentlyVisible.length === 0) {
+                    dummyInput.appendField(this.prefix, DestructuringMutator.prefixLabel);
+                }
+                this.currentlyVisible.forEach(function (param) {
+                    if (_this.parameters.indexOf(param) === -1) {
+                        var name_5 = _this.block.getFieldValue(param);
+                        // Persist renames
+                        if (name_5 !== param) {
+                            _this.parameterRenames[param] = name_5;
+                        }
+                        dummyInput.removeField(param);
+                    }
+                });
+                this.parameters.forEach(function (param) {
+                    if (_this.currentlyVisible.indexOf(param) === -1) {
+                        var fieldValue = _this.parameterRenames[param] || param;
+                        dummyInput.appendField(new Blockly.FieldVariable(fieldValue), param);
+                    }
+                });
+                if (this.prefix && this.parameters.length === 0) {
+                    dummyInput.removeField(DestructuringMutator.prefixLabel);
+                }
+                this.currentlyVisible = this.parameters;
+            };
+            DestructuringMutator.prototype.propertyId = function (property) {
+                return this.block.type + "_" + property;
+            };
+            DestructuringMutator.prototype.getParameterIndex = function () {
+                for (var i = 0; i < this.info.parameters.length; i++) {
+                    if (this.info.parameters[i].type.indexOf("=>") !== -1) {
+                        return i;
+                    }
+                }
+                return undefined;
+            };
+            DestructuringMutator.propertiesAttributeName = "callbackproperties";
+            DestructuringMutator.renameAttributeName = "renamemap";
+            // Avoid clashes by starting labels with a number
+            DestructuringMutator.prefixLabel = "0prefix_label_";
+            return DestructuringMutator;
+        }(MutatorHelper));
+        var ArrayMutator = (function (_super) {
+            __extends(ArrayMutator, _super);
+            function ArrayMutator() {
+                _super.apply(this, arguments);
+                this.count = 0;
+            }
+            ArrayMutator.prototype.getMutationType = function () {
+                return MutatorTypes.RestParameterMutator;
+            };
+            ArrayMutator.prototype.compileMutation = function (e, comments) {
+                var values = [];
+                this.forEachInput(function (block) { return values.push(blocks.compileExpression(e, block, comments)); });
+                return blocks.mkGroup(values);
+            };
+            ArrayMutator.prototype.mutationToDom = function () {
+                var mutation = document.createElement("mutation");
+                mutation.setAttribute(ArrayMutator.countAttributeName, this.count.toString());
+                return mutation;
+            };
+            ArrayMutator.prototype.domToMutation = function (xmlElement) {
+                var attribute = xmlElement.getAttribute(ArrayMutator.countAttributeName);
+                if (attribute) {
+                    try {
+                        this.count = parseInt(attribute);
+                    }
+                    catch (e) {
+                        return;
+                    }
+                    for (var i = 0; i < this.count; i++) {
+                        this.addNumberField(false, i);
+                    }
+                }
+            };
+            ArrayMutator.prototype.updateBlock = function (subBlocks) {
+                if (subBlocks) {
+                    var diff = Math.abs(this.count - subBlocks.length);
+                    if (this.count < subBlocks.length) {
+                        for (var i = 0; i < diff; i++)
+                            this.addNumberField(true, this.count);
+                    }
+                    else if (this.count > subBlocks.length) {
+                        for (var i = 0; i < diff; i++)
+                            this.removeNumberField();
+                    }
+                }
+            };
+            ArrayMutator.prototype.getSubBlockNames = function () {
+                return [{
+                        name: "Value",
+                        type: ArrayMutator.entryTypeName
+                    }];
+            };
+            ArrayMutator.prototype.getVisibleBlockTypes = function () {
+                var result = [];
+                this.forEachInput(function () { return result.push(ArrayMutator.entryTypeName); });
+                return result;
+            };
+            ArrayMutator.prototype.addNumberField = function (isNewField, index) {
+                var input = this.block.appendValueInput(ArrayMutator.valueInputPrefix + index).setCheck("Number");
+                if (isNewField) {
+                    var valueBlock = this.block.workspace.newBlock("math_number");
+                    valueBlock.initSvg();
+                    valueBlock.setShadow(true);
+                    input.connection.connect(valueBlock.outputConnection);
+                    this.block.workspace.render();
+                    this.count++;
+                }
+            };
+            ArrayMutator.prototype.removeNumberField = function () {
+                if (this.count > 0) {
+                    this.block.removeInput(ArrayMutator.valueInputPrefix + (this.count - 1));
+                }
+                this.count--;
+            };
+            ArrayMutator.prototype.forEachInput = function (cb) {
+                for (var i = 0; i < this.count; i++) {
+                    cb(this.block.getInputTargetBlock(ArrayMutator.valueInputPrefix + i), i);
+                }
+            };
+            ArrayMutator.countAttributeName = "count";
+            ArrayMutator.entryTypeName = "entry";
+            ArrayMutator.valueInputPrefix = "value_input_";
+            return ArrayMutator;
+        }(MutatorHelper));
+        var DefaultInstanceMutator = (function (_super) {
+            __extends(DefaultInstanceMutator, _super);
+            function DefaultInstanceMutator() {
+                _super.apply(this, arguments);
+                this.showing = false;
+            }
+            DefaultInstanceMutator.prototype.getMutationType = function () {
+                return MutatorTypes.DefaultInstanceMutator;
+            };
+            DefaultInstanceMutator.prototype.compileMutation = function (e, comments) {
+                if (this.showing) {
+                    var target = this.block.getInputTargetBlock(DefaultInstanceMutator.instanceInputName);
+                    if (target) {
+                        return blocks.compileExpression(e, target, comments);
+                    }
+                }
+                return undefined;
+            };
+            DefaultInstanceMutator.prototype.mutationToDom = function () {
+                var mutation = document.createElement("mutation");
+                mutation.setAttribute(DefaultInstanceMutator.attributeName, this.showing ? "true" : "false");
+                return mutation;
+            };
+            DefaultInstanceMutator.prototype.domToMutation = function (xmlElement) {
+                var attribute = xmlElement.getAttribute(DefaultInstanceMutator.attributeName);
+                if (attribute) {
+                    this.updateShape(attribute === "true");
+                }
+                else {
+                    this.updateShape(false);
+                }
+            };
+            DefaultInstanceMutator.prototype.updateBlock = function (subBlocks) {
+                this.updateShape(!!(subBlocks && subBlocks.length));
+            };
+            DefaultInstanceMutator.prototype.getSubBlockNames = function () {
+                return [{
+                        name: "Instance",
+                        type: DefaultInstanceMutator.instanceSubBlockType
+                    }];
+            };
+            DefaultInstanceMutator.prototype.getVisibleBlockTypes = function () {
+                var result = [];
+                if (this.showing) {
+                    result.push(DefaultInstanceMutator.instanceSubBlockType);
+                }
+                return result;
+            };
+            DefaultInstanceMutator.prototype.updateShape = function (show) {
+                if (this.showing !== show) {
+                    if (show && !this.block.getInputTargetBlock(DefaultInstanceMutator.instanceInputName)) {
+                        this.block.appendValueInput(DefaultInstanceMutator.instanceInputName);
+                    }
+                    else {
+                        this.block.removeInput(DefaultInstanceMutator.instanceInputName);
+                    }
+                    this.showing = show;
+                }
+            };
+            DefaultInstanceMutator.attributeName = "showing";
+            DefaultInstanceMutator.instanceInputName = "__instance__";
+            DefaultInstanceMutator.instanceSubBlockType = "instance";
+            return DefaultInstanceMutator;
+        }(MutatorHelper));
+    })(blocks = pxt.blocks || (pxt.blocks = {}));
+})(pxt || (pxt = {}));
+/// <reference path="../localtypings/pxtblockly.d.ts" />
+/// <reference path="../built/pxtlib.d.ts" />
+/// <reference path="../typings/globals/jquery/index.d.ts" />
+var pxt;
+(function (pxt) {
+    var blocks;
+    (function (blocks_11) {
+        var workspace;
+        var blocklyDiv;
+        function align(ws, emPixels) {
+            var blocks = ws.getTopBlocks(true);
+            var y = 0;
+            blocks.forEach(function (block) {
+                block.moveBy(0, y);
+                y += block.getHeightWidth().height;
+                y += emPixels; //buffer
+            });
+        }
+        (function (BlockLayout) {
+            BlockLayout[BlockLayout["Align"] = 1] = "Align";
+            // Shuffle deprecated
+            BlockLayout[BlockLayout["Clean"] = 3] = "Clean";
+            BlockLayout[BlockLayout["Flow"] = 4] = "Flow";
+        })(blocks_11.BlockLayout || (blocks_11.BlockLayout = {}));
+        var BlockLayout = blocks_11.BlockLayout;
+        function render(blocksXml, options) {
+            if (options === void 0) { options = { emPixels: 14, layout: BlockLayout.Flow }; }
+            if (!workspace) {
+                blocklyDiv = document.createElement("div");
+                blocklyDiv.style.position = "absolute";
+                blocklyDiv.style.top = "0";
+                blocklyDiv.style.left = "0";
+                blocklyDiv.style.width = "1px";
+                blocklyDiv.style.height = "1px";
+                document.body.appendChild(blocklyDiv);
+                workspace = Blockly.inject(blocklyDiv, {
+                    scrollbars: false,
+                    readOnly: true,
+                    zoom: false,
+                    sound: false,
+                    media: pxt.webConfig.commitCdnUrl + "blockly/media/",
+                    rtl: pxt.Util.isUserLanguageRtl()
+                });
+            }
+            workspace.clear();
+            try {
+                var text = blocksXml || "<xml xmlns=\"http://www.w3.org/1999/xhtml\"></xml>";
+                var xml = Blockly.Xml.textToDom(text);
+                Blockly.Xml.domToWorkspace(xml, workspace);
+                switch (options.layout) {
+                    case BlockLayout.Align:
+                        pxt.blocks.layout.verticalAlign(workspace, options.emPixels);
+                        break;
+                    case BlockLayout.Flow:
+                        pxt.blocks.layout.flow(workspace, { ratio: options.aspectRatio, useViewWidth: options.useViewWidth });
+                        break;
+                    case BlockLayout.Clean:
+                        if (workspace.cleanUp_)
+                            workspace.cleanUp_();
+                        break;
+                }
+                var metrics = workspace.getMetrics();
+                var svg = $(blocklyDiv).find('svg').clone(true, true);
+                svg.removeClass("blocklySvg").addClass('blocklyPreview');
+                svg.find('.blocklyBlockCanvas,.blocklyBubbleCanvas')
+                    .attr('transform', "translate(" + -metrics.contentLeft + ", " + -metrics.contentTop + ") scale(1)");
+                svg.find('.blocklyMainBackground').remove();
+                svg[0].setAttribute('viewBox', "0 0 " + metrics.contentWidth + " " + metrics.contentHeight);
+                svg.removeAttr('width');
+                svg.removeAttr('height');
+                if (options.emPixels) {
+                    svg[0].style.width = (metrics.contentWidth / options.emPixels) + 'em';
+                    svg[0].style.height = (metrics.contentHeight / options.emPixels) + 'em';
+                }
+                return svg[0];
+            }
+            catch (e) {
+                pxt.reportException(e);
+                return undefined;
+            }
+        }
+        blocks_11.render = render;
+        function blocksMetrics(ws) {
+            var blocks = ws.getTopBlocks(false);
+            if (!blocks.length)
+                return { width: 0, height: 0 };
+            var m = undefined;
+            blocks.forEach(function (b) {
+                var r = b.getBoundingRectangle();
+                if (!m)
+                    m = { l: r.topLeft.x, r: r.bottomRight.x, t: r.topLeft.y, b: r.bottomRight.y };
+                else {
+                    m.l = Math.min(m.l, r.topLeft.x);
+                    m.r = Math.max(m.r, r.bottomRight.y);
+                    m.t = Math.min(m.t, r.topLeft.y);
+                    m.b = Math.min(m.b, r.bottomRight.y);
+                }
+            });
+            return {
+                width: m.r - m.l,
+                height: m.b - m.t
+            };
+        }
+        blocks_11.blocksMetrics = blocksMetrics;
+    })(blocks = pxt.blocks || (pxt.blocks = {}));
+})(pxt || (pxt = {}));
+var pxt;
+(function (pxt) {
+    var docs;
+    (function (docs) {
+        var codeCard;
+        (function (codeCard) {
+            var repeat = pxt.Util.repeatMap;
+            function render(card, options) {
+                if (options === void 0) { options = {}; }
+                var repeat = pxt.Util.repeatMap;
+                var color = card.color || "";
+                if (!color) {
+                    if (card.hardware && !card.software)
+                        color = 'black';
+                    else if (card.software && !card.hardware)
+                        color = 'teal';
+                }
+                var url = card.url ? /^[^:]+:\/\//.test(card.url) ? card.url : ('/' + card.url.replace(/^\.?\/?/, ''))
+                    : undefined;
+                var link = !!url;
+                var div = function (parent, cls, tag, text) {
+                    if (tag === void 0) { tag = "div"; }
+                    if (text === void 0) { text = ''; }
+                    var d = document.createElement(tag);
+                    if (cls)
+                        d.className = cls;
+                    if (parent)
+                        parent.appendChild(d);
+                    if (text)
+                        d.appendChild(document.createTextNode(text + ''));
+                    return d;
+                };
+                var a = function (parent, href, text, cls) {
+                    var d = document.createElement('a');
+                    d.className = cls;
+                    d.href = href;
+                    d.appendChild(document.createTextNode(text));
+                    d.target = '_blank';
+                    parent.appendChild(d);
+                    return d;
+                };
+                var r = div(null, 'ui card ' + (card.color || '') + (link ? ' link' : ''), link ? "a" : "div");
+                r.setAttribute("role", "option");
+                r.setAttribute("aria-selected", "true");
+                if (url)
+                    r.href = url;
+                if (!options.hideHeader && (card.header || card.blocks || card.javascript || card.hardware || card.software || card.any)) {
+                    var h = div(r, "ui content " + (card.responsive ? " tall desktop only" : ""));
+                    var hr_1 = div(h, "right floated meta");
+                    if (card.any)
+                        div(hr_1, "ui grey circular label tiny", "i", card.any > 0 ? card.any : "");
+                    repeat(card.blocks, function (k) { return div(hr_1, "puzzle orange icon", "i"); });
+                    repeat(card.javascript, function (k) { return div(hr_1, "align left blue icon", "i"); });
+                    repeat(card.hardware, function (k) { return div(hr_1, "certificate black icon", "i"); });
+                    repeat(card.software, function (k) { return div(hr_1, "square teal icon", "i"); });
+                    if (card.header)
+                        div(h, 'description', 'span', card.header);
+                }
+                var name = (options.shortName ? card.shortName : '') || card.name;
+                var img = div(r, "ui image" + (card.responsive ? " tall landscape only" : ""));
+                if (card.label) {
+                    var lbl = document.createElement("label");
+                    lbl.className = "ui " + (card.labelClass ? card.labelClass : "orange right ribbon") + " label";
+                    lbl.textContent = card.label;
+                    img.appendChild(lbl);
+                }
+                if (card.blocksXml) {
+                    var svg = pxt.blocks.render(card.blocksXml);
+                    if (!svg) {
+                        console.error("failed to render blocks");
+                        pxt.debug(card.blocksXml);
+                    }
+                    else {
+                        var holder = div(img, '');
+                        holder.setAttribute('style', 'width:100%; min-height:10em');
+                        holder.appendChild(svg);
+                    }
+                }
+                if (card.typeScript) {
+                    var pre = document.createElement("pre");
+                    pre.appendChild(document.createTextNode(card.typeScript));
+                    img.appendChild(pre);
+                }
+                if (card.imageUrl) {
+                    var imageWrapper = document.createElement("div");
+                    imageWrapper.className = "ui imagewrapper";
+                    var image = document.createElement("img");
+                    image.className = "ui cardimage";
+                    image.src = card.imageUrl;
+                    image.alt = name;
+                    image.setAttribute("role", "presentation");
+                    imageWrapper.appendChild(image);
+                    img.appendChild(imageWrapper);
+                }
+                if (card.youTubeId) {
+                    var screenshot = document.createElement("img");
+                    screenshot.className = "ui image";
+                    screenshot.src = "https://img.youtube.com/vi/" + card.youTubeId + "/maxresdefault.jpg";
+                    img.appendChild(screenshot);
+                }
+                if (card.cardType == "file") {
+                    var file = div(r, "ui fileimage");
+                    img.appendChild(file);
+                }
+                if (name || card.description) {
+                    var ct = div(r, "ui content");
+                    if (name) {
+                        r.setAttribute("aria-label", name);
+                        if (url && !link)
+                            a(ct, url, name, 'header');
+                        else
+                            div(ct, 'header', 'div', name);
+                    }
+                    if (card.description) {
+                        var descr = div(ct, 'ui description');
+                        descr.appendChild(document.createTextNode(card.description.split('.')[0] + '.'));
+                    }
+                }
+                if (card.time) {
+                    var meta = div(r, "meta");
+                    if (card.time) {
+                        var m = div(meta, "date", "span");
+                        m.appendChild(document.createTextNode(pxt.Util.timeSince(card.time)));
+                    }
+                }
+                if (card.extracontent) {
+                    var extracontent = div(r, "extra content", "div");
+                    extracontent.appendChild(document.createTextNode(card.extracontent));
+                }
+                return r;
+            }
+            codeCard.render = render;
+        })(codeCard = docs.codeCard || (docs.codeCard = {}));
+    })(docs = pxt.docs || (pxt.docs = {}));
+})(pxt || (pxt = {}));
+/// <reference path="../../localtypings/blockly.d.ts" />
+var pxtblockly;
+(function (pxtblockly) {
+    var FieldColorWheel = (function (_super) {
+        __extends(FieldColorWheel, _super);
+        /**
+         * Class for a color wheel field.
+         * @param {number|string} value The initial content of the field.
+         * @param {Function=} opt_validator An optional function that is called
+         *     to validate any constraints on what the user entered.  Takes the new
+         *     text as an argument and returns either the accepted text, a replacement
+         *     text, or null to abort the change.
+         * @extends {Blockly.FieldNumber}
+         * @constructor
+         */
+        function FieldColorWheel(value_, params, opt_validator) {
+            _super.call(this, String(value_), '0', '255', null, '10', 'Color', opt_validator);
+            this.isFieldCustom_ = true;
+            this.params = params;
+            if (this.params['min'])
+                this.min_ = parseFloat(this.params['min']);
+            if (this.params['max'])
+                this.max_ = parseFloat(this.params['max']);
+            if (this.params['label'])
+                this.labelText_ = this.params['label'];
+            if (this.params['channel'])
+                this.channel_ = this.params['channel'];
+        }
+        /**
+         * Set the gradient CSS properties for the given node and channel
+         * @param {Node} node - The DOM node the gradient will be set on.
+         * @private
+         */
+        FieldColorWheel.prototype.setBackground_ = function (node) {
+            var gradient = this.createColourStops_().join(',');
+            goog.style.setStyle(node, 'background', '-moz-linear-gradient(left, ' + gradient + ')');
+            goog.style.setStyle(node, 'background', '-webkit-linear-gradient(left, ' + gradient + ')');
+            goog.style.setStyle(node, 'background', '-o-linear-gradient(left, ' + gradient + ')');
+            goog.style.setStyle(node, 'background', '-ms-linear-gradient(left, ' + gradient + ')');
+            goog.style.setStyle(node, 'background', 'linear-gradient(left, ' + gradient + ')');
+            if (this.params['sliderWidth'])
+                goog.style.setStyle(node, 'width', this.params['sliderWidth'] + "px");
+        };
+        ;
+        FieldColorWheel.prototype.setReadout_ = function (readout, value) {
+            var hexValue = this.colorWheel(parseInt(value), this.channel_);
+            readout.innerHTML = "<span class=\"blocklyColorReadout\" style=\"background-color: " + hexValue + ";\"></span>";
+        };
+        FieldColorWheel.prototype.createColourStops_ = function () {
+            var stops = [];
+            for (var n = 0; n <= 255; n += 20) {
+                stops.push(this.colorWheel(n, this.channel_));
+            }
+            return stops;
+        };
+        ;
+        FieldColorWheel.prototype.colorWheel = function (wheelPos, channel) {
+            if (channel == "hsvfast") {
+                return this.hsvFast(wheelPos, 255, 255);
+            }
+            else {
+                wheelPos = 255 - wheelPos;
+                if (wheelPos < 85) {
+                    return this.hex(wheelPos * 3, 255, 255 - wheelPos * 3);
+                }
+                if (wheelPos < 170) {
+                    wheelPos -= 85;
+                    return this.hex(255, 255 - wheelPos * 3, wheelPos * 3);
+                }
+                wheelPos -= 170;
+                return this.hex(255 - wheelPos * 3, wheelPos * 3, 255);
+            }
+        };
+        FieldColorWheel.prototype.hsvFast = function (hue, sat, val) {
+            var h = (hue % 255) >> 0;
+            if (h < 0)
+                h += 255;
+            // scale down to 0..192
+            h = (h * 192 / 255) >> 0;
+            //reference: based on FastLED's hsv2rgb rainbow algorithm [https://github.com/FastLED/FastLED](MIT)
+            var invsat = 255 - sat;
+            var brightness_floor = ((val * invsat) / 255) >> 0;
+            var color_amplitude = val - brightness_floor;
+            var section = (h / 0x40) >> 0; // [0..2]
+            var offset = (h % 0x40) >> 0; // [0..63]
+            var rampup = offset;
+            var rampdown = (0x40 - 1) - offset;
+            var rampup_amp_adj = ((rampup * color_amplitude) / (255 / 4)) >> 0;
+            var rampdown_amp_adj = ((rampdown * color_amplitude) / (255 / 4)) >> 0;
+            var rampup_adj_with_floor = (rampup_amp_adj + brightness_floor);
+            var rampdown_adj_with_floor = (rampdown_amp_adj + brightness_floor);
+            var r;
+            var g;
+            var b;
+            if (section) {
+                if (section == 1) {
+                    // section 1: 0x40..0x7F
+                    r = brightness_floor;
+                    g = rampdown_adj_with_floor;
+                    b = rampup_adj_with_floor;
+                }
+                else {
+                    // section 2; 0x80..0xBF
+                    r = rampup_adj_with_floor;
+                    g = brightness_floor;
+                    b = rampdown_adj_with_floor;
+                }
+            }
+            else {
+                // section 0: 0x00..0x3F
+                r = rampdown_adj_with_floor;
+                g = rampup_adj_with_floor;
+                b = brightness_floor;
+            }
+            return this.hex(r, g, b);
+        };
+        FieldColorWheel.prototype.hex = function (red, green, blue) {
+            return "#" + this.componentToHex(red & 0xFF) + this.componentToHex(green & 0xFF) + this.componentToHex(blue & 0xFF);
+        };
+        FieldColorWheel.prototype.componentToHex = function (c) {
+            var hex = c.toString(16);
+            return hex.length == 1 ? "0" + hex : hex;
+        };
+        return FieldColorWheel;
+    }(Blockly.FieldSlider));
+    pxtblockly.FieldColorWheel = FieldColorWheel;
+})(pxtblockly || (pxtblockly = {}));
+/// <reference path="../../localtypings/blockly.d.ts" />
+var pxtblockly;
+(function (pxtblockly) {
+    var FieldColorNumber = (function (_super) {
+        __extends(FieldColorNumber, _super);
+        function FieldColorNumber(text, params, opt_validator) {
+            _super.call(this, text, opt_validator);
+            this.isFieldCustom_ = true;
+            if (params.colours)
+                this.setColours(JSON.parse(params.colours));
+            if (params.columns)
+                this.setColumns(parseInt(params.columns));
+            if (params.className)
+                this.className_ = params.className;
+        }
+        /**
+         * Return the current colour.
+         * @param {boolean} opt_asHex optional field if the returned value should be a hex
+         * @return {string} Current colour in '#rrggbb' format.
+         */
+        FieldColorNumber.prototype.getValue = function (opt_asHex) {
+            if (!opt_asHex && this.colour_.indexOf('#') > -1) {
+                return "0x" + this.colour_.replace(/^#/, '');
+            }
+            return this.colour_;
+        };
+        /**
+         * Set the colour.
+         * @param {string} colour The new colour in '#rrggbb' format.
+         */
+        FieldColorNumber.prototype.setValue = function (colour) {
+            if (colour.indexOf('0x') > -1) {
+                colour = "#" + colour.substr(2);
+            }
+            if (this.sourceBlock_ && Blockly.Events.isEnabled() &&
+                this.colour_ != colour) {
+                Blockly.Events.fire(new Blockly.Events.BlockChange(this.sourceBlock_, 'field', this.name, this.colour_, colour));
+            }
+            this.colour_ = colour;
+            if (this.sourceBlock_) {
+                this.sourceBlock_.setColour(colour, colour, colour);
+            }
+        };
+        FieldColorNumber.prototype.showEditor_ = function () {
+            _super.prototype.showEditor_.call(this);
+            if (this.className_ && this.colorPicker_)
+                Blockly.utils.addClass((this.colorPicker_.getElement()), this.className_);
+        };
+        return FieldColorNumber;
+    }(Blockly.FieldColour));
+    pxtblockly.FieldColorNumber = FieldColorNumber;
+})(pxtblockly || (pxtblockly = {}));
+/// <reference path="../../localtypings/pxtblockly.d.ts" />
+var pxtblockly;
+(function (pxtblockly) {
+    var FieldGridPicker = (function (_super) {
+        __extends(FieldGridPicker, _super);
+        function FieldGridPicker(text, options, validator) {
+            _super.call(this, options.data);
+            this.isFieldCustom_ = true;
+            this.tooltips_ = [];
+            this.columns_ = parseInt(options.columns) || 4;
+            this.maxRows_ = parseInt(options.maxRows) || 0;
+            this.width_ = parseInt(options.width) || 400;
+            this.backgroundColour_ = pxtblockly.parseColour(options.colour);
+            this.itemColour_ = options.itemColour || "rgba(255, 255, 255, 0.6)";
+            this.borderColour_ = Blockly.PXTUtils.fadeColour(this.backgroundColour_, 0.4, false);
+            var tooltipCfg = {
+                xOffset: parseInt(options.tooltipsXOffset) || 15,
+                yOffset: parseInt(options.tooltipsYOffset) || -10
+            };
+            this.tooltipConfig_ = tooltipCfg;
+            this.hasSearchBar_ = !!options.hasSearchBar || false;
+            this.hideRect_ = !!options.hideRect || false;
+        }
+        /**
+         * When disposing the grid picker, make sure the tooltips are disposed too.
+         * @public
+         */
+        FieldGridPicker.prototype.dispose = function () {
+            _super.prototype.dispose.call(this);
+            this.disposeTooltips();
+        };
+        /**
+         * Create blocklyGridPickerRows and add them to table container
+         * @param options
+         * @param tableContainer
+         */
+        FieldGridPicker.prototype.populateTableContainer = function (options, tableContainer) {
+            this.disposeTooltips();
+            tableContainer.removeChildren(true);
+            if (options.length == 0) {
+                this.firstItem_ = undefined;
+            }
+            for (var i = 0; i < options.length / this.columns_; i++) {
+                var row = this.createRow(i, options);
+                tableContainer.addChild(row, true);
+            }
+            var tableContainerDom = tableContainer.getElement();
+            if (tableContainerDom) {
+                var menuItemsDom = tableContainerDom.childNodes;
+                for (var i = 0; i < menuItemsDom.length; ++i) {
+                    var elem = menuItemsDom[i];
+                    elem.className = "blocklyGridPickerRow";
+                }
+            }
+        };
+        /**
+         * Add the tooltips and style the items
+         * @param options
+         * @param tableContainer
+         */
+        FieldGridPicker.prototype.createTooltips = function (options, tableContainer) {
+            var _this = this;
+            var needToFloatLeft = (options.length < this.columns_);
+            var tableContainerDom = tableContainer.getElement();
+            var menuItemsDom = tableContainerDom.getElementsByClassName('goog-menuitem');
+            var largestTextItem = -1;
+            var _loop_3 = function(i) {
+                var elem = menuItemsDom[i];
+                elem.style.borderColor = this_2.backgroundColour_;
+                elem.style.backgroundColor = this_2.itemColour_;
+                if (needToFloatLeft) {
+                    elem.className += " floatLeft";
+                }
+                var tooltipText = options[i][0].alt;
+                if (tooltipText) {
+                    var tooltip_1 = new goog.ui.Tooltip(elem, tooltipText);
+                    var onShowOld_1 = tooltip_1.onShow;
+                    tooltip_1.onShow = function () {
+                        onShowOld_1.call(tooltip_1);
+                        var newPos = new goog.positioning.ClientPosition(tooltip_1.cursorPosition.x + _this.tooltipConfig_.xOffset, tooltip_1.cursorPosition.y + _this.tooltipConfig_.yOffset);
+                        tooltip_1.setPosition(newPos);
+                    };
+                    tooltip_1.setShowDelayMs(0);
+                    tooltip_1.className = 'goog-tooltip blocklyGridPickerTooltip';
+                    elem.addEventListener('mousemove', function (e) {
+                        var newPos = new goog.positioning.ClientPosition(e.clientX + _this.tooltipConfig_.xOffset, e.clientY + _this.tooltipConfig_.yOffset);
+                        tooltip_1.setPosition(newPos);
+                    });
+                    this_2.tooltips_.push(tooltip_1);
+                }
+                else {
+                    var elemWidth = goog.style.getSize(elem).width;
+                    if (elemWidth > largestTextItem) {
+                        largestTextItem = elemWidth;
+                    }
+                }
+            };
+            var this_2 = this;
+            for (var i = 0; i < menuItemsDom.length; ++i) {
+                _loop_3(i);
+            }
+            // Resize text items so they have a uniform width
+            if (largestTextItem > -1) {
+                for (var i = 0; i < menuItemsDom.length; ++i) {
+                    var elem = menuItemsDom[i];
+                    goog.style.setWidth(elem, largestTextItem);
+                }
+            }
+        };
+        /**
+         * Whether or not to show a box around the dropdown menu.
+         * @return {boolean} True if we should show a box (rect) around the dropdown menu. Otherwise false.
+         * @private
+         */
+        FieldGridPicker.prototype.shouldShowRect_ = function () {
+            return !this.hideRect_ ? !this.sourceBlock_.isShadow() : false;
+        };
+        /**
+         * Selects menu item and closes gridpicker
+         * @param item = the item to select
+         */
+        FieldGridPicker.prototype.selectItem = function (item) {
+            if (this.menu_) {
+                this.onItemSelected(this.menu_, item);
+                this.close();
+            }
+        };
+        /**
+         * Closes the gridpicker.
+         */
+        FieldGridPicker.prototype.close = function () {
+            Blockly.WidgetDiv.hideIfOwner(this);
+            Blockly.Events.setGroup(false);
+            this.disposeTooltips();
+        };
+        /**
+         * Getter method
+         */
+        FieldGridPicker.prototype.getFirstItem = function () {
+            return this.firstItem_;
+        };
+        /**
+         * Highlight first item in menu, de-select and de-highlight all others
+         */
+        FieldGridPicker.prototype.highlightFirstItem = function (tableContainerDom) {
+            var menuItemsDom = tableContainerDom.childNodes;
+            if (menuItemsDom.length && menuItemsDom[0].childNodes) {
+                for (var row = 0; row < menuItemsDom.length; ++row) {
+                    var rowLength = menuItemsDom[row].childNodes.length;
+                    for (var col = 0; col < rowLength; ++col) {
+                        var menuItem = menuItemsDom[row].childNodes[col];
+                        menuItem.classList.remove("goog-menuitem-highlight");
+                        menuItem.classList.remove("goog-option-selected");
+                    }
+                }
+                var firstItem = menuItemsDom[0].childNodes[0];
+                firstItem.className += " goog-menuitem-highlight";
+            }
+        };
+        /**
+         * Scroll menu to item that equals current value of gridpicker
+         */
+        FieldGridPicker.prototype.highlightAndScrollSelected = function (tableContainer, scrollContainerDom) {
+            var tableContainerDom = tableContainer.getElement();
+            var rowCount = tableContainer.getChildCount();
+            var selectedItemDom;
+            for (var row = 0; row < rowCount; ++row) {
+                for (var col = 0; col < this.columns_; ++col) {
+                    var val = tableContainer.getChildAt(row).getChildAt(col).getValue();
+                    if (this.value_ === val) {
+                        selectedItemDom = tableContainerDom.children[row].children[col];
+                        break;
+                    }
+                }
+                if (selectedItemDom) {
+                    goog.style.scrollIntoContainerView(selectedItemDom, scrollContainerDom, true);
+                    break;
+                }
+            }
+        };
+        /**
+         * Create a dropdown menu under the text.
+         * @private
+         */
+        FieldGridPicker.prototype.showEditor_ = function () {
+            var _this = this;
+            Blockly.WidgetDiv.show(this, this.sourceBlock_.RTL, null);
+            this.disposeTooltips();
+            var options = this.getOptions();
+            // Container for the menu rows
+            var tableContainer = new goog.ui.Control();
+            //const tableContainer = this.getTableContainer(options);
+            this.populateTableContainer(options, tableContainer);
+            // Container used to limit the height of the tableContainer, because the tableContainer uses
+            // display: table, which ignores height and maxHeight
+            var scrollContainer = new goog.ui.Control();
+            // Needed to correctly style borders and padding around the scrollContainer, because the padding around the
+            // scrollContainer is part of the scrollable area and will not be correctly shown at the top and bottom
+            // when scrolling
+            var paddingContainer = new goog.ui.Control();
+            // Record windowSize and scrollOffset before adding menu.
+            var windowSize = goog.dom.getViewportSize();
+            var scrollOffset = goog.style.getViewportPageOffset(document);
+            var xy = this.getAbsoluteXY_();
+            var borderBBox = this.getScaledBBox_();
+            var div = Blockly.WidgetDiv.DIV;
+            scrollContainer.addChild(tableContainer, true);
+            paddingContainer.addChild(scrollContainer, true);
+            paddingContainer.render(div);
+            var paddingContainerDom = paddingContainer.getElement();
+            var scrollContainerDom = scrollContainer.getElement();
+            var tableContainerDom = tableContainer.getElement();
+            // Search bar
+            if (this.hasSearchBar_) {
+                var searchBarDiv = document.createElement("div");
+                searchBarDiv.setAttribute("class", "ui fluid icon input");
+                var searchIcon = document.createElement("i");
+                searchIcon.setAttribute("class", "search icon");
+                var searchBar_1 = document.createElement("input");
+                searchBar_1.setAttribute("type", "search");
+                searchBar_1.setAttribute("id", "search-bar");
+                searchBar_1.setAttribute("class", "blocklyGridPickerSearchBar");
+                searchBar_1.setAttribute("placeholder", pxt.Util.lf("Search"));
+                searchBar_1.addEventListener("click", function () {
+                    searchBar_1.focus();
+                    searchBar_1.setSelectionRange(0, searchBar_1.value.length);
+                });
+                searchBar_1.addEventListener("keyup", Util.debounce(function () {
+                    var text = searchBar_1.value;
+                    var re = new RegExp(text, "i");
+                    var filteredOptions = options.filter(function (block) {
+                        var alt = block[0].alt; // Human-readable text or image.
+                        var value = block[1]; // Language-neutral value.
+                        return alt ? re.test(alt) : re.test(value);
+                    });
+                    _this.populateTableContainer.bind(_this)(filteredOptions, tableContainer);
+                    _this.createTooltips(filteredOptions, tableContainer);
+                    if (text) {
+                        _this.highlightFirstItem(tableContainerDom);
+                    }
+                    else {
+                        _this.highlightAndScrollSelected(tableContainer, scrollContainerDom);
+                    }
+                }, 300, false));
+                searchBar_1.addEventListener("keyup", function (e) {
+                    if (e.keyCode == 13) {
+                        var text = searchBar_1.value;
+                        var firstItem = _this.getFirstItem();
+                        if (text && firstItem) {
+                            _this.selectItem(firstItem);
+                        }
+                    }
+                });
+                searchBarDiv.appendChild(searchBar_1);
+                searchBarDiv.appendChild(searchIcon);
+                paddingContainerDom.insertBefore(searchBarDiv, paddingContainerDom.childNodes[0]);
+                searchBar_1.focus();
+            }
+            paddingContainerDom.style.border = "solid 1px " + this.borderColour_;
+            // Resize the grid picker if width > screen width
+            if (this.width_ > windowSize.width) {
+                this.width_ = windowSize.width;
+            }
+            tableContainerDom.style.width = this.width_ + 'px';
+            tableContainerDom.style.backgroundColor = this.backgroundColour_;
+            scrollContainerDom.style.backgroundColor = this.backgroundColour_;
+            paddingContainerDom.style.backgroundColor = this.backgroundColour_;
+            tableContainerDom.className = 'blocklyGridPickerMenu';
+            scrollContainerDom.className = 'blocklyGridPickerScroller';
+            paddingContainerDom.className = 'blocklyGridPickerPadder';
+            this.createTooltips(options, tableContainer);
+            // Record current container sizes after adding menu.
+            var paddingContainerSize = goog.style.getSize(paddingContainerDom);
+            var scrollContainerSize = goog.style.getSize(scrollContainerDom);
+            // Recalculate dimensions for the total content, not only box.
+            scrollContainerSize.height = scrollContainerDom.scrollHeight;
+            scrollContainerSize.width = scrollContainerDom.scrollWidth;
+            paddingContainerSize.height = paddingContainerDom.scrollHeight;
+            paddingContainerSize.width = paddingContainerDom.scrollWidth;
+            // Limit scroll container's height if a row limit was specified
+            if (this.maxRows_ > 0) {
+                var firstRowDom = tableContainerDom.children[0];
+                var rowSize = goog.style.getSize(firstRowDom);
+                // Compute maxHeight using maxRows + 0.3 to partially show next row, to hint at scrolling
+                var maxHeight = rowSize.height * (this.maxRows_ + 0.3);
+                // If the current height is greater than the computed max height, limit the height of the scroll
+                // container and increase its width to accomodate the scrollbar
+                if (scrollContainerSize.height > maxHeight) {
+                    scrollContainerDom.style.overflowY = "auto";
+                    goog.style.setHeight(scrollContainerDom, maxHeight);
+                    // Calculate total border, margin and padding width
+                    var scrollPaddings = goog.style.getPaddingBox(scrollContainerDom);
+                    var scrollPaddingWidth = scrollPaddings.left + scrollPaddings.right;
+                    var scrollMargins = goog.style.getMarginBox(scrollContainerDom);
+                    var scrollMarginWidth = scrollMargins.left + scrollMargins.right;
+                    var scrollBorders = goog.style.getBorderBox(scrollContainerDom);
+                    var scrollBorderWidth = scrollBorders.left + scrollBorders.right;
+                    var totalExtraWidth = scrollPaddingWidth + scrollMarginWidth + scrollBorderWidth;
+                    // Increase scroll container's width by the width of the scrollbar, so that we don't have horizontal scrolling
+                    var scrollbarWidth = scrollContainerDom.offsetWidth - scrollContainerDom.clientWidth - totalExtraWidth;
+                    goog.style.setWidth(scrollContainerDom, scrollContainerSize.width + scrollbarWidth);
+                    // Refresh the padding container's dimensions
+                    paddingContainerSize.height = paddingContainerDom.scrollHeight;
+                    paddingContainerSize.width = paddingContainerDom.scrollWidth;
+                    // Scroll the currently selected item into view
+                    this.highlightAndScrollSelected(tableContainer, scrollContainerDom);
+                }
+            }
+            // Position the menu.
+            // Flip menu vertically if off the bottom.
+            if (xy.y + paddingContainerSize.height + borderBBox.height >=
+                windowSize.height + scrollOffset.y) {
+                xy.y -= paddingContainerSize.height + 2;
+            }
+            else {
+                xy.y += borderBBox.height;
+            }
+            if (this.sourceBlock_.RTL) {
+                xy.x += paddingContainerSize.width / 2 - borderBBox.width / 2;
+                // Don't go offscreen left.
+                if (xy.x < scrollOffset.x + paddingContainerSize.width) {
+                    xy.x = scrollOffset.x + paddingContainerSize.width;
+                }
+            }
+            else {
+                xy.x += borderBBox.width / 2 - paddingContainerSize.width / 2;
+                // Don't go offscreen right.
+                if (xy.x > windowSize.width + scrollOffset.x - paddingContainerSize.width) {
+                    xy.x = windowSize.width + scrollOffset.x - paddingContainerSize.width;
+                }
+            }
+            Blockly.WidgetDiv.position(xy.x, xy.y, windowSize, scrollOffset, this.sourceBlock_.RTL);
+            goog.style.setHeight(div, "auto");
+        };
+        FieldGridPicker.prototype.createRow = function (row, options) {
+            var _this = this;
+            var columns = this.columns_;
+            var menu = new goog.ui.Menu();
+            menu.setRightToLeft(this.sourceBlock_.RTL);
+            for (var i = (columns * row); i < Math.min((columns * row) + columns, options.length); i++) {
+                var content = options[i][0]; // Human-readable text or image.
+                var value = options[i][1]; // Language-neutral value.
+                if (typeof content == 'object') {
+                    // An image, not text.
+                    var image = new Image(content['width'], content['height']);
+                    image.src = content['src'];
+                    image.alt = content['alt'] || '';
+                    content = image;
+                }
+                var menuItem = new goog.ui.MenuItem(content);
+                menuItem.setRightToLeft(this.sourceBlock_.RTL);
+                menuItem.setValue(value);
+                menuItem.setCheckable(true);
+                menuItem.setChecked(value == this.value_);
+                menu.addChild(menuItem, true);
+                if (i == 0) {
+                    this.firstItem_ = menuItem;
+                }
+            }
+            // Listen for mouse/keyboard events.
+            goog.events.listen(menu, goog.ui.Component.EventType.ACTION, function (e) {
+                var menuItem = e.target;
+                if (menuItem) {
+                    _this.selectItem.bind(_this)(menuItem);
+                }
+            });
+            this.menu_ = menu;
+            return menu;
+        };
+        /**
+         * Disposes the tooltip DOM elements.
+         * @private
+         */
+        FieldGridPicker.prototype.disposeTooltips = function () {
+            if (this.tooltips_ && this.tooltips_.length) {
+                this.tooltips_.forEach(function (t) { return t.dispose(); });
+                this.tooltips_ = [];
+            }
+        };
+        /**
+         * Sets the text in this field.  Trigger a rerender of the source block.
+         * @param {?string} text New text.
+         */
+        FieldGridPicker.prototype.setText = function (text) {
+            if (text === null || text === this.text_) {
+                // No change if null.
+                return;
+            }
+            this.text_ = text;
+            this.updateTextNode_();
+            if (this.imageJson_ && this.textElement_) {
+                // Update class for dropdown text.
+                // This class is reset every time updateTextNode_ is called.
+                this.textElement_.setAttribute('class', this.textElement_.getAttribute('class') + ' blocklyHidden');
+                this.imageElement_.parentNode.appendChild(this.arrow_);
+            }
+            else if (this.textElement_) {
+                // Update class for dropdown text.
+                // This class is reset every time updateTextNode_ is called.
+                this.textElement_.setAttribute('class', this.textElement_.getAttribute('class') + ' blocklyDropdownText');
+                this.textElement_.parentNode.appendChild(this.arrow_);
+            }
+            if (this.sourceBlock_ && this.sourceBlock_.rendered) {
+                this.sourceBlock_.render();
+                this.sourceBlock_.bumpNeighbours_();
+            }
+        };
+        ;
+        /**
+         * Updates the width of the field. This calls getCachedWidth which won't cache
+         * the approximated width on IE/Edge when `getComputedTextLength` fails. Once
+         * it eventually does succeed, the result will be cached.
+         **/
+        FieldGridPicker.prototype.updateWidth = function () {
+            var width;
+            if (this.imageJson_) {
+                width = this.imageJson_.width + 5;
+                this.arrowY_ = this.imageJson_.height / 2;
+            }
+            else {
+                // Calculate width of field
+                width = Blockly.Field.getCachedWidth(this.textElement_);
+            }
+            // Add padding to left and right of text.
+            if (this.EDITABLE) {
+                width += Blockly.BlockSvg.EDITABLE_FIELD_PADDING;
+            }
+            // Adjust width for drop-down arrows.
+            this.arrowWidth_ = 0;
+            if (this.positionArrow) {
+                this.arrowWidth_ = this.positionArrow(width);
+                width += this.arrowWidth_;
+            }
+            // Add padding to any drawn box.
+            if (this.box_) {
+                width += 2 * Blockly.BlockSvg.BOX_FIELD_PADDING;
+            }
+            // Set width of the field.
+            this.size_.width = width;
+        };
+        ;
+        /**
+         * Update the text node of this field to display the current text.
+         * @private
+         */
+        FieldGridPicker.prototype.updateTextNode_ = function () {
+            if (!this.textElement_ && !this.imageElement_) {
+                // Not rendered yet.
+                return;
+            }
+            var text = this.text_;
+            if (text.length > this.maxDisplayLength) {
+                // Truncate displayed string and add an ellipsis ('...').
+                text = text.substring(0, this.maxDisplayLength - 2) + '\u2026';
+                // Add special class for sizing font when truncated
+                this.textElement_.setAttribute('class', 'blocklyText blocklyTextTruncated');
+            }
+            else {
+                this.textElement_.setAttribute('class', 'blocklyText');
+            }
+            // Empty the text element.
+            goog.dom.removeChildren(/** @type {!Element} */ (this.textElement_));
+            goog.dom.removeNode(this.imageElement_);
+            this.imageElement_ = null;
+            if (this.imageJson_) {
+                // Image option is selected.
+                this.imageElement_ = Blockly.utils.createSvgElement('image', { 'y': 5, 'x': 8, 'height': this.imageJson_.height + 'px',
+                    'width': this.imageJson_.width + 'px', cursor: 'pointer' });
+                this.imageElement_.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', this.imageJson_.src);
+                this.size_.height = Number(this.imageJson_.height) + 10;
+                this.textElement_.parentNode.appendChild(this.imageElement_);
+            }
+            else {
+                // Replace whitespace with non-breaking spaces so the text doesn't collapse.
+                text = text.replace(/\s/g, Blockly.Field.NBSP);
+                if (this.sourceBlock_.RTL && text) {
+                    // The SVG is LTR, force text to be RTL.
+                    text += '\u200F';
+                }
+                if (!text) {
+                    // Prevent the field from disappearing if empty.
+                    text = Blockly.Field.NBSP;
+                }
+                var textNode = document.createTextNode(text);
+                this.textElement_.appendChild(textNode);
+            }
+            // Cached width is obsolete.  Clear it.
+            this.size_.width = 0;
+        };
+        ;
+        return FieldGridPicker;
+    }(Blockly.FieldDropdown));
+    pxtblockly.FieldGridPicker = FieldGridPicker;
+})(pxtblockly || (pxtblockly = {}));
+/// <reference path="../../localtypings/pxtblockly.d.ts" />
+var pxtblockly;
+(function (pxtblockly) {
+    var FieldImageDropdown = (function (_super) {
+        __extends(FieldImageDropdown, _super);
+        function FieldImageDropdown(text, options, validator) {
+            _super.call(this, options.data);
+            this.isFieldCustom_ = true;
+            /**
+             * Callback for when a button is clicked inside the drop-down.
+             * Should be bound to the FieldIconMenu.
+             * @param {Event} e DOM event for the click/touch
+             * @private
+             */
+            this.buttonClick_ = function (e) {
+                var value = e.target.getAttribute('data-value');
+                this.setValue(value);
+                Blockly.DropDownDiv.hide();
+            };
+            /**
+             * Callback for when the drop-down is hidden.
+             */
+            this.onHide_ = function () {
+                Blockly.DropDownDiv.content_.removeAttribute('role');
+                Blockly.DropDownDiv.content_.removeAttribute('aria-haspopup');
+                Blockly.DropDownDiv.content_.removeAttribute('aria-activedescendant');
+            };
+            this.columns_ = parseInt(options.columns);
+            this.maxRows_ = parseInt(options.maxRows) || 0;
+            this.width_ = parseInt(options.width) || 300;
+            this.backgroundColour_ = pxtblockly.parseColour(options.colour);
+            this.itemColour_ = options.itemColour || "rgba(255, 255, 255, 0.6)";
+            this.borderColour_ = Blockly.PXTUtils.fadeColour(this.backgroundColour_, 0.4, false);
+        }
+        /**
+         * Create a dropdown menu under the text.
+         * @private
+         */
+        FieldImageDropdown.prototype.showEditor_ = function () {
+            // If there is an existing drop-down we own, this is a request to hide the drop-down.
+            if (Blockly.DropDownDiv.hideIfOwner(this)) {
+                return;
+            }
+            // If there is an existing drop-down someone else owns, hide it immediately and clear it.
+            Blockly.DropDownDiv.hideWithoutAnimation();
+            Blockly.DropDownDiv.clearContent();
+            // Populate the drop-down with the icons for this field.
+            var dropdownDiv = Blockly.DropDownDiv.getContentDiv();
+            var contentDiv = document.createElement('div');
+            // Accessibility properties
+            contentDiv.setAttribute('role', 'menu');
+            contentDiv.setAttribute('aria-haspopup', 'true');
+            var options = this.getOptions();
+            for (var i = 0, option = void 0; option = options[i]; i++) {
+                var content = options[i][0]; // Human-readable text or image.
+                var value = options[i][1]; // Language-neutral value.
+                // Icons with the type property placeholder take up space but don't have any functionality
+                // Use for special-case layouts
+                if (content.type == 'placeholder') {
+                    var placeholder = document.createElement('span');
+                    placeholder.setAttribute('class', 'blocklyDropDownPlaceholder');
+                    placeholder.style.width = content.width + 'px';
+                    placeholder.style.height = content.height + 'px';
+                    contentDiv.appendChild(placeholder);
+                    continue;
+                }
+                var button = document.createElement('button');
+                button.setAttribute('id', ':' + i); // For aria-activedescendant
+                button.setAttribute('role', 'menuitem');
+                button.setAttribute('class', 'blocklyDropDownButton');
+                button.title = content.alt;
+                if (this.columns_) {
+                    button.style.width = ((this.width_ / this.columns_) - 8) + 'px';
+                    button.style.height = ((this.width_ / this.columns_) - 8) + 'px';
+                }
+                else {
+                    button.style.width = content.width + 'px';
+                    button.style.height = content.height + 'px';
+                }
+                var backgroundColor = this.backgroundColour_;
+                if (value == this.getValue()) {
+                    // This icon is selected, show it in a different colour
+                    backgroundColor = this.sourceBlock_.getColourTertiary();
+                    button.setAttribute('aria-selected', 'true');
+                }
+                button.style.backgroundColor = backgroundColor;
+                button.style.borderColor = this.borderColour_;
+                Blockly.bindEvent_(button, 'click', this, this.buttonClick_);
+                Blockly.bindEvent_(button, 'mouseup', this, this.buttonClick_);
+                // These are applied manually instead of using the :hover pseudoclass
+                // because Android has a bad long press "helper" menu and green highlight
+                // that we must prevent with ontouchstart preventDefault
+                Blockly.bindEvent_(button, 'mousedown', button, function (e) {
+                    this.setAttribute('class', 'blocklyDropDownButton blocklyDropDownButtonHover');
+                    e.preventDefault();
+                });
+                Blockly.bindEvent_(button, 'mouseover', button, function () {
+                    this.setAttribute('class', 'blocklyDropDownButton blocklyDropDownButtonHover');
+                    contentDiv.setAttribute('aria-activedescendant', this.id);
+                });
+                Blockly.bindEvent_(button, 'mouseout', button, function () {
+                    this.setAttribute('class', 'blocklyDropDownButton');
+                    contentDiv.removeAttribute('aria-activedescendant');
+                });
+                var buttonImg = document.createElement('img');
+                buttonImg.src = content.src;
+                //buttonImg.alt = icon.alt;
+                // Upon click/touch, we will be able to get the clicked element as e.target
+                // Store a data attribute on all possible click targets so we can match it to the icon.
+                button.setAttribute('data-value', value);
+                buttonImg.setAttribute('data-value', value);
+                button.appendChild(buttonImg);
+                contentDiv.appendChild(button);
+            }
+            contentDiv.style.width = this.width_ + 'px';
+            dropdownDiv.appendChild(contentDiv);
+            Blockly.DropDownDiv.setColour(this.backgroundColour_, this.borderColour_);
+            var scale = this.sourceBlock_.workspace.scale;
+            // Offset for icon-type horizontal blocks.
+            var secondaryYOffset = (-(Blockly.BlockSvg.MIN_BLOCK_Y * scale) - (Blockly.BlockSvg.FIELD_Y_OFFSET * scale));
+            var renderedPrimary = Blockly.DropDownDiv.showPositionedByBlock(this, this.sourceBlock_, this.onHide_.bind(this), secondaryYOffset);
+        };
+        /**
+         * Sets the text in this field.  Trigger a rerender of the source block.
+         * @param {?string} text New text.
+         */
+        FieldImageDropdown.prototype.setText = function (text) {
+            if (text === null || text === this.text_) {
+                // No change if null.
+                return;
+            }
+            this.text_ = text;
+            this.updateTextNode_();
+            if (this.imageJson_ && this.textElement_) {
+                // Update class for dropdown text.
+                // This class is reset every time updateTextNode_ is called.
+                this.textElement_.setAttribute('class', this.textElement_.getAttribute('class') + ' blocklyHidden');
+                this.imageElement_.parentNode.appendChild(this.arrow_);
+            }
+            else if (this.textElement_) {
+                // Update class for dropdown text.
+                // This class is reset every time updateTextNode_ is called.
+                this.textElement_.setAttribute('class', this.textElement_.getAttribute('class') + ' blocklyDropdownText');
+                this.textElement_.parentNode.appendChild(this.arrow_);
+            }
+            if (this.sourceBlock_ && this.sourceBlock_.rendered) {
+                this.sourceBlock_.render();
+                this.sourceBlock_.bumpNeighbours_();
+            }
+        };
+        ;
+        /**
+         * Updates the width of the field. This calls getCachedWidth which won't cache
+         * the approximated width on IE/Edge when `getComputedTextLength` fails. Once
+         * it eventually does succeed, the result will be cached.
+         **/
+        FieldImageDropdown.prototype.updateWidth = function () {
+            // Calculate width of field
+            var width = this.imageJson_.width + 5;
+            // Add padding to left and right of text.
+            if (this.EDITABLE) {
+                width += Blockly.BlockSvg.EDITABLE_FIELD_PADDING;
+            }
+            this.arrowY_ = this.imageJson_.height / 2;
+            // Adjust width for drop-down arrows.
+            this.arrowWidth_ = 0;
+            if (this.positionArrow) {
+                this.arrowWidth_ = this.positionArrow(width);
+                width += this.arrowWidth_;
+            }
+            // Add padding to any drawn box.
+            if (this.box_) {
+                width += 2 * Blockly.BlockSvg.BOX_FIELD_PADDING;
+            }
+            // Set width of the field.
+            this.size_.width = width;
+        };
+        ;
+        /**
+         * Update the text node of this field to display the current text.
+         * @private
+         */
+        FieldImageDropdown.prototype.updateTextNode_ = function () {
+            if (!this.textElement_ && !this.imageElement_) {
+                // Not rendered yet.
+                return;
+            }
+            var text = this.text_;
+            if (text.length > this.maxDisplayLength) {
+                // Truncate displayed string and add an ellipsis ('...').
+                text = text.substring(0, this.maxDisplayLength - 2) + '\u2026';
+                // Add special class for sizing font when truncated
+                this.textElement_.setAttribute('class', 'blocklyText blocklyTextTruncated');
+            }
+            else {
+                this.textElement_.setAttribute('class', 'blocklyText');
+            }
+            // Empty the text element.
+            goog.dom.removeChildren(/** @type {!Element} */ (this.textElement_));
+            goog.dom.removeNode(this.imageElement_);
+            this.imageElement_ = null;
+            if (this.imageJson_) {
+                // Image option is selected.
+                this.imageElement_ = Blockly.utils.createSvgElement('image', { 'y': 5, 'x': 8, 'height': this.imageJson_.height + 'px',
+                    'width': this.imageJson_.width + 'px' });
+                this.imageElement_.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', this.imageJson_.src);
+                this.size_.height = Number(this.imageJson_.height) + 10;
+                this.textElement_.parentNode.appendChild(this.imageElement_);
+            }
+            else {
+                // Replace whitespace with non-breaking spaces so the text doesn't collapse.
+                text = text.replace(/\s/g, Blockly.Field.NBSP);
+                if (this.sourceBlock_.RTL && text) {
+                    // The SVG is LTR, force text to be RTL.
+                    text += '\u200F';
+                }
+                if (!text) {
+                    // Prevent the field from disappearing if empty.
+                    text = Blockly.Field.NBSP;
+                }
+                var textNode = document.createTextNode(text);
+                this.textElement_.appendChild(textNode);
+            }
+            // Cached width is obsolete.  Clear it.
+            this.size_.width = 0;
+        };
+        ;
+        return FieldImageDropdown;
+    }(Blockly.FieldDropdown));
+    pxtblockly.FieldImageDropdown = FieldImageDropdown;
+})(pxtblockly || (pxtblockly = {}));
+/// <reference path="../../localtypings/pxtblockly.d.ts" />
+var pxtblockly;
+(function (pxtblockly) {
+    var Note;
+    (function (Note) {
+        Note[Note["C"] = 262] = "C";
+        Note[Note["CSharp"] = 277] = "CSharp";
+        Note[Note["D"] = 294] = "D";
+        Note[Note["Eb"] = 311] = "Eb";
+        Note[Note["E"] = 330] = "E";
+        Note[Note["F"] = 349] = "F";
+        Note[Note["FSharp"] = 370] = "FSharp";
+        Note[Note["G"] = 392] = "G";
+        Note[Note["GSharp"] = 415] = "GSharp";
+        Note[Note["A"] = 440] = "A";
+        Note[Note["Bb"] = 466] = "Bb";
+        Note[Note["B"] = 494] = "B";
+        Note[Note["C3"] = 131] = "C3";
+        Note[Note["CSharp3"] = 139] = "CSharp3";
+        Note[Note["D3"] = 147] = "D3";
+        Note[Note["Eb3"] = 156] = "Eb3";
+        Note[Note["E3"] = 165] = "E3";
+        Note[Note["F3"] = 175] = "F3";
+        Note[Note["FSharp3"] = 185] = "FSharp3";
+        Note[Note["G3"] = 196] = "G3";
+        Note[Note["GSharp3"] = 208] = "GSharp3";
+        Note[Note["A3"] = 220] = "A3";
+        Note[Note["Bb3"] = 233] = "Bb3";
+        Note[Note["B3"] = 247] = "B3";
+        Note[Note["C4"] = 262] = "C4";
+        Note[Note["CSharp4"] = 277] = "CSharp4";
+        Note[Note["D4"] = 294] = "D4";
+        Note[Note["Eb4"] = 311] = "Eb4";
+        Note[Note["E4"] = 330] = "E4";
+        Note[Note["F4"] = 349] = "F4";
+        Note[Note["FSharp4"] = 370] = "FSharp4";
+        Note[Note["G4"] = 392] = "G4";
+        Note[Note["GSharp4"] = 415] = "GSharp4";
+        Note[Note["A4"] = 440] = "A4";
+        Note[Note["Bb4"] = 466] = "Bb4";
+        Note[Note["B4"] = 494] = "B4";
+        Note[Note["C5"] = 523] = "C5";
+        Note[Note["CSharp5"] = 555] = "CSharp5";
+        Note[Note["D5"] = 587] = "D5";
+        Note[Note["Eb5"] = 622] = "Eb5";
+        Note[Note["E5"] = 659] = "E5";
+        Note[Note["F5"] = 698] = "F5";
+        Note[Note["FSharp5"] = 740] = "FSharp5";
+        Note[Note["G5"] = 784] = "G5";
+        Note[Note["GSharp5"] = 831] = "GSharp5";
+        Note[Note["A5"] = 880] = "A5";
+        Note[Note["Bb5"] = 932] = "Bb5";
+        Note[Note["B5"] = 988] = "B5";
+        Note[Note["C6"] = 1047] = "C6";
+        Note[Note["CSharp6"] = 1109] = "CSharp6";
+        Note[Note["D6"] = 1175] = "D6";
+        Note[Note["Eb6"] = 1245] = "Eb6";
+        Note[Note["E6"] = 1319] = "E6";
+        Note[Note["F6"] = 1397] = "F6";
+        Note[Note["FSharp6"] = 1480] = "FSharp6";
+        Note[Note["G6"] = 1568] = "G6";
+        Note[Note["GSharp6"] = 1568] = "GSharp6";
+        Note[Note["A6"] = 1760] = "A6";
+        Note[Note["Bb6"] = 1865] = "Bb6";
+        Note[Note["B6"] = 1976] = "B6";
+        Note[Note["C7"] = 2093] = "C7";
+    })(Note || (Note = {}));
+    var Notes = {
+        28: { name: "C", prefixedName: "Low C", freq: 131 },
+        29: { name: "C#", prefixedName: "Low C#", freq: 139 },
+        30: { name: "D", prefixedName: "Low D", freq: 147 },
+        31: { name: "D#", prefixedName: "Low D#", freq: 156 },
+        32: { name: "E", prefixedName: "Low E", freq: 165 },
+        33: { name: "F", prefixedName: "Low F", freq: 175 },
+        34: { name: "F#", prefixedName: "Low F#", freq: 185 },
+        35: { name: "G", prefixedName: "Low G", freq: 196 },
+        36: { name: "G#", prefixedName: "Low G#", freq: 208 },
+        37: { name: "A", prefixedName: "Low A", freq: 220 },
+        38: { name: "A#", prefixedName: "Low A#", freq: 233 },
+        39: { name: "B", prefixedName: "Low B", freq: 247 },
+        40: { name: "C", prefixedName: "Middle C", freq: 262 },
+        41: { name: "C#", prefixedName: "Middle C#", freq: 277 },
+        42: { name: "D", prefixedName: "Middle D", freq: 294 },
+        43: { name: "D#", prefixedName: "Middle D#", freq: 311 },
+        44: { name: "E", prefixedName: "Middle E", freq: 330 },
+        45: { name: "F", prefixedName: "Middle F", freq: 349 },
+        46: { name: "F#", prefixedName: "Middle F#", freq: 370 },
+        47: { name: "G", prefixedName: "Middle G", freq: 392 },
+        48: { name: "G#", prefixedName: "Middle G#", freq: 415 },
+        49: { name: "A", prefixedName: "Middle A", freq: 440 },
+        50: { name: "A#", prefixedName: "Middle A#", freq: 466 },
+        51: { name: "B", prefixedName: "Middle B", freq: 494 },
+        52: { name: "C", prefixedName: "Tenor C", altPrefixedName: "High C", freq: 523 },
+        53: { name: "C#", prefixedName: "Tenor C#", altPrefixedName: "High C#", freq: 554 },
+        54: { name: "D", prefixedName: "Tenor D", altPrefixedName: "High D", freq: 587 },
+        55: { name: "D#", prefixedName: "Tenor D#", altPrefixedName: "High D#", freq: 622 },
+        56: { name: "E", prefixedName: "Tenor E", altPrefixedName: "High E", freq: 659 },
+        57: { name: "F", prefixedName: "Tenor F", altPrefixedName: "High F", freq: 698 },
+        58: { name: "F#", prefixedName: "Tenor F#", altPrefixedName: "High F#", freq: 740 },
+        59: { name: "G", prefixedName: "Tenor G", altPrefixedName: "High G", freq: 784 },
+        60: { name: "G#", prefixedName: "Tenor G#", altPrefixedName: "High G#", freq: 831 },
+        61: { name: "A", prefixedName: "Tenor A", altPrefixedName: "High A", freq: 880 },
+        62: { name: "A#", prefixedName: "Tenor A#", altPrefixedName: "High A#", freq: 932 },
+        63: { name: "B", prefixedName: "Tenor B", altPrefixedName: "High B", freq: 988 },
+        64: { name: "C", prefixedName: "High C", freq: 1046 },
+        65: { name: "C#", prefixedName: "High C#", freq: 1109 },
+        66: { name: "D", prefixedName: "High D", freq: 1175 },
+        67: { name: "D#", prefixedName: "High D#", freq: 1245 },
+        68: { name: "E", prefixedName: "High E", freq: 1319 },
+        69: { name: "F", prefixedName: "High F", freq: 1397 },
+        70: { name: "F#", prefixedName: "High F#", freq: 1478 },
+        71: { name: "G", prefixedName: "High G", freq: 1568 },
+        72: { name: "G#", prefixedName: "High G#", freq: 1661 },
+        73: { name: "A", prefixedName: "High A", freq: 1760 },
+        74: { name: "A#", prefixedName: "High A#", freq: 1865 },
+        75: { name: "B", prefixedName: "High B", freq: 1976 }
+    };
+    var regex = /^Note\.(.+)$/;
+    //  Class for a note input field.
+    var FieldNote = (function (_super) {
+        __extends(FieldNote, _super);
+        function FieldNote(text, params, validator) {
+            _super.call(this, text);
+            this.isFieldCustom_ = true;
+            /**
+             * default number of piano keys
+             * @type {number}
+             * @private
+             */
+            this.nKeys_ = 36;
+            this.minNote_ = 28;
+            this.maxNote_ = 63;
+            /**
+             * Absolute error for note frequency identification (Hz)
+             * @type {number}
+             */
+            this.eps = 2;
+            /**
+             * array of notes frequency
+             * @type {Array.<number>}
+             * @private
+             */
+            this.noteFreq_ = [];
+            /**
+             * array of notes names
+             * @type {Array.<string>}
+             * @private
+             */
+            this.noteName_ = [];
+            FieldNote.superClass_.constructor.call(this, text, validator);
+            this.note_ = text;
+            if (params.editorColour) {
+                this.colour_ = pxtblockly.parseColour(params.editorColour);
+                this.colourBorder_ = goog.color.rgbArrayToHex(goog.color.darken(goog.color.hexToRgb(this.colour_), 0.2));
+            }
+            var minNote = parseInt(params.minNote) || this.minNote_;
+            var maxNote = parseInt(params.maxNote) || this.maxNote_;
+            if (minNote >= 28 && maxNote <= 76 && maxNote > minNote) {
+                this.minNote_ = minNote;
+                this.maxNote_ = maxNote;
+                this.nKeys_ = this.maxNote_ - this.minNote_ + 1;
+            }
+        }
+        /**
+         * Ensure that only a non negative number may be entered.
+         * @param {string} text The user's text.
+         * @return {?string} A string representing a valid positive number, or null if invalid.
+         */
+        FieldNote.prototype.classValidator = function (text) {
+            if (text === null) {
+                return null;
+            }
+            text = String(text);
+            var n = parseFloat(text || "0");
+            if (isNaN(n) || n < 0) {
+                // Invalid number.
+                return null;
+            }
+            // Get the value in range.
+            return String(n);
+        };
+        /**
+         * Install this field on a block.
+         */
+        FieldNote.prototype.init = function () {
+            FieldNote.superClass_.init.call(this);
+            this.noteFreq_.length = 0;
+            this.noteName_.length = 0;
+            var thisField = this;
+            //  Create arrays of name/frequency of the notes
+            createNotesArray();
+            this.setValue(this.callValidator(this.getValue()));
+            /**
+             * create Array of notes name and frequencies
+             * @private
+             */
+            function createNotesArray() {
+                for (var i = thisField.minNote_; i <= thisField.maxNote_; i++) {
+                    var name_6 = Notes[i].prefixedName;
+                    // special case: one octave
+                    if (thisField.nKeys_ < 13) {
+                        name_6 = Notes[i].name;
+                    }
+                    else if (thisField.minNote_ >= 28 && thisField.maxNote_ <= 63) {
+                        name_6 = Notes[i].altPrefixedName || name_6;
+                    }
+                    thisField.noteName_.push(name_6);
+                    thisField.noteFreq_.push(Notes[i].freq);
+                }
+                // Do not remove this comment.
+                // lf("C")
+                // lf("C#")
+                // lf("D")
+                // lf("D#")
+                // lf("E")
+                // lf("F")
+                // lf("F#")
+                // lf("G")
+                // lf("G#")
+                // lf("A")
+                // lf("A#")
+                // lf("B")
+                // lf("Deep C")
+                // lf("Deep C#")
+                // lf("Deep D")
+                // lf("Deep D#")
+                // lf("Deep E")
+                // lf("Deep F")
+                // lf("Deep F#")
+                // lf("Deep G")
+                // lf("Deep G#")
+                // lf("Deep A")
+                // lf("Deep A#")
+                // lf("Deep B")
+                // lf("Low C")
+                // lf("Low C#")
+                // lf("Low D")
+                // lf("Low D#")
+                // lf("Low E")
+                // lf("Low F")
+                // lf("Low F#")
+                // lf("Low G")
+                // lf("Low G#")
+                // lf("Low A")
+                // lf("Low A#")
+                // lf("Low B")
+                // lf("Middle C")
+                // lf("Middle C#")
+                // lf("Middle D")
+                // lf("Middle D#")
+                // lf("Middle E")
+                // lf("Middle F")
+                // lf("Middle F#")
+                // lf("Middle G")
+                // lf("Middle G#")
+                // lf("Middle A")
+                // lf("Middle A#")
+                // lf("Middle B")
+                // lf("Tenor C")
+                // lf("Tenor C#")
+                // lf("Tenor D")
+                // lf("Tenor D#")
+                // lf("Tenor E")
+                // lf("Tenor F")
+                // lf("Tenor F#")
+                // lf("Tenor G")
+                // lf("Tenor G#")
+                // lf("Tenor A")
+                // lf("Tenor A#")
+                // lf("Tenor B")
+                // lf("High C")
+                // lf("High C#")
+                // lf("High D")
+                // lf("High D#")
+                // lf("High E")
+                // lf("High F")
+                // lf("High F#")
+                // lf("High G")
+                // lf("High G#")
+                // lf("High A")
+                // lf("High A#")
+                // lf("High B")
+            }
+        };
+        /**
+         * Return the current note frequency.
+         * @return {string} Current note in string format.
+         */
+        FieldNote.prototype.getValue = function () {
+            return this.note_;
+        };
+        /**
+         * Set the note.
+         * @param {string} note The new note in string format.
+         */
+        FieldNote.prototype.setValue = function (note) {
+            // accommodate note strings like "Note.GSharp5" as well as numbers
+            var match = regex.exec(note);
+            var noteName = (match && match.length > 1) ? match[1] : null;
+            note = Note[noteName] ? Note[noteName] : String(parseFloat(note || "0"));
+            if (isNaN(Number(note)) || Number(note) < 0)
+                return;
+            if (this.sourceBlock_ && Blockly.Events.isEnabled() &&
+                this.note_ != note) {
+                Blockly.Events.fire(new Blockly.Events.Change(this.sourceBlock_, "field", this.name, String(this.note_), String(note)));
+            }
+            this.note_ = this.callValidator(note);
+            this.setText(this.getNoteName_());
+        };
+        /**
+         * Get the text from this field.  Used when the block is collapsed.
+         * @return {string} Current text.
+         */
+        FieldNote.prototype.getText = function () {
+            if (Math.floor(Number(this.note_)) == Number(this.note_))
+                return Number(this.note_).toFixed(0);
+            return Number(this.note_).toFixed(2);
+        };
+        /**
+         * Set the text in this field and NOT fire a change event.
+         * @param {*} newText New text.
+         */
+        FieldNote.prototype.setText = function (newText) {
+            if (newText === null) {
+                // No change if null.
+                return;
+            }
+            newText = String(newText);
+            if (!isNaN(Number(newText)))
+                newText = this.getNoteName_();
+            if (newText === this.text_) {
+                // No change.
+                return;
+            }
+            Blockly.Field.prototype.setText.call(this, newText);
+        };
+        /**
+        * get the note name to be displayed in the field
+        * @return {string} note name
+        * @private
+        */
+        FieldNote.prototype.getNoteName_ = function () {
+            var note = this.getValue();
+            var text = note.toString();
+            for (var i = 0; i < this.nKeys_; i++) {
+                if (Math.abs(this.noteFreq_[i] - Number(note)) < this.eps)
+                    return this.noteName_[i];
+            }
+            if (!isNaN(Number(note)))
+                text += " Hz";
+            return text;
+        };
+        /**
+         * Set a custom number of keys for this field.
+         * @param {number} nkeys Number of keys for this block,
+         *     or 26 to use default.
+         * @return {!Blockly.FieldNote} Returns itself (for method chaining).
+         */
+        FieldNote.prototype.setNumberOfKeys = function (size) {
+            this.nKeys_ = size;
+            return this;
+        };
+        FieldNote.prototype.onHtmlInputChange_ = function (e) {
+            _super.prototype.onHtmlInputChange_.call(this, e);
+            Blockly.DropDownDiv.hideWithoutAnimation();
+        };
+        /**
+         * Create a piano under the note field.
+         */
+        FieldNote.prototype.showEditor_ = function (opt_quietInput) {
+            if (!this.colour_) {
+                this.colour_ = (this.sourceBlock_.isShadow()) ?
+                    this.sourceBlock_.parentBlock_.getColour() : this.sourceBlock_.getColour();
+                this.colourBorder_ = (this.sourceBlock_.isShadow()) ?
+                    this.sourceBlock_.parentBlock_.getColourTertiary() : this.sourceBlock_.getColourTertiary();
+            }
+            // If there is an existing drop-down someone else owns, hide it immediately and clear it.
+            Blockly.DropDownDiv.hideWithoutAnimation();
+            Blockly.DropDownDiv.clearContent();
+            var contentDiv = Blockly.DropDownDiv.getContentDiv();
+            //  change Note name to number frequency
+            Blockly.FieldNumber.prototype.setText.call(this, this.getText());
+            FieldNote.superClass_.showEditor_.call(this, true);
+            var pianoWidth;
+            var pianoHeight;
+            var keyWidth = 22;
+            var keyHeight = 90;
+            var labelHeight = 24;
+            var prevNextHeight = 20;
+            var whiteKeyCounter = 0;
+            var selectedKeyColor = "yellowgreen";
+            var soundingKeys = 0;
+            var thisField = this;
+            //  Record windowSize and scrollOffset before adding the piano.
+            var windowSize = goog.dom.getViewportSize();
+            var pagination = false;
+            var mobile = false;
+            var editorWidth = windowSize.width;
+            var piano = [];
+            //  initializate
+            pianoWidth = keyWidth * (this.nKeys_ - (this.nKeys_ / 12 * 5));
+            pianoHeight = keyHeight + labelHeight;
+            //  Create the piano using Closure (CustomButton).
+            for (var i = 0; i < this.nKeys_; i++) {
+                piano.push(new goog.ui.CustomButton());
+            }
+            if (editorWidth < pianoWidth) {
+                pagination = true;
+                pianoWidth = 7 * keyWidth;
+                pianoHeight = keyHeight + labelHeight + prevNextHeight;
+            }
+            //  Check if Mobile, pagination -> true
+            var quietInput = opt_quietInput || false;
+            if (!quietInput && (goog.userAgent.MOBILE || goog.userAgent.ANDROID)) {
+                pagination = true;
+                mobile = true;
+                keyWidth = keyWidth * 2;
+                keyHeight = keyHeight * 2;
+                pianoWidth = 7 * keyWidth;
+                labelHeight = labelHeight * 1.2;
+                prevNextHeight = prevNextHeight * 2;
+                pianoHeight = keyHeight + labelHeight + prevNextHeight;
+            }
+            //  create piano div
+            var pianoDiv = goog.dom.createDom("div", {});
+            pianoDiv.className = "blocklyPianoDiv";
+            contentDiv.appendChild(pianoDiv);
+            var scrollOffset = goog.style.getViewportPageOffset(document);
+            var xy = this.getAbsoluteXY_();
+            var borderBBox = this.getScaledBBox_();
+            var leftPosition = 0; //-(<HTMLElement>document.getElementsByClassName("blocklyDropdownDiv")[0]).offsetLeft;   //+ ((windowSize.width - this.pianoWidth_) / 2);
+            var topPosition = 0; //(keyHeight + labelHeight + prevNextHeight);
+            //  save all changes in the same group of events
+            Blockly.Events.setGroup(true);
+            //  render piano keys
+            var octaveCounter = 0;
+            var currentSelectedKey = null;
+            var previousColor;
+            for (var i = 0; i < this.nKeys_; i++) {
+                if (i > 0 && i % 12 == 0)
+                    octaveCounter++;
+                var key = piano[i];
+                //  What color is i key
+                var bgColor = (isWhite(i)) ? "white" : "black";
+                var width = getKeyWidth(i);
+                var height = getKeyHeight(i);
+                var position_1 = getPosition(i);
+                //  modify original position in pagination
+                if (pagination && i >= 12)
+                    position_1 -= 7 * octaveCounter * keyWidth;
+                var style = getKeyStyle(bgColor, width, height, position_1 + leftPosition, topPosition, isWhite(i) ? 1000 : 1001, isWhite(i) ? this.colour_ : "black", mobile);
+                key.setContent(style);
+                key.setId(this.noteName_[i]);
+                key.render(pianoDiv);
+                var script = key.getContent();
+                script.setAttribute("tag", this.noteFreq_[i].toString());
+                //  highlight current selected key
+                if (Math.abs(this.noteFreq_[i] - Number(this.getValue())) < this.eps) {
+                    previousColor = script.style.backgroundColor;
+                    script.style.backgroundColor = selectedKeyColor;
+                    currentSelectedKey = key;
+                }
+                //  Listener when a new key is selected
+                if (!mobile) {
+                    goog.events.listen(key.getElement(), goog.events.EventType.MOUSEDOWN, soundKey, false, key);
+                }
+                else {
+                    /**  Listener when a new key is selected in MOBILE
+                     *   It is necessary to use TOUCHSTART event to allow passive event listeners
+                     *   to avoid preventDefault() call that blocks listener
+                     */
+                    goog.events.listen(key.getElement(), goog.events.EventType.TOUCHSTART, soundKey, false, key);
+                }
+                //  Listener when the mouse is over a key
+                goog.events.listen(key.getElement(), goog.events.EventType.MOUSEOVER, function () {
+                    var script = showNoteLabel.getContent();
+                    script.textContent = this.getId();
+                }, false, key);
+                //  increment white key counter
+                if (isWhite(i))
+                    whiteKeyCounter++;
+                // set octaves different from first octave invisible
+                if (pagination && i > 11)
+                    key.setVisible(false);
+            }
+            //  render note label
+            var showNoteLabel = new goog.ui.CustomButton();
+            var showNoteStyle = getShowNoteStyle(topPosition, leftPosition, mobile);
+            showNoteLabel.setContent(showNoteStyle);
+            showNoteLabel.render(pianoDiv);
+            var scriptLabel = showNoteLabel.getContent();
+            scriptLabel.textContent = "-";
+            // create next and previous CustomButtons for pagination
+            var prevButton = new goog.ui.CustomButton();
+            var nextButton = new goog.ui.CustomButton();
+            var prevButtonStyle = getNextPrevStyle(topPosition, leftPosition, true, mobile);
+            var nextButtonStyle = getNextPrevStyle(topPosition, leftPosition, false, mobile);
+            if (pagination) {
+                scriptLabel.textContent = "Octave #1";
+                //  render previous button
+                var script = void 0;
+                prevButton.setContent(prevButtonStyle);
+                prevButton.render(pianoDiv);
+                script = prevButton.getContent();
+                //  left arrow - previous button
+                script.textContent = "<";
+                //  render next button
+                nextButton.setContent(nextButtonStyle);
+                nextButton.render(pianoDiv);
+                script = nextButton.getContent();
+                //  right arrow - next button
+                script.textContent = ">";
+                var Npages_1 = this.nKeys_ / 12;
+                var currentPage_1 = 0;
+                goog.events.listen(prevButton.getElement(), goog.events.EventType.MOUSEDOWN, function () {
+                    if (currentPage_1 == 0) {
+                        scriptLabel.textContent = "Octave #" + (currentPage_1 + 1);
+                        return;
+                    }
+                    var curFirstKey = currentPage_1 * 12;
+                    var newFirstKey = currentPage_1 * 12 - 12;
+                    //  hide current octave
+                    for (var i = 0; i < 12; i++)
+                        piano[i + curFirstKey].setVisible(false);
+                    //  show new octave
+                    for (var i = 0; i < 12; i++)
+                        piano[i + newFirstKey].setVisible(true);
+                    currentPage_1--;
+                    scriptLabel.textContent = "Octave #" + (currentPage_1 + 1);
+                }, false, prevButton);
+                goog.events.listen(nextButton.getElement(), goog.events.EventType.MOUSEDOWN, function () {
+                    if (currentPage_1 == Npages_1 - 1) {
+                        scriptLabel.textContent = "Octave #" + (currentPage_1 + 1);
+                        return;
+                    }
+                    var curFirstKey = currentPage_1 * 12;
+                    var newFirstKey = currentPage_1 * 12 + 12;
+                    //  hide current octave
+                    for (var i = 0; i < 12; i++)
+                        piano[i + curFirstKey].setVisible(false);
+                    //  show new octave
+                    for (var i = 0; i < 12; i++)
+                        piano[i + newFirstKey].setVisible(true);
+                    currentPage_1++;
+                    scriptLabel.textContent = "Octave #" + (currentPage_1 + 1);
+                }, false, nextButton);
+            }
+            // create the key sound
+            function soundKey() {
+                var cnt = ++soundingKeys;
+                var freq = this.getContent().getAttribute("tag");
+                var script;
+                if (currentSelectedKey != null) {
+                    script = currentSelectedKey.getContent();
+                    script.style.backgroundColor = previousColor;
+                }
+                script = this.getContent();
+                if (currentSelectedKey !== this) {
+                    previousColor = script.style.backgroundColor;
+                    thisField.setValue(thisField.callValidator(freq));
+                    thisField.setText(thisField.callValidator(freq));
+                }
+                currentSelectedKey = this;
+                script.style.backgroundColor = selectedKeyColor;
+                Blockly.FieldTextInput.htmlInput_.value = thisField.getText();
+                pxtblockly.AudioContextManager.tone(freq);
+                setTimeout(function () {
+                    // compare current sound counter with listener sound counter (avoid async problems)
+                    if (soundingKeys == cnt)
+                        pxtblockly.AudioContextManager.stop();
+                }, 300);
+                FieldNote.superClass_.dispose.call(this);
+            }
+            /** get width of blockly editor space
+             * @return {number} width of the blockly editor workspace
+             * @private
+             */
+            function getEditorWidth() {
+                var windowSize = goog.dom.getViewportSize();
+                return windowSize.width;
+            }
+            /** get height of blockly editor space
+             * @return {number} Height of the blockly editor workspace
+             * @private
+             */
+            function getEditorHeight() {
+                var editorHeight = document.getElementById("blocklyDiv").offsetHeight;
+                return editorHeight;
+            }
+            /**
+             * create a DOM to assing a style to the button (piano Key)
+             * @param {string} bgColor color of the key background
+             * @param {number} width width of the key
+             * @param {number} heigth heigth of the key
+             * @param {number} leftPosition horizontal position of the key
+             * @param {number} topPosition vertical position of the key
+             * @param {number} z_index z-index of the key
+             * @param {string} keyBorderColour border color of the key
+             * @param {boolean} isMobile true if the device is a mobile
+             * @return {goog.dom} DOM with the new css style.
+             * @private
+             */
+            function getKeyStyle(bgColor, width, height, leftPosition, topPosition, z_index, keyBorderColour, isMobile) {
+                var div = goog.dom.createDom("div", {
+                    "style": "background-color: " + bgColor
+                        + "; width: " + width
+                        + "px; height: " + height
+                        + "px; left: " + leftPosition
+                        + "px; top: " + topPosition
+                        + "px; z-index: " + z_index
+                        + ";   border-color: " + keyBorderColour
+                        + ";"
+                });
+                div.className = "blocklyNote";
+                return div;
+            }
+            /**
+             * create a DOM to assing a style to the note label
+             * @param {number} topPosition vertical position of the label
+             * @param {number} leftPosition horizontal position of the label
+             * @param {boolean} isMobile true if the device is a mobile
+             * @return {goog.dom} DOM with the new css style.
+             * @private
+             */
+            function getShowNoteStyle(topPosition, leftPosition, isMobile) {
+                topPosition += keyHeight;
+                if (isMobile)
+                    topPosition += prevNextHeight;
+                var div = goog.dom.createDom("div", {
+                    "style": "top: " + topPosition
+                        + "px; left: " + leftPosition
+                        + "px; background-color: " + thisField.colour_
+                        + "; width: " + pianoWidth
+                        + "px; border-color: " + thisField.colour_
+                        + ";" + (isMobile ? " font-size: " + (labelHeight - 10) + "px; height: " + labelHeight + "px;" : "")
+                });
+                div.className = "blocklyNoteLabel";
+                return div;
+            }
+            /**
+             * create a DOM to assing a style to the previous and next buttons
+             * @param {number} topPosition vertical position of the label
+             * @param {number} leftPosition horizontal position of the label
+             * @param {boolean} isPrev true if is previous button, false otherwise
+             * @param {boolean} isMobile true if the device is a mobile
+             * @return {goog.dom} DOM with the new css style.
+             * @private
+             */
+            function getNextPrevStyle(topPosition, leftPosition, isPrev, isMobile) {
+                //  x position of the prev/next button
+                var xPosition = (isPrev ? 0 : (pianoWidth / 2)) + leftPosition;
+                //  y position of the prev/next button
+                var yPosition = (keyHeight + labelHeight + topPosition);
+                if (isMobile)
+                    yPosition = keyHeight + topPosition;
+                var div = goog.dom.createDom("div", {
+                    "style": "top: " + yPosition
+                        + "px; left: " + xPosition
+                        + "px; "
+                        + ";" + (isMobile ? "height: " + prevNextHeight + "px; font-size:" + (prevNextHeight - 10) + "px;" : "")
+                        + "width: " + Math.ceil(pianoWidth / 2) + "px;"
+                        + "background-color: " + thisField.colour_
+                        + ";" + (isPrev ? "border-left-color: " : "border-right-color: ") + thisField.colour_
+                        + ";" + (!isMobile ? "border-bottom-color: " + thisField.colour_ : "")
+                        + ";"
+                });
+                div.className = "blocklyNotePrevNext";
+                return div;
+            }
+            /**
+             * @param {number} idx index of the key
+             * @return {boolean} true if key_idx is white
+             * @private
+             */
+            function isWhite(idx) {
+                var octavePosition = idx % 12;
+                if (octavePosition == 1 || octavePosition == 3 || octavePosition == 6 ||
+                    octavePosition == 8 || octavePosition == 10)
+                    return false;
+                return true;
+            }
+            /**
+             * get width of the piano key
+             * @param {number} idx index of the key
+             * @return {number} width of the key
+             * @private
+             */
+            function getKeyWidth(idx) {
+                if (isWhite(idx))
+                    return keyWidth;
+                return keyWidth / 2;
+            }
+            /**
+             * get height of the piano key
+             * @param {number} idx index of the key
+             * @return {number} height of the key
+             * @private
+             */
+            function getKeyHeight(idx) {
+                if (isWhite(idx))
+                    return keyHeight;
+                return keyHeight / 2;
+            }
+            /**
+             * get the position of the key in the piano
+             * @param {number} idx index of the key
+             * @return {number} position of the key
+             */
+            function getPosition(idx) {
+                var pos = (whiteKeyCounter * keyWidth);
+                if (isWhite(idx))
+                    return pos;
+                return pos - (keyWidth / 4);
+            }
+            pianoDiv.style.width = pianoWidth + "px";
+            pianoDiv.style.height = (pianoHeight + 1) + "px";
+            Blockly.DropDownDiv.setColour(this.colour_, this.colourBorder_);
+            // Calculate positioning based on the field position.
+            var scale = this.sourceBlock_.workspace.scale;
+            var bBox = { width: this.size_.width, height: this.size_.height };
+            bBox.width *= scale;
+            bBox.height *= scale;
+            var position = this.fieldGroup_.getBoundingClientRect();
+            var primaryX = position.left + bBox.width / 2;
+            var primaryY = position.top + bBox.height;
+            var secondaryX = primaryX;
+            var secondaryY = position.top;
+            // Set bounds to workspace; show the drop-down.
+            Blockly.DropDownDiv.setBoundsElement(this.sourceBlock_.workspace.getParentSvg().parentNode);
+            Blockly.DropDownDiv.show(this, primaryX, primaryY, secondaryX, secondaryY, this.onHide.bind(this));
+        };
+        /**
+         * Callback for when the drop-down is hidden.
+         */
+        FieldNote.prototype.onHide = function () {
+        };
+        ;
+        /**
+         * Close the note picker if this input is being deleted.
+         */
+        FieldNote.prototype.dispose = function () {
+            Blockly.DropDownDiv.hideIfOwner(this);
+            Blockly.FieldTextInput.superClass_.dispose.call(this);
+        };
+        return FieldNote;
+    }(Blockly.FieldNumber));
+    pxtblockly.FieldNote = FieldNote;
+})(pxtblockly || (pxtblockly = {}));
+/// <reference path="../../localtypings/pxtblockly.d.ts" />
+var pxtblockly;
+(function (pxtblockly) {
+    var FieldNumberDropdown = (function (_super) {
+        __extends(FieldNumberDropdown, _super);
+        function FieldNumberDropdown(value, options, opt_validator) {
+            _super.call(this, value, options.data, options.min, options.max, options.precision, opt_validator);
+            this.isFieldCustom_ = true;
+        }
+        FieldNumberDropdown.prototype.getOptions = function () {
+            var newOptions;
+            if (this.menuGenerator_) {
+                newOptions = JSON.parse(this.menuGenerator_).map(function (x) {
+                    return (typeof x == 'object') ? x : [String(x), String(x)];
+                });
+            }
+            return newOptions;
+        };
+        return FieldNumberDropdown;
+    }(Blockly.FieldNumberDropdown));
+    pxtblockly.FieldNumberDropdown = FieldNumberDropdown;
+})(pxtblockly || (pxtblockly = {}));
+/// <reference path="../../localtypings/pxtblockly.d.ts" />
+var pxtblockly;
+(function (pxtblockly) {
+    var FieldProcedure = (function (_super) {
+        __extends(FieldProcedure, _super);
+        function FieldProcedure(funcname, opt_validator) {
+            _super.call(this, null, opt_validator);
+            this.setValue(funcname || '');
+        }
+        FieldProcedure.prototype.getOptions = function () {
+            return this.dropdownCreate();
+        };
+        ;
+        FieldProcedure.prototype.init = function () {
+            if (this.fieldGroup_) {
+                // Dropdown has already been initialized once.
+                return;
+            }
+            _super.prototype.init.call(this);
+        };
+        ;
+        FieldProcedure.prototype.setSourceBlock = function (block) {
+            goog.asserts.assert(!block.isShadow(), 'Procedure fields are not allowed to exist on shadow blocks.');
+            _super.prototype.setSourceBlock.call(this, block);
+        };
+        ;
+        FieldProcedure.prototype.getValue = function () {
+            return this.getText();
+        };
+        ;
+        FieldProcedure.prototype.setValue = function (newValue) {
+            if (this.sourceBlock_ && Blockly.Events.isEnabled()) {
+                Blockly.Events.fire(new Blockly.Events.Change(this.sourceBlock_, 'field', this.name, this.value_, newValue));
+            }
+            this.value_ = newValue;
+            this.setText(newValue);
+        };
+        ;
+        /**
+         * Return a sorted list of variable names for procedure dropdown menus.
+         * Include a special option at the end for creating a new function name.
+         * @return {!Array.<string>} Array of procedure names.
+         * @this {pxtblockly.FieldProcedure}
+         */
+        FieldProcedure.prototype.dropdownCreate = function () {
+            var functionList = [];
+            if (this.sourceBlock_ && this.sourceBlock_.workspace) {
+                var blocks = this.sourceBlock_.workspace.getAllBlocks();
+                // Iterate through every block and check the name.
+                for (var i = 0; i < blocks.length; i++) {
+                    if (blocks[i].getProcedureDef) {
+                        var procName = blocks[i].getProcedureDef();
+                        functionList.push(procName[0]);
+                    }
+                }
+            }
+            // Ensure that the currently selected variable is an option.
+            var name = this.getText();
+            if (name && functionList.indexOf(name) == -1) {
+                functionList.push(name);
+            }
+            functionList.sort(goog.string.caseInsensitiveCompare);
+            if (!functionList.length) {
+                // Add temporary list item so the dropdown doesn't break
+                functionList.push("Temp");
+            }
+            // Variables are not language-specific, use the name as both the user-facing
+            // text and the internal representation.
+            var options = [];
+            for (var i = 0; i < functionList.length; i++) {
+                options[i] = [functionList[i], functionList[i]];
+            }
+            return options;
+        };
+        FieldProcedure.prototype.onItemSelected = function (menu, menuItem) {
+            var itemText = menuItem.getValue();
+            if (this.sourceBlock_) {
+                // Call any validation function, and allow it to override.
+                itemText = this.callValidator(itemText);
+            }
+            if (itemText !== null) {
+                this.setValue(itemText);
+            }
+        };
+        return FieldProcedure;
+    }(Blockly.FieldDropdown));
+    pxtblockly.FieldProcedure = FieldProcedure;
+})(pxtblockly || (pxtblockly = {}));
+/// <reference path="../../localtypings/pxtblockly.d.ts" />
+var pxtblockly;
+(function (pxtblockly) {
+    var FieldTextDropdown = (function (_super) {
+        __extends(FieldTextDropdown, _super);
+        function FieldTextDropdown(text, options, opt_validator) {
+            _super.call(this, text, options.values, opt_validator);
+            this.isFieldCustom_ = true;
+        }
+        return FieldTextDropdown;
+    }(Blockly.FieldTextDropdown));
+    pxtblockly.FieldTextDropdown = FieldTextDropdown;
+})(pxtblockly || (pxtblockly = {}));
+/// <reference path="../../localtypings/pxtblockly.d.ts" />
+var pxtblockly;
+(function (pxtblockly) {
+    var FieldTextInput = (function (_super) {
+        __extends(FieldTextInput, _super);
+        function FieldTextInput(value, options, opt_validator) {
+            _super.call(this, value, opt_validator);
+            this.isFieldCustom_ = true;
+        }
+        return FieldTextInput;
+    }(Blockly.FieldTextInput));
+    pxtblockly.FieldTextInput = FieldTextInput;
+})(pxtblockly || (pxtblockly = {}));
+/// <reference path="../../localtypings/blockly.d.ts" />
+var pxtblockly;
+(function (pxtblockly) {
+    var FieldToggle = (function (_super) {
+        __extends(FieldToggle, _super);
+        function FieldToggle(state, params, opt_validator) {
+            _super.call(this, state, opt_validator);
+            this.isFieldCustom_ = true;
+            this.CURSOR = 'pointer';
+            this.params = params;
+            this.setValue(state);
+            this.addArgType('toggle');
+            this.type_ = params.type;
+        }
+        FieldToggle.prototype.init = function () {
+            if (this.fieldGroup_) {
+                // Field has already been initialized once.
+                return;
+            }
+            // Build the DOM.
+            this.fieldGroup_ = Blockly.utils.createSvgElement('g', {}, null);
+            if (!this.visible_) {
+                this.fieldGroup_.style.display = 'none';
+            }
+            // Add an attribute to cassify the type of field.
+            if (this.getArgTypes() !== null) {
+                if (this.sourceBlock_.isShadow()) {
+                    this.sourceBlock_.svgGroup_.setAttribute('data-argument-type', this.getArgTypes());
+                }
+                else {
+                    // Fields without a shadow wrapper, like square dropdowns.
+                    this.fieldGroup_.setAttribute('data-argument-type', this.getArgTypes());
+                }
+            }
+            // If not in a shadow block, and has more than one input, draw a box.
+            if (!this.sourceBlock_.isShadow()
+                && (this.sourceBlock_.inputList && this.sourceBlock_.inputList.length > 1)) {
+                this.box_ = Blockly.utils.createSvgElement('rect', {
+                    'rx': Blockly.BlockSvg.CORNER_RADIUS,
+                    'ry': Blockly.BlockSvg.CORNER_RADIUS,
+                    'x': 0,
+                    'y': 0,
+                    'width': this.size_.width,
+                    'height': this.size_.height,
+                    'fill': Blockly.Colours.textField,
+                    'stroke': this.sourceBlock_.getColourTertiary()
+                });
+                this.fieldGroup_.insertBefore(this.box_, this.textElement_);
+            }
+            // Adjust X to be flipped for RTL. Position is relative to horizontal start of source block.
+            var size = this.getSize();
+            this.checkElement_ = Blockly.utils.createSvgElement('g', {
+                'class': "blocklyToggle " + (this.state_ ? 'blocklyToggleOn' : 'blocklyToggleOff'),
+                'transform': "translate(8, " + size.height / 2 + ")",
+            }, this.fieldGroup_);
+            switch (this.getOutputShape()) {
+                case Blockly.OUTPUT_SHAPE_HEXAGONAL:
+                    this.toggleThumb_ = Blockly.utils.createSvgElement('polygon', {
+                        'class': 'blocklyToggleRect',
+                        'points': '-7,-14 -21,0 -7,14 7,14 21,0 7,-14',
+                        'cursor': 'pointer'
+                    }, this.checkElement_);
+                    break;
+                case Blockly.OUTPUT_SHAPE_ROUND:
+                    this.toggleThumb_ = Blockly.utils.createSvgElement('rect', {
+                        'class': 'blocklyToggleCircle',
+                        'x': -6, 'y': -14, 'height': 28,
+                        'width': 28, 'rx': 14, 'ry': 14,
+                        'cursor': 'pointer'
+                    }, this.checkElement_);
+                    break;
+                case Blockly.OUTPUT_SHAPE_SQUARE:
+                    this.toggleThumb_ = Blockly.utils.createSvgElement('rect', {
+                        'class': 'blocklyToggleRect',
+                        'x': -6, 'y': -14, 'height': 28,
+                        'width': 28, 'rx': 3, 'ry': 3,
+                        'cursor': 'pointer'
+                    }, this.checkElement_);
+                    break;
+            }
+            var fieldX = (this.sourceBlock_.RTL) ? -size.width / 2 : size.width / 2;
+            /** @type {!Element} */
+            this.textElement_ = Blockly.utils.createSvgElement('text', {
+                'class': 'blocklyText',
+                'x': fieldX,
+                'dy': '0.6ex',
+                'y': size.height / 2
+            }, this.fieldGroup_);
+            this.updateEditable();
+            this.sourceBlock_.getSvgRoot().appendChild(this.fieldGroup_);
+            this.switchToggle(this.state_);
+            this.setValue(this.getValue());
+            // Force a render.
+            this.render_();
+            this.size_.width = 0;
+            this.mouseDownWrapper_ =
+                Blockly.bindEventWithChecks_(this.getClickTarget_(), 'mousedown', this, this.onMouseDown_);
+        };
+        FieldToggle.prototype.getDisplayText_ = function () {
+            return this.state_ ? this.getTrueText() : this.getFalseText();
+        };
+        FieldToggle.prototype.getTrueText = function () {
+            return lf("True");
+        };
+        FieldToggle.prototype.getFalseText = function () {
+            return lf("False");
+        };
+        FieldToggle.prototype.updateWidth = function () {
+            var innerWidth = this.getInnerWidth();
+            var halfInnerWidth = innerWidth / 2;
+            switch (this.getOutputShape()) {
+                case Blockly.OUTPUT_SHAPE_ROUND:
+                    this.size_.width = this.getInnerWidth() * 2 - 7;
+                    break;
+                case Blockly.OUTPUT_SHAPE_HEXAGONAL:
+                    this.size_.width = this.getInnerWidth() * 2 + 8 - Math.floor(this.getInnerWidth() / 2);
+                    break;
+                case Blockly.OUTPUT_SHAPE_SQUARE:
+                    this.size_.width = 9 + this.getInnerWidth() * 2;
+                    break;
+            }
+            this.arrowWidth_ = 0;
+        };
+        FieldToggle.prototype.getInnerWidth = function () {
+            return this.getMaxLength() * 10;
+        };
+        FieldToggle.prototype.getMaxLength = function () {
+            return Math.max(this.getTrueText().length, this.getFalseText().length);
+        };
+        FieldToggle.prototype.getOutputShape = function () {
+            return this.sourceBlock_.isShadow() ? this.sourceBlock_.getOutputShape() : Blockly.OUTPUT_SHAPE_SQUARE;
+        };
+        /**
+         * Return 'TRUE' if the toggle is ON, 'FALSE' otherwise.
+         * @return {string} Current state.
+         */
+        FieldToggle.prototype.getValue = function () {
+            return this.toVal(this.state_);
+        };
+        ;
+        /**
+         * Set the checkbox to be checked if newBool is 'TRUE' or true,
+         * unchecks otherwise.
+         * @param {string|boolean} newBool New state.
+         */
+        FieldToggle.prototype.setValue = function (newBool) {
+            var newState = this.fromVal(newBool);
+            if (this.state_ !== newState) {
+                if (this.sourceBlock_ && Blockly.Events.isEnabled()) {
+                    Blockly.Events.fire(new Blockly.Events.BlockChange(this.sourceBlock_, 'field', this.name, this.state_, newState));
+                }
+                this.state_ = newState;
+                this.switchToggle(this.state_);
+                this.setText(this.getDisplayText_());
+            }
+        };
+        FieldToggle.prototype.switchToggle = function (newState) {
+            if (this.checkElement_) {
+                this.updateWidth();
+                var size = this.getSize();
+                var innerWidth_1 = this.getInnerWidth();
+                if (newState) {
+                    pxtblockly.svg.addClass(this.checkElement_, 'blocklyToggleOn');
+                    pxtblockly.svg.removeClass(this.checkElement_, 'blocklyToggleOff');
+                }
+                else {
+                    pxtblockly.svg.removeClass(this.checkElement_, 'blocklyToggleOn');
+                    pxtblockly.svg.addClass(this.checkElement_, 'blocklyToggleOff');
+                }
+                var outputShape = this.getOutputShape();
+                var width = 0, halfWidth = 0;
+                var leftPadding = 0, rightPadding = 0;
+                switch (outputShape) {
+                    case Blockly.OUTPUT_SHAPE_HEXAGONAL:
+                        width = innerWidth_1;
+                        halfWidth = width / 2;
+                        var quarterWidth = halfWidth / 2;
+                        // TODO: the left padding calculation is a hack, we should calculate left padding based on width (generic case)
+                        leftPadding = this.getMaxLength() > 3 ? -4 : 1;
+                        rightPadding = -quarterWidth;
+                        var topLeftPoint = -quarterWidth;
+                        var bottomRightPoint = quarterWidth;
+                        this.toggleThumb_.setAttribute('points', topLeftPoint + ",-14 " + (topLeftPoint - 14) + ",0 " + topLeftPoint + ",14 " + bottomRightPoint + ",14 " + (bottomRightPoint + 14) + ",0 " + bottomRightPoint + ",-14");
+                        break;
+                    case Blockly.OUTPUT_SHAPE_ROUND:
+                    case Blockly.OUTPUT_SHAPE_SQUARE:
+                        width = 5 + innerWidth_1;
+                        halfWidth = width / 2;
+                        this.toggleThumb_.setAttribute('width', width);
+                        this.toggleThumb_.setAttribute('x', "-" + halfWidth);
+                        leftPadding = rightPadding = outputShape == Blockly.OUTPUT_SHAPE_SQUARE ? 2 : -6;
+                        break;
+                }
+                this.checkElement_.setAttribute('transform', "translate(" + (newState ? rightPadding + innerWidth_1 + halfWidth : halfWidth + leftPadding) + ", " + size.height / 2 + ")");
+            }
+        };
+        FieldToggle.prototype.updateTextNode_ = function () {
+            _super.prototype.updateTextNode_.call(this);
+            if (this.textElement_)
+                pxtblockly.svg.addClass(this.textElement_, 'blocklyToggleText');
+        };
+        FieldToggle.prototype.render_ = function () {
+            if (this.visible_ && this.textElement_) {
+                // Replace the text.
+                goog.dom.removeChildren(/** @type {!Element} */ (this.textElement_));
+                var textNode = document.createTextNode(this.getDisplayText_());
+                this.textElement_.appendChild(textNode);
+                pxtblockly.svg.addClass(this.textElement_, 'blocklyToggleText');
+                this.updateWidth();
+                // Update text centering, based on newly calculated width.
+                var halfWidth = this.size_.width / 2;
+                var centerTextX = this.state_ ? halfWidth + halfWidth / 2 : halfWidth / 2;
+                // Apply new text element x position.
+                var width = Blockly.Field.getCachedWidth(this.textElement_);
+                var newX = centerTextX - width / 2;
+                this.textElement_.setAttribute('x', "" + newX);
+            }
+            // Update any drawn box to the correct width and height.
+            if (this.box_) {
+                this.box_.setAttribute('width', "" + this.size_.width);
+                this.box_.setAttribute('height', "" + this.size_.height);
+            }
+        };
+        /**
+         * Toggle the state of the toggle.
+         * @private
+         */
+        FieldToggle.prototype.showEditor_ = function () {
+            var newState = !this.state_;
+            /*
+            if (this.sourceBlock_) {
+              // Call any validation function, and allow it to override.
+              newState = this.callValidator(newState);
+            }*/
+            if (newState !== null) {
+                this.setValue(this.toVal(newState));
+            }
+        };
+        FieldToggle.prototype.toVal = function (newState) {
+            if (this.type_ == "number")
+                return String(newState ? '1' : '0');
+            else
+                return String(newState ? 'true' : 'false');
+        };
+        FieldToggle.prototype.fromVal = function (val) {
+            if (typeof val == "string") {
+                if (val == "1" || val.toUpperCase() == "TRUE")
+                    return true;
+                return false;
+            }
+            return !!val;
+        };
+        return FieldToggle;
+    }(Blockly.FieldNumber));
+    pxtblockly.FieldToggle = FieldToggle;
+})(pxtblockly || (pxtblockly = {}));
+/// <reference path="../../localtypings/blockly.d.ts" />
+var pxtblockly;
+(function (pxtblockly) {
+    var FieldToggleOnOff = (function (_super) {
+        __extends(FieldToggleOnOff, _super);
+        function FieldToggleOnOff(state, params, opt_validator) {
+            _super.call(this, state, params, opt_validator);
+            this.isFieldCustom_ = true;
+        }
+        FieldToggleOnOff.prototype.getTrueText = function () {
+            return lf("ON");
+        };
+        FieldToggleOnOff.prototype.getFalseText = function () {
+            return lf("OFF");
+        };
+        return FieldToggleOnOff;
+    }(pxtblockly.FieldToggle));
+    pxtblockly.FieldToggleOnOff = FieldToggleOnOff;
+})(pxtblockly || (pxtblockly = {}));
+/// <reference path="../../localtypings/blockly.d.ts" />
+var pxtblockly;
+(function (pxtblockly) {
+    var FieldToggleYesNo = (function (_super) {
+        __extends(FieldToggleYesNo, _super);
+        function FieldToggleYesNo(state, params, opt_validator) {
+            _super.call(this, state, params, opt_validator);
+            this.isFieldCustom_ = true;
+        }
+        FieldToggleYesNo.prototype.getTrueText = function () {
+            return lf("Yes");
+        };
+        FieldToggleYesNo.prototype.getFalseText = function () {
+            return lf("No");
+        };
+        return FieldToggleYesNo;
+    }(pxtblockly.FieldToggle));
+    pxtblockly.FieldToggleYesNo = FieldToggleYesNo;
+})(pxtblockly || (pxtblockly = {}));
+/// <reference path="../../localtypings/blockly.d.ts" />
+var pxtblockly;
+(function (pxtblockly) {
+    var FieldTsExpression = (function (_super) {
+        __extends(FieldTsExpression, _super);
+        function FieldTsExpression() {
+            _super.apply(this, arguments);
+            this.isFieldCustom_ = true;
+        }
+        /**
+         * Same as parent, but adds a different class to text when disabled
+         */
+        FieldTsExpression.prototype.updateEditable = function () {
+            var group = this.fieldGroup_;
+            if (!this.EDITABLE || !group) {
+                return;
+            }
+            if (this.sourceBlock_.isEditable()) {
+                Blockly.utils.addClass(group, 'blocklyEditableText');
+                Blockly.utils.removeClass(group, 'blocklyGreyExpressionBlockText');
+                this.fieldGroup_.style.cursor = this.CURSOR;
+            }
+            else {
+                Blockly.utils.addClass(group, 'blocklyGreyExpressionBlockText');
+                Blockly.utils.removeClass(group, 'blocklyEditableText');
+                this.fieldGroup_.style.cursor = '';
+            }
+        };
+        return FieldTsExpression;
+    }(Blockly.FieldTextInput));
+    pxtblockly.FieldTsExpression = FieldTsExpression;
+})(pxtblockly || (pxtblockly = {}));
+var pxtblockly;
+(function (pxtblockly) {
+    var svg;
+    (function (svg) {
+        function hasClass(el, cls) {
+            if (el.classList)
+                return el.classList.contains(cls);
+            else
+                return el.className.baseVal.indexOf(cls) > -1;
+        }
+        svg.hasClass = hasClass;
+        function addClass(el, cls) {
+            if (el.classList)
+                el.classList.add(cls);
+            else if (el.className.baseVal.indexOf(cls) < 0)
+                el.className.baseVal += ' ' + cls;
+        }
+        svg.addClass = addClass;
+        function removeClass(el, cls) {
+            if (el.classList)
+                el.classList.remove(cls);
+            else
+                el.className.baseVal = el.className.baseVal.replace(cls, '').replace(/\s{2,}/, ' ');
+        }
+        svg.removeClass = removeClass;
+    })(svg = pxtblockly.svg || (pxtblockly.svg = {}));
+    function parseColour(colour) {
+        var hue = Number(colour);
+        if (!isNaN(hue)) {
+            return Blockly.hueToRgb(hue);
+        }
+        else if (goog.isString(colour) && colour.match(/^#[0-9a-fA-F]{6}$/)) {
+            return colour;
+        }
+        else {
+            return '#000';
+        }
+    }
+    pxtblockly.parseColour = parseColour;
+    var AudioContextManager;
+    (function (AudioContextManager) {
+        var _frequency = 0;
+        var _context; // AudioContext
+        var _vco; // OscillatorNode;
+        var _mute = false; //mute audio
+        function context() {
+            if (!_context)
+                _context = freshContext();
+            return _context;
+        }
+        function freshContext() {
+            window.AudioContext = window.AudioContext || window.webkitAudioContext;
+            if (window.AudioContext) {
+                try {
+                    // this call my crash.
+                    // SyntaxError: audio resources unavailable for AudioContext construction
+                    return new window.AudioContext();
+                }
+                catch (e) { }
+            }
+            return undefined;
+        }
+        function mute(mute) {
+            if (!_context)
+                return;
+            _mute = mute;
+            stop();
+        }
+        AudioContextManager.mute = mute;
+        function stop() {
+            if (!_context)
+                return;
+            _vco.disconnect();
+            _frequency = 0;
+        }
+        AudioContextManager.stop = stop;
+        function frequency() {
+            return _frequency;
+        }
+        AudioContextManager.frequency = frequency;
+        function tone(frequency) {
+            if (_mute)
+                return;
+            if (frequency <= 0)
+                return;
+            _frequency = frequency;
+            var ctx = context();
+            if (!ctx)
+                return;
+            try {
+                if (_vco) {
+                    _vco.disconnect();
+                    _vco = undefined;
+                }
+                _vco = ctx.createOscillator();
+                _vco.frequency.value = frequency;
+                _vco.type = 'triangle';
+                _vco.connect(ctx.destination);
+                _vco.start(0);
+            }
+            catch (e) {
+                _vco = undefined;
+                return;
+            }
+        }
+        AudioContextManager.tone = tone;
+    })(AudioContextManager = pxtblockly.AudioContextManager || (pxtblockly.AudioContextManager = {}));
+})(pxtblockly || (pxtblockly = {}));

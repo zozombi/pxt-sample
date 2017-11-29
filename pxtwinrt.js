@@ -1,1 +1,664 @@
-var pxt;!function(e){!function(n){n.driveDeployCoreAsync=function(n){function t(n){return e.debug("writing "+o+" to "+n.displayName),e.winrt.promisify(n.createFileAsync(o,Windows.Storage.CreationCollisionOption.replaceExisting).then(function(e){return Windows.Storage.FileIO.writeTextAsync(e,a)})).then(function(e){}).catch(function(t){e.debug("failed to write "+o+" to "+n.displayName+" - "+t)})}var r=e.appTarget.compile.deployDrives;e.Util.assert(!!r),e.debug("deploying to drives "+r);var i=new RegExp(r),o=e.outputName(),a=n.outfiles[o];return e.winrt.promisify(Windows.Storage.KnownFolders.removableDevices.getFoldersAsync()).then(function(e){var n=e.filter(function(e){return i.test(e.displayName)}).map(t);return Promise.join.apply(Promise,n)}).then(function(e){})},n.browserDownloadAsync=function(n,t,r){var i;return e.winrt.promisify(Windows.Storage.ApplicationData.current.temporaryFolder.createFileAsync(t,Windows.Storage.CreationCollisionOption.replaceExisting).then(function(e){return Windows.Storage.FileIO.writeTextAsync(i=e,n)}).then(function(){return Windows.System.Launcher.launchFileAsync(i)}).then(function(e){}))},n.saveOnlyAsync=function(n){var t=e.appTarget.compile.useUF2,r=t?[".uf2"]:[".hex"],i=new Windows.Storage.Pickers.FileSavePicker;return i.suggestedStartLocation=Windows.Storage.Pickers.PickerLocationId.documentsLibrary,i.fileTypeChoices.insert("MakeCode binary file",r),i.suggestedFileName=n.downloadFileBaseName,e.winrt.promisify(i.pickSaveFileAsync().then(function(r){if(r){var i=t?n.outfiles[pxtc.BINARY_UF2]:n.outfiles[pxtc.BINARY_HEX],o=[];return e.Util.stringToUint8Array(atob(i)).forEach(function(e){return o.push(e)}),Windows.Storage.FileIO.writeBytesAsync(r,o).then(function(){return!0})}return Promise.resolve(!1)}))}}(e.winrt||(e.winrt={}))}(pxt||(pxt={}));var pxt;!function(e){!function(n){var t=function(){function n(){this.onData=function(e){},this.onEvent=function(e){},this.onError=function(e){}}return n.prototype.error=function(n){throw new Error(e.U.lf("USB/HID error ({0})",n))},n.prototype.reconnectAsync=function(){var e=this;return this.disconnectAsync().then(function(){return e.initAsync()})},n.prototype.disconnectAsync=function(){return this.dev&&(this.dev.close(),delete this.dev),Promise.resolve()},n.prototype.sendPacketAsync=function(n){if(!this.dev)return Promise.resolve();for(var t=[0],r=0;r<Math.max(n.length,64);++r)t.push(n[r]||0);var i=new Windows.Storage.Streams.DataWriter;i.writeBytes(t);var o=i.detachBuffer(),a=this.dev.createOutputReport(0);return a.data=o,e.winrt.promisify(this.dev.sendOutputReportAsync(a).then(function(n){e.debug("hf2: "+n+" bytes written")}))},n.prototype.initAsync=function(){var t=this;e.Util.assert(!this.dev,"HID interface not properly reseted");var r=Windows.Devices,i=r.HumanInterfaceDevice.HidDevice;return n.uf2Selectors||this.initUf2Selectors(),n.uf2Selectors.reduce(function(e,n){return e.then(function(e){return e&&e.length?Promise.resolve(e):r.Enumeration.DeviceInformation.findAllAsync(n,null)})},Promise.resolve(null)).then(function(n){if(!n||!n[0])return e.debug("no hid device found"),Promise.reject(new Error("no hid device found"));e.debug("hid enumerate "+n.length+" devices");var t=n[0];return e.debug("hid connect to "+t.name+" ("+t.id+")"),i.fromIdAsync(t.id,Windows.Storage.FileAccessMode.readWrite)}).then(function(n){return t.dev=n,t.dev?(e.debug("hid device version "+t.dev.version),t.dev.addEventListener("inputreportreceived",function(n){e.debug("input report");for(var r=Windows.Storage.Streams.DataReader.fromBuffer(n.report.data),i=[];r.unconsumedBufferLength;)i.push(r.readByte());65==i.length&&0===i[0]&&i.shift(),t.onData(new Uint8Array(i))}),Promise.resolve()):(e.debug("can't connect to hid device"),Promise.reject(new Error("can't connect to hid device")))}).catch(function(n){var t=new Error(e.U.lf("Device not found"));return t.notifyUser=!0,Promise.reject(t)})},n.prototype.initUf2Selectors=function(){var t=Windows.Devices.HumanInterfaceDevice.HidDevice;n.uf2Selectors=[],e.appTarget&&e.appTarget.compile&&e.appTarget.compile.hidSelectors&&e.appTarget.compile.hidSelectors.forEach(function(e){var r=t.getDeviceSelector(parseInt(e.usagePage),parseInt(e.usageId),parseInt(e.vid),parseInt(e.pid));n.uf2Selectors.push(r)})},n}();n.mkPacketIOAsync=function(){var e=new t;return e.initAsync().then(function(){return e})}}(e.winrt||(e.winrt={}))}(pxt||(pxt={}));var pxt;!function(e){!function(n){function t(n){var r=i[n];if(r)if(r.device){r.device.baudRate=115200;var o=r.device.inputStream,a=new Windows.Storage.Streams.DataReader(o),c={},u=function(){return a.loadAsync(32).done(function(t){var r=a.readString(4*Math.floor(t/4));e.Util.bufferSerial(c,r,n),u()},function(e){setTimeout(function(){return t(n)},1e3)})};u()}else{var s=Windows.Devices.Enumeration.DeviceAccessInformation.createFromId(n).currentStatus;e.debug("device issue: "+s)}}var r,i={};n.initSerial=function(){if(e.appTarget.serial&&e.appTarget.serial.log&&e.appTarget.serial.nameFilter){var o=new RegExp(e.appTarget.serial.nameFilter),a=Windows.Devices.SerialCommunication.SerialDevice.getDeviceSelector();(r=Windows.Devices.Enumeration.DeviceInformation.createWatcher(a,[])).addEventListener("added",function(r){n.toArray(r.detail).forEach(function(n){o.test(n.name)&&(e.debug("serial port added "+n.name+" - "+n.id),i[n.id]={info:n},Windows.Devices.SerialCommunication.SerialDevice.fromIdAsync(n.id).done(function(e){i[n.id].device=e,t(n.id)}))})}),r.addEventListener("removed",function(e){n.toArray(e.detail).forEach(function(e){return delete i[e.id]})}),r.addEventListener("updated",function(e){n.toArray(e.detail).forEach(function(e){return i[e.id]?i[e.id].info.update(e.info):null})}),r.start()}}}(e.winrt||(e.winrt={}))}(pxt||(pxt={}));var pxt;!function(e){!function(n){function t(){return"undefined"!=typeof Windows}function r(){return t()?(a.resolve(null),a.promise.then(function(e){return Promise.resolve(e&&e.kind===Windows.ApplicationModel.Activation.ActivationKind.file)})):Promise.resolve(!1)}function i(e){Windows.UI.WebUI.WebUIApplication.removeEventListener("activated",i),a.resolve(e)}function o(n,t){if(void 0===t&&(t=!1),n.kind===Windows.ApplicationModel.Activation.ActivationKind.file){var r=n.files.getAt(0);if(r&&r.isOfType(Windows.Storage.StorageItemTypes.file)){var i=r;Windows.Storage.FileIO.readBufferAsync(i).then(function(n){for(var t=[],r=Windows.Storage.Streams.DataReader.fromBuffer(n);r.unconsumedBufferLength;)t.push(r.readByte());return r.close(),e.cpp.unpackSourceFromHexAsync(new Uint8Array(t))}).then(function(e){return c(e,t)})}}}n.promisify=function(e){return new Promise(function(n,t){e.done(function(e){return n(e)},function(e){return t(e)})})},n.toArray=function(e){for(var n=[],t=e.length,r=0;r<t;++r)n.push(e[r]);return n},n.isWindows=function(){return!!navigator&&/Win32/i.test(navigator.platform)},n.isWinRT=t,n.initAsync=function(e){if(!t())return Promise.resolve();var a=Windows.UI.Core,u=a.SystemNavigationManager.getForCurrentView();return u.onbackrequested=function(e){console.log("BACK NAVIGATION"),u.appViewBackButtonVisibility=a.AppViewBackButtonVisibility.collapsed,e.handled=!0},n.initSerial(),r().then(function(){if(e){c=e;var n=Windows.UI.WebUI.WebUIApplication;n.removeEventListener("activated",i),n.addEventListener("activated",o)}})},n.captureInitialActivation=function(){t()&&(a=Promise.defer(),Windows.UI.WebUI.WebUIApplication.addEventListener("activated",i))},n.loadActivationProject=function(){return a.promise.then(function(e){return o(e,!0)})},n.hasActivationProjectAsync=r;var a,c}(e.winrt||(e.winrt={}))}(pxt||(pxt={}));var pxt;!function(e){!function(n){!function(t){function r(e){return w.filter(function(n){return n.id==e})[0]}function i(n){var t=r(n.path);t||(t={id:n.path,header:null,text:null,fsText:null},w.push(t));var i=n.files.map(function(e){return e.mtime});i.sort(function(e,n){return n-e});var o=Math.round(i[0]/1e3)||h.nowSeconds(),a={target:g,name:n.config.name,meta:{},editor:e.JAVASCRIPT_PROJECT_NAME,pubId:n.config.installedVersion,pubCurrent:!1,_rev:null,id:n.path,recentUse:o,modificationTime:o,blobId:null,blobCurrent:!1,isDeleted:!1,icon:n.icon};if(t.header){var c=t.header;c.name=a.name,c.pubId=a.pubId,c.modificationTime=a.modificationTime,c.isDeleted=a.isDeleted,c.icon=a.icon}else t.header=a}function o(n){return e.debug("winrt: fetch "+n.id),p(n.id,!0).then(function(e){if(!n.text){n.text={},n.mtime=0;for(var t=0,r=e.files;t<r.length;t++){var i=r[t];n.text[i.name]=i.content,n.mtime=Math.max(n.mtime,i.mtime)}n.fsText=h.flatClone(n.text)}return n.text})}function a(e,n){if(e.temporary)return Promise.resolve();var t=r(e.id);return h.assert(t.header===e),n?(e.saveId=null,t.textNeedsSave=!0,t.text=n,y.enqueue(e.id,function(){h.assert(!!t.fsText);for(var r={files:[],config:null,path:e.id},o=0,a=Object.keys(t.text);o<a.length;o++){var c=a[o];t.text[c]!==t.fsText[c]&&r.files.push({name:c,mtime:null,content:t.text[c],prevContent:t.fsText[c]})}var u=h.flatClone(t.text);return 0==r.files.length?Promise.resolve():l(e.id,r).then(function(r){t.fsText=u,i(r),n&&(e.saveId=null)})})):Promise.resolve()}function c(){for(var e=[],n=0;n<arguments.length;n++)e[n-0]=arguments[n];return e.join("\\")}function u(t){var r=c(m.path,t);return e.debug("winrt: reading "+r),n.promisify(Windows.Storage.StorageFile.getFileFromPathAsync(r).then(function(e){return Windows.Storage.FileIO.readTextAsync(e)}))}function s(t,r,i){var o=c(m.path,t);return e.debug("winrt: writing "+c(o,r)),n.promisify(Windows.Storage.StorageFolder.getFolderFromPathAsync(o)).then(function(e){return e.createFileAsync(r,Windows.Storage.CreationCollisionOption.replaceExisting)}).then(function(e){return Windows.Storage.FileIO.writeTextAsync(e,i)}).then(function(){})}function d(t){var r=c(m.path,t);return e.debug("winrt: "+r),n.promisify(Windows.Storage.StorageFile.getFileFromPathAsync(r).then(function(e){return e.getBasicPropertiesAsync().then(function(e){return{name:t,mtime:e.dateModified.getTime()}})}))}function f(e,n){void 0===n&&(n=null);var t=new Error(n||"Error "+e);throw t.statusCode=e,t}function l(t,r){return e.debug("winrt: writing package at "+t),n.promisify(m.createFolderAsync(t,Windows.Storage.CreationCollisionOption.openIfExists)).then(function(){return Promise.map(r.files,function(n){return u(c(t,n.name)).then(function(t){if(n.name==e.CONFIG_NAME)try{JSON.parse(n.content).name||(e.log("Trying to save invalid JSON config"),f(410))}catch(n){e.log("Trying to save invalid format JSON config"),f(410)}t!==n.prevContent&&(e.log("merge error for "+n.name+": previous content changed..."),f(409))},function(e){})})}).then(function(){return Promise.map(r.files,function(e){return s(t,e.name,e.content)})}).then(function(){return p(t,!1)})}function p(n,t){return e.debug("winrt: reading package under "+n),u(c(n,e.CONFIG_NAME)).then(function(r){var i=JSON.parse(r),o=[e.CONFIG_NAME].concat(i.files||[]).concat(i.testFiles||[]);return Promise.map(o,function(e){return d(c(n,e)).then(function(r){var i={name:e,mtime:r?r.mtime:null};return null!=r&&t?u(c(n,e)).then(function(e){return i.content=e,i}):i})}).then(function(e){return{path:n,config:i,files:e}})})}function v(){return n.promisify(m.getFoldersAsync()).then(function(e){return Promise.all(e.map(function(e){return p(e.name,!1)}))}).then(function(e){e.forEach(i)})}var m,g,h=e.Util,w=(h.lf,[]),y=new h.PromiseQueue;t.provider={getHeaders:function(){return w.map(function(e){return e.header})},getHeader:function(e){var n=r(e);return n&&!n.header.isDeleted?n.header:null},getTextAsync:function(n){e.debug("winrt: get text "+n);var t=r(n);return t?t.text?Promise.resolve(t.text):y.enqueue(n,function(){return o(t)}):Promise.resolve(null)},initAsync:function(t){w=[],g=t;var r=Windows.Storage.ApplicationData.current.localFolder;return e.debug("winrt: initializing workspace"),n.promisify(r.createFolderAsync(g,Windows.Storage.CreationCollisionOption.openIfExists)).then(function(n){return m=n,e.debug("winrt: initialized workspace at "+m.path),v()}).then(function(){})},saveAsync:function(e,n){return a(e,n)},installAsync:function(e,n){var t=e,i=t.name.replace(/[^a-zA-Z0-9]+/g," ").trim().replace(/ /g,"-");if(r(i)){for(var o=2;r(i+"-"+o);)o++;i+="-"+o,t.name+=" "+o}t.id=i,t.recentUse=h.nowSeconds(),t.modificationTime=t.recentUse,t.target=g;var c={id:t.id,header:t,text:n,fsText:{}};return w.push(c),a(t,n).then(function(){return t})},saveToCloudAsync:function(e){return Promise.resolve()},syncAsync:v,resetAsync:function(){return n.promisify(m.deleteAsync(Windows.Storage.StorageDeleteOption.default).then(function(){m=void 0,w=[],e.storage.clearLocal()}))}}}(n.workspace||(n.workspace={}))}(e.winrt||(e.winrt={}))}(pxt||(pxt={}));
+/// <reference path="../typings/globals/bluebird/index.d.ts"/>
+/// <reference path="./winrtrefs.d.ts"/>
+/// <reference path="../built/pxtlib.d.ts"/>
+var pxt;
+(function (pxt) {
+    var winrt;
+    (function (winrt) {
+        function driveDeployCoreAsync(res) {
+            var drives = pxt.appTarget.compile.deployDrives;
+            pxt.Util.assert(!!drives);
+            pxt.debug("deploying to drives " + drives);
+            var drx = new RegExp(drives);
+            var firmware = pxt.outputName();
+            var r = res.outfiles[firmware];
+            function writeAsync(folder) {
+                pxt.debug("writing " + firmware + " to " + folder.displayName);
+                return pxt.winrt.promisify(folder.createFileAsync(firmware, Windows.Storage.CreationCollisionOption.replaceExisting)
+                    .then(function (file) { return Windows.Storage.FileIO.writeTextAsync(file, r); })).then(function (r) { }).catch(function (e) {
+                    pxt.debug("failed to write " + firmware + " to " + folder.displayName + " - " + e);
+                });
+            }
+            return pxt.winrt.promisify(Windows.Storage.KnownFolders.removableDevices.getFoldersAsync())
+                .then(function (ds) {
+                var df = ds.filter(function (d) { return drx.test(d.displayName); });
+                var pdf = df.map(writeAsync);
+                var all = Promise.join.apply(Promise, pdf);
+                return all;
+            }).then(function (r) { });
+        }
+        winrt.driveDeployCoreAsync = driveDeployCoreAsync;
+        function browserDownloadAsync(text, name, contentType) {
+            var file;
+            return pxt.winrt.promisify(Windows.Storage.ApplicationData.current.temporaryFolder.createFileAsync(name, Windows.Storage.CreationCollisionOption.replaceExisting)
+                .then(function (f) { return Windows.Storage.FileIO.writeTextAsync(file = f, text); })
+                .then(function () { return Windows.System.Launcher.launchFileAsync(file); })
+                .then(function (b) { }));
+        }
+        winrt.browserDownloadAsync = browserDownloadAsync;
+        function saveOnlyAsync(res) {
+            var useUf2 = pxt.appTarget.compile.useUF2;
+            var fileTypes = useUf2 ? [".uf2"] : [".hex"];
+            var savePicker = new Windows.Storage.Pickers.FileSavePicker();
+            savePicker.suggestedStartLocation = Windows.Storage.Pickers.PickerLocationId.documentsLibrary;
+            savePicker.fileTypeChoices.insert("MakeCode binary file", fileTypes);
+            savePicker.suggestedFileName = res.downloadFileBaseName;
+            return pxt.winrt.promisify(savePicker.pickSaveFileAsync()
+                .then(function (file) {
+                if (file) {
+                    var fileContent = useUf2 ? res.outfiles[pxtc.BINARY_UF2] : res.outfiles[pxtc.BINARY_HEX];
+                    var ar_1 = [];
+                    var bytes = pxt.Util.stringToUint8Array(atob(fileContent));
+                    bytes.forEach(function (b) { return ar_1.push(b); });
+                    return Windows.Storage.FileIO.writeBytesAsync(file, ar_1)
+                        .then(function () { return true; });
+                }
+                // Save cancelled
+                return Promise.resolve(false);
+            }));
+        }
+        winrt.saveOnlyAsync = saveOnlyAsync;
+    })(winrt = pxt.winrt || (pxt.winrt = {}));
+})(pxt || (pxt = {}));
+/// <reference path="../typings/globals/bluebird/index.d.ts"/>
+/// <reference path="./winrtrefs.d.ts"/>
+/// <reference path="../built/pxtlib.d.ts"/>
+var pxt;
+(function (pxt) {
+    var winrt;
+    (function (winrt) {
+        var WindowsRuntimeIO = (function () {
+            function WindowsRuntimeIO() {
+                this.onData = function (v) { };
+                this.onEvent = function (v) { };
+                this.onError = function (e) { };
+            }
+            WindowsRuntimeIO.prototype.error = function (msg) {
+                throw new Error(pxt.U.lf("USB/HID error ({0})", msg));
+            };
+            WindowsRuntimeIO.prototype.reconnectAsync = function () {
+                var _this = this;
+                return this.disconnectAsync()
+                    .then(function () { return _this.initAsync(); });
+            };
+            WindowsRuntimeIO.prototype.disconnectAsync = function () {
+                if (this.dev) {
+                    this.dev.close();
+                    delete this.dev;
+                }
+                return Promise.resolve();
+            };
+            WindowsRuntimeIO.prototype.sendPacketAsync = function (pkt) {
+                if (!this.dev)
+                    return Promise.resolve();
+                var ar = [0];
+                for (var i = 0; i < Math.max(pkt.length, 64); ++i)
+                    ar.push(pkt[i] || 0);
+                var dataWriter = new Windows.Storage.Streams.DataWriter();
+                dataWriter.writeBytes(ar);
+                var buffer = dataWriter.detachBuffer();
+                var report = this.dev.createOutputReport(0);
+                report.data = buffer;
+                return pxt.winrt.promisify(this.dev.sendOutputReportAsync(report)
+                    .then(function (value) {
+                    pxt.debug("hf2: " + value + " bytes written");
+                }));
+            };
+            WindowsRuntimeIO.prototype.initAsync = function () {
+                var _this = this;
+                pxt.Util.assert(!this.dev, "HID interface not properly reseted");
+                var wd = Windows.Devices;
+                var whid = wd.HumanInterfaceDevice.HidDevice;
+                if (!WindowsRuntimeIO.uf2Selectors) {
+                    this.initUf2Selectors();
+                }
+                var getDevicesPromise = WindowsRuntimeIO.uf2Selectors.reduce(function (soFar, currentSelector) {
+                    // Try all selectors, in order, until some devices are found
+                    return soFar.then(function (devices) {
+                        if (devices && devices.length) {
+                            return Promise.resolve(devices);
+                        }
+                        return wd.Enumeration.DeviceInformation.findAllAsync(currentSelector, null);
+                    });
+                }, Promise.resolve(null));
+                return getDevicesPromise
+                    .then(function (devices) {
+                    if (!devices || !devices[0]) {
+                        pxt.debug("no hid device found");
+                        return Promise.reject(new Error("no hid device found"));
+                    }
+                    pxt.debug("hid enumerate " + devices.length + " devices");
+                    var device = devices[0];
+                    pxt.debug("hid connect to " + device.name + " (" + device.id + ")");
+                    return whid.fromIdAsync(device.id, Windows.Storage.FileAccessMode.readWrite);
+                })
+                    .then(function (r) {
+                    _this.dev = r;
+                    if (!_this.dev) {
+                        pxt.debug("can't connect to hid device");
+                        return Promise.reject(new Error("can't connect to hid device"));
+                    }
+                    pxt.debug("hid device version " + _this.dev.version);
+                    _this.dev.addEventListener("inputreportreceived", function (e) {
+                        pxt.debug("input report");
+                        var dr = Windows.Storage.Streams.DataReader.fromBuffer(e.report.data);
+                        var values = [];
+                        while (dr.unconsumedBufferLength) {
+                            values.push(dr.readByte());
+                        }
+                        if (values.length == 65 && values[0] === 0) {
+                            values.shift();
+                        }
+                        _this.onData(new Uint8Array(values));
+                    });
+                    return Promise.resolve();
+                })
+                    .catch(function (e) {
+                    var err = new Error(pxt.U.lf("Device not found"));
+                    err.notifyUser = true;
+                    return Promise.reject(err);
+                });
+            };
+            WindowsRuntimeIO.prototype.initUf2Selectors = function () {
+                var whid = Windows.Devices.HumanInterfaceDevice.HidDevice;
+                WindowsRuntimeIO.uf2Selectors = [];
+                if (pxt.appTarget && pxt.appTarget.compile && pxt.appTarget.compile.hidSelectors) {
+                    pxt.appTarget.compile.hidSelectors.forEach(function (s) {
+                        var sel = whid.getDeviceSelector(parseInt(s.usagePage), parseInt(s.usageId), parseInt(s.vid), parseInt(s.pid));
+                        WindowsRuntimeIO.uf2Selectors.push(sel);
+                    });
+                }
+            };
+            return WindowsRuntimeIO;
+        }());
+        function mkPacketIOAsync() {
+            var b = new WindowsRuntimeIO();
+            return b.initAsync()
+                .then(function () { return b; });
+        }
+        winrt.mkPacketIOAsync = mkPacketIOAsync;
+    })(winrt = pxt.winrt || (pxt.winrt = {}));
+})(pxt || (pxt = {}));
+/// <reference path="./winrtrefs.d.ts"/>
+var pxt;
+(function (pxt) {
+    var winrt;
+    (function (winrt) {
+        var watcher;
+        var ports = {};
+        var options;
+        function initSerial() {
+            if (!pxt.appTarget.serial
+                || !pxt.appTarget.serial.log
+                || !pxt.appTarget.serial.nameFilter)
+                return;
+            var filter = new RegExp(pxt.appTarget.serial.nameFilter);
+            var serialDeviceSelector = Windows.Devices.SerialCommunication.SerialDevice.getDeviceSelector();
+            // Create a device watcher to look for instances of the Serial device
+            // The createWatcher() takes a string only when you provide it two arguments, so be sure to include an array as a second
+            // parameter (JavaScript can only recognize overloaded functions with different numbers of parameters).
+            watcher = Windows.Devices.Enumeration.DeviceInformation.createWatcher(serialDeviceSelector, []);
+            watcher.addEventListener("added", function (dis) {
+                winrt.toArray(dis.detail).forEach(function (di) {
+                    if (!filter.test(di.name))
+                        return;
+                    pxt.debug("serial port added " + di.name + " - " + di.id);
+                    ports[di.id] = {
+                        info: di
+                    };
+                    Windows.Devices.SerialCommunication.SerialDevice.fromIdAsync(di.id)
+                        .done(function (dev) {
+                        ports[di.id].device = dev;
+                        startDevice(di.id);
+                    });
+                });
+            });
+            watcher.addEventListener("removed", function (dis) {
+                winrt.toArray(dis.detail).forEach(function (di) { return delete ports[di.id]; });
+            });
+            watcher.addEventListener("updated", function (dis) {
+                winrt.toArray(dis.detail).forEach(function (di) { return ports[di.id] ? ports[di.id].info.update(di.info) : null; });
+            });
+            watcher.start();
+        }
+        winrt.initSerial = initSerial;
+        function startDevice(id) {
+            var port = ports[id];
+            if (!port)
+                return;
+            if (!port.device) {
+                var status_1 = Windows.Devices.Enumeration.DeviceAccessInformation.createFromId(id).currentStatus;
+                pxt.debug("device issue: " + status_1);
+                return;
+            }
+            port.device.baudRate = 115200;
+            var stream = port.device.inputStream;
+            var reader = new Windows.Storage.Streams.DataReader(stream);
+            var serialBuffers = {};
+            var readMore = function () { return reader.loadAsync(32).done(function (bytesRead) {
+                var msg = reader.readString(Math.floor(bytesRead / 4) * 4);
+                pxt.Util.bufferSerial(serialBuffers, msg, id);
+                readMore();
+            }, function (e) {
+                setTimeout(function () { return startDevice(id); }, 1000);
+            }); };
+            readMore();
+        }
+    })(winrt = pxt.winrt || (pxt.winrt = {}));
+})(pxt || (pxt = {}));
+var pxt;
+(function (pxt) {
+    var winrt;
+    (function (winrt) {
+        function promisify(p) {
+            return new Promise(function (resolve, reject) {
+                p.done(function (v) { return resolve(v); }, function (e) { return reject(e); });
+            });
+        }
+        winrt.promisify = promisify;
+        function toArray(v) {
+            var r = [];
+            var length = v.length;
+            for (var i = 0; i < length; ++i)
+                r.push(v[i]);
+            return r;
+        }
+        winrt.toArray = toArray;
+        /**
+         * Detects if the script is running in a browser on windows
+         */
+        function isWindows() {
+            return !!navigator && /Win32/i.test(navigator.platform);
+        }
+        winrt.isWindows = isWindows;
+        function isWinRT() {
+            return typeof Windows !== "undefined";
+        }
+        winrt.isWinRT = isWinRT;
+        function initAsync(importHexImpl) {
+            if (!isWinRT())
+                return Promise.resolve();
+            var uiCore = Windows.UI.Core;
+            var navMgr = uiCore.SystemNavigationManager.getForCurrentView();
+            navMgr.onbackrequested = function (e) {
+                // Ignore the built-in back button; it tries to back-navigate the sidedoc panel, but it crashes the
+                // app if the sidedoc has been closed since the navigation happened
+                console.log("BACK NAVIGATION");
+                navMgr.appViewBackButtonVisibility = uiCore.AppViewBackButtonVisibility.collapsed;
+                e.handled = true;
+            };
+            winrt.initSerial();
+            return hasActivationProjectAsync()
+                .then(function () {
+                if (importHexImpl) {
+                    importHex = importHexImpl;
+                    var app = Windows.UI.WebUI.WebUIApplication;
+                    app.removeEventListener("activated", initialActivationHandler);
+                    app.addEventListener("activated", fileActivationHandler);
+                }
+            });
+        }
+        winrt.initAsync = initAsync;
+        // Needed for when user double clicks a hex file without the app already running
+        function captureInitialActivation() {
+            if (!isWinRT()) {
+                return;
+            }
+            initialActivationDeferred = Promise.defer();
+            Windows.UI.WebUI.WebUIApplication.addEventListener("activated", initialActivationHandler);
+        }
+        winrt.captureInitialActivation = captureInitialActivation;
+        function loadActivationProject() {
+            return initialActivationDeferred.promise
+                .then(function (args) { return fileActivationHandler(args, /* createNewIfFailed */ true); });
+        }
+        winrt.loadActivationProject = loadActivationProject;
+        function hasActivationProjectAsync() {
+            if (!isWinRT()) {
+                return Promise.resolve(false);
+            }
+            // By the time the webapp calls this, if the activation promise hasn't been settled yet, assume we missed the
+            // activation event and pretend there were no activation args
+            initialActivationDeferred.resolve(null); // This is no-op if the promise had been previously resolved
+            return initialActivationDeferred.promise
+                .then(function (args) {
+                return Promise.resolve(args && args.kind === Windows.ApplicationModel.Activation.ActivationKind.file);
+            });
+        }
+        winrt.hasActivationProjectAsync = hasActivationProjectAsync;
+        function initialActivationHandler(args) {
+            Windows.UI.WebUI.WebUIApplication.removeEventListener("activated", initialActivationHandler);
+            initialActivationDeferred.resolve(args);
+        }
+        var initialActivationDeferred;
+        var importHex;
+        function fileActivationHandler(args, createNewIfFailed) {
+            if (createNewIfFailed === void 0) { createNewIfFailed = false; }
+            if (args.kind === Windows.ApplicationModel.Activation.ActivationKind.file) {
+                var info = args;
+                var file = info.files.getAt(0);
+                if (file && file.isOfType(Windows.Storage.StorageItemTypes.file)) {
+                    var f = file;
+                    Windows.Storage.FileIO.readBufferAsync(f)
+                        .then(function (buffer) {
+                        var ar = [];
+                        var dataReader = Windows.Storage.Streams.DataReader.fromBuffer(buffer);
+                        while (dataReader.unconsumedBufferLength) {
+                            ar.push(dataReader.readByte());
+                        }
+                        dataReader.close();
+                        return pxt.cpp.unpackSourceFromHexAsync(new Uint8Array(ar));
+                    })
+                        .then(function (hex) { return importHex(hex, createNewIfFailed); });
+                }
+            }
+        }
+    })(winrt = pxt.winrt || (pxt.winrt = {}));
+})(pxt || (pxt = {}));
+/// <reference path="../built/pxtlib.d.ts"/>
+/// <reference path="../built/pxteditor.d.ts"/>
+/// <reference path="./winrtrefs.d.ts"/>
+var pxt;
+(function (pxt) {
+    var winrt;
+    (function (winrt) {
+        var workspace;
+        (function (workspace) {
+            var U = pxt.Util;
+            var lf = U.lf;
+            var folder;
+            var allScripts = [];
+            var currentTarget;
+            function lookup(id) {
+                return allScripts.filter(function (x) { return x.id == id; })[0];
+            }
+            function getHeaders() {
+                return allScripts.map(function (e) { return e.header; });
+            }
+            function getHeader(id) {
+                var e = lookup(id);
+                if (e && !e.header.isDeleted)
+                    return e.header;
+                return null;
+            }
+            function mergeFsPkg(pkg) {
+                var e = lookup(pkg.path);
+                if (!e) {
+                    e = {
+                        id: pkg.path,
+                        header: null,
+                        text: null,
+                        fsText: null
+                    };
+                    allScripts.push(e);
+                }
+                var time = pkg.files.map(function (f) { return f.mtime; });
+                time.sort(function (a, b) { return b - a; });
+                var modTime = Math.round(time[0] / 1000) || U.nowSeconds();
+                var hd = {
+                    target: currentTarget,
+                    name: pkg.config.name,
+                    meta: {},
+                    editor: pxt.JAVASCRIPT_PROJECT_NAME,
+                    pubId: pkg.config.installedVersion,
+                    pubCurrent: false,
+                    _rev: null,
+                    id: pkg.path,
+                    recentUse: modTime,
+                    modificationTime: modTime,
+                    blobId: null,
+                    blobCurrent: false,
+                    isDeleted: false,
+                    icon: pkg.icon
+                };
+                if (!e.header) {
+                    e.header = hd;
+                }
+                else {
+                    var eh = e.header;
+                    eh.name = hd.name;
+                    eh.pubId = hd.pubId;
+                    eh.modificationTime = hd.modificationTime;
+                    eh.isDeleted = hd.isDeleted;
+                    eh.icon = hd.icon;
+                }
+            }
+            function initAsync(target) {
+                allScripts = [];
+                currentTarget = target;
+                var applicationData = Windows.Storage.ApplicationData.current;
+                var localFolder = applicationData.localFolder;
+                pxt.debug("winrt: initializing workspace");
+                return winrt.promisify(localFolder.createFolderAsync(currentTarget, Windows.Storage.CreationCollisionOption.openIfExists))
+                    .then(function (fd) {
+                    folder = fd;
+                    pxt.debug("winrt: initialized workspace at " + folder.path);
+                    return syncAsync();
+                }).then(function () { });
+            }
+            function fetchTextAsync(e) {
+                pxt.debug("winrt: fetch " + e.id);
+                return readPkgAsync(e.id, true)
+                    .then(function (resp) {
+                    if (!e.text) {
+                        // otherwise we were beaten to it
+                        e.text = {};
+                        e.mtime = 0;
+                        for (var _i = 0, _a = resp.files; _i < _a.length; _i++) {
+                            var f = _a[_i];
+                            e.text[f.name] = f.content;
+                            e.mtime = Math.max(e.mtime, f.mtime);
+                        }
+                        e.fsText = U.flatClone(e.text);
+                    }
+                    return e.text;
+                });
+            }
+            var headerQ = new U.PromiseQueue();
+            function getTextAsync(id) {
+                pxt.debug("winrt: get text " + id);
+                var e = lookup(id);
+                if (!e)
+                    return Promise.resolve(null);
+                if (e.text)
+                    return Promise.resolve(e.text);
+                return headerQ.enqueue(id, function () { return fetchTextAsync(e); });
+            }
+            function saveCoreAsync(h, text) {
+                if (h.temporary)
+                    return Promise.resolve();
+                var e = lookup(h.id);
+                U.assert(e.header === h);
+                if (!text)
+                    return Promise.resolve();
+                h.saveId = null;
+                e.textNeedsSave = true;
+                e.text = text;
+                return headerQ.enqueue(h.id, function () {
+                    U.assert(!!e.fsText);
+                    var pkg = {
+                        files: [],
+                        config: null,
+                        path: h.id,
+                    };
+                    for (var _i = 0, _a = Object.keys(e.text); _i < _a.length; _i++) {
+                        var fn = _a[_i];
+                        if (e.text[fn] !== e.fsText[fn])
+                            pkg.files.push({
+                                name: fn,
+                                mtime: null,
+                                content: e.text[fn],
+                                prevContent: e.fsText[fn]
+                            });
+                    }
+                    var savedText = U.flatClone(e.text);
+                    if (pkg.files.length == 0)
+                        return Promise.resolve();
+                    return writePkgAsync(h.id, pkg)
+                        .then(function (pkg) {
+                        e.fsText = savedText;
+                        mergeFsPkg(pkg);
+                        if (text) {
+                            h.saveId = null;
+                        }
+                    });
+                });
+            }
+            function saveAsync(h, text) {
+                return saveCoreAsync(h, text);
+            }
+            function installAsync(h0, text) {
+                var h = h0;
+                var path = h.name.replace(/[^a-zA-Z0-9]+/g, " ").trim().replace(/ /g, "-");
+                if (lookup(path)) {
+                    var n = 2;
+                    while (lookup(path + "-" + n))
+                        n++;
+                    path += "-" + n;
+                    h.name += " " + n;
+                }
+                h.id = path;
+                h.recentUse = U.nowSeconds();
+                h.modificationTime = h.recentUse;
+                h.target = currentTarget;
+                var e = {
+                    id: h.id,
+                    header: h,
+                    text: text,
+                    fsText: {}
+                };
+                allScripts.push(e);
+                return saveCoreAsync(h, text)
+                    .then(function () { return h; });
+            }
+            function saveToCloudAsync(h) {
+                return Promise.resolve();
+            }
+            function pathjoin() {
+                var parts = [];
+                for (var _i = 0; _i < arguments.length; _i++) {
+                    parts[_i - 0] = arguments[_i];
+                }
+                return parts.join('\\');
+            }
+            function readFileAsync(path) {
+                var fp = pathjoin(folder.path, path);
+                pxt.debug("winrt: reading " + fp);
+                return winrt.promisify(Windows.Storage.StorageFile.getFileFromPathAsync(fp)
+                    .then(function (file) { return Windows.Storage.FileIO.readTextAsync(file); }));
+            }
+            function writeFileAsync(dir, name, content) {
+                var fd = pathjoin(folder.path, dir);
+                pxt.debug("winrt: writing " + pathjoin(fd, name));
+                return winrt.promisify(Windows.Storage.StorageFolder.getFolderFromPathAsync(fd))
+                    .then(function (dk) { return dk.createFileAsync(name, Windows.Storage.CreationCollisionOption.replaceExisting); })
+                    .then(function (f) { return Windows.Storage.FileIO.writeTextAsync(f, content); })
+                    .then(function () { });
+            }
+            function statOptAsync(path) {
+                var fn = pathjoin(folder.path, path);
+                pxt.debug("winrt: " + fn);
+                return winrt.promisify(Windows.Storage.StorageFile.getFileFromPathAsync(fn)
+                    .then(function (file) { return file.getBasicPropertiesAsync()
+                    .then(function (props) {
+                    return {
+                        name: path,
+                        mtime: props.dateModified.getTime()
+                    };
+                }); }));
+            }
+            function throwError(code, msg) {
+                if (msg === void 0) { msg = null; }
+                var err = new Error(msg || "Error " + code);
+                err.statusCode = code;
+                throw err;
+            }
+            function writePkgAsync(logicalDirname, data) {
+                pxt.debug("winrt: writing package at " + logicalDirname);
+                return winrt.promisify(folder.createFolderAsync(logicalDirname, Windows.Storage.CreationCollisionOption.openIfExists))
+                    .then(function () { return Promise.map(data.files, function (f) { return readFileAsync(pathjoin(logicalDirname, f.name))
+                    .then(function (text) {
+                    if (f.name == pxt.CONFIG_NAME) {
+                        try {
+                            var cfg = JSON.parse(f.content);
+                            if (!cfg.name) {
+                                pxt.log("Trying to save invalid JSON config");
+                                throwError(410);
+                            }
+                        }
+                        catch (e) {
+                            pxt.log("Trying to save invalid format JSON config");
+                            throwError(410);
+                        }
+                    }
+                    if (text !== f.prevContent) {
+                        pxt.log("merge error for " + f.name + ": previous content changed...");
+                        throwError(409);
+                    }
+                }, function (err) { }); }); })
+                    .then(function () { return Promise.map(data.files, function (f) { return writeFileAsync(logicalDirname, f.name, f.content); }); })
+                    .then(function () { return readPkgAsync(logicalDirname, false); });
+            }
+            function readPkgAsync(logicalDirname, fileContents) {
+                pxt.debug("winrt: reading package under " + logicalDirname);
+                return readFileAsync(pathjoin(logicalDirname, pxt.CONFIG_NAME))
+                    .then(function (text) {
+                    var cfg = JSON.parse(text);
+                    var files = [pxt.CONFIG_NAME].concat(cfg.files || []).concat(cfg.testFiles || []);
+                    return Promise.map(files, function (fn) {
+                        return statOptAsync(pathjoin(logicalDirname, fn))
+                            .then(function (st) {
+                            var rf = {
+                                name: fn,
+                                mtime: st ? st.mtime : null
+                            };
+                            if (st == null || !fileContents)
+                                return rf;
+                            else
+                                return readFileAsync(pathjoin(logicalDirname, fn))
+                                    .then(function (text) {
+                                    rf.content = text;
+                                    return rf;
+                                });
+                        });
+                    })
+                        .then(function (files) {
+                        var rs = {
+                            path: logicalDirname,
+                            config: cfg,
+                            files: files
+                        };
+                        return rs;
+                    });
+                });
+            }
+            function syncAsync() {
+                return winrt.promisify(folder.getFoldersAsync())
+                    .then(function (fds) { return Promise.all(fds.map(function (fd) { return readPkgAsync(fd.name, false); })); })
+                    .then(function (hs) {
+                    hs.forEach(mergeFsPkg);
+                    return undefined;
+                });
+            }
+            function resetAsync() {
+                return winrt.promisify(folder.deleteAsync(Windows.Storage.StorageDeleteOption.default)
+                    .then(function () {
+                    folder = undefined;
+                    allScripts = [];
+                    pxt.storage.clearLocal();
+                }));
+            }
+            workspace.provider = {
+                getHeaders: getHeaders,
+                getHeader: getHeader,
+                getTextAsync: getTextAsync,
+                initAsync: initAsync,
+                saveAsync: saveAsync,
+                installAsync: installAsync,
+                saveToCloudAsync: saveToCloudAsync,
+                syncAsync: syncAsync,
+                resetAsync: resetAsync
+            };
+        })(workspace = winrt.workspace || (winrt.workspace = {}));
+    })(winrt = pxt.winrt || (pxt.winrt = {}));
+})(pxt || (pxt = {}));
