@@ -63,7 +63,7 @@
     "floatingPoint": true
   },
   "versions": {
-    "target": "1.0.17",
-    "pxt": "2.3.29"
+    "target": "2.0.1",
+    "pxt": "3.2.4"
   }
 }

@@ -1,23 +1,33 @@
-var __extends = (this && this.__extends) || function (d, b) {
-    for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
-    function __() { this.constructor = d; }
-    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
-};
+var __extends = (this && this.__extends) || (function () {
+    var extendStatics = Object.setPrototypeOf ||
+        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+    return function (d, b) {
+        extendStatics(d, b);
+        function __() { this.constructor = d; }
+        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+    };
+})();
+/// <reference path="../localtypings/mscc" />
 var pxt;
+(function (pxt) {
+})(pxt || (pxt = {}));
 (function (pxt) {
     var analytics;
     (function (analytics) {
         function enable() {
-            var ai = window.appInsights;
-            if (!ai)
+            if (!pxt.aiTrackException || !pxt.aiTrackEvent)
                 return;
-            pxt.debug('enabling app insights');
+            pxt.debug('setting up app insights');
             var te = pxt.tickEvent;
-            pxt.tickEvent = function (id, data) {
+            pxt.tickEvent = function (id, data, opts) {
                 if (te)
-                    te(id, data);
+                    te(id, data, opts);
+                if (opts && opts.interactiveConsent && typeof mscc !== "undefined" && !mscc.hasConsent()) {
+                    mscc.setConsent();
+                }
                 if (!data)
-                    ai.trackEvent(id);
+                    pxt.aiTrackEvent(id);
                 else {
                     var props = {};
                     var measures = {};
@@ -26,7 +36,7 @@ var pxt;
                             props[k] = data[k];
                         else
                             measures[k] = data[k];
-                    ai.trackEvent(id, props, measures);
+                    pxt.aiTrackEvent(id, props, measures);
                 }
             };
             var rexp = pxt.reportException;
@@ -39,7 +49,7 @@ var pxt;
                 };
                 if (data)
                     pxt.Util.jsonMergeFrom(props, data);
-                ai.trackException(err, 'exception', props);
+                pxt.aiTrackException(err, 'exception', props);
             };
             var re = pxt.reportError;
             pxt.reportError = function (cat, msg, data) {
@@ -57,14 +67,13 @@ var pxt;
                     };
                     if (data)
                         pxt.Util.jsonMergeFrom(props, data);
-                    ai.trackException(err, 'error', props);
+                    pxt.aiTrackException(err, 'error', props);
                 }
             };
         }
         analytics.enable = enable;
     })(analytics = pxt.analytics || (pxt.analytics = {}));
 })(pxt || (pxt = {}));
-/// <reference path="../typings/globals/bluebird/index.d.ts"/>
 var ts;
 (function (ts) {
     var pxtc;
@@ -73,7 +82,21 @@ var ts;
     })(pxtc = ts.pxtc || (ts.pxtc = {}));
 })(ts || (ts = {}));
 var pxtc = ts.pxtc;
-var ts;
+(function (ts) {
+    var pxtc;
+    (function (pxtc) {
+        /**
+         * atob replacement
+         * @param s
+         */
+        pxtc.decodeBase64 = function (s) { return atob(s); };
+        /**
+         * bota replacement
+         * @param s
+         */
+        pxtc.encodeBase64 = function (s) { return btoa(s); };
+    })(pxtc = ts.pxtc || (ts.pxtc = {}));
+})(ts || (ts = {}));
 (function (ts) {
     var pxtc;
     (function (pxtc) {
@@ -85,7 +108,7 @@ var ts;
                 if (maxBufLen === void 0) { maxBufLen = 255; }
                 for (var i = 0; i < data.length; ++i) {
                     var char = data[i];
-                    buffers[source] = buffers[source] ? buffers[source] + char : char;
+                    buffers[source] = (buffers[source] || "") + char;
                     if (char === "\n" || buffers[source].length > maxBufLen) {
                         var buffer = buffers[source];
                         buffers[source] = "";
@@ -405,6 +428,9 @@ var ts;
             }
             Util.toDictionary = toDictionary;
             function toArray(a) {
+                if (Array.isArray(a)) {
+                    return a;
+                }
                 var r = [];
                 for (var i = 0; i < a.length; ++i)
                     r.push(a[i]);
@@ -695,7 +721,7 @@ var ts;
                 return r;
             }
             Util.fromHex = fromHex;
-            var PromiseQueue = (function () {
+            var PromiseQueue = /** @class */ (function () {
                 function PromiseQueue() {
                     this.promises = {};
                 }
@@ -724,7 +750,7 @@ var ts;
                 return PromiseQueue;
             }());
             Util.PromiseQueue = PromiseQueue;
-            var PromiseBuffer = (function () {
+            var PromiseBuffer = /** @class */ (function () {
                 function PromiseBuffer() {
                     this.waiting = [];
                     this.available = [];
@@ -836,7 +862,7 @@ var ts;
             var _localizeStrings = {};
             var _translationsCache = {};
             Util.localizeLive = false;
-            var MemTranslationDb = (function () {
+            var MemTranslationDb = /** @class */ (function () {
                 function MemTranslationDb() {
                     this.translations = {};
                 }
@@ -1213,13 +1239,12 @@ var ts;
                 if (/xml|svg/.test(mimetype))
                     return "data:" + mimetype + "," + encodeURIComponent(data);
                 else
-                    return "data:" + (mimetype || "image/png") + ";base64," + btoa(toUTF8(data));
+                    return "data:" + (mimetype || "image/png") + ";base64," + pxtc.encodeBase64(toUTF8(data));
             }
             Util.toDataUri = toDataUri;
         })(Util = pxtc.Util || (pxtc.Util = {}));
     })(pxtc = ts.pxtc || (ts.pxtc = {}));
 })(ts || (ts = {}));
-var ts;
 (function (ts) {
     var pxtc;
     (function (pxtc) {
@@ -1399,7 +1424,6 @@ var ts;
         })(BrowserImpl = pxtc.BrowserImpl || (pxtc.BrowserImpl = {}));
     })(pxtc = ts.pxtc || (ts.pxtc = {}));
 })(ts || (ts = {}));
-/// <reference path="../typings/globals/bluebird/index.d.ts"/>
 /// <reference path="../localtypings/pxtpackage.d.ts"/>
 /// <reference path="../localtypings/pxtparts.d.ts"/>
 /// <reference path="../localtypings/pxtarget.d.ts"/>
@@ -1463,6 +1487,7 @@ var pxt;
                 try {
                     // log it as object, so native object inspector can be used
                     console.log(d);
+                    //pxt.log(JSON.stringify(d, null, 2))
                 }
                 catch (e) { }
             }
@@ -1494,7 +1519,7 @@ var pxt;
     function tickActivity() {
         var ids = [];
         for (var _i = 0; _i < arguments.length; _i++) {
-            ids[_i - 0] = arguments[_i];
+            ids[_i] = arguments[_i];
         }
         ids.filter(function (id) { return !!id; }).map(function (id) { return id.slice(0, 64); })
             .forEach(function (id) { return activityEvents[id] = (activityEvents[id] || 0) + 1; });
@@ -1576,7 +1601,7 @@ var pxt;
     pxt.outputName = outputName;
     function isOutputText(trg) {
         if (trg === void 0) { trg = null; }
-        return outputName(trg) == ts.pxtc.BINARY_HEX;
+        return outputName(trg) == ts.pxtc.BINARY_HEX || outputName(trg) == ts.pxtc.BINARY_CS;
     }
     pxt.isOutputText = isOutputText;
 })(pxt || (pxt = {}));
@@ -1730,7 +1755,21 @@ var pxt;
                 'math_number': {
                     name: pxt.Util.lf("{id:block}number"),
                     url: '/blocks/math/random',
-                    category: 'math'
+                    category: 'math',
+                    tooltip: (pxt.appTarget.compile && pxt.appTarget.compile.floatingPoint) ?
+                        pxt.Util.lf("a decimal number") : pxt.Util.lf("an integer number")
+                },
+                'math_integer': {
+                    name: pxt.Util.lf("{id:block}number"),
+                    url: '/blocks/math/random',
+                    category: 'math',
+                    tooltip: pxt.Util.lf("an integer number")
+                },
+                'math_whole_number': {
+                    name: pxt.Util.lf("{id:block}number"),
+                    url: '/blocks/math/random',
+                    category: 'math',
+                    tooltip: pxt.Util.lf("an whole number")
                 },
                 'math_number_minmax': {
                     name: pxt.Util.lf("{id:block}number"),
@@ -1756,7 +1795,7 @@ var pxt;
                         MATH_SUBTRACTION_SYMBOL: pxt.Util.lf("{id:op}-"),
                         MATH_MULTIPLICATION_SYMBOL: pxt.Util.lf("{id:op}×"),
                         MATH_DIVISION_SYMBOL: pxt.Util.lf("{id:op}÷"),
-                        MATH_POWER_SYMBOL: pxt.Util.lf("{id:op}^")
+                        MATH_POWER_SYMBOL: pxt.Util.lf("{id:op}**")
                     }
                 },
                 'math_modulo': {
@@ -1965,6 +2004,15 @@ var pxt;
                 category: "loops",
                 block: {
                     message0: pxt.Util.lf("on start %1 %2")
+                }
+            };
+            _blockDefinitions[pxtc.PAUSE_UNTIL_TYPE] = {
+                name: pxt.Util.lf("pause until"),
+                tooltip: pxt.Util.lf("Pause execution of code until the given boolean expression is true"),
+                url: '/blocks/pause-until',
+                category: "loops",
+                block: {
+                    message0: pxt.Util.lf("pause until %1")
                 }
             };
         }
@@ -2219,12 +2267,12 @@ var pxt;
         BrowserUtils.devicePixelRatio = devicePixelRatio;
         function browserDownloadBinText(text, name, contentType, userContextWindow, onError) {
             if (contentType === void 0) { contentType = "application/octet-stream"; }
-            return browserDownloadBase64(btoa(text), name, contentType, userContextWindow, onError);
+            return browserDownloadBase64(ts.pxtc.encodeBase64(text), name, contentType, userContextWindow, onError);
         }
         BrowserUtils.browserDownloadBinText = browserDownloadBinText;
         function browserDownloadText(text, name, contentType, userContextWindow, onError) {
             if (contentType === void 0) { contentType = "application/octet-stream"; }
-            return browserDownloadBase64(btoa(pxt.Util.toUTF8(text)), name, contentType, userContextWindow, onError);
+            return browserDownloadBase64(ts.pxtc.encodeBase64(pxt.Util.toUTF8(text)), name, contentType, userContextWindow, onError);
         }
         BrowserUtils.browserDownloadText = browserDownloadText;
         function isBrowserDownloadInSameWindow() {
@@ -2232,6 +2280,14 @@ var pxt;
             return windowOpen;
         }
         BrowserUtils.isBrowserDownloadInSameWindow = isBrowserDownloadInSameWindow;
+        // for browsers that strictly require that a download gets initiated within a user click
+        function isBrowserDownloadWithinUserContext() {
+            var versionString = browserVersion();
+            var v = parseInt(versionString || "0");
+            var r = (isMobile() && isSafari() && v >= 11) || /downloadUserContext=1/i.test(window.location.href);
+            return r;
+        }
+        BrowserUtils.isBrowserDownloadWithinUserContext = isBrowserDownloadWithinUserContext;
         function browserDownloadDataUri(uri, name, userContextWindow) {
             var windowOpen = isBrowserDownloadInSameWindow();
             var versionString = browserVersion();
@@ -2286,14 +2342,10 @@ var pxt;
         BrowserUtils.browserDownloadDataUri = browserDownloadDataUri;
         function browserDownloadUInt8Array(buf, name, contentType, userContextWindow, onError) {
             if (contentType === void 0) { contentType = "application/octet-stream"; }
-            return browserDownloadBase64(btoa(pxt.Util.uint8ArrayToString(buf)), name, contentType, userContextWindow, onError);
+            return browserDownloadBase64(ts.pxtc.encodeBase64(pxt.Util.uint8ArrayToString(buf)), name, contentType, userContextWindow, onError);
         }
         BrowserUtils.browserDownloadUInt8Array = browserDownloadUInt8Array;
-        function browserDownloadBase64(b64, name, contentType, userContextWindow, onError) {
-            if (contentType === void 0) { contentType = "application/octet-stream"; }
-            pxt.debug('trigger download');
-            var isMobileBrowser = pxt.BrowserUtils.isMobile();
-            var saveBlob = window.navigator.msSaveOrOpenBlob && !isMobileBrowser;
+        function toDownloadDataUri(b64, contentType) {
             var protocol = "data";
             if (isMobile() && isSafari() && pxt.appTarget.appTheme.mobileSafariDownloadProtocol)
                 protocol = pxt.appTarget.appTheme.mobileSafariDownloadProtocol;
@@ -2301,6 +2353,14 @@ var pxt;
             if (m)
                 protocol = m[1];
             var dataurl = protocol + ":" + contentType + ";base64," + b64;
+            return dataurl;
+        }
+        BrowserUtils.toDownloadDataUri = toDownloadDataUri;
+        function browserDownloadBase64(b64, name, contentType, userContextWindow, onError) {
+            if (contentType === void 0) { contentType = "application/octet-stream"; }
+            pxt.debug('trigger download');
+            var saveBlob = window.navigator.msSaveOrOpenBlob && !pxt.BrowserUtils.isMobile();
+            var dataurl = toDownloadDataUri(b64, name);
             try {
                 if (saveBlob) {
                     var b = new Blob([pxt.Util.stringToUint8Array(atob(b64))], { type: contentType });
@@ -2410,6 +2470,15 @@ var pxt;
                         boardDef.outlineImage = patchCdn(boardDef.outlineImage);
                 }
             }
+            // patch icons in bundled packages
+            Object.keys(pxt.appTarget.bundledpkgs).forEach(function (pkgid) {
+                var res = pxt.appTarget.bundledpkgs[pkgid];
+                // path config before storing
+                var config = JSON.parse(res[pxt.CONFIG_NAME]);
+                if (config.icon)
+                    config.icon = patchCdn(config.icon);
+                res[pxt.CONFIG_NAME] = JSON.stringify(config, null, 2);
+            });
         }
         BrowserUtils.initTheme = initTheme;
         /**
@@ -2485,7 +2554,6 @@ var pxt;
     pxt.lzmaCompressAsync = lzmaCompressAsync;
 })(pxt || (pxt = {}));
 // preprocess C++ file to find functions exposed to pxt
-var pxt;
 (function (pxt) {
     var cpp;
     (function (cpp) {
@@ -2566,12 +2634,13 @@ var pxt;
         cpp.parseCppInt = parseCppInt;
         var prevExtInfo;
         var prevSnapshot;
-        var PkgConflictError = (function (_super) {
+        var PkgConflictError = /** @class */ (function (_super) {
             __extends(PkgConflictError, _super);
             function PkgConflictError(msg) {
-                _super.call(this, msg);
-                this.isUserError = true;
-                this.message = msg;
+                var _this = _super.call(this, msg) || this;
+                _this.isUserError = true;
+                _this.message = msg;
+                return _this;
             }
             return PkgConflictError;
         }(Error));
@@ -3174,6 +3243,7 @@ var pxt;
                             currSettings[settingName] = settingValue;
                         }
                         else if (currSettings[settingName] === settingValue) {
+                            // OK
                         }
                         else if (!pkg.parent.config.yotta || !pkg.parent.config.yotta.ignoreConflicts) {
                             var err_1 = new PkgConflictError(lf("conflict on yotta setting {0} between packages {1} and {2}", settingName, pkg.id, prev.id));
@@ -3236,7 +3306,7 @@ var pxt;
                             if (isCSharp) {
                                 pxt.debug("Parse C#: " + fullName);
                                 parseCs(src);
-                                fullCS += ("\n\n\n#line 1 \"" + fullName + "\"\n") + src;
+                                fullCS += "\n\n\n#line 1 \"" + fullName + "\"\n" + src;
                             }
                             else {
                                 // parseCpp() will remove doc comments, to prevent excessive recompilation
@@ -3369,7 +3439,7 @@ var pxt;
             };
             var data = JSON.stringify(creq);
             res.sha = U.sha256(data);
-            res.compileData = btoa(U.toUTF8(data));
+            res.compileData = ts.pxtc.encodeBase64(U.toUTF8(data));
             res.shimsDTS = shimsDTS.finish();
             res.enumsDTS = enumsDTS.finish();
             prevSnapshot = pkgSnapshot;
@@ -3540,12 +3610,13 @@ var pxt;
         cpp.unpackSourceFromHexAsync = unpackSourceFromHexAsync;
     })(cpp = pxt.cpp || (pxt.cpp = {}));
 })(pxt || (pxt = {}));
-var pxt;
 (function (pxt) {
     var hex;
     (function (hex_1) {
         var downloadCache = {};
         var cdnUrlPromise;
+        hex_1.showLoading = function (msg) { };
+        hex_1.hideLoading = function () { };
         function downloadHexInfoAsync(extInfo) {
             var cachePromise = Promise.resolve();
             if (!downloadCache.hasOwnProperty(extInfo.sha)) {
@@ -3571,6 +3642,7 @@ var pxt;
         }
         function downloadHexInfoCoreAsync(extInfo) {
             var hexurl = "";
+            hex_1.showLoading(pxt.U.lf("Compiling (this may take a minute)..."));
             return downloadHexInfoLocalAsync(extInfo)
                 .then(function (hex) {
                 if (hex) {
@@ -3605,12 +3677,15 @@ var pxt;
                     }); });
                 })
                     .then(function (text) {
+                    hex_1.hideLoading();
                     return {
                         enums: [],
                         functions: [],
                         hex: text.split(/\r?\n/)
                     };
                 });
+            }).finally(function () {
+                hex_1.hideLoading();
             });
         }
         function downloadHexInfoLocalAsync(extInfo) {
@@ -3744,7 +3819,7 @@ var pxt;
                     }
                 }
                 else {
-                    buf = pxtc.decodeBase64(nxt);
+                    buf = ts.pxtc.decodeBase64(nxt);
                 }
                 pxt.Util.assert(buf.length > 0);
                 pxt.Util.assert(buf.length % 16 == 0);
@@ -3813,7 +3888,7 @@ var pxt;
                         var bin = "";
                         for (var k = 0; k < outln.length; k += 2)
                             bin += String.fromCharCode(parseInt(outln.slice(k, k + 2), 16));
-                        outp.push(btoa(bin));
+                        outp.push(ts.pxtc.encodeBase64(bin));
                     }
                 }
             }
@@ -3836,7 +3911,7 @@ var pxt;
                 args["branch"] = branch;
             }
             if (args)
-                suff += "&" + Object.keys(args).map(function (k) { return (k + "=" + encodeURIComponent(args[k])); }).join("&");
+                suff += "&" + Object.keys(args).map(function (k) { return k + "=" + encodeURIComponent(args[k]); }).join("&");
             return apiRoot + cmd + suff;
         }
         function downloadTranslationsAsync(branch, prj, key, filename, options) {
@@ -3958,10 +4033,11 @@ var pxt;
             return startAsync();
         }
         crowdin.uploadTranslationAsync = uploadTranslationAsync;
-        function flatten(allFiles, files, parentDir) {
+        function flatten(allFiles, files, parentDir, branch) {
             var n = files.name;
             var d = parentDir ? parentDir + "/" + n : n;
             files.fullName = d;
+            files.branch = branch || "";
             switch (files.node_type) {
                 case "file":
                     allFiles.push(files);
@@ -3970,17 +4046,24 @@ var pxt;
                     (files.files || []).forEach(function (f) { return flatten(allFiles, f, d); });
                     break;
                 case "branch":
-                    (files.files || []).forEach(function (f) { return flatten(allFiles, f, parentDir); });
+                    (files.files || []).forEach(function (f) { return flatten(allFiles, f, parentDir, files.name); });
                     break;
             }
         }
-        function filterAndFlattenFiles(files, branch, crowdinPath) {
+        function filterAndFlattenFiles(files, crowdinPath) {
+            var pxtCrowdinBranch = pxt.appTarget.versions.pxtCrowdinBranch || "";
+            var targetCrowdinBranch = pxt.appTarget.versions.targetCrowdinBranch || "";
             var allFiles = [];
-            // if branch, filter out
-            if (branch)
-                files = files.filter(function (f) { return f.node_type == "branch" && f.name == branch; });
             // flatten the files
             files.forEach(function (f) { return flatten(allFiles, f, ""); });
+            // top level files are for PXT, subolder are targets
+            allFiles = allFiles.filter(function (f) {
+                if (f.fullName.indexOf('/') < 0)
+                    return f.branch == pxtCrowdinBranch; // pxt file
+                else
+                    return f.branch == targetCrowdinBranch;
+            });
+            // folder filter
             if (crowdinPath) {
                 // filter out crowdin folder
                 allFiles = allFiles.filter(function (f) { return f.fullName.indexOf(crowdinPath) == 0; });
@@ -3996,50 +4079,55 @@ var pxt;
             }
             return allFiles;
         }
+        function projectInfoAsync(prj, key) {
+            var q = { json: "true" };
+            var infoUri = apiUri("", prj, key, "info", q);
+            return pxt.Util.httpGetTextAsync(infoUri).then(function (respText) {
+                var info = JSON.parse(respText);
+                return info;
+            });
+        }
+        crowdin.projectInfoAsync = projectInfoAsync;
         /**
          * Scans files in crowdin and report files that are not on disk anymore
          */
-        function listFilesAsync(branch, prj, key, crowdinPath) {
-            var q = { json: "true" };
-            var infoUri = apiUri(branch, prj, key, "info", q);
-            pxt.log("crowdin: listing files under " + crowdinPath + " in branch " + (branch || "master"));
-            pxt.debug("uri: " + infoUri);
-            return pxt.Util.httpGetTextAsync(infoUri).then(function (respText) {
-                var info = JSON.parse(respText);
+        function listFilesAsync(prj, key, crowdinPath) {
+            pxt.log("crowdin: listing files under " + crowdinPath);
+            return projectInfoAsync(prj, key)
+                .then(function (info) {
                 if (!info)
                     throw new Error("info failed");
-                var allFiles = filterAndFlattenFiles(info.files, branch, crowdinPath);
+                var allFiles = filterAndFlattenFiles(info.files, crowdinPath);
                 pxt.debug("crowdin: found " + allFiles.length + " under " + crowdinPath);
                 return allFiles.map(function (f) {
                     return {
-                        fullName: f.fullName
+                        fullName: f.fullName,
+                        branch: f.branch || ""
                     };
                 });
             });
         }
         crowdin.listFilesAsync = listFilesAsync;
-        function languageStatsAsync(branch, prj, key, lang) {
-            var uri = apiUri(branch, prj, key, "language-status", { language: lang, json: "true" });
+        function languageStatsAsync(prj, key, lang) {
+            var uri = apiUri("", prj, key, "language-status", { language: lang, json: "true" });
             return pxt.Util.httpGetJsonAsync(uri)
                 .then(function (info) {
-                var allFiles = filterAndFlattenFiles(info.files, branch);
+                var allFiles = filterAndFlattenFiles(info.files);
                 return allFiles;
             });
         }
         crowdin.languageStatsAsync = languageStatsAsync;
     })(crowdin = pxt.crowdin || (pxt.crowdin = {}));
 })(pxt || (pxt = {}));
-/// <reference path='../typings/globals/marked/index.d.ts' />
-/// <reference path='../typings/globals/highlightjs/index.d.ts' />
 /// <reference path='../localtypings/pxtarget.d.ts' />
 /// <reference path="util.ts"/>
 var pxt;
 (function (pxt) {
     var docs;
     (function (docs) {
-        var marked;
         var U = pxtc.Util;
         var lf = U.lf;
+        var markedInstance;
         var stdboxes = {};
         var stdmacros = {};
         var stdSetting = "<!-- @CMD@ @ARGS@ -->";
@@ -4115,7 +4203,7 @@ var pxt;
             return attrs;
         }
         var error = function (s) {
-            return ("<div class='ui negative message'>" + htmlQuote(s) + "</div>");
+            return "<div class='ui negative message'>" + htmlQuote(s) + "</div>";
         };
         function prepTemplate(d) {
             var boxes = U.clone(stdboxes);
@@ -4245,17 +4333,17 @@ var pxt;
             var breadcrumbHtml = '';
             if (breadcrumb.length > 1) {
                 breadcrumbHtml = "\n            <nav class=\"ui breadcrumb\" aria-label=\"" + lf("Breadcrumb") + "\">\n                " + breadcrumb.map(function (b, i) {
-                    return ("<a class=\"" + (i == breadcrumb.length - 1 ? "active" : "") + " section\"\n                        href=\"" + html2Quote(b.href) + "\" aria-current=\"" + (i == breadcrumb.length - 1 ? "page" : "") + "\">" + html2Quote(b.name) + "</a>");
+                    return "<a class=\"" + (i == breadcrumb.length - 1 ? "active" : "") + " section\"\n                        href=\"" + html2Quote(b.href) + "\" aria-current=\"" + (i == breadcrumb.length - 1 ? "page" : "") + "\">" + html2Quote(b.name) + "</a>";
                 })
                     .join('<i class="right chevron icon divider"></i>') + "\n            </nav>";
             }
             params["breadcrumb"] = breadcrumbHtml;
             if (currentTocEntry) {
                 if (currentTocEntry.prevPath) {
-                    params["prev"] = "<a href=\"" + currentTocEntry.prevPath + "\" class=\"navigation navigation-prev \" title=\"" + ('Previous page: {0}', currentTocEntry.prevName) + "\">\n                                    <i class=\"icon angle left\"></i>\n                                </a>";
+                    params["prev"] = "<a href=\"" + currentTocEntry.prevPath + "\" class=\"navigation navigation-prev \" title=\"" + currentTocEntry.prevName + "\">\n                                    <i class=\"icon angle left\"></i>\n                                </a>";
                 }
                 if (currentTocEntry.nextPath) {
-                    params["next"] = "<a href=\"" + currentTocEntry.nextPath + "\" class=\"navigation navigation-next \" title=\"" + ('Next page {0}', currentTocEntry.nextName) + "\">\n                                    <i class=\"icon angle right\"></i>\n                                </a>";
+                    params["next"] = "<a href=\"" + currentTocEntry.nextPath + "\" class=\"navigation navigation-next \" title=\"" + currentTocEntry.nextName + "\">\n                                    <i class=\"icon angle right\"></i>\n                                </a>";
                 }
             }
             if (theme.boardName)
@@ -4282,7 +4370,7 @@ var pxt;
             else {
                 params["github"] = "";
             }
-            // Add accessiblity menu 
+            // Add accessiblity menu
             var accMenuHtml = "\n            <a href=\"#maincontent\" class=\"ui item link\" tabindex=\"0\" role=\"menuitem\">" + lf("Skip to main content") + "</a>\n        ";
             params['accMenu'] = accMenuHtml;
             // Add print button
@@ -4374,9 +4462,9 @@ var pxt;
                 params: pubinfo,
             };
             prepTemplate(d);
-            if (!marked) {
-                marked = docs.requireMarked();
-                var renderer = new marked.Renderer();
+            if (!markedInstance) {
+                markedInstance = docs.requireMarked();
+                var renderer = new markedInstance.Renderer();
                 renderer.image = function (href, title, text) {
                     var out = '<img class="ui centered image" src="' + href + '" alt="' + text + '"';
                     if (title) {
@@ -4388,7 +4476,7 @@ var pxt;
                 renderer.listitem = function (text) {
                     var m = /^\s*\[( |x)\]/i.exec(text);
                     if (m)
-                        return ("<li class=\"" + (m[1] == ' ' ? 'unchecked' : 'checked') + "\">") + text.slice(m[0].length) + '</li>\n';
+                        return "<li class=\"" + (m[1] == ' ' ? 'unchecked' : 'checked') + "\">" + text.slice(m[0].length) + '</li>\n';
                     return '<li>' + text + '</li>\n';
                 };
                 renderer.heading = function (text, level, raw) {
@@ -4403,7 +4491,7 @@ var pxt;
                     }
                     return "<h" + level + " id=\"" + this.options.headerPrefix + id + "\">" + text + "</h" + level + ">";
                 };
-                marked.setOptions({
+                markedInstance.setOptions({
                     renderer: renderer,
                     gfm: true,
                     tables: true,
@@ -4421,24 +4509,25 @@ var pxt;
                 markdown += "\n```package\n" + opts.repo.name.replace(/^pxt-/, '') + "=github:" + opts.repo.fullName + "#" + (opts.repo.tag || "master") + "\n```\n";
             //Uses the CmdLink definitions to replace links to YouTube and Vimeo (limited at the moment)
             markdown = markdown.replace(/^\s*https?:\/\/(\S+)\s*$/mg, function (f, lnk) {
-                var _loop_1 = function(ent) {
+                var _loop_1 = function (ent) {
                     var m = ent.rx.exec(lnk);
                     if (m) {
                         return { value: ent.cmd.replace(/\$(\d+)/g, function (f, k) {
-                            return m[parseInt(k)] || "";
-                        }) + "\n" };
+                                return m[parseInt(k)] || "";
+                            }) + "\n" };
                     }
                 };
                 for (var _i = 0, links_1 = links; _i < links_1.length; _i++) {
                     var ent = links_1[_i];
                     var state_1 = _loop_1(ent);
-                    if (typeof state_1 === "object") return state_1.value;
+                    if (typeof state_1 === "object")
+                        return state_1.value;
                 }
                 return f;
             });
             // replace pre-template in markdown
             markdown = markdown.replace(/@([a-z]+)@/ig, function (m, param) { return pubinfo[param] || 'unknown macro'; });
-            var html = marked(markdown);
+            var html = markedInstance(markdown);
             // support for breaks which somehow don't work out of the box
             html = html.replace(/&lt;br\s*\/&gt;/ig, "<br/>");
             var endBox = "";
@@ -4551,12 +4640,12 @@ var pxt;
             return embed;
         }
         docs.runUrl = runUrl;
-        function docsEmbedUrl(rootUrl, id, height) {
-            var docurl = rootUrl + "--docs?projectid=" + id;
+        function codeEmbedUrl(rootUrl, id, height) {
+            var docurl = rootUrl + "---codeembed#pub:" + id;
             height = Math.ceil(height || 300);
-            return "<div style=\"position:relative;height:calc(" + height + "px + 5em);width:100%;overflow:hidden;\"><iframe style=\"position:absolute;top:0;left:0;width:100%;height:100%;\" src=\"" + docurl + "\" allowfullscreen=\"allowfullscreen\" frameborder=\"0\" sandbox=\"allow-popups allow-forms allow-scripts allow-same-origin\"></iframe></div>";
+            return "<div style=\"position:relative;height:calc(" + height + "px + 5em);width:100%;overflow:hidden;\"><iframe style=\"position:absolute;top:0;left:0;width:100%;height:100%;\" src=\"" + docurl + "\" allowfullscreen=\"allowfullscreen\" frameborder=\"0\" sandbox=\"allow-scripts allow-same-origin\"></iframe></div>";
         }
-        docs.docsEmbedUrl = docsEmbedUrl;
+        docs.codeEmbedUrl = codeEmbedUrl;
         var inlineTags = {
             b: 1,
             strong: 1,
@@ -4631,7 +4720,7 @@ var pxt;
             md = md.replace(/\r/g, "");
             var lines = md.split(/\n/);
             var skipThese = {};
-            var _loop_2 = function(l) {
+            var _loop_2 = function (l) {
                 var m = /^\s*(#+)\s*(.*?)(#(\S+)\s*)?$/.exec(l);
                 var templSect = null;
                 if (template && m) {
@@ -4686,9 +4775,9 @@ var pxt;
         function buildTOC(summaryMD) {
             if (!summaryMD)
                 return null;
-            var marked = pxt.docs.requireMarked();
+            var markedInstance = pxt.docs.requireMarked();
             var options = {
-                renderer: new marked.Renderer(),
+                renderer: new markedInstance.Renderer(),
                 gfm: true,
                 tables: false,
                 breaks: false,
@@ -4700,11 +4789,12 @@ var pxt;
             var dummy = { name: 'dummy', subitems: [] };
             var currentStack = [];
             currentStack.push(dummy);
-            var tokens = marked.lexer(summaryMD, options);
+            var tokens = markedInstance.lexer(summaryMD, options);
             tokens.forEach(function (token) {
                 switch (token.type) {
                     case "heading":
                         if (token.depth == 3) {
+                            // heading
                         }
                         break;
                     case "list_start":
@@ -4841,22 +4931,50 @@ var pxt;
 (function (pxt) {
     var github;
     (function (github) {
+        function useProxy() {
+            if (pxt.U.isNodeJS)
+                return false; // bypass proxy for CLI
+            if (pxt.appTarget && pxt.appTarget.cloud && pxt.appTarget.cloud.noGithubProxy)
+                return false; // target requests no proxy
+            return true;
+        }
+        github.useProxy = useProxy;
         function listRefsAsync(repopath, namespace) {
             if (namespace === void 0) { namespace = "tags"; }
-            return pxt.U.httpGetJsonAsync("https://api.github.com/repos/" + repopath + "/git/refs/" + namespace + "/?per_page=100")
-                .then(function (resp) {
-                var tagnames = resp
-                    .map(function (x) { return x.ref.replace(/^refs\/[^\/]+\//, ""); });
-                tagnames.sort(pxt.semver.strcmp);
-                return tagnames;
+            return listRefsExtAsync(repopath, namespace)
+                .then(function (res) { return Object.keys(res.refs); });
+        }
+        github.listRefsAsync = listRefsAsync;
+        function listRefsExtAsync(repopath, namespace) {
+            if (namespace === void 0) { namespace = "tags"; }
+            var head = null;
+            var fetch = !useProxy ?
+                pxt.U.httpGetJsonAsync("https://api.github.com/repos/" + repopath + "/git/refs/" + namespace + "/?per_page=100") :
+                pxt.U.httpGetJsonAsync(pxt.Cloud.apiRoot + "gh/" + repopath + "/refs")
+                    .then(function (r) {
+                    var res = Object.keys(r.refs)
+                        .filter(function (k) { return pxt.U.startsWith(k, "refs/" + namespace + "/"); })
+                        .map(function (k) { return ({ ref: k, object: { sha: r.refs[k] } }); });
+                    head = r.refs["HEAD"];
+                    return res;
+                });
+            var clean = function (x) { return x.replace(/^refs\/[^\/]+\//, ""); };
+            return fetch.then(function (resp) {
+                resp.sort(function (a, b) { return pxt.semver.strcmp(clean(a.ref), clean(b.ref)); });
+                var r = {};
+                for (var _i = 0, resp_1 = resp; _i < resp_1.length; _i++) {
+                    var obj = resp_1[_i];
+                    r[clean(obj.ref)] = obj.object.sha;
+                }
+                return { refs: r, head: head };
             }, function (err) {
                 if (err.statusCode == 404)
-                    return [];
+                    return { refs: {} };
                 else
                     return Promise.reject(err);
             });
         }
-        github.listRefsAsync = listRefsAsync;
+        github.listRefsExtAsync = listRefsExtAsync;
         function resolveRefAsync(r) {
             if (r.object.type == "commit")
                 return Promise.resolve(r.object.sha);
@@ -4878,9 +4996,13 @@ var pxt;
                     .then(resolveRefAsync);
             });
         }
-        github.tagToShaAsync = tagToShaAsync;
         function pkgConfigAsync(repopath, tag) {
             if (tag === void 0) { tag = "master"; }
+            if (useProxy()) {
+                // this is a bit wasteful, we just need pxt.json and download everything
+                return pxt.U.httpGetJsonAsync(pxt.Cloud.apiRoot + "gh/" + repopath + "/" + tag + "/text")
+                    .then(function (v) { return JSON.parse(v[pxt.CONFIG_NAME]); });
+            }
             var url = "https://raw.githubusercontent.com/" + repopath + "/" + tag + "/" + pxt.CONFIG_NAME;
             return pxt.U.httpGetTextAsync(url)
                 .then(function (v) { return JSON.parse(v); });
@@ -4898,11 +5020,21 @@ var pxt;
                 pxt.log('Github repo is banned');
                 return Promise.resolve(undefined);
             }
+            if (!current)
+                current = { sha: "", files: {} };
+            if (useProxy()) {
+                if (!p.tag)
+                    p.tag = "master";
+                return pxt.U.httpGetJsonAsync(pxt.Cloud.apiRoot + "gh/" + p.fullName + "/" + p.tag + "/text")
+                    .then(function (v) {
+                    current.sha = p.tag;
+                    current.files = v;
+                    return current;
+                });
+            }
             return tagToShaAsync(p.fullName, p.tag)
                 .then(function (sha) {
                 var pref = "https://raw.githubusercontent.com/" + p.fullName + "/" + sha + "/";
-                if (!current)
-                    current = { sha: "", files: {} };
                 if (current.sha === sha)
                     return Promise.resolve(current);
                 else {
@@ -4926,12 +5058,12 @@ var pxt;
             });
         }
         github.downloadPackageAsync = downloadPackageAsync;
+        var GitRepoStatus;
         (function (GitRepoStatus) {
             GitRepoStatus[GitRepoStatus["Unknown"] = 0] = "Unknown";
             GitRepoStatus[GitRepoStatus["Approved"] = 1] = "Approved";
             GitRepoStatus[GitRepoStatus["Banned"] = 2] = "Banned";
-        })(github.GitRepoStatus || (github.GitRepoStatus = {}));
-        var GitRepoStatus = github.GitRepoStatus;
+        })(GitRepoStatus = github.GitRepoStatus || (github.GitRepoStatus = {}));
         function repoIconUrl(repo) {
             if (repo.status != GitRepoStatus.Approved)
                 return undefined;
@@ -5005,6 +5137,9 @@ var pxt;
             var status = repoStatus(rid, config);
             if (status == GitRepoStatus.Banned)
                 return Promise.resolve(undefined);
+            if (!useProxy())
+                return pxt.U.httpGetJsonAsync("https://api.github.com/repos/" + rid.fullName)
+                    .then(function (r) { return mkRepo(r, config, rid.tag); });
             // always use proxy
             return pxt.Util.httpGetJsonAsync(pxt.Cloud.apiRoot + "gh/" + rid.fullName)
                 .then(function (meta) {
@@ -5044,7 +5179,7 @@ var pxt;
                 return undefined;
             var m = /^((https:\/\/)?github.com\/)?([^/]+\/[^/#]+)(#(\w+))?$/i.exec(url.trim());
             if (!m)
-                return;
+                return undefined;
             var r = {
                 repo: m ? m[3].toLowerCase() : null,
                 tag: m ? m[5] : null
@@ -5086,14 +5221,14 @@ var pxt;
                 .then(function (scr) {
                 if (!scr)
                     return undefined;
-                return listRefsAsync(scr.fullName, "tags")
-                    .then(function (tags) {
-                    tags.sort(pxt.semver.strcmp);
+                return listRefsExtAsync(scr.fullName, "tags")
+                    .then(function (refsRes) {
+                    var tags = Object.keys(refsRes.refs);
                     tags.reverse();
                     if (tags[0])
                         return Promise.resolve(tags[0]);
                     else
-                        return tagToShaAsync(scr.fullName, scr.defaultBranch);
+                        return refsRes.head || tagToShaAsync(scr.fullName, scr.defaultBranch);
                 });
             });
         }
@@ -5261,7 +5396,7 @@ var pxt;
             else
                 pxt.debug("HF2: " + msg);
         }
-        var Wrapper = (function () {
+        var Wrapper = /** @class */ (function () {
             function Wrapper(io) {
                 var _this = this;
                 this.io = io;
@@ -5623,7 +5758,7 @@ var pxt;
                     return blocks;
                 log("skipping flash at: " +
                     regionsOk.map(function (r) {
-                        return (pxtc.assembler.tohex(r.start) + " (" + r.length / 1024 + "kB)");
+                        return pxtc.assembler.tohex(r.start) + " (" + r.length / 1024 + "kB)";
                     })
                         .join(", "));
                 var unchangedAddr = function (a) {
@@ -5647,7 +5782,6 @@ var pxt;
     pxt.REF_TAG_NUMBER = 32;
     pxt.REF_TAG_ACTION = 33;
 })(pxt || (pxt = {}));
-var pxt;
 (function (pxt) {
     var HWDBG;
     (function (HWDBG) {
@@ -5752,6 +5886,7 @@ var pxt;
                         neededLength = 8 + 4;
                     }
                     else {
+                        // TODO
                     }
                     if (neededLength > buf.length) {
                         return readMemAsync(v.ptr + buf.length, neededLength - buf.length)
@@ -5794,7 +5929,7 @@ var pxt;
         HWDBG.heapExpandAsync = heapExpandAsync;
         function heapExpandMapAsync(vars) {
             var promises = [];
-            var _loop_3 = function(k) {
+            var _loop_3 = function (k) {
                 promises.push(heapExpandAsync(vars[k])
                     .then(function (r) {
                     vars[k] = r;
@@ -5874,7 +6009,7 @@ var pxt;
                 var w = H.decodeU32LE(buf);
                 var pc = w[0];
                 var globals = {};
-                var _loop_4 = function(l) {
+                var _loop_4 = function (l) {
                     var gbuf = st.globals;
                     var readV = function () {
                         switch (l.type) {
@@ -6015,19 +6150,19 @@ var pxt;
 (function (pxt) {
     var blocks;
     (function (blocks) {
+        var NT;
         (function (NT) {
             NT[NT["Prefix"] = 0] = "Prefix";
             NT[NT["Infix"] = 1] = "Infix";
             NT[NT["Block"] = 2] = "Block";
             NT[NT["NewLine"] = 3] = "NewLine";
-        })(blocks.NT || (blocks.NT = {}));
-        var NT = blocks.NT;
+        })(NT = blocks.NT || (blocks.NT = {}));
+        var GlueMode;
         (function (GlueMode) {
             GlueMode[GlueMode["None"] = 0] = "None";
             GlueMode[GlueMode["WithSpace"] = 1] = "WithSpace";
             GlueMode[GlueMode["NoSpace"] = 2] = "NoSpace";
-        })(blocks.GlueMode || (blocks.GlueMode = {}));
-        var GlueMode = blocks.GlueMode;
+        })(GlueMode = blocks.GlueMode || (blocks.GlueMode = {}));
         var reservedWords = ["break", "case", "catch", "class", "const", "continue", "debugger",
             "default", "delete", "do", "else", "enum", "export", "extends", "false", "finally",
             "for", "function", "if", "import", "in", "instanceof", "new", "null", "return",
@@ -6076,10 +6211,11 @@ var pxt;
         function mkStmt() {
             var nodes = [];
             for (var _i = 0; _i < arguments.length; _i++) {
-                nodes[_i - 0] = arguments[_i];
+                nodes[_i] = arguments[_i];
             }
             var last = nodes[nodes.length - 1];
             if (last && last.type == NT.Block) {
+                // OK - no newline needed
             }
             else {
                 nodes.push(mkNewLine());
@@ -6400,7 +6536,6 @@ var pxt;
         blocks.isReservedWord = isReservedWord;
     })(blocks = pxt.blocks || (pxt.blocks = {}));
 })(pxt || (pxt = {}));
-/// <reference path="../typings/globals/bluebird/index.d.ts"/>
 /// <reference path="../localtypings/pxtpackage.d.ts"/>
 /// <reference path="../localtypings/pxtparts.d.ts"/>
 /// <reference path="../localtypings/pxtarget.d.ts"/>
@@ -6408,7 +6543,7 @@ var pxt;
 var pxt;
 (function (pxt) {
     var lf = pxt.U.lf;
-    var Package = (function () {
+    var Package = /** @class */ (function () {
         function Package(id, _verspec, parent, addedBy) {
             this.id = id;
             this._verspec = _verspec;
@@ -6434,6 +6569,11 @@ var pxt;
                     return JSON.parse(pxt.appTarget.bundledpkgs[Package.upgradePackageReference(id, fullVers)][pxt.CONFIG_NAME]);
                 }
             });
+        };
+        Package.corePackages = function () {
+            var pkgs = pxt.appTarget.bundledpkgs;
+            return Object.keys(pkgs).map(function (id) { return JSON.parse(pkgs[id][pxt.CONFIG_NAME]); })
+                .filter(function (cfg) { return !!cfg; });
         };
         Package.upgradePackageReference = function (pkg, val) {
             if (val != "*")
@@ -6555,7 +6695,7 @@ var pxt;
                 .then(function (verNo) {
                 if (!/^embed:/.test(verNo) &&
                     _this.config && _this.config.installedVersion == verNo)
-                    return;
+                    return undefined;
                 pxt.debug('downloading ' + verNo);
                 return _this.host().downloadPackageAsync(_this)
                     .then(function () {
@@ -6611,7 +6751,7 @@ var pxt;
             if (ts && upgrades)
                 upgrades.filter(function (rule) { return rule.type == "missingPackage"; })
                     .forEach(function (rule) {
-                    var _loop_5 = function(match) {
+                    var _loop_5 = function (match) {
                         var regex = new RegExp(match, 'g');
                         var pkg = rule.map[match];
                         ts.replace(regex, function (m) {
@@ -6761,6 +6901,28 @@ var pxt;
             }
             this.validateConfig();
         };
+        Package.prototype.patchCorePackage = function () {
+            var _this = this;
+            pxt.Util.assert(pxt.appTarget.simulator && pxt.appTarget.simulator.dynamicBoardDefinition);
+            pxt.Util.assert(this.level == 0);
+            // find all core packages in target
+            var corePackages = Object.keys(this.config.dependencies)
+                .filter(function (dep) { return !!dep && JSON.parse((pxt.appTarget.bundledpkgs[dep] || {})[pxt.CONFIG_NAME] || "{}").core; });
+            // no core package? add the first one
+            if (corePackages.length == 0) {
+                var allCorePkgs = pxt.Package.corePackages();
+                if (allCorePkgs.length)
+                    this.config.dependencies[allCorePkgs[0].name];
+            }
+            else if (corePackages.length > 1) {
+                // keep last package
+                corePackages.pop();
+                corePackages.forEach(function (dep) {
+                    pxt.log("removing core package " + dep);
+                    delete _this.config.dependencies[dep];
+                });
+            }
+        };
         Package.prototype.loadAsync = function (isInstall) {
             var _this = this;
             if (isInstall === void 0) { isInstall = false; }
@@ -6779,6 +6941,8 @@ var pxt;
             if (isInstall)
                 initPromise = initPromise.then(function () { return _this.downloadAsync(); });
             if (pxt.appTarget.simulator && pxt.appTarget.simulator.dynamicBoardDefinition) {
+                if (this.level == 0)
+                    initPromise = initPromise.then(function () { return _this.patchCorePackage(); });
                 initPromise = initPromise.then(function () {
                     if (_this.config.files.indexOf("board.json") < 0)
                         return;
@@ -6871,7 +7035,7 @@ var pxt;
         };
         Package.prototype.addSnapshot = function (files, exts) {
             if (exts === void 0) { exts = [""]; }
-            var _loop_6 = function(fn) {
+            var _loop_6 = function (fn) {
                 if (exts.some(function (e) { return pxt.U.endsWith(fn, e); })) {
                     files[this_1.id + "/" + fn] = this_1.readFile(fn);
                 }
@@ -6919,16 +7083,17 @@ var pxt;
         return Package;
     }());
     pxt.Package = Package;
-    var MainPackage = (function (_super) {
+    var MainPackage = /** @class */ (function (_super) {
         __extends(MainPackage, _super);
         function MainPackage(_host) {
-            _super.call(this, "this", "file:.", null, null);
-            this._host = _host;
-            this.deps = {};
-            this.parent = this;
-            this.addedBy = [this];
-            this.level = 0;
-            this.deps[this.id] = this;
+            var _this = _super.call(this, "this", "file:.", null, null) || this;
+            _this._host = _host;
+            _this.deps = {};
+            _this.parent = _this;
+            _this.addedBy = [_this];
+            _this.level = 0;
+            _this.deps[_this.id] = _this;
+            return _this;
         }
         MainPackage.prototype.installAllAsync = function () {
             return this.loadAsync(true);
@@ -6992,9 +7157,9 @@ var pxt;
                 if (_this.config.files.indexOf(fn) < 0)
                     pxt.U.userError(lf("please add '{0}' to \"files\" in {1}", fn, pxt.CONFIG_NAME));
                 cont = "// Auto-generated. Do not edit.\n" + cont + "\n// Auto-generated. Do not edit. Really.\n";
-                if (_this.host().readFile(_this, fn) !== cont) {
+                if (_this.host().readFile(_this, fn, true) !== cont) {
                     pxt.debug("updating " + fn + " (size=" + cont.length + ")...");
-                    _this.host().writeFile(_this, fn, cont);
+                    _this.host().writeFile(_this, fn, cont, true);
                 }
             };
             var upgradeFile = function (fn, cont) {
@@ -7051,7 +7216,7 @@ var pxt;
                             eVER: pxt.appTarget.versions ? pxt.appTarget.versions.target : "",
                             pxtTarget: pxt.appTarget.id,
                         });
-                        opts.embedBlob = btoa(pxt.U.uint8ArrayToString(buf));
+                        opts.embedBlob = ts.pxtc.encodeBase64(pxt.U.uint8ArrayToString(buf));
                     });
                 }
                 else {
@@ -7295,6 +7460,7 @@ var ts;
         pxtc.HANDLER_COMMENT = pxtc.U.lf("code goes here");
         pxtc.TS_STATEMENT_TYPE = "typescript_statement";
         pxtc.TS_OUTPUT_TYPE = "typescript_expression";
+        pxtc.PAUSE_UNTIL_TYPE = "pxt_pause_until";
         pxtc.BINARY_JS = "binary.js";
         pxtc.BINARY_CS = "binary.cs";
         pxtc.BINARY_ASM = "binary.asm";
@@ -7305,6 +7471,7 @@ var ts;
         pxtc.NATIVE_TYPE_AVR = "AVR";
         pxtc.NATIVE_TYPE_CS = "C#";
         pxtc.NATIVE_TYPE_AVRVM = "AVRVM";
+        var SymbolKind;
         (function (SymbolKind) {
             SymbolKind[SymbolKind["None"] = 0] = "None";
             SymbolKind[SymbolKind["Method"] = 1] = "Method";
@@ -7316,8 +7483,7 @@ var ts;
             SymbolKind[SymbolKind["EnumMember"] = 7] = "EnumMember";
             SymbolKind[SymbolKind["Class"] = 8] = "Class";
             SymbolKind[SymbolKind["Interface"] = 9] = "Interface";
-        })(pxtc.SymbolKind || (pxtc.SymbolKind = {}));
-        var SymbolKind = pxtc.SymbolKind;
+        })(SymbolKind = pxtc.SymbolKind || (pxtc.SymbolKind = {}));
         function computeUsedParts(resp, ignoreBuiltin) {
             if (ignoreBuiltin === void 0) { ignoreBuiltin = false; }
             if (!resp.usedSymbols || !pxt.appTarget.simulator || !pxt.appTarget.simulator.parts)
@@ -7378,10 +7544,10 @@ var ts;
                 if (jsDoc) {
                     fn.attributes.jsDoc = jsDoc;
                     if (fn.parameters)
-                        fn.parameters.forEach(function (pi) { return pi.description = loc[(fn.qName + "|param|" + pi.name)] || pi.description; });
+                        fn.parameters.forEach(function (pi) { return pi.description = loc[fn.qName + "|param|" + pi.name] || pi.description; });
                 }
                 var nsDoc = loc['{id:category}' + pxtc.Util.capitalize(fn.qName)];
-                var locBlock = loc[(fn.qName + "|block")];
+                var locBlock = loc[fn.qName + "|block"];
                 if (nsDoc) {
                     // Check for "friendly namespace"
                     if (fn.attributes.block) {
@@ -7563,6 +7729,14 @@ var ts;
                     res.groups = undefined;
                 }
             }
+            if (res.groupIcons) {
+                try {
+                    res.groupIcons = JSON.parse(res.groupIcons);
+                }
+                catch (e) {
+                    res.groupIcons = undefined;
+                }
+            }
             return res;
         }
         pxtc.parseCommentString = parseCommentString;
@@ -7616,7 +7790,6 @@ var ts;
             }
             hex.parseChecksumBlock = parseChecksumBlock;
         })(hex = pxtc.hex || (pxtc.hex = {}));
-        pxtc.decodeBase64 = function (s) { return atob(s); };
         var UF2;
         (function (UF2) {
             UF2.UF2_MAGIC_START0 = 0x0A324655; // "UF2\n"
@@ -7880,18 +8053,17 @@ var ts;
         })(UF2 = pxtc.UF2 || (pxtc.UF2 = {}));
     })(pxtc = ts.pxtc || (ts.pxtc = {}));
 })(ts || (ts = {}));
-var ts;
 (function (ts) {
     var pxtc;
     (function (pxtc) {
         var ir;
         (function (ir) {
+            var CallingConvention;
             (function (CallingConvention) {
                 CallingConvention[CallingConvention["Plain"] = 0] = "Plain";
                 CallingConvention[CallingConvention["Async"] = 1] = "Async";
                 CallingConvention[CallingConvention["Promise"] = 2] = "Promise";
-            })(ir.CallingConvention || (ir.CallingConvention = {}));
-            var CallingConvention = ir.CallingConvention;
+            })(CallingConvention = ir.CallingConvention || (ir.CallingConvention = {}));
         })(ir = pxtc.ir || (pxtc.ir = {}));
     })(pxtc = ts.pxtc || (ts.pxtc = {}));
 })(ts || (ts = {}));
@@ -7939,14 +8111,14 @@ var ts;
             }
         }
         pxtc.flattenDiagnosticMessageText = flattenDiagnosticMessageText;
+        var ScriptTarget;
         (function (ScriptTarget) {
             ScriptTarget[ScriptTarget["ES3"] = 0] = "ES3";
             ScriptTarget[ScriptTarget["ES5"] = 1] = "ES5";
             ScriptTarget[ScriptTarget["ES6"] = 2] = "ES6";
             ScriptTarget[ScriptTarget["ES2015"] = 2] = "ES2015";
             ScriptTarget[ScriptTarget["Latest"] = 2] = "Latest";
-        })(pxtc.ScriptTarget || (pxtc.ScriptTarget = {}));
-        var ScriptTarget = pxtc.ScriptTarget;
+        })(ScriptTarget = pxtc.ScriptTarget || (pxtc.ScriptTarget = {}));
         function isIdentifierStart(ch, languageVersion) {
             return ch >= 65 /* A */ && ch <= 90 /* Z */ || ch >= 97 /* a */ && ch <= 122 /* z */ ||
                 ch === 36 /* $ */ || ch === 95 /* _ */ ||
@@ -8022,23 +8194,24 @@ var ts;
             }
             return false;
         }
+        var DiagnosticCategory;
         (function (DiagnosticCategory) {
             DiagnosticCategory[DiagnosticCategory["Warning"] = 0] = "Warning";
             DiagnosticCategory[DiagnosticCategory["Error"] = 1] = "Error";
             DiagnosticCategory[DiagnosticCategory["Message"] = 2] = "Message";
-        })(pxtc.DiagnosticCategory || (pxtc.DiagnosticCategory = {}));
-        var DiagnosticCategory = pxtc.DiagnosticCategory;
+        })(DiagnosticCategory = pxtc.DiagnosticCategory || (pxtc.DiagnosticCategory = {}));
     })(pxtc = ts.pxtc || (ts.pxtc = {}));
 })(ts || (ts = {}));
 var pxt;
 (function (pxt) {
     var usb;
     (function (usb) {
-        var USBError = (function (_super) {
+        var USBError = /** @class */ (function (_super) {
             __extends(USBError, _super);
             function USBError(msg) {
-                _super.call(this, msg);
-                this.message = msg;
+                var _this = _super.call(this, msg) || this;
+                _this.message = msg;
+                return _this;
             }
             return USBError;
         }(Error));
@@ -8046,7 +8219,7 @@ var pxt;
         ;
         ;
         ;
-        var HID = (function () {
+        var HID = /** @class */ (function () {
             function HID(dev) {
                 this.dev = dev;
                 this.ready = false;
@@ -8291,7 +8464,7 @@ var ts;
             // as well as extract the relevant values to substitute for the meta-variables.
             // The Instruction also knows how to convert the particular instance into
             // machine code (EmitResult)
-            var Instruction = (function () {
+            var Instruction = /** @class */ (function () {
                 function Instruction(ei, format, opcode, mask, is32bit) {
                     var _this = this;
                     this.opcode = opcode;
@@ -8418,6 +8591,7 @@ var ts;
                             r |= v;
                         }
                         else if (formal == actual) {
+                            // skip
                         }
                         else {
                             return emitErr("expecting " + formal, actual);
@@ -8442,7 +8616,7 @@ var ts;
             }());
             assembler.Instruction = Instruction;
             // represents a line of assembly from a file
-            var Line = (function () {
+            var Line = /** @class */ (function () {
                 function Line(bin, text) {
                     this.bin = bin;
                     this.text = text;
@@ -8475,7 +8649,7 @@ var ts;
             assembler.Line = Line;
             // File is the center of the action: parsing a file into a sequence of Lines
             // and also emitting the binary (buf)
-            var File = (function () {
+            var File = /** @class */ (function () {
                 function File(ei) {
                     this.baseOffset = 0;
                     this.checkStack = true;
@@ -8580,6 +8754,7 @@ var ts;
                             if (this.stackpointers.hasOwnProperty(m[1])) {
                                 // console.log(m[1] + ": " + this.stack + " " + this.stackpointers[m[1]] + " " + m[2])
                                 v = this.ei.wordSize() * this.ei.computeStackOffset(m[1], this.stack - this.stackpointers[m[1]] + parseInt(m[2]));
+                                // console.log(v)
                             }
                             else
                                 this.directiveError(lf("saved stack not found"));
@@ -8907,6 +9082,7 @@ var ts;
                             break;
                         default:
                             if (/^\.cfi_/.test(words[0])) {
+                                // ignore
                             }
                             else {
                                 this.directiveError(lf("unknown directive"));
@@ -9056,6 +9232,7 @@ var ts;
                             _this.handleInstruction(l);
                         }
                         else if (l.type == "empty") {
+                            // nothing
                         }
                         else {
                             pxtc.oops();
@@ -9182,10 +9359,10 @@ var ts;
                 return File;
             }());
             assembler.File = File;
-            var VMFile = (function (_super) {
+            var VMFile = /** @class */ (function (_super) {
                 __extends(VMFile, _super);
                 function VMFile(ei) {
-                    _super.call(this, ei);
+                    return _super.call(this, ei) || this;
                 }
                 VMFile.prototype.location = function () {
                     // the this.buf stores bytes here
@@ -9205,7 +9382,7 @@ var ts;
             assembler.VMFile = VMFile;
             // an assembler provider must inherit from this
             // class and provide Encoders and Instructions
-            var AbstractProcessor = (function () {
+            var AbstractProcessor = /** @class */ (function () {
                 function AbstractProcessor() {
                     var _this = this;
                     this.file = null;
@@ -9456,7 +9633,7 @@ var pxt;
             try {
                 return /^http:\/\/(localhost|127\.0\.0\.1):\d+\//.test(window.location.href)
                     && !/nolocalhost=1/.test(window.location.href)
-                    && !pxt.webConfig.isStatic;
+                    && !(pxt.webConfig && pxt.webConfig.isStatic);
             }
             catch (e) {
                 return false;
@@ -9464,7 +9641,7 @@ var pxt;
         }
         Cloud.isLocalHost = isLocalHost;
         function privateRequestAsync(options) {
-            options.url = pxt.webConfig.isStatic ? pxt.webConfig.relprefix + options.url : Cloud.apiRoot + options.url;
+            options.url = pxt.webConfig && pxt.webConfig.isStatic ? pxt.webConfig.relprefix + options.url : Cloud.apiRoot + options.url;
             options.allowGzipPost = true;
             if (!Cloud.isOnline()) {
                 return offlineError(options.url);
@@ -9500,7 +9677,7 @@ var pxt;
         function downloadTargetConfigAsync() {
             if (!Cloud.isOnline())
                 return Promise.resolve(undefined);
-            var url = pxt.webConfig.isStatic ? "targetconfig.json" : "config/" + pxt.appTarget.id + "/targetconfig";
+            var url = pxt.webConfig && pxt.webConfig.isStatic ? "targetconfig.json" : "config/" + pxt.appTarget.id + "/targetconfig";
             if (Cloud.isLocalHost())
                 return Util.requestAsync({
                     url: "/api/" + url,
@@ -9519,7 +9696,7 @@ var pxt;
         }
         Cloud.downloadScriptFilesAsync = downloadScriptFilesAsync;
         function downloadMarkdownAsync(docid, locale, live) {
-            var packaged = !!pxt.webConfig.isStatic;
+            var packaged = pxt.webConfig && pxt.webConfig.isStatic;
             var url = packaged
                 ? "docs/" + docid + ".md"
                 : "md/" + pxt.appTarget.id + "/" + docid.replace(/^\//, "") + "?targetVersion=" + encodeURIComponent(pxt.webConfig.targetVersion);

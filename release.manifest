@@ -49,6 +49,7 @@ CACHE:
 
 # charts
 /pxt-sample/smoothie/smoothie_compressed.js
+/pxt-sample/images/Bars_black.gif
 
 # ai
 https://az416426.vo.msecnd.net/scripts/a/ai.0.js
@@ -56,7 +57,7 @@ https://az416426.vo.msecnd.net/scripts/a/ai.0.js
 /pxt-sample/worker.js
 /pxt-sample/monacoworker.js
 
-# ver Wed Nov 29 2017 09:46:32 GMT-0800 (Pacific Standard Time)
+# ver Thu Feb 01 2018 14:54:11 GMT-0800 (Pacific Standard Time)
 
 /pxt-sample/target.js
   

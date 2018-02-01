@@ -1,8 +1,13 @@
-var __extends = (this && this.__extends) || function (d, b) {
-    for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
-    function __() { this.constructor = d; }
-    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
-};
+var __extends = (this && this.__extends) || (function () {
+    var extendStatics = Object.setPrototypeOf ||
+        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+    return function (d, b) {
+        extendStatics(d, b);
+        function __() { this.constructor = d; }
+        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+    };
+})();
 /// <reference path="../libs/core/enums.d.ts"/>
 var pxsim;
 (function (pxsim) {
@@ -46,7 +51,6 @@ var pxsim;
         turtle.onBump = onBump;
     })(turtle = pxsim.turtle || (pxsim.turtle = {}));
 })(pxsim || (pxsim = {}));
-var pxsim;
 (function (pxsim) {
     var loops;
     (function (loops) {
@@ -73,7 +77,6 @@ var pxsim;
     })(loops = pxsim.loops || (pxsim.loops = {}));
 })(pxsim || (pxsim = {}));
 function logMsg(m) { console.log(m); }
-var pxsim;
 (function (pxsim) {
     var console;
     (function (console) {
@@ -89,13 +92,12 @@ var pxsim;
         console.log = log;
     })(console = pxsim.console || (pxsim.console = {}));
 })(pxsim || (pxsim = {}));
-var pxsim;
 (function (pxsim) {
     /**
      * A ghost on the screen.
      */
     //%
-    var Sprite = (function () {
+    var Sprite = /** @class */ (function () {
         function Sprite() {
             /**
              * The X-coordiante
@@ -127,7 +129,6 @@ var pxsim;
     }());
     pxsim.Sprite = Sprite;
 })(pxsim || (pxsim = {}));
-var pxsim;
 (function (pxsim) {
     var sprites;
     (function (sprites) {
@@ -141,7 +142,6 @@ var pxsim;
         sprites.createSprite = createSprite;
     })(sprites = pxsim.sprites || (pxsim.sprites = {}));
 })(pxsim || (pxsim = {}));
-/// <reference path="../node_modules/pxt-core/typings/globals/bluebird/index.d.ts"/>
 /// <reference path="../node_modules/pxt-core/built/pxtsim.d.ts"/>
 var pxsim;
 (function (pxsim) {
@@ -162,14 +162,15 @@ var pxsim;
      * Represents the entire state of the executing program.
      * Do not store state anywhere else!
      */
-    var Board = (function (_super) {
+    var Board = /** @class */ (function (_super) {
         __extends(Board, _super);
         function Board() {
-            _super.call(this);
-            this.bus = new pxsim.EventBus(pxsim.runtime);
-            this.element = document.getElementById('svgcanvas');
-            this.spriteElement = this.element.getElementById('svgsprite');
-            this.sprite = new pxsim.Sprite();
+            var _this = _super.call(this) || this;
+            _this.bus = new pxsim.EventBus(pxsim.runtime);
+            _this.element = document.getElementById('svgcanvas');
+            _this.spriteElement = _this.element.getElementById('svgsprite');
+            _this.sprite = new pxsim.Sprite();
+            return _this;
         }
         Board.prototype.initAsync = function (msg) {
             document.body.innerHTML = ''; // clear children

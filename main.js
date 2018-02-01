@@ -1,35 +1,39 @@
 (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
-/// <reference path="../../typings/globals/react/index.d.ts" />
-/// <reference path="../../typings/globals/react-dom/index.d.ts" />
-/// <reference path="../../built/pxtlib.d.ts" />
 "use strict";
-var __extends = (this && this.__extends) || function (d, b) {
-    for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
-    function __() { this.constructor = d; }
-    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
-};
+/// <reference path="../../built/pxtlib.d.ts" />
+var __extends = (this && this.__extends) || (function () {
+    var extendStatics = Object.setPrototypeOf ||
+        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+    return function (d, b) {
+        extendStatics(d, b);
+        function __() { this.constructor = d; }
+        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
 var React = require("react");
 var data = require("./data");
 var sui = require("./sui");
-var EditorAccessibilityMenu = (function (_super) {
+var EditorAccessibilityMenu = /** @class */ (function (_super) {
     __extends(EditorAccessibilityMenu, _super);
     function EditorAccessibilityMenu() {
-        _super.apply(this, arguments);
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     EditorAccessibilityMenu.prototype.openJavaScript = function () {
-        pxt.tickEvent("accmenu.editor.openJS");
+        pxt.tickEvent("accmenu.editor.openJS", undefined, { interactiveConsent: true });
         this.props.parent.openJavaScript();
     };
     EditorAccessibilityMenu.prototype.selectLang = function () {
-        pxt.tickEvent("accmenu.editor.importdialog");
+        pxt.tickEvent("accmenu.editor.importdialog", undefined, { interactiveConsent: true });
         this.props.parent.selectLang();
     };
     EditorAccessibilityMenu.prototype.toggleHighContrast = function () {
-        pxt.tickEvent("accmenu.editor.togglecontrast");
+        pxt.tickEvent("accmenu.editor.togglecontrast", undefined, { interactiveConsent: true });
         this.props.parent.toggleHighContrast();
     };
     EditorAccessibilityMenu.prototype.goHome = function () {
-        pxt.tickEvent("accmenu.editor.home");
+        pxt.tickEvent("accmenu.editor.home", undefined, { interactiveConsent: true });
         this.props.parent.exitAndSave();
     };
     EditorAccessibilityMenu.prototype.componentWillReceiveProps = function (nextProps) {
@@ -47,22 +51,26 @@ var EditorAccessibilityMenu = (function (_super) {
         var _this = this;
         var highContrast = this.props.parent.state.highContrast;
         var targetTheme = pxt.appTarget.appTheme;
-        return React.createElement("div", {className: "ui accessibleMenu borderless fixed menu", role: "menubar"}, React.createElement(sui.Item, {class: (targetTheme.invertedMenu ? "inverted" : '') + " menu", role: "menuitem", icon: "xicon js", text: lf("Skip to JavaScript editor"), onClick: function () { return _this.openJavaScript(); }}), targetTheme.selectLanguage ? React.createElement(sui.Item, {class: (targetTheme.invertedMenu ? "inverted" : '') + " menu", role: "menuitem", icon: "xicon globe", text: lf("Select Language"), onClick: function () { return _this.selectLang(); }}) : undefined, targetTheme.highContrast ? React.createElement(sui.Item, {class: (targetTheme.invertedMenu ? "inverted" : '') + " menu", role: "menuitem", text: highContrast ? lf("High Contrast Off") : lf("High Contrast On"), onClick: function () { return _this.toggleHighContrast(); }}) : undefined, React.createElement(sui.Item, {class: (targetTheme.invertedMenu ? "inverted" : '') + " menu", role: "menuitem", icon: "home", text: lf("Go Home"), onClick: function () { return _this.goHome(); }}));
+        return React.createElement("div", { className: "ui accessibleMenu borderless fixed menu", role: "menubar" },
+            React.createElement(sui.Item, { class: (targetTheme.invertedMenu ? "inverted" : '') + " menu", role: "menuitem", icon: "xicon js", text: lf("Skip to JavaScript editor"), onClick: function () { return _this.openJavaScript(); } }),
+            targetTheme.selectLanguage ? React.createElement(sui.Item, { class: (targetTheme.invertedMenu ? "inverted" : '') + " menu", role: "menuitem", icon: "xicon globe", text: lf("Select Language"), onClick: function () { return _this.selectLang(); } }) : undefined,
+            targetTheme.highContrast ? React.createElement(sui.Item, { class: (targetTheme.invertedMenu ? "inverted" : '') + " menu", role: "menuitem", text: highContrast ? lf("High Contrast Off") : lf("High Contrast On"), onClick: function () { return _this.toggleHighContrast(); } }) : undefined,
+            React.createElement(sui.Item, { class: (targetTheme.invertedMenu ? "inverted" : '') + " menu", role: "menuitem", icon: "home", text: lf("Go Home"), onClick: function () { return _this.goHome(); } }));
     };
     return EditorAccessibilityMenu;
 }(data.Component));
 exports.EditorAccessibilityMenu = EditorAccessibilityMenu;
-var HomeAccessibilityMenu = (function (_super) {
+var HomeAccessibilityMenu = /** @class */ (function (_super) {
     __extends(HomeAccessibilityMenu, _super);
     function HomeAccessibilityMenu() {
-        _super.apply(this, arguments);
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     HomeAccessibilityMenu.prototype.newProject = function () {
-        pxt.tickEvent("accmenu.home.new");
+        pxt.tickEvent("accmenu.home.new", undefined, { interactiveConsent: true });
         this.props.parent.newProject();
     };
     HomeAccessibilityMenu.prototype.importProjectDialog = function () {
-        pxt.tickEvent("accmenu.home.importdialog");
+        pxt.tickEvent("accmenu.home.importdialog", undefined, { interactiveConsent: true });
         this.props.parent.importProjectDialog();
     };
     HomeAccessibilityMenu.prototype.selectLang = function () {
@@ -70,7 +78,7 @@ var HomeAccessibilityMenu = (function (_super) {
         this.props.parent.selectLang();
     };
     HomeAccessibilityMenu.prototype.toggleHighContrast = function () {
-        pxt.tickEvent("accmenu.home.togglecontrast");
+        pxt.tickEvent("accmenu.home.togglecontrast", undefined, { interactiveConsent: true });
         this.props.parent.toggleHighContrast();
     };
     HomeAccessibilityMenu.prototype.componentWillReceiveProps = function (nextProps) {
@@ -88,24 +96,34 @@ var HomeAccessibilityMenu = (function (_super) {
         var _this = this;
         var highContrast = this.state.highContrast;
         var targetTheme = pxt.appTarget.appTheme;
-        return React.createElement("div", {className: "ui accessibleMenu borderless fixed menu", role: "menubar"}, React.createElement(sui.Item, {class: (targetTheme.invertedMenu ? "inverted" : '') + " menu", role: "menuitem", icon: "add circle", text: lf("New Project"), onClick: function () { return _this.newProject(); }}), React.createElement(sui.Item, {class: (targetTheme.invertedMenu ? "inverted" : '') + " menu", role: "menuitem", icon: "upload", text: lf("Import Project"), onClick: function () { return _this.importProjectDialog(); }}), targetTheme.selectLanguage ? React.createElement(sui.Item, {class: (targetTheme.invertedMenu ? "inverted" : '') + " menu", role: "menuitem", icon: "xicon globe", text: lf("Select Language"), onClick: function () { return _this.selectLang(); }}) : undefined, targetTheme.highContrast ? React.createElement(sui.Item, {class: (targetTheme.invertedMenu ? "inverted" : '') + " menu", role: "menuitem", text: highContrast ? lf("High Contrast Off") : lf("High Contrast On"), onClick: function () { return _this.toggleHighContrast(); }}) : undefined);
+        return React.createElement("div", { className: "ui accessibleMenu borderless fixed menu", role: "menubar" },
+            React.createElement(sui.Item, { class: (targetTheme.invertedMenu ? "inverted" : '') + " menu", role: "menuitem", icon: "add circle", text: lf("New Project"), onClick: function () { return _this.newProject(); } }),
+            React.createElement(sui.Item, { class: (targetTheme.invertedMenu ? "inverted" : '') + " menu", role: "menuitem", icon: "upload", text: lf("Import Project"), onClick: function () { return _this.importProjectDialog(); } }),
+            targetTheme.selectLanguage ? React.createElement(sui.Item, { class: (targetTheme.invertedMenu ? "inverted" : '') + " menu", role: "menuitem", icon: "xicon globe", text: lf("Select Language"), onClick: function () { return _this.selectLang(); } }) : undefined,
+            targetTheme.highContrast ? React.createElement(sui.Item, { class: (targetTheme.invertedMenu ? "inverted" : '') + " menu", role: "menuitem", text: highContrast ? lf("High Contrast Off") : lf("High Contrast On"), onClick: function () { return _this.toggleHighContrast(); } }) : undefined);
     };
     return HomeAccessibilityMenu;
 }(data.Component));
 exports.HomeAccessibilityMenu = HomeAccessibilityMenu;
 
-},{"./data":14,"./sui":44,"react":277}],2:[function(require,module,exports){
+},{"./data":14,"./sui":44,"react":274}],2:[function(require,module,exports){
+"use strict";
 /// <reference path="../../localtypings/pxtpackage.d.ts"/>
 /// <reference path="../../built/pxtlib.d.ts"/>
 /// <reference path="../../built/pxtblocks.d.ts"/>
 /// <reference path="../../built/pxtsim.d.ts"/>
 /// <reference path="../../built/pxtwinrt.d.ts"/>
-"use strict";
-var __extends = (this && this.__extends) || function (d, b) {
-    for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
-    function __() { this.constructor = d; }
-    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
-};
+var __extends = (this && this.__extends) || (function () {
+    var extendStatics = Object.setPrototypeOf ||
+        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+    return function (d, b) {
+        extendStatics(d, b);
+        function __() { this.constructor = d; }
+        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
 var React = require("react");
 var ReactDOM = require("react-dom");
 var workspace = require("./workspace");
@@ -173,27 +191,26 @@ class CloudSyncButton extends data.Component<ISettingsProps, {}> {
             />
     }
 }*/
-var ProjectView = (function (_super) {
+var ProjectView = /** @class */ (function (_super) {
     __extends(ProjectView, _super);
     function ProjectView(props) {
-        var _this = this;
-        _super.call(this, props);
-        this.allEditors = [];
-        this.autoRunBlocksSimulator = pxtc.Util.debounce(function () {
+        var _this = _super.call(this, props) || this;
+        _this.allEditors = [];
+        _this.autoRunBlocksSimulator = pxtc.Util.debounce(function () {
             if (Util.now() - _this.lastChangeTime < 1000)
                 return;
             if (!_this.state.active)
                 return;
             _this.runSimulator({ background: true });
         }, 1000, true);
-        this.autoRunSimulator = pxtc.Util.debounce(function () {
+        _this.autoRunSimulator = pxtc.Util.debounce(function () {
             if (Util.now() - _this.lastChangeTime < 1000)
                 return;
             if (!_this.state.active)
                 return;
             _this.runSimulator({ background: true });
         }, 2000, true);
-        this.typecheck = pxtc.Util.debounce(function () {
+        _this.typecheck = pxtc.Util.debounce(function () {
             if (_this.editor.isIncomplete())
                 return;
             var state = _this.editor.snapshotState();
@@ -214,19 +231,19 @@ var ProjectView = (function (_super) {
                 }
             });
         }, 1000, false);
-        this.markdownChangeHandler = Util.debounce(function () {
+        _this.markdownChangeHandler = Util.debounce(function () {
             if (_this.state.currFile && /\.md$/i.test(_this.state.currFile.name))
                 _this.setSideMarkdown(_this.editor.getCurrentSource());
         }, 4000, false);
-        this.editorChangeHandler = Util.debounce(function () {
+        _this.editorChangeHandler = Util.debounce(function () {
             if (!_this.editor.isIncomplete()) {
                 _this.saveFileAsync().done(); // don't wait till save is done
                 _this.typecheck();
             }
             _this.markdownChangeHandler();
         }, 500, false);
-        this.updatingEditorFile = false;
-        this.hexFileImporters = [{
+        _this.updatingEditorFile = false;
+        _this.hexFileImporters = [{
                 id: "default",
                 canImport: function (data) { return data.meta.cloudId == "ks/" + pxt.appTarget.id || data.meta.cloudId == pxt.CLOUD_ID + pxt.appTarget.id // match on targetid
                     || (Util.startsWith(data.meta.cloudId, pxt.CLOUD_ID + pxt.appTarget.id)); } // trying to load white-label file into main target
@@ -246,33 +263,36 @@ var ProjectView = (function (_super) {
                         .then(function (hd) { return _this.loadHeaderAsync(hd, null); });
                 }
             }];
-        this.resourceImporters = [];
+        _this.resourceImporters = [
+            new serial.ResourceImporter()
+        ];
         // Close on escape
-        this.closeOnEscape = function (e) {
+        _this.closeOnEscape = function (e) {
             if (e.keyCode !== 27)
                 return;
             e.preventDefault();
             _this.toggleSimulatorFullscreen();
         };
-        this.debouncedSaveProjectName = Util.debounce(function () {
+        _this.debouncedSaveProjectName = Util.debounce(function () {
             _this.saveProjectNameAsync().done();
         }, 2000, false);
         document.title = pxt.appTarget.title || pxt.appTarget.name;
-        this.reload = false; //set to true in case of reset of the project where we are going to reload the page.
-        this.settings = JSON.parse(pxt.storage.getLocal("editorSettings") || "{}");
-        var shouldShowHomeScreen = this.shouldShowHomeScreen();
-        this.state = {
+        _this.reload = false; //set to true in case of reset of the project where we are going to reload the page.
+        _this.settings = JSON.parse(pxt.storage.getLocal("editorSettings") || "{}");
+        var shouldShowHomeScreen = _this.shouldShowHomeScreen();
+        _this.state = {
             showFiles: false,
             home: shouldShowHomeScreen,
             active: document.visibilityState == 'visible',
             collapseEditorTools: pxt.appTarget.simulator.headless || pxt.BrowserUtils.isMobile()
         };
-        if (!this.settings.editorFontSize)
-            this.settings.editorFontSize = /mobile/i.test(navigator.userAgent) ? 15 : 19;
-        if (!this.settings.fileHistory)
-            this.settings.fileHistory = [];
+        if (!_this.settings.editorFontSize)
+            _this.settings.editorFontSize = /mobile/i.test(navigator.userAgent) ? 15 : 19;
+        if (!_this.settings.fileHistory)
+            _this.settings.fileHistory = [];
         if (shouldShowHomeScreen)
-            this.homeLoaded();
+            _this.homeLoaded();
+        return _this;
     }
     ProjectView.prototype.shouldShowHomeScreen = function () {
         var hash = parseHash();
@@ -300,7 +320,7 @@ var ProjectView = (function (_super) {
                 pxt.debug('workspace changed, reloading...');
                 var id_1 = this.state.header ? this.state.header.id : '';
                 workspace.initAsync()
-                    .done(function () { return !_this.state.home && id_1 ? _this.loadHeaderAsync(workspace.getHeader(id_1)) : Promise.resolve(); });
+                    .done(function () { return !_this.state.home && id_1 ? _this.loadHeaderAsync(workspace.getHeader(id_1), _this.state.editorState) : Promise.resolve(); });
             }
             else if (this.state.resumeOnVisibility && !this.state.running) {
                 this.setState({ resumeOnVisibility: false });
@@ -529,11 +549,11 @@ var ProjectView = (function (_super) {
         var _this = this;
         if (editorOverride === void 0) { editorOverride = null; }
         if (!this.state.active)
-            return;
+            return undefined;
         if (this.state.currFile == this.editorFile && !editorOverride)
-            return;
+            return undefined;
         if (this.updatingEditorFile)
-            return;
+            return undefined;
         this.updatingEditorFile = true;
         this.saveSettings();
         var hc = this.state.highContrast;
@@ -966,6 +986,7 @@ var ProjectView = (function (_super) {
         // clear the hash
         pxt.BrowserUtils.changeHash("", true);
         this.setState({ home: true });
+        this.allEditors.forEach(function (e) { return e.setVisible(false); });
         this.homeLoaded();
     };
     ProjectView.prototype.homeLoaded = function () {
@@ -993,7 +1014,7 @@ var ProjectView = (function (_super) {
         pxt.debug("exporting project");
         return this.exportProjectToFileAsync()
             .then(function (buf) {
-            return window.btoa(Util.uint8ArrayToString(buf));
+            return ts.pxtc.encodeBase64(Util.uint8ArrayToString(buf));
         });
     };
     ProjectView.prototype.importProjectFromFileAsync = function (buf) {
@@ -1049,6 +1070,8 @@ var ProjectView = (function (_super) {
         var files = Util.clone(options.prj.files);
         if (options.filesOverride)
             Util.jsonCopyFrom(files, options.filesOverride);
+        if (options.dependencies)
+            Util.jsonMergeFrom(cfg.dependencies, options.dependencies);
         files["pxt.json"] = JSON.stringify(cfg, null, 4) + "\n";
         return workspace.installAsync({
             name: cfg.name,
@@ -1148,7 +1171,7 @@ var ProjectView = (function (_super) {
     ProjectView.prototype.saveAndCompile = function () {
         var _this = this;
         if (!this.state.header)
-            return;
+            return undefined;
         this.setState({ isSaving: true });
         return (this.state.projectName !== lf("Untitled")
             ? Promise.resolve(true) : this.promptRenameProjectAsync())
@@ -1177,7 +1200,7 @@ var ProjectView = (function (_super) {
         }
         this.beforeCompile();
         var userContextWindow = undefined;
-        if (!pxt.appTarget.compile.useModulator && pxt.BrowserUtils.isBrowserDownloadInSameWindow())
+        if (!pxt.appTarget.compile.useModulator && pxt.BrowserUtils.isBrowserDownloadInSameWindow() && !pxt.BrowserUtils.isBrowserDownloadWithinUserContext())
             userContextWindow = window.open("");
         pxt.tickEvent("compile");
         pxt.debug('compiling...');
@@ -1685,7 +1708,7 @@ var ProjectView = (function (_super) {
         var highContrastOn = !this.state.highContrast;
         pxt.tickEvent("app.highcontrast", { on: highContrastOn ? 1 : 0 });
         this.setState({ highContrast: highContrastOn }, function () { return _this.restartSimulator(); });
-        core.highContrast = highContrastOn;
+        core.setHighContrast(highContrastOn);
         if (this.editor && this.editor.isReady) {
             this.editor.setHighContrast(highContrastOn);
         }
@@ -1725,13 +1748,9 @@ var ProjectView = (function (_super) {
         var shouldHideEditorFloats = (this.state.hideEditorFloats || this.state.collapseEditorTools) && (!inTutorial || isHeadless);
         var shouldCollapseEditorTools = this.state.collapseEditorTools && (!inTutorial || isHeadless);
         var isApp = electron.isElectron || pxt.winrt.isWinRT();
-        // cookie consent
-        var cookieKey = "cookieconsent";
-        var cookieConsented = targetTheme.hideCookieNotice || isApp || !!pxt.storage.getLocal(cookieKey)
-            || sandbox;
         // update window title
         document.title = this.state.header ? this.state.header.name + " - " + pxt.appTarget.name : pxt.appTarget.name;
-        var rootClasses = sui.cx([
+        var rootClassList = [
             shouldHideEditorFloats ? " hideEditorFloats" : '',
             shouldCollapseEditorTools ? " collapsedEditorTools" : '',
             this.state.fullscreen ? 'fullscreensim' : '',
@@ -1746,12 +1765,57 @@ var ProjectView = (function (_super) {
             !showEditorToolbar ? 'hideEditorToolbar' : '',
             this.state.bannerVisible ? "notificationBannerVisible" : "",
             sandbox && this.isEmbedSimActive() ? 'simView' : '',
-            'full-abs',
-            'dimmable'
-        ]);
-        return (React.createElement("div", {id: 'root', className: rootClasses}, hideMenuBar ? undefined :
-            React.createElement("header", {className: "menubar", role: "banner"}, inEditor ? React.createElement(accessibility.EditorAccessibilityMenu, {parent: this, highContrast: this.state.highContrast}) : undefined, React.createElement(notification.NotificationBanner, {parent: this}), React.createElement(container.MainMenu, {parent: this})), inTutorial ? React.createElement("div", {id: "maineditor", className: sandbox ? "sandbox" : "", role: "main"}, React.createElement(tutorial.TutorialCard, {ref: "tutorialcard", parent: this})) : undefined, React.createElement("div", {id: "simulator"}, React.createElement("aside", {id: "filelist", className: "ui items"}, React.createElement("label", {htmlFor: "boardview", id: "boardviewLabel", className: "accessible-hidden", "aria-hidden": "true"}, lf("Simulator")), React.createElement("div", {id: "boardview", className: "ui vertical editorFloat", role: "region", "aria-labelledby": "boardviewLabel"}), React.createElement(simtoolbar.SimulatorToolbar, {parent: this}), React.createElement("div", {className: "ui item portrait hide"}, pxt.options.debug && !this.state.running ? React.createElement(sui.Button, {key: 'debugbtn', class: 'teal', icon: "xicon bug", text: "Sim Debug", onClick: function () { return _this.runSimulator({ debug: true }); }}) : '', pxt.options.debug ? React.createElement(sui.Button, {key: 'hwdebugbtn', class: 'teal', icon: "xicon chip", text: "Dev Debug", onClick: function () { return _this.hwDebug(); }}) : ''), useSerialEditor ?
-            React.createElement("div", {id: "serialPreview", className: "ui editorFloat portrait hide"}, React.createElement(serialindicator.SerialIndicator, {ref: "simIndicator", isSim: true, onClick: function () { return _this.openSerial(true); }}), React.createElement(serialindicator.SerialIndicator, {ref: "devIndicator", isSim: false, onClick: function () { return _this.openSerial(false); }})) : undefined, sandbox || isBlocks || this.editor == this.serialEditor ? undefined : React.createElement(filelist.FileList, {parent: this}))), React.createElement("div", {id: "maineditor", className: sandbox ? "sandbox" : "", role: "main"}, this.allEditors.map(function (e) { return e.displayOuter(); })), inHome ? React.createElement("div", {id: "homescreen", className: "full-abs", role: "main"}, React.createElement("div", {className: "ui home projectsdialog"}, React.createElement("div", {className: "menubar", role: "banner"}, React.createElement(accessibility.HomeAccessibilityMenu, {parent: this, highContrast: this.state.highContrast}), " }", React.createElement(projects.ProjectsMenu, {parent: this})), React.createElement(projects.Projects, {parent: this, ref: function (v) { return _this.home = v; }}))) : undefined, inTutorial ? React.createElement(tutorial.TutorialHint, {ref: "tutorialhint", parent: this}) : undefined, inTutorial ? React.createElement(tutorial.TutorialContent, {ref: "tutorialcontent", parent: this}) : undefined, showEditorToolbar ? React.createElement("div", {id: "editortools", role: "complementary", "aria-label": lf("Editor toolbar")}, React.createElement(editortoolbar.EditorToolbar, {ref: "editortools", parent: this})) : undefined, sideDocs ? React.createElement(container.SideDocs, {ref: "sidedoc", parent: this, sideDocsCollapsed: this.state.sideDocsCollapsed, docsUrl: this.state.sideDocsLoadUrl}) : undefined, sandbox ? undefined : React.createElement(scriptsearch.ScriptSearch, {parent: this, ref: function (v) { return _this.scriptSearch = v; }}), sandbox ? undefined : React.createElement(extensions.Extensions, {parent: this, ref: function (v) { return _this.extensions = v; }}), inHome ? React.createElement(projects.ImportDialog, {parent: this, ref: function (v) { return _this.importDialog = v; }}) : undefined, sandbox ? undefined : React.createElement(projects.ExitAndSaveDialog, {parent: this, ref: function (v) { return _this.exitAndSaveDialog = v; }}), sandbox || !sharingEnabled ? undefined : React.createElement(share.ShareEditor, {parent: this, ref: function (v) { return _this.shareEditor = v; }}), selectLanguage ? React.createElement(lang.LanguagePicker, {parent: this, ref: function (v) { return _this.languagePicker = v; }}) : undefined, sandbox ? React.createElement(container.SandboxFooter, {parent: this}) : undefined, cookieConsented ? undefined : React.createElement(container.CookieMessage, {parent: this, cookieConsented: cookieConsented, cookieKey: cookieKey}), hideMenuBar ? React.createElement("div", {id: "editorlogo"}, React.createElement("a", {className: "poweredbylogo"})) : undefined));
+            'full-abs'
+        ];
+        var jQueryClasses = ["dimmable", "dimmed"];
+        var prevRoot = document.getElementById("root");
+        if (prevRoot) {
+            jQueryClasses.filter(function (c) { return prevRoot.classList.contains(c); }).forEach(function (c) { return rootClassList.push(c); });
+        }
+        var rootClasses = sui.cx(rootClassList);
+        return (React.createElement("div", { id: 'root', className: rootClasses },
+            hideMenuBar ? undefined :
+                React.createElement("header", { className: "menubar", role: "banner" },
+                    inEditor ? React.createElement(accessibility.EditorAccessibilityMenu, { parent: this, highContrast: this.state.highContrast }) : undefined,
+                    React.createElement(notification.NotificationBanner, { parent: this }),
+                    React.createElement(container.MainMenu, { parent: this })),
+            inTutorial ? React.createElement("div", { id: "maineditor", className: sandbox ? "sandbox" : "", role: "main" },
+                React.createElement(tutorial.TutorialCard, { ref: "tutorialcard", parent: this })) : undefined,
+            React.createElement("div", { id: "simulator" },
+                React.createElement("aside", { id: "filelist", className: "ui items" },
+                    React.createElement("label", { htmlFor: "boardview", id: "boardviewLabel", className: "accessible-hidden", "aria-hidden": "true" }, lf("Simulator")),
+                    React.createElement("div", { id: "boardview", className: "ui vertical editorFloat", role: "region", "aria-labelledby": "boardviewLabel" }),
+                    React.createElement(simtoolbar.SimulatorToolbar, { parent: this }),
+                    React.createElement("div", { className: "ui item portrait hide" },
+                        pxt.options.debug && !this.state.running ? React.createElement(sui.Button, { key: 'debugbtn', class: 'teal', icon: "xicon bug", text: "Sim Debug", onClick: function () { return _this.runSimulator({ debug: true }); } }) : '',
+                        pxt.options.debug ? React.createElement(sui.Button, { key: 'hwdebugbtn', class: 'teal', icon: "xicon chip", text: "Dev Debug", onClick: function () { return _this.hwDebug(); } }) : ''),
+                    useSerialEditor ?
+                        React.createElement("div", { id: "serialPreview", className: "ui editorFloat portrait hide" },
+                            React.createElement(serialindicator.SerialIndicator, { ref: "simIndicator", isSim: true, onClick: function () { return _this.openSerial(true); } }),
+                            React.createElement(serialindicator.SerialIndicator, { ref: "devIndicator", isSim: false, onClick: function () { return _this.openSerial(false); } })) : undefined,
+                    sandbox || isBlocks || this.editor == this.serialEditor ? undefined : React.createElement(filelist.FileList, { parent: this }))),
+            React.createElement("div", { id: "maineditor", className: sandbox ? "sandbox" : "", role: "main" }, this.allEditors.map(function (e) { return e.displayOuter(); })),
+            inHome ? React.createElement("div", { id: "homescreen", className: "full-abs", role: "main" },
+                React.createElement("div", { className: "ui home projectsdialog" },
+                    React.createElement("div", { className: "menubar", role: "banner" },
+                        React.createElement(accessibility.HomeAccessibilityMenu, { parent: this, highContrast: this.state.highContrast }),
+                        " }",
+                        React.createElement(projects.ProjectsMenu, { parent: this })),
+                    React.createElement(projects.Projects, { parent: this, ref: function (v) { return _this.home = v; } }))) : undefined,
+            inTutorial ? React.createElement(tutorial.TutorialHint, { ref: "tutorialhint", parent: this }) : undefined,
+            inTutorial ? React.createElement(tutorial.TutorialContent, { ref: "tutorialcontent", parent: this }) : undefined,
+            showEditorToolbar ? React.createElement("div", { id: "editortools", role: "complementary", "aria-label": lf("Editor toolbar") },
+                React.createElement(editortoolbar.EditorToolbar, { ref: "editortools", parent: this })) : undefined,
+            sideDocs ? React.createElement(container.SideDocs, { ref: "sidedoc", parent: this, sideDocsCollapsed: this.state.sideDocsCollapsed, docsUrl: this.state.sideDocsLoadUrl }) : undefined,
+            sandbox ? undefined : React.createElement(scriptsearch.ScriptSearch, { parent: this, ref: function (v) { return _this.scriptSearch = v; } }),
+            sandbox ? undefined : React.createElement(extensions.Extensions, { parent: this, ref: function (v) { return _this.extensions = v; } }),
+            inHome ? React.createElement(projects.ImportDialog, { parent: this, ref: function (v) { return _this.importDialog = v; } }) : undefined,
+            sandbox ? undefined : React.createElement(projects.ExitAndSaveDialog, { parent: this, ref: function (v) { return _this.exitAndSaveDialog = v; } }),
+            sandbox || !sharingEnabled ? undefined : React.createElement(share.ShareEditor, { parent: this, ref: function (v) { return _this.shareEditor = v; } }),
+            selectLanguage ? React.createElement(lang.LanguagePicker, { parent: this, ref: function (v) { return _this.languagePicker = v; } }) : undefined,
+            sandbox ? React.createElement(container.SandboxFooter, { parent: this }) : undefined,
+            hideMenuBar ? React.createElement("div", { id: "editorlogo" },
+                React.createElement("a", { className: "poweredbylogo" })) : undefined));
     };
     return ProjectView;
 }(data.Component));
@@ -1913,7 +1977,7 @@ function showIcons() {
     ];
     core.confirmAsync({
         header: "Icons",
-        htmlBody: usedIcons.map(function (s) { return ("<i style='font-size:2em' class=\"ui icon " + s + "\"></i>&nbsp;" + s + "&nbsp; "); }).join("\n")
+        htmlBody: usedIcons.map(function (s) { return "<i style='font-size:2em' class=\"ui icon " + s + "\"></i>&nbsp;" + s + "&nbsp; "; }).join("\n")
     });
 }
 function assembleCurrent() {
@@ -1971,12 +2035,12 @@ function handleHash(hash, loading) {
             pxt.tickEvent("hash.follow");
             editor.newEmptyProject(undefined, hash.arg);
             return true;
-        case "newproject":
+        case "newproject":// shortcut to create a new blocks proj
             pxt.tickEvent("hash.newproject");
             editor.newProject();
             pxt.BrowserUtils.changeHash("");
             return true;
-        case "newjavascript":
+        case "newjavascript":// shortcut to create a new JS proj
             pxt.tickEvent("hash.newjavascript");
             editor.newProject({
                 prj: pxt.appTarget.blocksprj,
@@ -1991,19 +2055,19 @@ function handleHash(hash, loading) {
             editor.newProject();
             pxt.BrowserUtils.changeHash("");
             return true;
-        case "tutorial":
+        case "tutorial":// shortcut to a tutorial. eg: #tutorial:tutorials/getting-started
             pxt.tickEvent("hash.tutorial");
             editor.startTutorial(hash.arg);
             pxt.BrowserUtils.changeHash("");
             return true;
-        case "home":
+        case "home":// shortcut to home
             pxt.tickEvent("hash.home");
             editor.openHome();
             pxt.BrowserUtils.changeHash("");
             return true;
         case "sandbox":
         case "pub":
-        case "edit":
+        case "edit":// load a published proj, eg: #pub:27750-32291-62442-22749
             pxt.tickEvent("hash." + hash.cmd);
             pxt.BrowserUtils.changeHash("");
             loadHeaderBySharedId(hash.arg);
@@ -2017,7 +2081,7 @@ function handleHash(hash, loading) {
             theEditor.importProjectFromFileAsync(fileContents)
                 .done(function () { return core.hideLoading("loadingproject"); });
             return true;
-        case "reload":
+        case "reload":// need to reload last project - handled later in the load process
             if (loading)
                 pxt.BrowserUtils.changeHash("");
             return false;
@@ -2152,6 +2216,8 @@ $(document).ready(function () {
         }
     };
     appcache.init(appCacheUpdated);
+    pxt.hex.showLoading = function (msg) { return core.showLoading("hexcloudcompiler", msg); };
+    pxt.hex.hideLoading = function () { return core.hideLoading("hexcloudcompiler"); };
     pxt.docs.requireMarked = function () { return require("marked"); };
     var importHex = function (hex, createNewIfFailed) {
         if (createNewIfFailed === void 0) { createNewIfFailed = false; }
@@ -2183,11 +2249,11 @@ $(document).ready(function () {
         var live = !pxt.appTarget.appTheme.disableLiveTranslations || (mlang && !!mlang[1]);
         if (useLang)
             pxt.tickEvent("locale." + useLang + (live ? ".live" : ""));
-        lang.initialLang = useLang;
+        lang.setInitialLang(useLang);
         return Util.updateLocalizationAsync(pxt.appTarget.id, false, config.commitCdnUrl, useLang, pxt.appTarget.versions.pxtCrowdinBranch, pxt.appTarget.versions.targetCrowdinBranch, live)
             .then(function () { return Util.downloadSimulatorLocalizationAsync(pxt.appTarget.id, config.commitCdnUrl, useLang, pxt.appTarget.versions.pxtCrowdinBranch, pxt.appTarget.versions.targetCrowdinBranch, live); }).then(function (simStrings) {
             if (simStrings)
-                simulator.simTranslations = simStrings;
+                simulator.setTranslations(simStrings);
         });
     })
         .then(function () { return pxt.BrowserUtils.initTheme(); })
@@ -2294,8 +2360,9 @@ $(document).ready(function () {
     }, false);
 });
 
-},{"./accessibility":1,"./appcache":3,"./blocks":5,"./cmds":9,"./compiler":11,"./container":12,"./core":13,"./data":14,"./draganddrop":16,"./editortoolbar":17,"./electron":18,"./extensions":20,"./filelist":21,"./hidbridge":24,"./lang":26,"./make":27,"./monaco":29,"./monacoSnippets":30,"./notification":31,"./package":32,"./projects":33,"./pxtjson":34,"./screenshot":35,"./scriptsearch":36,"./serial":37,"./serialindicator":38,"./share":39,"./simtoolbar":40,"./simulator":41,"./sounds":42,"./sui":44,"./tdlegacy":45,"./toolbox":46,"./tutorial":47,"./workspace":48,"marked":121,"react":277,"react-dom":148}],3:[function(require,module,exports){
+},{"./accessibility":1,"./appcache":3,"./blocks":5,"./cmds":9,"./compiler":11,"./container":12,"./core":13,"./data":14,"./draganddrop":16,"./editortoolbar":17,"./electron":18,"./extensions":20,"./filelist":21,"./hidbridge":24,"./lang":26,"./make":27,"./monaco":29,"./monacoSnippets":30,"./notification":31,"./package":32,"./projects":33,"./pxtjson":34,"./screenshot":35,"./scriptsearch":36,"./serial":37,"./serialindicator":38,"./share":39,"./simtoolbar":40,"./simulator":41,"./sounds":42,"./sui":44,"./tdlegacy":45,"./toolbox":46,"./tutorial":47,"./workspace":48,"marked":118,"react":274,"react-dom":145}],3:[function(require,module,exports){
 "use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
 var core = require("./core");
 function init(updated) {
     var appCache = window.applicationCache;
@@ -2313,6 +2380,7 @@ exports.init = init;
 
 },{"./core":13}],4:[function(require,module,exports){
 "use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
 var _context; // AudioContext
 function context() {
     if (!_context)
@@ -2356,14 +2424,19 @@ function loadAsync(buffer) {
 exports.loadAsync = loadAsync;
 
 },{}],5:[function(require,module,exports){
-/// <reference path="../../localtypings/pxtblockly.d.ts" />
-/// <reference path="../../typings/globals/jquery/index.d.ts" />
 "use strict";
-var __extends = (this && this.__extends) || function (d, b) {
-    for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
-    function __() { this.constructor = d; }
-    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
-};
+/// <reference path="../../localtypings/pxtblockly.d.ts" />
+var __extends = (this && this.__extends) || (function () {
+    var extendStatics = Object.setPrototypeOf ||
+        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+    return function (d, b) {
+        extendStatics(d, b);
+        function __() { this.constructor = d; }
+        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
 var React = require("react");
 var pkg = require("./package");
 var core = require("./core");
@@ -2374,12 +2447,13 @@ var CategoryMode = pxt.blocks.CategoryMode;
 var Util = pxt.Util;
 var lf = Util.lf;
 var iface;
-var Editor = (function (_super) {
+var Editor = /** @class */ (function (_super) {
     __extends(Editor, _super);
     function Editor() {
-        _super.apply(this, arguments);
-        this.isFirstBlocklyLoad = true;
-        this.showToolboxCategories = CategoryMode.Basic;
+        var _this = _super !== null && _super.apply(this, arguments) || this;
+        _this.isFirstBlocklyLoad = true;
+        _this.showToolboxCategories = CategoryMode.Basic;
+        return _this;
     }
     Editor.prototype.setVisible = function (v) {
         _super.prototype.setVisible.call(this, v);
@@ -2390,8 +2464,10 @@ var Editor = (function (_super) {
             // Fire a resize event since the toolbox may have changed width and height.
             this.parent.fireResize();
         }
-        else
+        else {
             $(classes).hide();
+            Blockly.hideChaff();
+        }
     };
     Editor.prototype.saveToTypeScript = function () {
         var _this = this;
@@ -2713,7 +2789,7 @@ var Editor = (function (_super) {
     Editor.prototype.prepare = function () {
         var _this = this;
         pxt.blocks.openHelpUrl = function (url) {
-            pxt.tickEvent("blocks.help", { url: url });
+            pxt.tickEvent("blocks.help", { url: url }, { interactiveConsent: true });
             var m = /^\/pkg\/([^#]+)#(.+)$/.exec(url);
             if (m) {
                 var dep = pkg.mainPkg.deps[m[1]];
@@ -2878,7 +2954,8 @@ var Editor = (function (_super) {
         return "blocksArea";
     };
     Editor.prototype.display = function () {
-        return (React.createElement("div", null, React.createElement("div", {id: "blocksEditor"})));
+        return (React.createElement("div", null,
+            React.createElement("div", { id: "blocksEditor" })));
     };
     Editor.prototype.addPackage = function () {
         pxt.tickEvent("blocks.addpackage");
@@ -2908,10 +2985,12 @@ var Editor = (function (_super) {
     Editor.prototype.loadFileAsync = function (file) {
         Util.assert(!this.delayLoadXml);
         Util.assert(!this.loadingXmlPromise);
+        this.blockInfo = undefined;
         this.currSource = file.content;
         this.typeScriptSaveable = false;
         this.setDiagnostics(file);
         this.delayLoadXml = file.content;
+        this.editor.clear();
         this.editor.clearUndo();
         if (this.currFile && this.currFile != file) {
             this.filterToolbox(null);
@@ -3089,21 +3168,27 @@ var Editor = (function (_super) {
 }(srceditor.Editor));
 exports.Editor = Editor;
 
-},{"./compiler":11,"./core":13,"./package":32,"./srceditor":43,"./toolbox":46,"react":277}],6:[function(require,module,exports){
-/// <reference path="../../typings/globals/jquery/index.d.ts" />
+},{"./compiler":11,"./core":13,"./package":32,"./srceditor":43,"./toolbox":46,"react":274}],6:[function(require,module,exports){
 "use strict";
-var __extends = (this && this.__extends) || function (d, b) {
-    for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
-    function __() { this.constructor = d; }
-    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
-};
+var __extends = (this && this.__extends) || (function () {
+    var extendStatics = Object.setPrototypeOf ||
+        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+    return function (d, b) {
+        extendStatics(d, b);
+        function __() { this.constructor = d; }
+        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
 var React = require("react");
 var ReactDOM = require("react-dom");
-var BlocksPreview = (function (_super) {
+var BlocksPreview = /** @class */ (function (_super) {
     __extends(BlocksPreview, _super);
     function BlocksPreview(props) {
-        _super.call(this, props);
-        this.state = {};
+        var _this = _super.call(this, props) || this;
+        _this.state = {};
+        return _this;
     }
     BlocksPreview.prototype.renderSvg = function () {
         var el = $(ReactDOM.findDOMNode(this));
@@ -3118,33 +3203,40 @@ var BlocksPreview = (function (_super) {
         this.renderSvg();
     };
     BlocksPreview.prototype.render = function () {
-        return (React.createElement("div", {style: { width: "100%", minHeight: "10em", direction: "ltr" }}));
+        return (React.createElement("div", { style: { width: "100%", minHeight: "10em", direction: "ltr" } }));
     };
     return BlocksPreview;
 }(React.Component));
 exports.BlocksPreview = BlocksPreview;
 
-},{"react":277,"react-dom":148}],7:[function(require,module,exports){
+},{"react":274,"react-dom":145}],7:[function(require,module,exports){
 "use strict";
-var __extends = (this && this.__extends) || function (d, b) {
-    for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
-    function __() { this.constructor = d; }
-    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
-};
+var __extends = (this && this.__extends) || (function () {
+    var extendStatics = Object.setPrototypeOf ||
+        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+    return function (d, b) {
+        extendStatics(d, b);
+        function __() { this.constructor = d; }
+        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
 var React = require("react");
 var sui = require("./sui");
 var OUT_OF_BOUND_MARGIN = 300;
-var Carousel = (function (_super) {
+var Carousel = /** @class */ (function (_super) {
     __extends(Carousel, _super);
     function Carousel() {
-        _super.apply(this, arguments);
-        this.arrows = [];
-        this.isDragging = false;
-        this.definitelyDragging = false;
-        this.cancelClick = false;
-        this.currentOffset = 0;
-        this.index = 0;
-        this.childrenElements = [];
+        var _this = _super !== null && _super.apply(this, arguments) || this;
+        _this.arrows = [];
+        _this.isDragging = false;
+        _this.definitelyDragging = false;
+        _this.cancelClick = false;
+        _this.currentOffset = 0;
+        _this.index = 0;
+        _this.childrenElements = [];
+        return _this;
     }
     Carousel.prototype.componentWillReceiveProps = function (nextProps) {
         if (nextProps.selectedIndex != undefined) {
@@ -3156,7 +3248,13 @@ var Carousel = (function (_super) {
         this.childrenElements = [];
         this.arrows = [];
         var _a = this.state || {}, rightDisabled = _a.rightDisabled, leftDisabled = _a.leftDisabled;
-        return React.createElement("div", {className: "ui carouselouter"}, React.createElement("span", {className: "carouselarrow left aligned" + (leftDisabled ? " arrowdisabled" : ""), tabIndex: leftDisabled ? -1 : 0, onClick: function () { return _this.onArrowClick(true); }, ref: function (r) { return _this.arrows.push(r); }}, React.createElement(sui.Icon, {icon: "circle angle left"})), React.createElement("div", {className: "carouselcontainer", ref: function (r) { return _this.container = r; }}, React.createElement("div", {className: "carouselbody", ref: function (r) { return _this.dragSurface = r; }}, React.Children.map(this.props.children, function (child, index) { return React.createElement("div", {className: "carouselitem " + (_this.props.selectedIndex == index ? 'selected' : ''), ref: function (r) { return r && _this.childrenElements.push(r); }}, child); }))), React.createElement("span", {className: "carouselarrow right aligned" + (rightDisabled ? " arrowdisabled" : ""), tabIndex: rightDisabled ? -1 : 0, onClick: function () { return _this.onArrowClick(false); }, ref: function (r) { return _this.arrows.push(r); }}, React.createElement(sui.Icon, {icon: "circle angle right"})));
+        return React.createElement("div", { className: "ui carouselouter" },
+            React.createElement("span", { className: "carouselarrow left aligned" + (leftDisabled ? " arrowdisabled" : ""), tabIndex: leftDisabled ? -1 : 0, onClick: function () { return _this.onArrowClick(true); }, ref: function (r) { return _this.arrows.push(r); } },
+                React.createElement(sui.Icon, { icon: "circle angle left" })),
+            React.createElement("div", { className: "carouselcontainer", ref: function (r) { return _this.container = r; } },
+                React.createElement("div", { className: "carouselbody", ref: function (r) { return _this.dragSurface = r; } }, React.Children.map(this.props.children, function (child, index) { return child ? React.createElement("div", { className: "carouselitem " + (_this.props.selectedIndex == index ? 'selected' : ''), ref: function (r) { return r && _this.childrenElements.push(r); } }, child) : undefined; }))),
+            React.createElement("span", { className: "carouselarrow right aligned" + (rightDisabled ? " arrowdisabled" : ""), tabIndex: rightDisabled ? -1 : 0, onClick: function () { return _this.onArrowClick(false); }, ref: function (r) { return _this.arrows.push(r); } },
+                React.createElement(sui.Icon, { icon: "circle angle right" })));
     };
     Carousel.prototype.onArrowClick = function (left) {
         this.setIndex(left ? this.index - this.actualPageLength : this.index + this.actualPageLength);
@@ -3359,7 +3457,7 @@ var Carousel = (function (_super) {
     return Carousel;
 }(React.Component));
 exports.Carousel = Carousel;
-var AnimationState = (function () {
+var AnimationState = /** @class */ (function () {
     function AnimationState(start, end, millis) {
         this.start = start;
         this.end = end;
@@ -3392,8 +3490,9 @@ function getX(event) {
     }
 }
 
-},{"./sui":44,"react":277}],8:[function(require,module,exports){
+},{"./sui":44,"react":274}],8:[function(require,module,exports){
 "use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
 var db = require("./db");
 var core = require("./core");
 var pkg = require("./package");
@@ -3795,6 +3894,7 @@ exports.provider = {
 
 },{"./core":13,"./data":14,"./db":15,"./package":32,"./workspace":48}],9:[function(require,module,exports){
 "use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
 /// <reference path="../../built/pxtlib.d.ts"/>
 var core = require("./core");
 var pkg = require("./package");
@@ -3806,19 +3906,20 @@ function browserDownloadAsync(text, name, contentType) {
 }
 function browserDownloadDeployCoreAsync(resp) {
     var url = "";
-    var fn = "";
     var ext = pxt.outputName().replace(/[^.]*/, "");
-    if (!pxt.isOutputText()) {
-        var uf2 = resp.outfiles[pxt.outputName()];
-        fn = pkg.genFileName(ext);
+    var out = resp.outfiles[pxt.outputName()];
+    var fn = pkg.genFileName(ext);
+    var userContext = pxt.BrowserUtils.isBrowserDownloadWithinUserContext();
+    if (userContext) {
+        url = pxt.BrowserUtils.toDownloadDataUri(pxt.isOutputText() ? ts.pxtc.encodeBase64(out) : out, pxt.appTarget.compile.hexMimeType);
+    }
+    else if (!pxt.isOutputText()) {
         pxt.debug('saving ' + fn);
-        url = pxt.BrowserUtils.browserDownloadBase64(uf2, fn, "application/x-uf2", resp.userContextWindow, function (e) { return core.errorNotification(lf("saving file failed...")); });
+        url = pxt.BrowserUtils.browserDownloadBase64(out, fn, "application/x-uf2", resp.userContextWindow, function (e) { return core.errorNotification(lf("saving file failed...")); });
     }
     else {
-        var hex = resp.outfiles[pxt.outputName()];
-        fn = pkg.genFileName(ext);
         pxt.debug('saving ' + fn);
-        url = pxt.BrowserUtils.browserDownloadBinText(hex, fn, pxt.appTarget.compile.hexMimeType, resp.userContextWindow, function (e) { return core.errorNotification(lf("saving file failed...")); });
+        url = pxt.BrowserUtils.browserDownloadBinText(out, fn, pxt.appTarget.compile.hexMimeType, resp.userContextWindow, function (e) { return core.errorNotification(lf("saving file failed...")); });
     }
     if (!resp.success) {
         return core.confirmAsync({
@@ -3828,7 +3929,9 @@ function browserDownloadDeployCoreAsync(resp) {
             disagreeLbl: lf("Close")
         }).then(function () { });
     }
-    if (resp.saveOnly || pxt.BrowserUtils.isBrowserDownloadInSameWindow())
+    if (resp.saveOnly && userContext)
+        return pxt.commands.showUploadInstructionsAsync(fn, url, core.confirmAsync); // save does the same as download as far iOS is concerned
+    if (resp.saveOnly || pxt.BrowserUtils.isBrowserDownloadInSameWindow() && !userContext)
         return Promise.resolve();
     else
         return pxt.commands.showUploadInstructionsAsync(fn, url, core.confirmAsync);
@@ -3838,34 +3941,36 @@ function showUploadInstructionsAsync(fn, url, confirmAsync) {
     var boardName = pxt.appTarget.appTheme.boardName || "???";
     var boardDriveName = pxt.appTarget.appTheme.driveDisplayName || pxt.appTarget.compile.driveName || "???";
     // https://msdn.microsoft.com/en-us/library/cc848897.aspx
-    // "For security reasons, data URIs are restricted to downloaded resources. 
+    // "For security reasons, data URIs are restricted to downloaded resources.
     // Data URIs cannot be used for navigation, for scripting, or to populate frame or iframe elements"
+    var userDownload = pxt.BrowserUtils.isBrowserDownloadWithinUserContext();
     var downloadAgain = !pxt.BrowserUtils.isIE() && !pxt.BrowserUtils.isEdge();
     var docUrl = pxt.appTarget.appTheme.usbDocs;
     var saveAs = pxt.BrowserUtils.hasSaveAs();
-    var useUF2 = pxt.appTarget.compile.useUF2;
-    var body = saveAs ? lf("Click 'Save As' and save the {0} file to the {1} drive to transfer the code into your {2}.", useUF2 ? ".uf2" : ".hex", boardDriveName, boardName)
-        : lf("Move the {0} file to the {1} drive to transfer the code into your {2}.", pxt.appTarget.compile.useUF2 ? ".uf2" : ".hex", boardDriveName, boardName);
-    if (useUF2)
-        body = lf("Press the `reset` button once on the {0}.", boardName) + " " + body;
+    var ext = pxt.appTarget.compile.useUF2 ? ".uf2" : ".hex";
+    var body = userDownload ? lf("Click 'Download' to open the {0} app.", pxt.appTarget.appTheme.boardName) :
+        saveAs ? lf("Click 'Save As' and save the {0} file to the {1} drive to transfer the code into your {2}.", ext, boardDriveName, boardName)
+            : lf("Move the {0} file to the {1} drive to transfer the code into your {2}.", ext, boardDriveName, boardName);
+    var timeout = pxt.BrowserUtils.isBrowserDownloadWithinUserContext() ? 0 : 10000;
     return confirmAsync({
-        header: lf("Download completed..."),
+        header: userDownload ? lf("Download ready...") : lf("Download completed..."),
         body: body,
+        hasCloseIcon: true,
         hideCancel: true,
         hideAgree: true,
         buttons: [downloadAgain ? {
-                label: fn,
+                label: userDownload ? lf("Download") : fn,
                 icon: "download",
-                class: "lightgrey focused",
+                class: (userDownload ? "primary" : "lightgrey") + " focused",
                 url: url,
                 fileName: fn
             } : undefined, docUrl ? {
                 label: lf("Help"),
                 icon: "help",
-                class: "lightgrey focused",
+                class: "lightgrey",
                 url: docUrl
             } : undefined],
-        timeout: 10000
+        timeout: timeout
     }).then(function () { });
 }
 function webusbDeployCoreAsync(resp) {
@@ -3948,21 +4053,28 @@ exports.initCommandsAsync = initCommandsAsync;
 
 },{"./core":13,"./hidbridge":24,"./package":32}],10:[function(require,module,exports){
 "use strict";
-var __extends = (this && this.__extends) || function (d, b) {
-    for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
-    function __() { this.constructor = d; }
-    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
-};
+var __extends = (this && this.__extends) || (function () {
+    var extendStatics = Object.setPrototypeOf ||
+        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+    return function (d, b) {
+        extendStatics(d, b);
+        function __() { this.constructor = d; }
+        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
 var React = require("react");
 var sui = require("./sui");
 var blockspreview = require("./blockspreview");
 var lf = pxt.Util.lf;
 var repeat = pxt.Util.repeatMap;
-var CodeCardView = (function (_super) {
+var CodeCardView = /** @class */ (function (_super) {
     __extends(CodeCardView, _super);
     function CodeCardView(props) {
-        _super.call(this, props);
-        this.state = {};
+        var _this = _super.call(this, props) || this;
+        _this.state = {};
+        return _this;
     }
     CodeCardView.prototype.componentDidUpdate = function () {
         $('.ui.embed').embed();
@@ -3984,12 +4096,44 @@ var CodeCardView = (function (_super) {
         var className = card.className;
         var cardType = card.cardType;
         var imageUrl = card.imageUrl || (card.youTubeId ? "https://img.youtube.com/vi/" + card.youTubeId + "/maxresdefault.jpg" : undefined);
-        var cardDiv = React.createElement("div", {ref: function (el) { return _this.element = el; }, className: "ui card " + color + " " + (card.onClick ? "link" : '') + " " + (className ? className : ''), role: card.role, "aria-selected": card.role === "option" ? "true" : undefined, "aria-label": card.ariaLabel || card.title, title: card.title, onClick: function (e) { return card.onClick ? card.onClick(e) : undefined; }, tabIndex: card.onClick ? card.tabIndex || 0 : null, onKeyDown: card.onClick ? sui.fireClickOnEnter : null}, card.header || card.blocks || card.javascript || card.hardware || card.software || card.any ?
-            React.createElement("div", {key: "header", className: "ui content " + (card.responsive ? " tall desktop only" : "")}, React.createElement("div", {className: "right floated meta"}, card.any ? (React.createElement(sui.Icon, {key: "costany", icon: "ui grey circular label tiny"}, card.any > 0 ? card.any : null, " ")) : null, repeat(card.blocks, function (k) { return React.createElement(sui.Icon, {key: "costblocks" + k, icon: "puzzle orange"}); }), repeat(card.javascript, function (k) { return React.createElement(sui.Icon, {key: "costjs" + k, icon: "align left blue"}); }), repeat(card.hardware, function (k) { return React.createElement(sui.Icon, {key: "costhardware" + k, icon: "certificate black"}); }), repeat(card.software, function (k) { return React.createElement(sui.Icon, {key: "costsoftware" + k, icon: "square teal"}); })), card.header) : null, card.label || card.blocksXml || card.typeScript || imageUrl || cardType == "file" ? React.createElement("div", {className: "ui image"}, card.label ? React.createElement("label", {className: "ui " + (card.labelClass ? card.labelClass : "orange right ribbon") + " label"}, card.label) : undefined, card.blocksXml ? React.createElement(blockspreview.BlocksPreview, {key: "promoblocks", xml: card.blocksXml}) : undefined, card.typeScript ? React.createElement("pre", {key: "promots"}, card.typeScript) : undefined, imageUrl ? React.createElement("div", {className: "ui imagewrapper"}, React.createElement("div", {className: "ui cardimage", style: { backgroundImage: "url(\"" + imageUrl + "\")" }}), " ") : undefined, card.cardType == "file" ? React.createElement("div", {className: "ui fileimage"}) : undefined) : undefined, card.icon || card.iconContent ?
-            React.createElement("div", {className: "ui imagewrapper"}, React.createElement("div", {className: "ui button massive fluid " + card.iconColor + " " + (card.iconContent ? "iconcontent" : "")}, card.icon ? React.createElement(sui.Icon, {icon: "" + ('icon ' + card.icon)}) : undefined, card.iconContent || undefined)) : undefined, card.shortName || card.name || card.description ?
-            React.createElement("div", {className: "content"}, card.shortName || card.name ? React.createElement("div", {className: "header"}, card.shortName || card.name) : null, card.description ? React.createElement("div", {className: "description tall"}, renderMd(card.description)) : null) : undefined, card.time ? React.createElement("div", {className: "meta"}, card.time ? React.createElement("span", {key: "date", className: "date"}, pxt.Util.timeSince(card.time)) : null) : undefined, card.extracontent ? React.createElement("div", {className: "extra content"}, " ", card.extracontent, " ") : undefined);
+        var cardDiv = React.createElement("div", { ref: function (el) { return _this.element = el; }, className: "ui card " + color + " " + (card.onClick ? "link" : '') + " " + (className ? className : ''), role: card.role, "aria-selected": card.role === "option" ? "true" : undefined, "aria-label": card.ariaLabel || card.title, title: card.title, onClick: function (e) { return card.onClick ? card.onClick(e) : undefined; }, tabIndex: card.onClick ? card.tabIndex || 0 : null, onKeyDown: card.onClick ? sui.fireClickOnEnter : null },
+            card.header || card.blocks || card.javascript || card.hardware || card.software || card.any ?
+                React.createElement("div", { key: "header", className: "ui content " + (card.responsive ? " tall desktop only" : "") },
+                    React.createElement("div", { className: "right floated meta" },
+                        card.any ? (React.createElement(sui.Icon, { key: "costany", icon: "ui grey circular label tiny" },
+                            card.any > 0 ? card.any : null,
+                            " ")) : null,
+                        repeat(card.blocks, function (k) { return React.createElement(sui.Icon, { key: "costblocks" + k, icon: "puzzle orange" }); }),
+                        repeat(card.javascript, function (k) { return React.createElement(sui.Icon, { key: "costjs" + k, icon: "align left blue" }); }),
+                        repeat(card.hardware, function (k) { return React.createElement(sui.Icon, { key: "costhardware" + k, icon: "certificate black" }); }),
+                        repeat(card.software, function (k) { return React.createElement(sui.Icon, { key: "costsoftware" + k, icon: "square teal" }); })),
+                    card.header) : null,
+            card.label || card.blocksXml || card.typeScript || imageUrl || cardType == "file" ? React.createElement("div", { className: "ui image" },
+                card.label ? React.createElement("label", { className: "ui " + (card.labelClass ? card.labelClass : "orange right ribbon") + " label" }, card.label) : undefined,
+                card.blocksXml ? React.createElement(blockspreview.BlocksPreview, { key: "promoblocks", xml: card.blocksXml }) : undefined,
+                card.typeScript ? React.createElement("pre", { key: "promots" }, card.typeScript) : undefined,
+                imageUrl ? React.createElement("div", { className: "ui imagewrapper" },
+                    React.createElement("div", { className: "ui cardimage", style: { backgroundImage: "url(\"" + imageUrl + "\")" } }),
+                    " ") : undefined,
+                card.cardType == "file" ? React.createElement("div", { className: "ui fileimage" }) : undefined) : undefined,
+            card.icon || card.iconContent ?
+                React.createElement("div", { className: "ui imagewrapper" },
+                    React.createElement("div", { className: "ui button massive fluid " + card.iconColor + " " + (card.iconContent ? "iconcontent" : "") },
+                        card.icon ? React.createElement(sui.Icon, { icon: "" + ('icon ' + card.icon) }) : undefined,
+                        card.iconContent || undefined)) : undefined,
+            card.shortName || card.name || card.description ?
+                React.createElement("div", { className: "content" },
+                    card.shortName || card.name ? React.createElement("div", { className: "header" }, card.shortName || card.name) : null,
+                    card.description ? React.createElement("div", { className: "description tall" }, renderMd(card.description)) : null) : undefined,
+            card.time ? React.createElement("div", { className: "meta" }, card.time ? React.createElement("span", { key: "date", className: "date" }, pxt.Util.timeSince(card.time)) : null) : undefined,
+            card.extracontent ? React.createElement("div", { className: "extra content" },
+                " ",
+                card.extracontent,
+                " ") : undefined);
         if (!card.onClick && url) {
-            return (React.createElement("div", null, React.createElement("a", {href: url, target: "docs", className: "ui widedesktop hide"}, cardDiv), React.createElement("a", {href: sideUrl, className: "ui widedesktop only"}, cardDiv)));
+            return (React.createElement("div", null,
+                React.createElement("a", { href: url, target: "docs", className: "ui widedesktop hide" }, cardDiv),
+                React.createElement("a", { href: sideUrl, className: "ui widedesktop only" }, cardDiv)));
         }
         else {
             return (cardDiv);
@@ -3999,8 +4143,9 @@ var CodeCardView = (function (_super) {
 }(React.Component));
 exports.CodeCardView = CodeCardView;
 
-},{"./blockspreview":6,"./sui":44,"react":277}],11:[function(require,module,exports){
+},{"./blockspreview":6,"./sui":44,"react":274}],11:[function(require,module,exports){
 "use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
 var pkg = require("./package");
 var core = require("./core");
 var U = pxt.Util;
@@ -4008,7 +4153,7 @@ function setDiagnostics(diagnostics) {
     var mainPkg = pkg.mainEditorPkg();
     mainPkg.forEachFile(function (f) { return f.diagnostics = []; });
     var output = "";
-    var _loop_1 = function(diagnostic) {
+    var _loop_1 = function (diagnostic) {
         if (diagnostic.fileName) {
             output += (diagnostic.category == ts.pxtc.DiagnosticCategory.Error ? lf("error") : diagnostic.category == ts.pxtc.DiagnosticCategory.Warning ? lf("warning") : lf("message")) + ": " + diagnostic.fileName + "(" + (diagnostic.line + 1) + "," + (diagnostic.column + 1) + "): ";
             var f_1 = mainPkg.filterFiles(function (f) { return f.getTypeScriptName() == diagnostic.fileName; })[0];
@@ -4226,15 +4371,19 @@ function newProject() {
 exports.newProject = newProject;
 
 },{"./core":13,"./package":32}],12:[function(require,module,exports){
-/// <reference path="../../typings/globals/react/index.d.ts" />
-/// <reference path="../../typings/globals/react-dom/index.d.ts" />
-/// <reference path="../../built/pxtlib.d.ts" />
 "use strict";
-var __extends = (this && this.__extends) || function (d, b) {
-    for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
-    function __() { this.constructor = d; }
-    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
-};
+/// <reference path="../../built/pxtlib.d.ts" />
+var __extends = (this && this.__extends) || (function () {
+    var extendStatics = Object.setPrototypeOf ||
+        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+    return function (d, b) {
+        extendStatics(d, b);
+        function __() { this.constructor = d; }
+        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
 var React = require("react");
 var data = require("./data");
 var sui = require("./sui");
@@ -4253,17 +4402,17 @@ var container = require("./container");
 // lf("Reference")
 // lf("Support")
 // lf("Hardware")
-var DocsMenuItem = (function (_super) {
+var DocsMenuItem = /** @class */ (function (_super) {
     __extends(DocsMenuItem, _super);
     function DocsMenuItem(props) {
-        _super.call(this, props);
+        return _super.call(this, props) || this;
     }
     DocsMenuItem.prototype.openTutorial = function (path) {
-        pxt.tickEvent("docstutorial", { path: path });
+        pxt.tickEvent("docstutorial", { path: path }, { interactiveConsent: true });
         this.props.parent.startTutorial(path);
     };
     DocsMenuItem.prototype.openDocs = function (path) {
-        pxt.tickEvent("docs", { path: path });
+        pxt.tickEvent("docs", { path: path }, { interactiveConsent: true });
         this.props.parent.setSideDoc(path);
     };
     DocsMenuItem.prototype.shouldComponentUpdate = function (nextProps, nextState, nextContext) {
@@ -4272,46 +4421,46 @@ var DocsMenuItem = (function (_super) {
     DocsMenuItem.prototype.render = function () {
         var _this = this;
         var targetTheme = pxt.appTarget.appTheme;
-        return React.createElement(sui.DropdownMenuItem, {icon: "help circle large", class: "help-dropdown-menuitem", textClass: "landscape only", title: lf("Help")}, targetTheme.docMenu.map(function (m) {
-            return m.tutorial ? React.createElement(sui.Item, {key: "docsmenututorial" + m.path, role: "menuitem", ariaLabel: m.name, text: Util.rlf(m.name), class: "", onClick: function () { return _this.openTutorial(m.path); }})
-                : !/^\//.test(m.path) ? React.createElement("a", {key: "docsmenulink" + m.path, role: "menuitem", "aria-label": m.name, className: "ui item link", href: m.path, target: "docs"}, Util.rlf(m.name))
-                    : React.createElement(sui.Item, {key: "docsmenu" + m.path, role: "menuitem", ariaLabel: m.name, text: Util.rlf(m.name), class: "", onClick: function () { return _this.openDocs(m.path); }});
+        return React.createElement(sui.DropdownMenuItem, { icon: "help circle large", class: "help-dropdown-menuitem", textClass: "landscape only", title: lf("Help") }, targetTheme.docMenu.map(function (m) {
+            return m.tutorial ? React.createElement(sui.Item, { key: "docsmenututorial" + m.path, role: "menuitem", ariaLabel: m.name, text: Util.rlf(m.name), class: "", onClick: function () { return _this.openTutorial(m.path); } })
+                : !/^\//.test(m.path) ? React.createElement("a", { key: "docsmenulink" + m.path, role: "menuitem", "aria-label": m.name, className: "ui item link", href: m.path, target: "docs" }, Util.rlf(m.name))
+                    : React.createElement(sui.Item, { key: "docsmenu" + m.path, role: "menuitem", ariaLabel: m.name, text: Util.rlf(m.name), class: "", onClick: function () { return _this.openDocs(m.path); } });
         }));
     };
     return DocsMenuItem;
 }(data.Component));
 exports.DocsMenuItem = DocsMenuItem;
-var SettingsMenuItem = (function (_super) {
+var SettingsMenuItem = /** @class */ (function (_super) {
     __extends(SettingsMenuItem, _super);
     function SettingsMenuItem() {
-        _super.apply(this, arguments);
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     SettingsMenuItem.prototype.openSettings = function () {
-        pxt.tickEvent("menu.settings");
+        pxt.tickEvent("menu.settings", undefined, { interactiveConsent: true });
         this.props.parent.openSettings();
     };
     SettingsMenuItem.prototype.addPackage = function () {
-        pxt.tickEvent("menu.addpackage");
+        pxt.tickEvent("menu.addpackage", undefined, { interactiveConsent: true });
         this.props.parent.addPackage();
     };
     SettingsMenuItem.prototype.removeProject = function () {
-        pxt.tickEvent("menu.removeproject");
+        pxt.tickEvent("menu.removeproject", undefined, { interactiveConsent: true });
         this.props.parent.removeProject();
     };
     SettingsMenuItem.prototype.showReportAbuse = function () {
-        pxt.tickEvent("menu.reportabuse");
+        pxt.tickEvent("menu.reportabuse", undefined, { interactiveConsent: true });
         this.props.parent.showReportAbuse();
     };
     SettingsMenuItem.prototype.selectLang = function () {
-        pxt.tickEvent("menu.langpicker");
+        pxt.tickEvent("menu.langpicker", undefined, { interactiveConsent: true });
         this.props.parent.selectLang();
     };
     SettingsMenuItem.prototype.toggleHighContrast = function () {
-        pxt.tickEvent("menu.togglecontrast");
+        pxt.tickEvent("menu.togglecontrast", undefined, { interactiveConsent: true });
         this.props.parent.toggleHighContrast();
     };
     SettingsMenuItem.prototype.reset = function () {
-        pxt.tickEvent("menu.reset");
+        pxt.tickEvent("menu.reset", undefined, { interactiveConsent: true });
         pxt.tickEvent("reset"); // Deprecated, will Feb 2018.
         this.props.parent.reset();
     };
@@ -4336,50 +4485,65 @@ var SettingsMenuItem = (function (_super) {
         var targetTheme = pxt.appTarget.appTheme;
         var packages = pxt.appTarget.cloud && pxt.appTarget.cloud.packages;
         var reportAbuse = pxt.appTarget.cloud && pxt.appTarget.cloud.sharing && pxt.appTarget.cloud.publishing && pxt.appTarget.cloud.importing;
-        return React.createElement(sui.DropdownMenuItem, {icon: 'setting large', title: lf("More..."), class: "more-dropdown-menuitem"}, React.createElement(sui.Item, {role: "menuitem", icon: "options", text: lf("Project Settings"), onClick: function () { return _this.openSettings(); }, tabIndex: -1}), packages ? React.createElement(sui.Item, {role: "menuitem", icon: "disk outline", text: lf("Extensions"), onClick: function () { return _this.addPackage(); }, tabIndex: -1}) : undefined, React.createElement(sui.Item, {role: "menuitem", icon: "trash", text: lf("Delete Project"), onClick: function () { return _this.removeProject(); }, tabIndex: -1}), reportAbuse ? React.createElement(sui.Item, {role: "menuitem", icon: "warning circle", text: lf("Report Abuse..."), onClick: function () { return _this.showReportAbuse(); }, tabIndex: -1}) : undefined, React.createElement("div", {className: "ui divider"}), targetTheme.selectLanguage ? React.createElement(sui.Item, {icon: "xicon globe", role: "menuitem", text: lf("Language"), onClick: function () { return _this.selectLang(); }, tabIndex: -1}) : undefined, targetTheme.highContrast ? React.createElement(sui.Item, {role: "menuitem", text: highContrast ? lf("High Contrast Off") : lf("High Contrast On"), onClick: function () { return _this.toggleHighContrast(); }, tabIndex: -1}) : undefined, React.createElement(sui.Item, {role: "menuitem", icon: 'sign out', text: lf("Reset"), onClick: function () { return _this.reset(); }, tabIndex: -1}), React.createElement("div", {className: "ui divider"}), targetTheme.privacyUrl ? React.createElement("a", {className: "ui item", href: targetTheme.privacyUrl, role: "menuitem", title: lf("Privacy & Cookies"), target: "_blank", tabIndex: -1}, lf("Privacy & Cookies")) : undefined, targetTheme.termsOfUseUrl ? React.createElement("a", {className: "ui item", href: targetTheme.termsOfUseUrl, role: "menuitem", title: lf("Terms Of Use"), target: "_blank", tabIndex: -1}, lf("Terms Of Use")) : undefined, React.createElement(sui.Item, {role: "menuitem", text: lf("About..."), onClick: function () { return _this.about(); }, tabIndex: -1}), electron.isPxtElectron ? React.createElement(sui.Item, {role: "menuitem", text: lf("Check for updates..."), onClick: function () { return electron.checkForUpdate(); }, tabIndex: -1}) : undefined, targetTheme.feedbackUrl ? React.createElement("div", {className: "ui divider"}) : undefined, targetTheme.feedbackUrl ? React.createElement("a", {className: "ui item", href: targetTheme.feedbackUrl, role: "menuitem", title: lf("Give Feedback"), target: "_blank", rel: "noopener", tabIndex: -1}, lf("Give Feedback")) : undefined);
+        return React.createElement(sui.DropdownMenuItem, { icon: 'setting large', title: lf("More..."), class: "more-dropdown-menuitem" },
+            React.createElement(sui.Item, { role: "menuitem", icon: "options", text: lf("Project Settings"), onClick: function () { return _this.openSettings(); }, tabIndex: -1 }),
+            packages ? React.createElement(sui.Item, { role: "menuitem", icon: "disk outline", text: lf("Extensions"), onClick: function () { return _this.addPackage(); }, tabIndex: -1 }) : undefined,
+            React.createElement(sui.Item, { role: "menuitem", icon: "trash", text: lf("Delete Project"), onClick: function () { return _this.removeProject(); }, tabIndex: -1 }),
+            reportAbuse ? React.createElement(sui.Item, { role: "menuitem", icon: "warning circle", text: lf("Report Abuse..."), onClick: function () { return _this.showReportAbuse(); }, tabIndex: -1 }) : undefined,
+            React.createElement("div", { className: "ui divider" }),
+            targetTheme.selectLanguage ? React.createElement(sui.Item, { icon: "xicon globe", role: "menuitem", text: lf("Language"), onClick: function () { return _this.selectLang(); }, tabIndex: -1 }) : undefined,
+            targetTheme.highContrast ? React.createElement(sui.Item, { role: "menuitem", text: highContrast ? lf("High Contrast Off") : lf("High Contrast On"), onClick: function () { return _this.toggleHighContrast(); }, tabIndex: -1 }) : undefined,
+            React.createElement(sui.Item, { role: "menuitem", icon: 'sign out', text: lf("Reset"), onClick: function () { return _this.reset(); }, tabIndex: -1 }),
+            React.createElement("div", { className: "ui divider" }),
+            targetTheme.privacyUrl ? React.createElement("a", { className: "ui item", href: targetTheme.privacyUrl, role: "menuitem", title: lf("Privacy & Cookies"), target: "_blank", tabIndex: -1 }, lf("Privacy & Cookies")) : undefined,
+            targetTheme.termsOfUseUrl ? React.createElement("a", { className: "ui item", href: targetTheme.termsOfUseUrl, role: "menuitem", title: lf("Terms Of Use"), target: "_blank", tabIndex: -1 }, lf("Terms Of Use")) : undefined,
+            React.createElement(sui.Item, { role: "menuitem", text: lf("About..."), onClick: function () { return _this.about(); }, tabIndex: -1 }),
+            electron.isPxtElectron ? React.createElement(sui.Item, { role: "menuitem", text: lf("Check for updates..."), onClick: function () { return electron.checkForUpdate(); }, tabIndex: -1 }) : undefined,
+            targetTheme.feedbackUrl ? React.createElement("div", { className: "ui divider" }) : undefined,
+            targetTheme.feedbackUrl ? React.createElement("a", { className: "ui item", href: targetTheme.feedbackUrl, role: "menuitem", title: lf("Give Feedback"), target: "_blank", rel: "noopener", tabIndex: -1 }, lf("Give Feedback")) : undefined);
     };
     return SettingsMenuItem;
 }(data.Component));
 exports.SettingsMenuItem = SettingsMenuItem;
-var MainMenu = (function (_super) {
+var MainMenu = /** @class */ (function (_super) {
     __extends(MainMenu, _super);
     function MainMenu() {
-        _super.apply(this, arguments);
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     MainMenu.prototype.brandIconClick = function () {
-        pxt.tickEvent("menu.brand");
+        pxt.tickEvent("menu.brand", undefined, { interactiveConsent: true });
         this.props.parent.exitAndSave();
     };
     MainMenu.prototype.orgIconClick = function () {
-        pxt.tickEvent("menu.org");
+        pxt.tickEvent("menu.org", undefined, { interactiveConsent: true });
     };
     MainMenu.prototype.goHome = function () {
-        pxt.tickEvent("menu.home");
+        pxt.tickEvent("menu.home", undefined, { interactiveConsent: true });
         this.props.parent.exitAndSave();
     };
     MainMenu.prototype.share = function () {
-        pxt.tickEvent("menu.share");
+        pxt.tickEvent("menu.share", undefined, { interactiveConsent: true });
         this.props.parent.share();
     };
     MainMenu.prototype.launchFullEditor = function () {
-        pxt.tickEvent("sandbox.openfulleditor");
+        pxt.tickEvent("sandbox.openfulleditor", undefined, { interactiveConsent: true });
         this.props.parent.launchFullEditor();
     };
     MainMenu.prototype.openSimView = function () {
-        pxt.tickEvent("menu.simView");
+        pxt.tickEvent("menu.simView", undefined, { interactiveConsent: true });
         this.props.parent.openSimView();
     };
     MainMenu.prototype.openBlocks = function () {
-        pxt.tickEvent("menu.blocks");
+        pxt.tickEvent("menu.blocks", undefined, { interactiveConsent: true });
         this.props.parent.openBlocks();
     };
     MainMenu.prototype.openJavaScript = function (giveFocusOnLoading) {
         if (giveFocusOnLoading === void 0) { giveFocusOnLoading = true; }
-        pxt.tickEvent("menu.javascript");
+        pxt.tickEvent("menu.javascript", undefined, { interactiveConsent: true });
         this.props.parent.openJavaScript(giveFocusOnLoading);
     };
     MainMenu.prototype.exitTutorial = function () {
-        pxt.tickEvent("menu.exitTutorial");
+        pxt.tickEvent("menu.exitTutorial", undefined, { interactiveConsent: true });
         this.props.parent.exitTutorial();
     };
     MainMenu.prototype.render = function () {
@@ -4394,26 +4558,55 @@ var MainMenu = (function (_super) {
         var inTutorial = !!tutorialOptions && !!tutorialOptions.tutorial;
         var docMenu = targetTheme.docMenu && targetTheme.docMenu.length && !sandbox && !inTutorial;
         var isRunning = this.props.parent.state.running;
+        var hc = !!this.props.parent.state.highContrast;
+        var logo = (hc ? targetTheme.highContrastLogo : undefined) || targetTheme.logo;
+        var portraitLogo = (hc ? targetTheme.highContrastPortraitLogo : undefined) || targetTheme.portraitLogo;
         var rightLogo = sandbox ? targetTheme.portraitLogo : targetTheme.rightLogo;
         var simActive = this.props.parent.isEmbedSimActive();
         var blockActive = this.props.parent.isBlocksActive();
         var javascriptActive = this.props.parent.isJavaScriptActive();
         var runTooltip = isRunning ? lf("Stop the simulator") : lf("Start the simulator");
-        return React.createElement("div", {id: "mainmenu", className: "ui borderless fixed " + (targetTheme.invertedMenu ? "inverted" : '') + " menu", role: "menubar", "aria-label": lf("Main menu")}, !sandbox ? React.createElement("div", {className: "left menu"}, React.createElement("a", {"aria-label": lf("{0} Logo", targetTheme.boardName), role: "menuitem", target: "blank", rel: "noopener", className: "ui item logo brand", tabIndex: 0, onClick: function () { return _this.brandIconClick(); }, onKeyDown: sui.fireClickOnEnter}, targetTheme.logo || targetTheme.portraitLogo
-            ? React.createElement("img", {className: "ui logo " + (targetTheme.logo ? " portrait hide" : ''), src: Util.toDataUri(targetTheme.logo || targetTheme.portraitLogo), alt: lf("{0} Logo", targetTheme.boardName)})
-            : React.createElement("span", {className: "name"}, targetTheme.boardName), targetTheme.portraitLogo ? (React.createElement("img", {className: 'ui mini image portrait only', src: Util.toDataUri(targetTheme.portraitLogo), alt: lf("{0} Logo", targetTheme.boardName)})) : null), targetTheme.betaUrl ? React.createElement("a", {href: "" + targetTheme.betaUrl, className: "ui red mini corner top left attached label betalabel", role: "menuitem"}, lf("Beta")) : undefined, !inTutorial ? React.createElement(sui.Item, {class: "icon openproject", role: "menuitem", textClass: "landscape only", icon: "home large", ariaLabel: lf("Home screen"), text: lf("Home"), onClick: function () { return _this.goHome(); }}) : null, !inTutorial && header && sharingEnabled ? React.createElement(sui.Item, {class: "icon shareproject", role: "menuitem", textClass: "widedesktop only", ariaLabel: lf("Share Project"), text: lf("Share"), icon: "share alternate large", onClick: function () { return _this.share(); }}) : null, inTutorial ? React.createElement(sui.Item, {class: "tutorialname", tabIndex: -1, textClass: "landscape only", text: tutorialOptions.tutorialName}) : null) : React.createElement("div", {className: "left menu"}, React.createElement("span", {id: "logo", className: "ui item logo"}, React.createElement("img", {className: "ui mini image", src: Util.toDataUri(rightLogo), tabIndex: 0, onClick: function () { return _this.launchFullEditor(); }, onKeyDown: sui.fireClickOnEnter, alt: targetTheme.boardName + " Logo"}))), !inTutorial && !targetTheme.blocksOnly ? React.createElement("div", {className: "ui item link editor-menuitem"}, React.createElement("div", {className: "ui grid padded"}, sandbox ? React.createElement(sui.Item, {class: "sim-menuitem thin portrait only", role: "menuitem", textClass: "landscape only", text: lf("Simulator"), icon: simActive && isRunning ? "stop" : "play", active: simActive, onClick: function () { return _this.openSimView(); }, title: !simActive ? lf("Show Simulator") : runTooltip}) : undefined, React.createElement(sui.Item, {class: "blocks-menuitem", role: "menuitem", textClass: "landscape only", text: lf("Blocks"), icon: "xicon blocks", active: blockActive, onClick: function () { return _this.openBlocks(); }, title: lf("Convert code to Blocks")}), React.createElement(sui.Item, {class: "javascript-menuitem", role: "menuitem", textClass: "landscape only", text: lf("JavaScript"), icon: "xicon js", active: javascriptActive, onClick: function () { return _this.openJavaScript(false); }, title: lf("Convert code to JavaScript")}), React.createElement("div", {className: "ui item toggle"}))) : undefined, inTutorial ? React.createElement(tutorial.TutorialMenuItem, {parent: this.props.parent}) : undefined, React.createElement("div", {className: "right menu"}, docMenu ? React.createElement(container.DocsMenuItem, {parent: this.props.parent}) : undefined, sandbox || inTutorial ? undefined : React.createElement(container.SettingsMenuItem, {parent: this.props.parent, highContrast: highContrast}), sandbox && !targetTheme.hideEmbedEdit ? React.createElement(sui.Item, {role: "menuitem", icon: "external", textClass: "mobile hide", text: lf("Edit"), onClick: function () { return _this.launchFullEditor(); }}) : undefined, inTutorial ? React.createElement(sui.ButtonMenuItem, {class: "exit-tutorial-btn", role: "menuitem", icon: "external", text: lf("Exit tutorial"), textClass: "landscape only", onClick: function () { return _this.exitTutorial(); }}) : undefined, !sandbox ? React.createElement("a", {href: targetTheme.organizationUrl, "aria-label": lf("{0} Logo", targetTheme.organization), role: "menuitem", target: "blank", rel: "noopener", className: "ui item logo organization", onClick: function () { return _this.orgIconClick(); }}, targetTheme.organizationWideLogo || targetTheme.organizationLogo
-            ? React.createElement("img", {className: "ui logo " + (targetTheme.organizationWideLogo ? " portrait hide" : ''), src: Util.toDataUri(targetTheme.organizationWideLogo || targetTheme.organizationLogo), alt: lf("{0} Logo", targetTheme.organization)})
-            : React.createElement("span", {className: "name"}, targetTheme.organization), targetTheme.organizationLogo ? (React.createElement("img", {className: 'ui mini image portrait only', src: Util.toDataUri(targetTheme.organizationLogo), alt: lf("{0} Logo", targetTheme.organization)})) : null) : undefined));
+        return React.createElement("div", { id: "mainmenu", className: "ui borderless fixed " + (targetTheme.invertedMenu ? "inverted" : '') + " menu", role: "menubar", "aria-label": lf("Main menu") },
+            !sandbox ? React.createElement("div", { className: "left menu" },
+                React.createElement("a", { "aria-label": lf("{0} Logo", targetTheme.boardName), role: "menuitem", target: "blank", rel: "noopener", className: "ui item logo brand", tabIndex: 0, onClick: function () { return _this.brandIconClick(); }, onKeyDown: sui.fireClickOnEnter },
+                    logo || portraitLogo
+                        ? React.createElement("img", { className: "ui logo " + (logo ? " portrait hide" : ''), src: Util.toDataUri(logo || portraitLogo), alt: lf("{0} Logo", targetTheme.boardName) })
+                        : React.createElement("span", { className: "name" }, targetTheme.boardName),
+                    portraitLogo ? (React.createElement("img", { className: 'ui mini image portrait only', src: Util.toDataUri(portraitLogo), alt: lf("{0} Logo", targetTheme.boardName) })) : null),
+                targetTheme.betaUrl ? React.createElement("a", { href: "" + targetTheme.betaUrl, className: "ui red mini corner top left attached label betalabel", role: "menuitem" }, lf("Beta")) : undefined,
+                !inTutorial ? React.createElement(sui.Item, { class: "icon openproject", role: "menuitem", textClass: "landscape only", icon: "home large", ariaLabel: lf("Home screen"), text: lf("Home"), onClick: function () { return _this.goHome(); } }) : null,
+                !inTutorial && header && sharingEnabled ? React.createElement(sui.Item, { class: "icon shareproject", role: "menuitem", textClass: "widedesktop only", ariaLabel: lf("Share Project"), text: lf("Share"), icon: "share alternate large", onClick: function () { return _this.share(); } }) : null,
+                inTutorial ? React.createElement(sui.Item, { class: "tutorialname", tabIndex: -1, textClass: "landscape only", text: tutorialOptions.tutorialName }) : null) : React.createElement("div", { className: "left menu" },
+                React.createElement("span", { id: "logo", className: "ui item logo" },
+                    React.createElement("img", { className: "ui mini image", src: Util.toDataUri(rightLogo), tabIndex: 0, onClick: function () { return _this.launchFullEditor(); }, onKeyDown: sui.fireClickOnEnter, alt: targetTheme.boardName + " Logo" }))),
+            !inTutorial && !targetTheme.blocksOnly ? React.createElement("div", { className: "ui item link editor-menuitem" },
+                React.createElement("div", { className: "ui grid padded" },
+                    sandbox ? React.createElement(sui.Item, { class: "sim-menuitem thin portrait only", role: "menuitem", textClass: "landscape only", text: lf("Simulator"), icon: simActive && isRunning ? "stop" : "play", active: simActive, onClick: function () { return _this.openSimView(); }, title: !simActive ? lf("Show Simulator") : runTooltip }) : undefined,
+                    React.createElement(sui.Item, { class: "blocks-menuitem", role: "menuitem", textClass: "landscape only", text: lf("Blocks"), icon: "xicon blocks", active: blockActive, onClick: function () { return _this.openBlocks(); }, title: lf("Convert code to Blocks") }),
+                    React.createElement(sui.Item, { class: "javascript-menuitem", role: "menuitem", textClass: "landscape only", text: lf("JavaScript"), icon: "xicon js", active: javascriptActive, onClick: function () { return _this.openJavaScript(false); }, title: lf("Convert code to JavaScript") }),
+                    React.createElement("div", { className: "ui item toggle" }))) : undefined,
+            inTutorial ? React.createElement(tutorial.TutorialMenuItem, { parent: this.props.parent }) : undefined,
+            React.createElement("div", { className: "right menu" },
+                docMenu ? React.createElement(container.DocsMenuItem, { parent: this.props.parent }) : undefined,
+                sandbox || inTutorial ? undefined : React.createElement(container.SettingsMenuItem, { parent: this.props.parent, highContrast: highContrast }),
+                sandbox && !targetTheme.hideEmbedEdit ? React.createElement(sui.Item, { role: "menuitem", icon: "external", textClass: "mobile hide", text: lf("Edit"), onClick: function () { return _this.launchFullEditor(); } }) : undefined,
+                inTutorial ? React.createElement(sui.ButtonMenuItem, { class: "exit-tutorial-btn", role: "menuitem", icon: "external", text: lf("Exit tutorial"), textClass: "landscape only", onClick: function () { return _this.exitTutorial(); } }) : undefined,
+                !sandbox ? React.createElement("a", { href: targetTheme.organizationUrl, "aria-label": lf("{0} Logo", targetTheme.organization), role: "menuitem", target: "blank", rel: "noopener", className: "ui item logo organization", onClick: function () { return _this.orgIconClick(); } },
+                    targetTheme.organizationWideLogo || targetTheme.organizationLogo
+                        ? React.createElement("img", { className: "ui logo " + (targetTheme.organizationWideLogo ? " portrait hide" : ''), src: Util.toDataUri(targetTheme.organizationWideLogo || targetTheme.organizationLogo), alt: lf("{0} Logo", targetTheme.organization) })
+                        : React.createElement("span", { className: "name" }, targetTheme.organization),
+                    targetTheme.organizationLogo ? (React.createElement("img", { className: 'ui mini image portrait only', src: Util.toDataUri(targetTheme.organizationLogo), alt: lf("{0} Logo", targetTheme.organization) })) : null) : undefined));
     };
     return MainMenu;
 }(data.Component));
 exports.MainMenu = MainMenu;
-var SideDocs = (function (_super) {
+var SideDocs = /** @class */ (function (_super) {
     __extends(SideDocs, _super);
     function SideDocs() {
-        _super.apply(this, arguments);
-        this.firstLoad = true;
-        this.openingSideDoc = false;
+        var _this = _super !== null && _super.apply(this, arguments) || this;
+        _this.firstLoad = true;
+        _this.openingSideDoc = false;
+        return _this;
     }
     SideDocs.notify = function (message) {
         var sd = document.getElementById("sidedocsframe");
@@ -4484,18 +4677,27 @@ var SideDocs = (function (_super) {
         var _a = this.state, sideDocsCollapsed = _a.sideDocsCollapsed, docsUrl = _a.docsUrl;
         if (!docsUrl)
             return null;
-        return React.createElement("div", null, React.createElement("button", {id: "sidedocstoggle", role: "button", "aria-label": sideDocsCollapsed ? lf("Expand the side documentation") : lf("Collapse the side documentation"), className: "ui icon button", onClick: function () { return _this.toggleVisibility(); }}, React.createElement(sui.Icon, {icon: "icon large inverted " + (sideDocsCollapsed ? 'book' : 'chevron right')}), sideDocsCollapsed ? React.createElement(sui.Icon, {icon: "large inverted chevron left hover"}) : undefined), React.createElement("div", {id: "sidedocs"}, React.createElement("div", {id: "sidedocsframe-wrapper"}, React.createElement("iframe", {id: "sidedocsframe", src: docsUrl, title: lf("Documentation"), "aria-atomic": "true", "aria-live": "assertive", sandbox: "allow-scripts allow-same-origin allow-forms allow-popups"})), React.createElement("div", {id: "sidedocsbar"}, React.createElement("a", {className: "ui icon link", role: "link", tabIndex: 0, "data-content": lf("Open documentation in new tab"), "aria-label": lf("Open documentation in new tab"), onClick: function () { return _this.popOut(); }, onKeyDown: sui.fireClickOnEnter}, React.createElement(sui.Icon, {icon: "external"})))));
+        return React.createElement("div", null,
+            React.createElement("button", { id: "sidedocstoggle", role: "button", "aria-label": sideDocsCollapsed ? lf("Expand the side documentation") : lf("Collapse the side documentation"), className: "ui icon button", onClick: function () { return _this.toggleVisibility(); } },
+                React.createElement(sui.Icon, { icon: "icon large inverted " + (sideDocsCollapsed ? 'book' : 'chevron right') }),
+                sideDocsCollapsed ? React.createElement(sui.Icon, { icon: "large inverted chevron left hover" }) : undefined),
+            React.createElement("div", { id: "sidedocs" },
+                React.createElement("div", { id: "sidedocsframe-wrapper" },
+                    React.createElement("iframe", { id: "sidedocsframe", src: docsUrl, title: lf("Documentation"), "aria-atomic": "true", "aria-live": "assertive", sandbox: "allow-scripts allow-same-origin allow-forms allow-popups" })),
+                React.createElement("div", { id: "sidedocsbar" },
+                    React.createElement("a", { className: "ui icon link", role: "link", tabIndex: 0, "data-content": lf("Open documentation in new tab"), "aria-label": lf("Open documentation in new tab"), onClick: function () { return _this.popOut(); }, onKeyDown: sui.fireClickOnEnter },
+                        React.createElement(sui.Icon, { icon: "external" })))));
     };
     return SideDocs;
 }(data.Component));
 exports.SideDocs = SideDocs;
-var SandboxFooter = (function (_super) {
+var SandboxFooter = /** @class */ (function (_super) {
     __extends(SandboxFooter, _super);
     function SandboxFooter() {
-        _super.apply(this, arguments);
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     SandboxFooter.prototype.compile = function () {
-        pxt.tickEvent("sandboxfooter.compile");
+        pxt.tickEvent("sandboxfooter.compile", undefined, { interactiveConsent: true });
         this.props.parent.compile();
     };
     SandboxFooter.prototype.shouldComponentUpdate = function (nextProps, nextState, nextContext) {
@@ -4505,48 +4707,23 @@ var SandboxFooter = (function (_super) {
         var _this = this;
         var targetTheme = pxt.appTarget.appTheme;
         var compileTooltip = lf("Download your code to the {0}", targetTheme.boardName);
-        return React.createElement("div", {className: "ui horizontal small divided link list sandboxfooter"}, targetTheme.organizationUrl && targetTheme.organization ? React.createElement("a", {className: "item", target: "_blank", rel: "noopener", href: targetTheme.organizationUrl}, targetTheme.organization) : undefined, React.createElement("a", {target: "_blank", className: "item", href: targetTheme.termsOfUseUrl, rel: "noopener"}, lf("Terms of Use")), React.createElement("a", {target: "_blank", className: "item", href: targetTheme.privacyUrl, rel: "noopener"}, lf("Privacy")), React.createElement("span", {className: "item"}, React.createElement("a", {className: "ui thin portrait only", title: compileTooltip, onClick: function () { return _this.compile(); }}, React.createElement(sui.Icon, {icon: "icon " + (pxt.appTarget.appTheme.downloadIcon || 'download')}), pxt.appTarget.appTheme.useUploadMessage ? lf("Upload") : lf("Download"))));
+        return React.createElement("div", { className: "ui horizontal small divided link list sandboxfooter" },
+            targetTheme.organizationUrl && targetTheme.organization ? React.createElement("a", { className: "item", target: "_blank", rel: "noopener", href: targetTheme.organizationUrl }, targetTheme.organization) : undefined,
+            React.createElement("a", { target: "_blank", className: "item", href: targetTheme.termsOfUseUrl, rel: "noopener" }, lf("Terms of Use")),
+            React.createElement("a", { target: "_blank", className: "item", href: targetTheme.privacyUrl, rel: "noopener" }, lf("Privacy")),
+            React.createElement("span", { className: "item" },
+                React.createElement("a", { className: "ui thin portrait only", title: compileTooltip, onClick: function () { return _this.compile(); } },
+                    React.createElement(sui.Icon, { icon: "icon " + (pxt.appTarget.appTheme.downloadIcon || 'download') }),
+                    pxt.appTarget.appTheme.useUploadMessage ? lf("Upload") : lf("Download"))));
     };
     return SandboxFooter;
 }(data.Component));
 exports.SandboxFooter = SandboxFooter;
-var CookieMessage = (function (_super) {
-    __extends(CookieMessage, _super);
-    function CookieMessage() {
-        _super.apply(this, arguments);
-    }
-    CookieMessage.prototype.componentWillReceiveProps = function (nextProps) {
-        var newState = {};
-        if (nextProps.cookieConsented != undefined) {
-            newState.cookieConsented = nextProps.cookieConsented;
-        }
-        if (Object.keys(newState).length > 0)
-            this.setState(newState);
-    };
-    CookieMessage.prototype.shouldComponentUpdate = function (nextProps, nextState, nextContext) {
-        return this.state.cookieConsented != nextState.cookieConsented;
-    };
-    CookieMessage.prototype.renderCore = function () {
-        var _this = this;
-        var _a = this.props, cookieConsented = _a.cookieConsented, cookieKey = _a.cookieKey;
-        var targetTheme = pxt.appTarget.appTheme;
-        var sandbox = pxt.shell.isSandboxMode();
-        var isApp = electron.isElectron || pxt.winrt.isWinRT();
-        var consentCookie = function () {
-            pxt.storage.setLocal(cookieKey, "1");
-            _this.props.parent.forceUpdate();
-        };
-        return React.createElement("div", {id: 'cookiemsg', className: "ui teal inverted black segment", role: "alert"}, React.createElement("button", {"aria-label": lf("Close"), tabIndex: 0, className: "ui right floated icon button clear inverted", onClick: consentCookie}, React.createElement(sui.Icon, {icon: "remove"})), lf("By using this site you agree to the use of cookies for analytics.") + " ", React.createElement("a", {target: "_blank", className: "ui link", href: pxt.appTarget.appTheme.privacyUrl, rel: "noopener"}, lf("Learn more")));
-    };
-    return CookieMessage;
-}(data.Component));
-exports.CookieMessage = CookieMessage;
 
-},{"./container":12,"./data":14,"./electron":18,"./sui":44,"./tutorial":47,"react":277}],13:[function(require,module,exports){
-/// <reference path="../../typings/globals/react/index.d.ts" />
-/// <reference path="../../typings/globals/react-dom/index.d.ts" />
-/// <reference path="../../built/pxtlib.d.ts" />
+},{"./container":12,"./data":14,"./electron":18,"./sui":44,"./tutorial":47,"react":274}],13:[function(require,module,exports){
 "use strict";
+/// <reference path="../../built/pxtlib.d.ts" />
+Object.defineProperty(exports, "__esModule", { value: true });
 var ReactDOM = require("react-dom");
 var Cloud = pxt.Cloud;
 var Util = pxt.Util;
@@ -4561,6 +4738,10 @@ function isLoading() {
 exports.isLoading = isLoading;
 var loadingQueue = [];
 var loadingQueueMsg = {};
+function setHighContrast(on) {
+    exports.highContrast = on;
+}
+exports.setHighContrast = setHighContrast;
 function hideLoading(id) {
     pxt.debug("hideloading: " + id);
     if (loadingQueueMsg[id] != undefined) {
@@ -4592,6 +4773,8 @@ function hideLoading(id) {
 exports.hideLoading = hideLoading;
 function showLoading(id, msg) {
     pxt.debug("showloading: " + id);
+    if (loadingQueueMsg[id])
+        return; // already loading?
     initializeDimmer();
     $('.ui.dimmer.loading').dimmer('show');
     $('.ui.dimmer.loading').html("\n  <div class=\"content loadingcontent\">\n    <div class=\"ui text large loader msg\" aria-live=\"assertive\">" + lf("Please wait") + "</div>\n  </div>\n");
@@ -4678,6 +4861,7 @@ function htmlmsg(kind, msg) {
 }
 function errorNotification(msg) {
     pxt.tickEvent("notification.error", { message: msg });
+    debugger; // trigger a breakpoint when a debugger is connected, like in U.oops()
     htmlmsg("err", msg);
 }
 exports.errorNotification = errorNotification;
@@ -4709,7 +4893,7 @@ function dialogAsync(options) {
     var buttons = options.buttons ? options.buttons.filter(function (b) { return !!b; }) : [];
     var logos = (options.logos || [])
         .filter(function (logo) { return !!logo; })
-        .map(function (logo) { return ("<img class=\"ui logo\" src=\"" + Util.toDataUri(logo) + "\" />"); })
+        .map(function (logo) { return "<img class=\"ui logo\" src=\"" + Util.toDataUri(logo) + "\" />"; })
         .join(' ');
     var html = "\n  <div role=\"dialog\" class=\"ui " + (options.size || "small") + " modal\">\n    " + (options.hasCloseIcon ? "<i class=\"close icon\"></i>" : "") + "\n    <div role=\"heading\" class=\"header\">\n        " + Util.htmlEscape(options.header) + "\n    </div>\n    <div class=\"content\">\n      " + (options.body ? "<p>" + Util.htmlEscape(options.body) + "</p>" : "") + "\n      " + (options.htmlBody || "") + "\n      " + (options.input ? "<div class=\"ui fluid action input\">\n         <input class=\"userinput focused\" spellcheck=\"false\" placeholder=\"" + Util.htmlEscape(options.input) + "\" type=\"text\">\n         </div>" : "") + "\n      " + (options.copyable ? "<div class=\"ui fluid action input\">\n         <input class=\"linkinput focused\" readonly spellcheck=\"false\" type=\"text\" value=\"" + Util.htmlEscape(options.copyable) + "\">\n         <button class=\"ui teal right labeled icon button copybtn\" data-content=\"" + lf("Copied!") + "\">\n            " + lf("Copy") + "\n            <i class=\"copy icon\"></i>\n         </button>\n      </div>" : "") + "\n    </div>";
     html += "<div class=\"actions\">";
@@ -4930,6 +5114,7 @@ function scrollIntoView(item, margin) {
     }
     if (newTop != selfTop) {
         parent.scrollTop(newTop);
+        //parent.animate({ 'scrollTop': newTop }, 'fast');
     }
 }
 exports.scrollIntoView = scrollIntoView;
@@ -5028,13 +5213,19 @@ function apiAsync(path, data) {
 }
 exports.apiAsync = apiAsync;
 
-},{"react-dom":148}],14:[function(require,module,exports){
+},{"react-dom":145}],14:[function(require,module,exports){
 "use strict";
-var __extends = (this && this.__extends) || function (d, b) {
-    for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
-    function __() { this.constructor = d; }
-    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
-};
+var __extends = (this && this.__extends) || (function () {
+    var extendStatics = Object.setPrototypeOf ||
+        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+    return function (d, b) {
+        extendStatics(d, b);
+        function __() { this.constructor = d; }
+        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
 var React = require("react");
 var core = require("./core");
 var gallery = require("./gallery");
@@ -5048,7 +5239,10 @@ mountVirtualApi("cloud", {
     isOffline: function () { return !Cloud.isOnline(); },
 });
 mountVirtualApi("cloud-search", {
-    getAsync: function (p) { return Cloud.privateGetAsync(stripProtocol(p)).catch(function (e) { return core.handleNetworkError(e, [404]); }); },
+    getAsync: function (p) { return Cloud.privateGetAsync(stripProtocol(p)).catch(function (e) {
+        core.handleNetworkError(e, [404]);
+        return { statusCode: 404, headers: {}, json: {} };
+    }); },
     expirationTime: function (p) { return 60 * 1000; },
     isOffline: function () { return !Cloud.isOnline(); },
 });
@@ -5236,13 +5430,14 @@ function getAsync(path) {
     });
 }
 exports.getAsync = getAsync;
-var Component = (function (_super) {
+var Component = /** @class */ (function (_super) {
     __extends(Component, _super);
     function Component(props) {
-        _super.call(this, props);
-        this.subscriptions = [];
-        this.renderCoreOk = false;
-        this.state = {};
+        var _this = _super.call(this, props) || this;
+        _this.subscriptions = [];
+        _this.renderCoreOk = false;
+        _this.state = {};
+        return _this;
     }
     Component.prototype.getData = function (path) {
         if (!this.renderCoreOk)
@@ -5292,8 +5487,9 @@ function wrapWorkspace(ws) {
 exports.wrapWorkspace = wrapWorkspace;
 loadCache();
 
-},{"./core":13,"./gallery":23,"react":277}],15:[function(require,module,exports){
+},{"./core":13,"./gallery":23,"react":274}],15:[function(require,module,exports){
 "use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
 var Promise = require("bluebird");
 window.Promise = Promise;
 var PouchDB = require("pouchdb");
@@ -5336,7 +5532,7 @@ function destroyAsync() {
     return !_db ? Promise.resolve() : _db.destroy();
 }
 exports.destroyAsync = destroyAsync;
-var Table = (function () {
+var Table = /** @class */ (function () {
     function Table(name) {
         this.name = name;
     }
@@ -5374,7 +5570,7 @@ var Table = (function () {
     return Table;
 }());
 exports.Table = Table;
-var TranslationDb = (function () {
+var TranslationDb = /** @class */ (function () {
     function TranslationDb() {
         this.memCache = {};
         this.table = new Table("translations");
@@ -5399,7 +5595,6 @@ var TranslationDb = (function () {
             pxt.debug("translation cache miss " + id);
             return undefined;
         } // not found
-         // not found
         );
     };
     TranslationDb.prototype.setAsync = function (lang, filename, branch, etag, strings) {
@@ -5422,8 +5617,9 @@ var TranslationDb = (function () {
 }());
 ts.pxtc.Util.translationDb = new TranslationDb();
 
-},{"bluebird":51,"pouchdb":133,"pouchdb/extras/memory":131}],16:[function(require,module,exports){
+},{"bluebird":51,"pouchdb":130,"pouchdb/extras/memory":128}],16:[function(require,module,exports){
 "use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
 function setupDragAndDrop(r, filter, dragged) {
     var dragAndDrop = document && document.createElement && 'draggable' in document.createElement('span');
     r.addEventListener('paste', function (e) {
@@ -5475,65 +5671,69 @@ function setupDragAndDrop(r, filter, dragged) {
 exports.setupDragAndDrop = setupDragAndDrop;
 
 },{}],17:[function(require,module,exports){
-/// <reference path="../../typings/globals/react/index.d.ts" />
-/// <reference path="../../typings/globals/react-dom/index.d.ts" />
-/// <reference path="../../built/pxtlib.d.ts" />
 "use strict";
-var __extends = (this && this.__extends) || function (d, b) {
-    for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
-    function __() { this.constructor = d; }
-    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
-};
+/// <reference path="../../built/pxtlib.d.ts" />
+var __extends = (this && this.__extends) || (function () {
+    var extendStatics = Object.setPrototypeOf ||
+        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+    return function (d, b) {
+        extendStatics(d, b);
+        function __() { this.constructor = d; }
+        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
 var React = require("react");
 var data = require("./data");
 var sui = require("./sui");
-var EditorToolbar = (function (_super) {
+var EditorToolbar = /** @class */ (function (_super) {
     __extends(EditorToolbar, _super);
     function EditorToolbar(props) {
-        _super.call(this, props);
+        return _super.call(this, props) || this;
     }
     EditorToolbar.prototype.saveProjectName = function (name, view) {
-        pxt.tickEvent("editortools.projectrename", { view: view });
+        pxt.tickEvent("editortools.projectrename", { view: view }, { interactiveConsent: true });
         this.props.parent.updateHeaderName(name);
     };
     EditorToolbar.prototype.compile = function (view) {
-        pxt.tickEvent("editortools.download", { view: view, collapsed: this.getCollapsedState() });
+        pxt.tickEvent("editortools.download", { view: view, collapsed: this.getCollapsedState() }, { interactiveConsent: true });
         this.props.parent.compile();
     };
     EditorToolbar.prototype.saveFile = function (view) {
-        pxt.tickEvent("editortools.save", { view: view, collapsed: this.getCollapsedState() });
+        pxt.tickEvent("editortools.save", { view: view, collapsed: this.getCollapsedState() }, { interactiveConsent: true });
         this.props.parent.saveAndCompile();
     };
     EditorToolbar.prototype.undo = function (view) {
-        pxt.tickEvent("editortools.undo", { view: view, collapsed: this.getCollapsedState() });
+        pxt.tickEvent("editortools.undo", { view: view, collapsed: this.getCollapsedState() }, { interactiveConsent: true });
         this.props.parent.editor.undo();
     };
     EditorToolbar.prototype.redo = function (view) {
-        pxt.tickEvent("editortools.redo", { view: view, collapsed: this.getCollapsedState() });
+        pxt.tickEvent("editortools.redo", { view: view, collapsed: this.getCollapsedState() }, { interactiveConsent: true });
         this.props.parent.editor.redo();
     };
     EditorToolbar.prototype.zoomIn = function (view) {
-        pxt.tickEvent("editortools.zoomIn", { view: view, collapsed: this.getCollapsedState() });
+        pxt.tickEvent("editortools.zoomIn", { view: view, collapsed: this.getCollapsedState() }, { interactiveConsent: true });
         this.props.parent.editor.zoomIn();
     };
     EditorToolbar.prototype.zoomOut = function (view) {
-        pxt.tickEvent("editortools.zoomOut", { view: view, collapsed: this.getCollapsedState() });
+        pxt.tickEvent("editortools.zoomOut", { view: view, collapsed: this.getCollapsedState() }, { interactiveConsent: true });
         this.props.parent.editor.zoomOut();
     };
     EditorToolbar.prototype.startStopSimulator = function (view) {
-        pxt.tickEvent("editortools.startStopSimulator", { view: view, collapsed: this.getCollapsedState(), headless: this.getHeadlessState() });
+        pxt.tickEvent("editortools.startStopSimulator", { view: view, collapsed: this.getCollapsedState(), headless: this.getHeadlessState() }, { interactiveConsent: true });
         this.props.parent.startStopSimulator();
     };
     EditorToolbar.prototype.restartSimulator = function (view) {
-        pxt.tickEvent("editortools.restart", { view: view, collapsed: this.getCollapsedState(), headless: this.getHeadlessState() });
+        pxt.tickEvent("editortools.restart", { view: view, collapsed: this.getCollapsedState(), headless: this.getHeadlessState() }, { interactiveConsent: true });
         this.props.parent.restartSimulator();
     };
     EditorToolbar.prototype.toggleTrace = function (view) {
-        pxt.tickEvent("editortools.trace", { view: view, collapsed: this.getCollapsedState(), headless: this.getHeadlessState() });
+        pxt.tickEvent("editortools.trace", { view: view, collapsed: this.getCollapsedState(), headless: this.getHeadlessState() }, { interactiveConsent: true });
         this.props.parent.toggleTrace();
     };
     EditorToolbar.prototype.toggleCollapse = function (view) {
-        pxt.tickEvent("editortools.toggleCollapse", { view: view, collapsedTo: '' + !this.props.parent.state.collapseEditorTools });
+        pxt.tickEvent("editortools.toggleCollapse", { view: view, collapsedTo: '' + !this.props.parent.state.collapseEditorTools }, { interactiveConsent: true });
         this.props.parent.toggleSimulatorCollapse();
     };
     EditorToolbar.prototype.getCollapsedState = function () {
@@ -5558,11 +5758,9 @@ var EditorToolbar = (function (_super) {
         var compile = pxt.appTarget.compile;
         var compileBtn = compile.hasHex;
         var simOpts = pxt.appTarget.simulator;
-        var make = !sandbox && showParts && simOpts && (simOpts.instructions || (simOpts.parts && pxt.options.debug));
         var compileTooltip = lf("Download your code to the {0}", targetTheme.boardName);
         var compileLoading = !!compiling;
         var runTooltip = running ? lf("Stop the simulator") : lf("Start the simulator");
-        var makeTooltip = lf("Open assembly instructions");
         var restartTooltip = lf("Restart the simulator");
         var collapseTooltip = collapsed ? lf("Show the simulator") : lf("Hide the simulator");
         var headless = simOpts.headless;
@@ -5589,38 +5787,146 @@ var EditorToolbar = (function (_super) {
             downloadButtonClasses = "loading disabled";
             saveButtonClasses = "disabled";
         }
-        return React.createElement("div", {className: "ui equal width grid right aligned padded"}, React.createElement("div", {className: "column mobile only"}, collapsed ?
-            React.createElement("div", {className: "ui equal width grid"}, React.createElement("div", {className: "left aligned column"}, React.createElement("div", {className: "ui icon small buttons"}, React.createElement(sui.Button, {icon: "" + (collapsed ? 'toggle up' : 'toggle down'), class: "collapse-button " + (collapsed ? 'collapsed' : '') + " " + (hideEditorFloats ? 'disabled' : ''), ariaLabel: lf("{0}, {1}", collapseTooltip, hideEditorFloats ? lf("Disabled") : ""), title: collapseTooltip, onClick: function () { return _this.toggleCollapse('mobile'); }}), headless && run ? React.createElement(sui.Button, {class: "play-button " + (running ? "stop" : "play"), key: 'runmenubtn', icon: running ? "stop" : "play", title: runTooltip, onClick: function () { return _this.startStopSimulator('mobile'); }}) : undefined, headless && restart ? React.createElement(sui.Button, {key: 'restartbtn', class: "restart-button", icon: "refresh", title: restartTooltip, onClick: function () { return _this.restartSimulator('mobile'); }}) : undefined, headless && trace ? React.createElement(sui.Button, {key: 'tracebtn', class: "trace-button " + (tracing ? 'orange' : ''), icon: "xicon turtle", title: traceTooltip, onClick: function () { return _this.toggleTrace('mobile'); }}) : undefined, compileBtn ? React.createElement(sui.Button, {class: "primary download-button download-button-full " + downloadButtonClasses, icon: downloadIcon, title: compileTooltip, ariaLabel: lf("Download your code"), onClick: function () { return _this.compile('mobile'); }}) : undefined)), React.createElement("div", {className: "right aligned column"}, !readOnly ?
-                React.createElement("div", {className: "ui icon small buttons"}, React.createElement(sui.Button, {icon: 'save', class: "editortools-btn save-editortools-btn " + saveButtonClasses, title: lf("Save"), ariaLabel: lf("Save the project"), onClick: function () { return _this.saveFile('mobile'); }}), showUndoRedo ? React.createElement(sui.Button, {icon: 'xicon undo', class: "editortools-btn undo-editortools-btn} " + (!hasUndo ? 'disabled' : ''), ariaLabel: lf("{0}, {1}", lf("Undo"), !hasUndo ? lf("Disabled") : ""), title: lf("Undo"), onClick: function () { return _this.undo('mobile'); }}) : undefined) : undefined), React.createElement("div", {className: "right aligned column"}, showZoomControls ?
-                React.createElement("div", {className: "ui icon small buttons"}, React.createElement(sui.Button, {icon: 'plus circle', class: "editortools-btn zoomin-editortools-btn", title: lf("Zoom In"), onClick: function () { return _this.zoomIn('mobile'); }}), React.createElement(sui.Button, {icon: 'minus circle', class: "editortools-btn zoomout-editortools-btn", title: lf("Zoom Out"), onClick: function () { return _this.zoomOut('mobile'); }})) : undefined)) :
-            React.createElement("div", {className: "ui equal width grid"}, React.createElement("div", {className: "left aligned two wide column"}, React.createElement("div", {className: "ui vertical icon small buttons"}, run ? React.createElement(sui.Button, {class: "play-button " + (running ? "stop" : "play"), key: 'runmenubtn', icon: running ? "stop" : "play", title: runTooltip, onClick: function () { return _this.startStopSimulator('mobile'); }}) : undefined, restart ? React.createElement(sui.Button, {key: 'restartbtn', class: "restart-button", icon: "refresh", title: restartTooltip, onClick: function () { return _this.restartSimulator('mobile'); }}) : undefined), showCollapsed ?
-                React.createElement("div", {className: "row", style: { paddingTop: "1rem" }}, React.createElement("div", {className: "ui vertical icon small buttons"}, React.createElement(sui.Button, {icon: "" + (collapsed ? 'toggle up' : 'toggle down'), class: "collapse-button " + (collapsed ? 'collapsed' : ''), title: collapseTooltip, ariaLabel: lf("{0}, {1}", collapseTooltip, collapsed ? lf("Collapsed") : "Expanded"), onClick: function () { return _this.toggleCollapse('mobile'); }}))) : undefined), React.createElement("div", {className: "three wide column"}), React.createElement("div", {className: "column"}, React.createElement("div", {className: "ui grid"}, readOnly || !showUndoRedo ? undefined :
-                React.createElement("div", {className: "row"}, React.createElement("div", {className: "column"}, React.createElement("div", {className: "ui icon large buttons"}, React.createElement(sui.Button, {icon: 'xicon undo', class: "editortools-btn undo-editortools-btn " + (!hasUndo ? 'disabled' : ''), ariaLabel: lf("{0}, {1}", lf("Undo"), !hasUndo ? lf("Disabled") : ""), title: lf("Undo"), onClick: function () { return _this.undo('mobile'); }})))), React.createElement("div", {className: "row", style: readOnly || !showUndoRedo ? undefined : { paddingTop: 0 }}, React.createElement("div", {className: "column"}, React.createElement("div", {className: "ui icon large buttons"}, trace ? React.createElement(sui.Button, {key: 'tracebtn', class: "trace-button " + (tracing ? 'orange' : ''), icon: "xicon turtle", title: traceTooltip, onClick: function () { return _this.toggleTrace('mobile'); }}) : undefined, compileBtn ? React.createElement(sui.Button, {class: "primary download-button download-button-full " + downloadButtonClasses, icon: downloadIcon, title: compileTooltip, onClick: function () { return _this.compile('mobile'); }}) : undefined))))))), React.createElement("div", {className: "column tablet only"}, collapsed ?
-            React.createElement("div", {className: "ui grid seven column"}, headless ?
-                React.createElement("div", {className: "left aligned six wide column"}, React.createElement("div", {className: "ui icon buttons"}, React.createElement(sui.Button, {icon: "" + (collapsed ? 'toggle up' : 'toggle down'), class: "collapse-button " + (collapsed ? 'collapsed' : '') + " " + (hideEditorFloats ? 'disabled' : ''), ariaLabel: lf("{0}, {1}", collapseTooltip, hideEditorFloats ? lf("Disabled") : ""), title: collapseTooltip, onClick: function () { return _this.toggleCollapse('tablet'); }}), run ? React.createElement(sui.Button, {role: "menuitem", class: "play-button " + (running ? "stop" : "play"), key: 'runmenubtn', icon: running ? "stop" : "play", title: runTooltip, onClick: function () { return _this.startStopSimulator('tablet'); }}) : undefined, restart ? React.createElement(sui.Button, {key: 'restartbtn', class: "restart-button", icon: "refresh", title: restartTooltip, onClick: function () { return _this.restartSimulator('tablet'); }}) : undefined, trace ? React.createElement(sui.Button, {key: 'tracebtn', class: "trace-button " + (tracing ? 'orange' : ''), icon: "xicon turtle", title: traceTooltip, onClick: function () { return _this.toggleTrace('tablet'); }}) : undefined, compileBtn ? React.createElement(sui.Button, {class: "primary download-button download-button-full " + downloadButtonClasses, icon: downloadIcon, title: compileTooltip, onClick: function () { return _this.compile('tablet'); }}) : undefined)) :
-                React.createElement("div", {className: "left aligned six wide column"}, React.createElement("div", {className: "ui icon buttons"}, React.createElement(sui.Button, {icon: "" + (collapsed ? 'toggle up' : 'toggle down'), class: "collapse-button " + (collapsed ? 'collapsed' : '') + " " + (hideEditorFloats ? 'disabled' : ''), ariaLabel: lf("{0}, {1}", collapseTooltip, hideEditorFloats ? lf("Disabled") : ""), title: collapseTooltip, onClick: function () { return _this.toggleCollapse('tablet'); }}), compileBtn ? React.createElement(sui.Button, {class: "primary download-button download-button-full " + downloadButtonClasses, icon: downloadIcon, text: downloadText, title: compileTooltip, onClick: function () { return _this.compile('tablet'); }}) : undefined)), React.createElement("div", {className: "column four wide"}, readOnly ? undefined :
-                React.createElement(sui.Button, {icon: 'save', class: "small editortools-btn save-editortools-btn " + saveButtonClasses, title: lf("Save"), ariaLabel: lf("Save the project"), onClick: function () { return _this.saveFile('tablet'); }})), React.createElement("div", {className: "column six wide right aligned"}, showUndoRedo ?
-                React.createElement("div", {className: "ui icon small buttons"}, React.createElement(sui.Button, {icon: 'xicon undo', class: "editortools-btn undo-editortools-btn " + (!hasUndo ? 'disabled' : ''), ariaLabel: lf("{0}, {1}", lf("Undo"), !hasUndo ? lf("Disabled") : ""), title: lf("Undo"), onClick: function () { return _this.undo('tablet'); }}), React.createElement(sui.Button, {icon: 'xicon redo', class: "editortools-btn redo-editortools-btn " + (!hasRedo ? 'disabled' : ''), ariaLabel: lf("{0}, {1}", lf("Red"), !hasRedo ? lf("Disabled") : ""), title: lf("Redo"), onClick: function () { return _this.redo('tablet'); }})) : undefined, showZoomControls ?
-                React.createElement("div", {className: "ui icon small buttons"}, React.createElement(sui.Button, {icon: 'plus circle', class: "editortools-btn zoomin-editortools-btn", title: lf("Zoom In"), onClick: function () { return _this.zoomIn('tablet'); }}), React.createElement(sui.Button, {icon: 'minus circle', class: "editortools-btn zoomout-editortools-btn", title: lf("Zoom Out"), onClick: function () { return _this.zoomOut('tablet'); }})) : undefined))
-            : React.createElement("div", {className: "ui grid"}, React.createElement("div", {className: "left aligned two wide column"}, React.createElement("div", {className: "ui vertical icon small buttons"}, run ? React.createElement(sui.Button, {role: "menuitem", class: "play-button " + (running ? "stop" : "play"), key: 'runmenubtn', icon: running ? "stop" : "play", title: runTooltip, onClick: function () { return _this.startStopSimulator('tablet'); }}) : undefined, restart ? React.createElement(sui.Button, {key: 'restartbtn', class: "restart-button", icon: "refresh", title: restartTooltip, onClick: function () { return _this.restartSimulator('tablet'); }}) : undefined), showCollapsed ?
-                React.createElement("div", {className: "row", style: { paddingTop: "1rem" }}, React.createElement("div", {className: "ui vertical icon small buttons"}, React.createElement(sui.Button, {icon: "" + (collapsed ? 'toggle up' : 'toggle down'), class: "collapse-button " + (collapsed ? 'collapsed' : ''), title: collapseTooltip, ariaLabel: lf("{0}, {1}", collapseTooltip, collapsed ? lf("Collapsed") : "Expanded"), onClick: function () { return _this.toggleCollapse('tablet'); }}))) : undefined), React.createElement("div", {className: "three wide column"}), React.createElement("div", {className: "five wide column"}, React.createElement("div", {className: "ui grid right aligned"}, compileBtn ? React.createElement("div", {className: "row"}, React.createElement("div", {className: "column"}, React.createElement(sui.Button, {role: "menuitem", class: "primary large fluid download-button download-button-full " + downloadButtonClasses, icon: downloadIcon, text: downloadText, title: compileTooltip, onClick: function () { return _this.compile('tablet'); }}))) : undefined, showProjectRename ?
-                React.createElement("div", {className: "row", style: compileBtn ? { paddingTop: 0 } : {}}, React.createElement("div", {className: "column"}, React.createElement("div", {className: "ui item large right labeled fluid input projectname-input projectname-tablet", title: lf("Pick a name for your project")}, React.createElement("label", {htmlFor: "fileNameInput1", id: "fileNameInputLabel1", className: "accessible-hidden"}, lf("Type a name for your project")), React.createElement("input", {id: "fileNameInput1", type: "text", "aria-labelledby": "fileNameInputLabel1", placeholder: lf("Pick a name..."), value: projectName || '', onChange: function (e) { return _this.saveProjectName(e.target.value, 'tablet'); }}), React.createElement(sui.Button, {icon: 'save', class: "large right attached editortools-btn save-editortools-btn " + saveButtonClasses, title: lf("Save"), ariaLabel: lf("Save the project"), onClick: function () { return _this.saveFile('tablet'); }})))) : undefined)), React.createElement("div", {className: "six wide column right aligned"}, React.createElement("div", {className: "ui grid right aligned"}, showUndoRedo || showZoomControls ?
-                React.createElement("div", {className: "row"}, React.createElement("div", {className: "column"}, showUndoRedo ?
-                    React.createElement("div", {className: "ui icon large buttons"}, React.createElement(sui.Button, {icon: 'xicon undo', class: "editortools-btn undo-editortools-btn} " + (!hasUndo ? 'disabled' : ''), title: lf("Undo"), ariaLabel: lf("{0}, {1}", lf("Undo"), !hasUndo ? lf("Disabled") : ""), onClick: function () { return _this.undo(); }}), React.createElement(sui.Button, {icon: 'xicon redo', class: "editortools-btn redo-editortools-btn} " + (!hasRedo ? 'disabled' : ''), title: lf("Redo"), ariaLabel: lf("{0}, {1}", lf("Redo"), !hasRedo ? lf("Disabled") : ""), onClick: function () { return _this.redo(); }})) : undefined, showZoomControls ?
-                    React.createElement("div", {className: "ui icon large buttons"}, React.createElement(sui.Button, {icon: 'plus circle', class: "editortools-btn zoomin-editortools-btn", title: lf("Zoom In"), onClick: function () { return _this.zoomIn(); }}), React.createElement(sui.Button, {icon: 'minus circle', class: "editortools-btn zoomout-editortools-btn", title: lf("Zoom Out"), onClick: function () { return _this.zoomOut(); }})) : undefined)) : undefined, trace ?
-                React.createElement("div", {className: "row", style: showUndoRedo || showZoomControls ? { paddingTop: 0 } : {}}, React.createElement("div", {className: "column"}, React.createElement(sui.Button, {key: 'tracebtn', class: "large trace-button " + (tracing ? 'orange' : ''), icon: "xicon turtle", title: traceTooltip, onClick: function () { return _this.toggleTrace('tablet'); }}))) : undefined)))), React.createElement("div", {className: "column computer only"}, React.createElement("div", {className: "ui grid equal width"}, React.createElement("div", {id: "downloadArea", className: "ui column items"}, headless ?
-            React.createElement("div", {className: "ui item"}, React.createElement("div", {className: "ui icon large buttons"}, showCollapsed ? React.createElement(sui.Button, {icon: "" + (collapseEditorTools ? 'toggle right' : 'toggle left'), class: "large collapse-button " + (collapsed ? 'collapsed' : ''), title: collapseTooltip, onClick: function () { return _this.toggleCollapse('computer'); }}) : undefined, run ? React.createElement(sui.Button, {role: "menuitem", class: "large play-button " + (running ? "stop" : "play"), key: 'runmenubtn', icon: running ? "stop" : "play", title: runTooltip, onClick: function () { return _this.startStopSimulator('computer'); }}) : undefined, restart ? React.createElement(sui.Button, {key: 'restartbtn', class: "large restart-button", icon: "refresh", title: restartTooltip, onClick: function () { return _this.restartSimulator('computer'); }}) : undefined, trace ? React.createElement(sui.Button, {key: 'tracebtn', class: "large trace-button " + (tracing ? 'orange' : ''), icon: "xicon turtle", title: traceTooltip, onClick: function () { return _this.toggleTrace('computer'); }}) : undefined, compileBtn ? React.createElement(sui.Button, {icon: downloadIcon, class: "primary large download-button " + downloadButtonClasses, title: compileTooltip, onClick: function () { return _this.compile('computer'); }}) : undefined)) :
-            React.createElement("div", {className: "ui item"}, showCollapsed ? React.createElement(sui.Button, {icon: "" + (collapseEditorTools ? 'toggle right' : 'toggle left'), class: "large collapse-button " + (collapsed ? 'collapsed' : ''), title: collapseTooltip, onClick: function () { return _this.toggleCollapse('computer'); }}) : undefined, compileBtn ? React.createElement(sui.Button, {icon: downloadIcon, class: "primary huge fluid download-button " + downloadButtonClasses, text: downloadText, title: compileTooltip, onClick: function () { return _this.compile('computer'); }}) : undefined)), showProjectRename ?
-            React.createElement("div", {className: "column left aligned"}, React.createElement("div", {className: "ui right labeled input projectname-input projectname-computer", title: lf("Pick a name for your project")}, React.createElement("label", {htmlFor: "fileNameInput2", id: "fileNameInputLabel2", className: "accessible-hidden"}, lf("Type a name for your project")), React.createElement("input", {id: "fileNameInput2", type: "text", "aria-labelledby": "fileNameInputLabel2", placeholder: lf("Pick a name..."), value: projectName || '', onChange: function (e) { return _this.saveProjectName(e.target.value, 'computer'); }}), React.createElement(sui.Button, {icon: 'save', class: "small right attached editortools-btn save-editortools-btn " + saveButtonClasses, title: lf("Save"), ariaLabel: lf("Save the project"), onClick: function () { return _this.saveFile('computer'); }}))) : undefined, React.createElement("div", {className: "column right aligned"}, showUndoRedo ?
-            React.createElement("div", {className: "ui icon small buttons"}, React.createElement(sui.Button, {icon: 'xicon undo', class: "editortools-btn undo-editortools-btn " + (!hasUndo ? 'disabled' : ''), ariaLabel: lf("{0}, {1}", lf("Undo"), !hasUndo ? lf("Disabled") : ""), title: lf("Undo"), onClick: function () { return _this.undo('computer'); }}), React.createElement(sui.Button, {icon: 'xicon redo', class: "editortools-btn redo-editortools-btn " + (!hasRedo ? 'disabled' : ''), ariaLabel: lf("{0}, {1}", lf("Redo"), !hasRedo ? lf("Disabled") : ""), title: lf("Redo"), onClick: function () { return _this.redo('computer'); }})) : undefined, showZoomControls ?
-            React.createElement("div", {className: "ui icon small buttons"}, React.createElement(sui.Button, {icon: 'plus circle', class: "editortools-btn zoomin-editortools-btn", title: lf("Zoom In"), onClick: function () { return _this.zoomIn('computer'); }}), React.createElement(sui.Button, {icon: 'minus circle', class: "editortools-btn zoomout-editortools-btn", title: lf("Zoom Out"), onClick: function () { return _this.zoomOut('computer'); }})) : undefined))));
+        return React.createElement("div", { className: "ui equal width grid right aligned padded" },
+            React.createElement("div", { className: "column mobile only" }, collapsed ?
+                React.createElement("div", { className: "ui equal width grid" },
+                    React.createElement("div", { className: "left aligned column" },
+                        React.createElement("div", { className: "ui icon small buttons" },
+                            React.createElement(sui.Button, { icon: "" + (collapsed ? 'toggle up' : 'toggle down'), class: "collapse-button " + (collapsed ? 'collapsed' : '') + " " + (hideEditorFloats ? 'disabled' : ''), ariaLabel: lf("{0}, {1}", collapseTooltip, hideEditorFloats ? lf("Disabled") : ""), title: collapseTooltip, onClick: function () { return _this.toggleCollapse('mobile'); } }),
+                            headless && run ? React.createElement(sui.Button, { class: "play-button " + (running ? "stop" : "play"), key: 'runmenubtn', icon: running ? "stop" : "play", title: runTooltip, onClick: function () { return _this.startStopSimulator('mobile'); } }) : undefined,
+                            headless && restart ? React.createElement(sui.Button, { key: 'restartbtn', class: "restart-button", icon: "refresh", title: restartTooltip, onClick: function () { return _this.restartSimulator('mobile'); } }) : undefined,
+                            headless && trace ? React.createElement(sui.Button, { key: 'tracebtn', class: "trace-button " + (tracing ? 'orange' : ''), icon: "xicon turtle", title: traceTooltip, onClick: function () { return _this.toggleTrace('mobile'); } }) : undefined,
+                            compileBtn ? React.createElement(sui.Button, { class: "primary download-button download-button-full " + downloadButtonClasses, icon: downloadIcon, title: compileTooltip, ariaLabel: lf("Download your code"), onClick: function () { return _this.compile('mobile'); } }) : undefined)),
+                    React.createElement("div", { className: "right aligned column" }, !readOnly ?
+                        React.createElement("div", { className: "ui icon small buttons" },
+                            React.createElement(sui.Button, { icon: 'save', class: "editortools-btn save-editortools-btn " + saveButtonClasses, title: lf("Save"), ariaLabel: lf("Save the project"), onClick: function () { return _this.saveFile('mobile'); } }),
+                            showUndoRedo ? React.createElement(sui.Button, { icon: 'xicon undo', class: "editortools-btn undo-editortools-btn} " + (!hasUndo ? 'disabled' : ''), ariaLabel: lf("{0}, {1}", lf("Undo"), !hasUndo ? lf("Disabled") : ""), title: lf("Undo"), onClick: function () { return _this.undo('mobile'); } }) : undefined) : undefined),
+                    React.createElement("div", { className: "right aligned column" }, showZoomControls ?
+                        React.createElement("div", { className: "ui icon small buttons" },
+                            React.createElement(sui.Button, { icon: 'plus circle', class: "editortools-btn zoomin-editortools-btn", title: lf("Zoom In"), onClick: function () { return _this.zoomIn('mobile'); } }),
+                            React.createElement(sui.Button, { icon: 'minus circle', class: "editortools-btn zoomout-editortools-btn", title: lf("Zoom Out"), onClick: function () { return _this.zoomOut('mobile'); } })) : undefined)) :
+                React.createElement("div", { className: "ui equal width grid" },
+                    React.createElement("div", { className: "left aligned two wide column" },
+                        React.createElement("div", { className: "ui vertical icon small buttons" },
+                            run ? React.createElement(sui.Button, { class: "play-button " + (running ? "stop" : "play"), key: 'runmenubtn', icon: running ? "stop" : "play", title: runTooltip, onClick: function () { return _this.startStopSimulator('mobile'); } }) : undefined,
+                            restart ? React.createElement(sui.Button, { key: 'restartbtn', class: "restart-button", icon: "refresh", title: restartTooltip, onClick: function () { return _this.restartSimulator('mobile'); } }) : undefined),
+                        showCollapsed ?
+                            React.createElement("div", { className: "row", style: { paddingTop: "1rem" } },
+                                React.createElement("div", { className: "ui vertical icon small buttons" },
+                                    React.createElement(sui.Button, { icon: "" + (collapsed ? 'toggle up' : 'toggle down'), class: "collapse-button " + (collapsed ? 'collapsed' : ''), title: collapseTooltip, ariaLabel: lf("{0}, {1}", collapseTooltip, collapsed ? lf("Collapsed") : "Expanded"), onClick: function () { return _this.toggleCollapse('mobile'); } }))) : undefined),
+                    React.createElement("div", { className: "three wide column" }),
+                    React.createElement("div", { className: "column" },
+                        React.createElement("div", { className: "ui grid" },
+                            readOnly || !showUndoRedo ? undefined :
+                                React.createElement("div", { className: "row" },
+                                    React.createElement("div", { className: "column" },
+                                        React.createElement("div", { className: "ui icon large buttons" },
+                                            React.createElement(sui.Button, { icon: 'xicon undo', class: "editortools-btn undo-editortools-btn " + (!hasUndo ? 'disabled' : ''), ariaLabel: lf("{0}, {1}", lf("Undo"), !hasUndo ? lf("Disabled") : ""), title: lf("Undo"), onClick: function () { return _this.undo('mobile'); } })))),
+                            React.createElement("div", { className: "row", style: readOnly || !showUndoRedo ? undefined : { paddingTop: 0 } },
+                                React.createElement("div", { className: "column" },
+                                    React.createElement("div", { className: "ui icon large buttons" },
+                                        trace ? React.createElement(sui.Button, { key: 'tracebtn', class: "trace-button " + (tracing ? 'orange' : ''), icon: "xicon turtle", title: traceTooltip, onClick: function () { return _this.toggleTrace('mobile'); } }) : undefined,
+                                        compileBtn ? React.createElement(sui.Button, { class: "primary download-button download-button-full " + downloadButtonClasses, icon: downloadIcon, title: compileTooltip, onClick: function () { return _this.compile('mobile'); } }) : undefined))))))),
+            React.createElement("div", { className: "column tablet only" }, collapsed ?
+                React.createElement("div", { className: "ui grid seven column" },
+                    headless ?
+                        React.createElement("div", { className: "left aligned six wide column" },
+                            React.createElement("div", { className: "ui icon buttons" },
+                                React.createElement(sui.Button, { icon: "" + (collapsed ? 'toggle up' : 'toggle down'), class: "collapse-button " + (collapsed ? 'collapsed' : '') + " " + (hideEditorFloats ? 'disabled' : ''), ariaLabel: lf("{0}, {1}", collapseTooltip, hideEditorFloats ? lf("Disabled") : ""), title: collapseTooltip, onClick: function () { return _this.toggleCollapse('tablet'); } }),
+                                run ? React.createElement(sui.Button, { role: "menuitem", class: "play-button " + (running ? "stop" : "play"), key: 'runmenubtn', icon: running ? "stop" : "play", title: runTooltip, onClick: function () { return _this.startStopSimulator('tablet'); } }) : undefined,
+                                restart ? React.createElement(sui.Button, { key: 'restartbtn', class: "restart-button", icon: "refresh", title: restartTooltip, onClick: function () { return _this.restartSimulator('tablet'); } }) : undefined,
+                                trace ? React.createElement(sui.Button, { key: 'tracebtn', class: "trace-button " + (tracing ? 'orange' : ''), icon: "xicon turtle", title: traceTooltip, onClick: function () { return _this.toggleTrace('tablet'); } }) : undefined,
+                                compileBtn ? React.createElement(sui.Button, { class: "primary download-button download-button-full " + downloadButtonClasses, icon: downloadIcon, title: compileTooltip, onClick: function () { return _this.compile('tablet'); } }) : undefined)) :
+                        React.createElement("div", { className: "left aligned six wide column" },
+                            React.createElement("div", { className: "ui icon buttons" },
+                                React.createElement(sui.Button, { icon: "" + (collapsed ? 'toggle up' : 'toggle down'), class: "collapse-button " + (collapsed ? 'collapsed' : '') + " " + (hideEditorFloats ? 'disabled' : ''), ariaLabel: lf("{0}, {1}", collapseTooltip, hideEditorFloats ? lf("Disabled") : ""), title: collapseTooltip, onClick: function () { return _this.toggleCollapse('tablet'); } }),
+                                compileBtn ? React.createElement(sui.Button, { class: "primary download-button download-button-full " + downloadButtonClasses, icon: downloadIcon, text: downloadText, title: compileTooltip, onClick: function () { return _this.compile('tablet'); } }) : undefined)),
+                    React.createElement("div", { className: "column four wide" }, readOnly ? undefined :
+                        React.createElement(sui.Button, { icon: 'save', class: "small editortools-btn save-editortools-btn " + saveButtonClasses, title: lf("Save"), ariaLabel: lf("Save the project"), onClick: function () { return _this.saveFile('tablet'); } })),
+                    React.createElement("div", { className: "column six wide right aligned" },
+                        showUndoRedo ?
+                            React.createElement("div", { className: "ui icon small buttons" },
+                                React.createElement(sui.Button, { icon: 'xicon undo', class: "editortools-btn undo-editortools-btn " + (!hasUndo ? 'disabled' : ''), ariaLabel: lf("{0}, {1}", lf("Undo"), !hasUndo ? lf("Disabled") : ""), title: lf("Undo"), onClick: function () { return _this.undo('tablet'); } }),
+                                React.createElement(sui.Button, { icon: 'xicon redo', class: "editortools-btn redo-editortools-btn " + (!hasRedo ? 'disabled' : ''), ariaLabel: lf("{0}, {1}", lf("Red"), !hasRedo ? lf("Disabled") : ""), title: lf("Redo"), onClick: function () { return _this.redo('tablet'); } })) : undefined,
+                        showZoomControls ?
+                            React.createElement("div", { className: "ui icon small buttons" },
+                                React.createElement(sui.Button, { icon: 'plus circle', class: "editortools-btn zoomin-editortools-btn", title: lf("Zoom In"), onClick: function () { return _this.zoomIn('tablet'); } }),
+                                React.createElement(sui.Button, { icon: 'minus circle', class: "editortools-btn zoomout-editortools-btn", title: lf("Zoom Out"), onClick: function () { return _this.zoomOut('tablet'); } })) : undefined))
+                : React.createElement("div", { className: "ui grid" },
+                    React.createElement("div", { className: "left aligned two wide column" },
+                        React.createElement("div", { className: "ui vertical icon small buttons" },
+                            run ? React.createElement(sui.Button, { role: "menuitem", class: "play-button " + (running ? "stop" : "play"), key: 'runmenubtn', icon: running ? "stop" : "play", title: runTooltip, onClick: function () { return _this.startStopSimulator('tablet'); } }) : undefined,
+                            restart ? React.createElement(sui.Button, { key: 'restartbtn', class: "restart-button", icon: "refresh", title: restartTooltip, onClick: function () { return _this.restartSimulator('tablet'); } }) : undefined),
+                        showCollapsed ?
+                            React.createElement("div", { className: "row", style: { paddingTop: "1rem" } },
+                                React.createElement("div", { className: "ui vertical icon small buttons" },
+                                    React.createElement(sui.Button, { icon: "" + (collapsed ? 'toggle up' : 'toggle down'), class: "collapse-button " + (collapsed ? 'collapsed' : ''), title: collapseTooltip, ariaLabel: lf("{0}, {1}", collapseTooltip, collapsed ? lf("Collapsed") : "Expanded"), onClick: function () { return _this.toggleCollapse('tablet'); } }))) : undefined),
+                    React.createElement("div", { className: "three wide column" }),
+                    React.createElement("div", { className: "five wide column" },
+                        React.createElement("div", { className: "ui grid right aligned" },
+                            compileBtn ? React.createElement("div", { className: "row" },
+                                React.createElement("div", { className: "column" },
+                                    React.createElement(sui.Button, { role: "menuitem", class: "primary large fluid download-button download-button-full " + downloadButtonClasses, icon: downloadIcon, text: downloadText, title: compileTooltip, onClick: function () { return _this.compile('tablet'); } }))) : undefined,
+                            showProjectRename ?
+                                React.createElement("div", { className: "row", style: compileBtn ? { paddingTop: 0 } : {} },
+                                    React.createElement("div", { className: "column" },
+                                        React.createElement("div", { className: "ui item large right labeled fluid input projectname-input projectname-tablet", title: lf("Pick a name for your project") },
+                                            React.createElement("label", { htmlFor: "fileNameInput1", id: "fileNameInputLabel1", className: "accessible-hidden" }, lf("Type a name for your project")),
+                                            React.createElement("input", { id: "fileNameInput1", type: "text", "aria-labelledby": "fileNameInputLabel1", placeholder: lf("Pick a name..."), value: projectName || '', onChange: function (e) { return _this.saveProjectName(e.target.value, 'tablet'); } }),
+                                            React.createElement(sui.Button, { icon: 'save', class: "large right attached editortools-btn save-editortools-btn " + saveButtonClasses, title: lf("Save"), ariaLabel: lf("Save the project"), onClick: function () { return _this.saveFile('tablet'); } })))) : undefined)),
+                    React.createElement("div", { className: "six wide column right aligned" },
+                        React.createElement("div", { className: "ui grid right aligned" },
+                            showUndoRedo || showZoomControls ?
+                                React.createElement("div", { className: "row" },
+                                    React.createElement("div", { className: "column" },
+                                        showUndoRedo ?
+                                            React.createElement("div", { className: "ui icon large buttons" },
+                                                React.createElement(sui.Button, { icon: 'xicon undo', class: "editortools-btn undo-editortools-btn} " + (!hasUndo ? 'disabled' : ''), title: lf("Undo"), ariaLabel: lf("{0}, {1}", lf("Undo"), !hasUndo ? lf("Disabled") : ""), onClick: function () { return _this.undo(); } }),
+                                                React.createElement(sui.Button, { icon: 'xicon redo', class: "editortools-btn redo-editortools-btn} " + (!hasRedo ? 'disabled' : ''), title: lf("Redo"), ariaLabel: lf("{0}, {1}", lf("Redo"), !hasRedo ? lf("Disabled") : ""), onClick: function () { return _this.redo(); } })) : undefined,
+                                        showZoomControls ?
+                                            React.createElement("div", { className: "ui icon large buttons" },
+                                                React.createElement(sui.Button, { icon: 'plus circle', class: "editortools-btn zoomin-editortools-btn", title: lf("Zoom In"), onClick: function () { return _this.zoomIn(); } }),
+                                                React.createElement(sui.Button, { icon: 'minus circle', class: "editortools-btn zoomout-editortools-btn", title: lf("Zoom Out"), onClick: function () { return _this.zoomOut(); } })) : undefined)) : undefined,
+                            trace ?
+                                React.createElement("div", { className: "row", style: showUndoRedo || showZoomControls ? { paddingTop: 0 } : {} },
+                                    React.createElement("div", { className: "column" },
+                                        React.createElement(sui.Button, { key: 'tracebtn', class: "large trace-button " + (tracing ? 'orange' : ''), icon: "xicon turtle", title: traceTooltip, onClick: function () { return _this.toggleTrace('tablet'); } }))) : undefined)))),
+            React.createElement("div", { className: "column computer only" },
+                React.createElement("div", { className: "ui grid equal width" },
+                    React.createElement("div", { id: "downloadArea", className: "ui column items" }, headless ?
+                        React.createElement("div", { className: "ui item" },
+                            React.createElement("div", { className: "ui icon large buttons" },
+                                showCollapsed ? React.createElement(sui.Button, { icon: "" + (collapseEditorTools ? 'toggle right' : 'toggle left'), class: "large collapse-button " + (collapsed ? 'collapsed' : ''), title: collapseTooltip, onClick: function () { return _this.toggleCollapse('computer'); } }) : undefined,
+                                run ? React.createElement(sui.Button, { role: "menuitem", class: "large play-button " + (running ? "stop" : "play"), key: 'runmenubtn', icon: running ? "stop" : "play", title: runTooltip, onClick: function () { return _this.startStopSimulator('computer'); } }) : undefined,
+                                restart ? React.createElement(sui.Button, { key: 'restartbtn', class: "large restart-button", icon: "refresh", title: restartTooltip, onClick: function () { return _this.restartSimulator('computer'); } }) : undefined,
+                                trace ? React.createElement(sui.Button, { key: 'tracebtn', class: "large trace-button " + (tracing ? 'orange' : ''), icon: "xicon turtle", title: traceTooltip, onClick: function () { return _this.toggleTrace('computer'); } }) : undefined,
+                                compileBtn ? React.createElement(sui.Button, { icon: downloadIcon, class: "primary large download-button " + downloadButtonClasses, title: compileTooltip, onClick: function () { return _this.compile('computer'); } }) : undefined)) :
+                        React.createElement("div", { className: "ui item" },
+                            showCollapsed ? React.createElement(sui.Button, { icon: "" + (collapseEditorTools ? 'toggle right' : 'toggle left'), class: "large collapse-button " + (collapsed ? 'collapsed' : ''), title: collapseTooltip, onClick: function () { return _this.toggleCollapse('computer'); } }) : undefined,
+                            compileBtn ? React.createElement(sui.Button, { icon: downloadIcon, class: "primary huge fluid download-button " + downloadButtonClasses, text: downloadText, title: compileTooltip, onClick: function () { return _this.compile('computer'); } }) : undefined)),
+                    showProjectRename ?
+                        React.createElement("div", { className: "column left aligned" },
+                            React.createElement("div", { className: "ui right labeled input projectname-input projectname-computer", title: lf("Pick a name for your project") },
+                                React.createElement("label", { htmlFor: "fileNameInput2", id: "fileNameInputLabel2", className: "accessible-hidden" }, lf("Type a name for your project")),
+                                React.createElement("input", { id: "fileNameInput2", type: "text", "aria-labelledby": "fileNameInputLabel2", placeholder: lf("Pick a name..."), value: projectName || '', onChange: function (e) { return _this.saveProjectName(e.target.value, 'computer'); } }),
+                                React.createElement(sui.Button, { icon: 'save', class: "small right attached editortools-btn save-editortools-btn " + saveButtonClasses, title: lf("Save"), ariaLabel: lf("Save the project"), onClick: function () { return _this.saveFile('computer'); } }))) : undefined,
+                    React.createElement("div", { className: "column right aligned" },
+                        showUndoRedo ?
+                            React.createElement("div", { className: "ui icon small buttons" },
+                                React.createElement(sui.Button, { icon: 'xicon undo', class: "editortools-btn undo-editortools-btn " + (!hasUndo ? 'disabled' : ''), ariaLabel: lf("{0}, {1}", lf("Undo"), !hasUndo ? lf("Disabled") : ""), title: lf("Undo"), onClick: function () { return _this.undo('computer'); } }),
+                                React.createElement(sui.Button, { icon: 'xicon redo', class: "editortools-btn redo-editortools-btn " + (!hasRedo ? 'disabled' : ''), ariaLabel: lf("{0}, {1}", lf("Redo"), !hasRedo ? lf("Disabled") : ""), title: lf("Redo"), onClick: function () { return _this.redo('computer'); } })) : undefined,
+                        showZoomControls ?
+                            React.createElement("div", { className: "ui icon small buttons" },
+                                React.createElement(sui.Button, { icon: 'plus circle', class: "editortools-btn zoomin-editortools-btn", title: lf("Zoom In"), onClick: function () { return _this.zoomIn('computer'); } }),
+                                React.createElement(sui.Button, { icon: 'minus circle', class: "editortools-btn zoomout-editortools-btn", title: lf("Zoom Out"), onClick: function () { return _this.zoomOut('computer'); } })) : undefined))));
     };
     return EditorToolbar;
 }(data.Component));
 exports.EditorToolbar = EditorToolbar;
 
-},{"./data":14,"./sui":44,"react":277}],18:[function(require,module,exports){
+},{"./data":14,"./sui":44,"react":274}],18:[function(require,module,exports){
 "use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
 var core = require("./core");
 var Cloud = pxt.Cloud;
 var UpdateEventType;
@@ -5814,21 +6120,22 @@ exports.checkForUpdate = checkForUpdate;
 
 },{"./core":13}],19:[function(require,module,exports){
 "use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
 var e = pxt.editor;
 var pkg = require("./package");
+var Permissions;
 (function (Permissions) {
     Permissions[Permissions["Console"] = 0] = "Console";
     Permissions[Permissions["ReadUserCode"] = 1] = "ReadUserCode";
-})(exports.Permissions || (exports.Permissions = {}));
-var Permissions = exports.Permissions;
+})(Permissions = exports.Permissions || (exports.Permissions = {}));
+var PermissionStatus;
 (function (PermissionStatus) {
     PermissionStatus[PermissionStatus["Granted"] = 0] = "Granted";
     PermissionStatus[PermissionStatus["Denied"] = 1] = "Denied";
     PermissionStatus[PermissionStatus["NotAvailable"] = 2] = "NotAvailable";
     PermissionStatus[PermissionStatus["NotYetPrompted"] = 3] = "NotYetPrompted";
-})(exports.PermissionStatus || (exports.PermissionStatus = {}));
-var PermissionStatus = exports.PermissionStatus;
-var ExtensionManager = (function () {
+})(PermissionStatus = exports.PermissionStatus || (exports.PermissionStatus = {}));
+var ExtensionManager = /** @class */ (function () {
     function ExtensionManager(host) {
         this.host = host;
         this.statuses = {};
@@ -6113,30 +6420,35 @@ function statusToResponse(p) {
 }
 
 },{"./package":32}],20:[function(require,module,exports){
-/// <reference path="../../typings/globals/react/index.d.ts" />
-/// <reference path="../../typings/globals/react-dom/index.d.ts" />
-/// <reference path="../../built/pxtlib.d.ts" />
 "use strict";
-var __extends = (this && this.__extends) || function (d, b) {
-    for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
-    function __() { this.constructor = d; }
-    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
-};
+/// <reference path="../../built/pxtlib.d.ts" />
+var __extends = (this && this.__extends) || (function () {
+    var extendStatics = Object.setPrototypeOf ||
+        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+    return function (d, b) {
+        extendStatics(d, b);
+        function __() { this.constructor = d; }
+        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
 var React = require("react");
 var data = require("./data");
 var sui = require("./sui");
 var ext = require("./extensionManager");
 var CUSTOM_CONTENT_DIV = 'custom-content';
-var Extensions = (function (_super) {
+var Extensions = /** @class */ (function (_super) {
     __extends(Extensions, _super);
     function Extensions(props) {
-        _super.call(this, props);
-        this.state = {
+        var _this = _super.call(this, props) || this;
+        _this.state = {
             visible: false,
             consent: false
         };
-        this.manager = new ext.ExtensionManager(this);
-        window.addEventListener("message", this.processMessage.bind(this), false);
+        _this.manager = new ext.ExtensionManager(_this);
+        window.addEventListener("message", _this.processMessage.bind(_this), false);
+        return _this;
     }
     Extensions.prototype.processMessage = function (ev) {
         var _this = this;
@@ -6209,8 +6521,8 @@ var Extensions = (function (_super) {
                     var bb = extensionDialog.getBoundingClientRect();
                     frame.width = this.extensionWrapper.clientWidth + "px";
                     frame.height = this.extensionWrapper.clientHeight + "px";
-                    frame.style.top = (bb.top + this.extensionWrapper.offsetTop) + "px";
-                    frame.style.left = (bb.left + this.extensionWrapper.offsetLeft) + "px";
+                    frame.style.top = bb.top + this.extensionWrapper.offsetTop + "px";
+                    frame.style.left = bb.left + this.extensionWrapper.offsetLeft + "px";
                 }
             }
         }
@@ -6317,41 +6629,66 @@ var Extensions = (function (_super) {
         var actions = action ? [{ label: action, onClick: actionClick }] : undefined;
         if (!needsConsent && visible)
             this.initializeFrame();
-        return (React.createElement(sui.Modal, {open: visible, className: "" + (needsConsent ? 'extensionconsentdialog' : 'extensiondialog'), size: "fullscreen", closeIcon: false, onClose: function () { return _this.hide(); }, dimmer: true, actions: actions, onPositionChanged: function () { return _this.updateDimensions(); }, closeOnDimmerClick: true}, consent ?
-            React.createElement("div", {id: "extensionWrapper", "data-frame": extension, ref: function (v) { return _this.extensionWrapper = v; }}, permissionRequest ?
-                React.createElement(sui.Modal, {className: "extensionpermissiondialog basic", size: "fullscreen", closeIcon: false, dimmer: true, open: true, dimmerClassName: "permissiondimmer"}, React.createElement("div", {className: "permissiondialoginner"}, React.createElement("div", {className: "permissiondialogheader"}, lf("Permission Request")), React.createElement("div", {className: "permissiondialogbody"}, lf("Extension {0} is requesting the following permission(s):", permissionExtName)), React.createElement("div", {className: "ui inverted list"}, permissionRequest.map(function (permission) {
-                    return React.createElement("div", {className: "item"}, React.createElement(sui.Icon, {icon: _this.getIconForPermission(permission) + " icon"}), React.createElement("div", {className: "content"}, React.createElement("div", {className: "header"}, _this.getDisplayNameForPermission(permission)), React.createElement("div", {className: "description"}, _this.getDescriptionForPermission(permission))));
-                }))), React.createElement("div", {className: "actions"}, React.createElement(sui.Button, {text: lf("Deny"), class: "deny inverted", onClick: function () { return _this.onPermissionDecision(false); }}), React.createElement(sui.Button, {text: lf("Approve"), class: "approve inverted green", onClick: function () { return _this.onPermissionDecision(true); }})))
+        return (React.createElement(sui.Modal, { open: visible, className: "" + (needsConsent ? 'extensionconsentdialog' : 'extensiondialog'), size: "fullscreen", closeIcon: false, onClose: function () { return _this.hide(); }, dimmer: true, actions: actions, onPositionChanged: function () { return _this.updateDimensions(); }, closeOnDimmerClick: true }, consent ?
+            React.createElement("div", { id: "extensionWrapper", "data-frame": extension, ref: function (v) { return _this.extensionWrapper = v; } }, permissionRequest ?
+                React.createElement(sui.Modal, { className: "extensionpermissiondialog basic", size: "fullscreen", closeIcon: false, dimmer: true, open: true, dimmerClassName: "permissiondimmer" },
+                    React.createElement("div", { className: "permissiondialoginner" },
+                        React.createElement("div", { className: "permissiondialogheader" }, lf("Permission Request")),
+                        React.createElement("div", { className: "permissiondialogbody" }, lf("Extension {0} is requesting the following permission(s):", permissionExtName)),
+                        React.createElement("div", { className: "ui inverted list" }, permissionRequest.map(function (permission) {
+                            return React.createElement("div", { className: "item" },
+                                React.createElement(sui.Icon, { icon: _this.getIconForPermission(permission) + " icon" }),
+                                React.createElement("div", { className: "content" },
+                                    React.createElement("div", { className: "header" }, _this.getDisplayNameForPermission(permission)),
+                                    React.createElement("div", { className: "description" }, _this.getDescriptionForPermission(permission))));
+                        }))),
+                    React.createElement("div", { className: "actions" },
+                        React.createElement(sui.Button, { text: lf("Deny"), class: "deny inverted", onClick: function () { return _this.onPermissionDecision(false); } }),
+                        React.createElement(sui.Button, { text: lf("Approve"), class: "approve inverted green", onClick: function () { return _this.onPermissionDecision(true); } })))
                 : undefined)
-            : React.createElement("div", null, React.createElement("div", {className: "ui form"}, React.createElement("div", {className: "ui icon violet message"}, React.createElement(sui.Icon, {icon: "user"}), React.createElement("div", {className: "content"}, React.createElement("h3", {className: "header"}, "User-provided content"), React.createElement("p", null, lf("This content is provided by a user, and is not endorsed by Microsoft."), React.createElement("br", null), lf("If you think it's not appropriate, please report abuse through Settings -> Report Abuse."))))))));
+            : React.createElement("div", null,
+                React.createElement("div", { className: "ui form" },
+                    React.createElement("div", { className: "ui icon violet message" },
+                        React.createElement(sui.Icon, { icon: "user" }),
+                        React.createElement("div", { className: "content" },
+                            React.createElement("h3", { className: "header" }, "User-provided content"),
+                            React.createElement("p", null,
+                                lf("This content is provided by a user, and is not endorsed by Microsoft."),
+                                React.createElement("br", null),
+                                lf("If you think it's not appropriate, please report abuse through Settings -> Report Abuse."))))))));
     };
     return Extensions;
 }(data.Component));
 exports.Extensions = Extensions;
 
-},{"./data":14,"./extensionManager":19,"./sui":44,"react":277}],21:[function(require,module,exports){
-/// <reference path="../../typings/globals/react/index.d.ts" />
-/// <reference path="../../typings/globals/react-dom/index.d.ts" />
-/// <reference path="../../built/pxtlib.d.ts" />
+},{"./data":14,"./extensionManager":19,"./sui":44,"react":274}],21:[function(require,module,exports){
 "use strict";
-var __extends = (this && this.__extends) || function (d, b) {
-    for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
-    function __() { this.constructor = d; }
-    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
-};
+/// <reference path="../../built/pxtlib.d.ts" />
+var __extends = (this && this.__extends) || (function () {
+    var extendStatics = Object.setPrototypeOf ||
+        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+    return function (d, b) {
+        extendStatics(d, b);
+        function __() { this.constructor = d; }
+        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
 var React = require("react");
 var data = require("./data");
 var sui = require("./sui");
 var pkg = require("./package");
 var core = require("./core");
 var customFile = "custom.ts";
-var FileList = (function (_super) {
+var FileList = /** @class */ (function (_super) {
     __extends(FileList, _super);
     function FileList(props) {
-        _super.call(this, props);
-        this.state = {
+        var _this = _super.call(this, props) || this;
+        _this.state = {
             expands: {}
         };
+        return _this;
     }
     FileList.prototype.removePkg = function (e, p) {
         var _this = this;
@@ -6387,7 +6724,14 @@ var FileList = (function (_super) {
         var parent = this.props.parent;
         return pkg.sortedFiles().map(function (file) {
             var meta = _this.getData("open-meta:" + file.getName());
-            return (React.createElement("a", {key: file.getName(), onClick: function () { return parent.setSideFile(file); }, tabIndex: 0, role: "treeitem", "aria-label": parent.state.currFile == file ? lf("{0}, it is the current opened file in the JavaScript editor", file.name) : file.name, onKeyDown: sui.fireClickOnEnter, className: (parent.state.currFile == file ? "active " : "") + (pkg.isTopLevel() ? "" : "nested ") + "item"}, file.name, " ", meta.isSaved ? "" : "*", /\.ts$/.test(file.name) ? React.createElement(sui.Icon, {icon: "align left"}) : /\.blocks$/.test(file.name) ? React.createElement(sui.Icon, {icon: "puzzle"}) : undefined, meta.isReadonly ? React.createElement(sui.Icon, {icon: "lock"}) : null, !meta.numErrors ? null : React.createElement("span", {className: 'ui label red'}, meta.numErrors), deleteFiles && /\.blocks$/i.test(file.getName()) ? React.createElement(sui.Button, {class: "primary label", icon: "trash", title: lf("Delete file {0}", file.name), onClick: function (e) { return _this.removeFile(e, file); }, onKeyDown: function (e) { return e.stopPropagation(); }}) : ''));
+            return (React.createElement("a", { key: file.getName(), onClick: function () { return parent.setSideFile(file); }, tabIndex: 0, role: "treeitem", "aria-label": parent.state.currFile == file ? lf("{0}, it is the current opened file in the JavaScript editor", file.name) : file.name, onKeyDown: sui.fireClickOnEnter, className: (parent.state.currFile == file ? "active " : "") + (pkg.isTopLevel() ? "" : "nested ") + "item" },
+                file.name,
+                " ",
+                meta.isSaved ? "" : "*",
+                /\.ts$/.test(file.name) ? React.createElement(sui.Icon, { icon: "align left" }) : /\.blocks$/.test(file.name) ? React.createElement(sui.Icon, { icon: "puzzle" }) : undefined,
+                meta.isReadonly ? React.createElement(sui.Icon, { icon: "lock" }) : null,
+                !meta.numErrors ? null : React.createElement("span", { className: 'ui label red' }, meta.numErrors),
+                deleteFiles && /\.blocks$/i.test(file.getName()) ? React.createElement(sui.Button, { class: "primary label", icon: "trash", title: lf("Delete file {0}", file.name), onClick: function (e) { return _this.removeFile(e, file); }, onKeyDown: function (e) { return e.stopPropagation(); } }) : ''));
         });
     };
     FileList.prototype.packageOf = function (p) {
@@ -6399,7 +6743,11 @@ var FileList = (function (_super) {
             && !p.getKsPkg().config.core
             && p.getKsPkg().level <= 1;
         var upd = p.getKsPkg() && p.getKsPkg().verProtocol() == "github";
-        return [React.createElement("div", {key: "hd-" + p.getPkgId(), className: "header link item", role: "treeitem", "aria-expanded": expands[p.getPkgId()], "aria-label": lf("{0}, {1}", p.getPkgId(), expands[p.getPkgId()] ? lf("expanded") : lf("collapsed")), onClick: function () { return _this.togglePkg(p); }, tabIndex: 0, onKeyDown: sui.fireClickOnEnter}, React.createElement(sui.Icon, {icon: "chevron " + (expands[p.getPkgId()] ? "down" : "right") + " icon"}), upd ? React.createElement(sui.Button, {class: "primary label", icon: "refresh", title: lf("Refresh package {0}", p.getPkgId()), onClick: function (e) { return _this.updatePkg(e, p); }, onKeyDown: function (e) { return e.stopPropagation(); }}) : '', del ? React.createElement(sui.Button, {class: "primary label", icon: "trash", title: lf("Delete package {0}", p.getPkgId()), onClick: function (e) { return _this.removePkg(e, p); }, onKeyDown: function (e) { return e.stopPropagation(); }}) : '', p.getPkgId())
+        return [React.createElement("div", { key: "hd-" + p.getPkgId(), className: "header link item", role: "treeitem", "aria-expanded": expands[p.getPkgId()], "aria-label": lf("{0}, {1}", p.getPkgId(), expands[p.getPkgId()] ? lf("expanded") : lf("collapsed")), onClick: function () { return _this.togglePkg(p); }, tabIndex: 0, onKeyDown: sui.fireClickOnEnter },
+                React.createElement(sui.Icon, { icon: "chevron " + (expands[p.getPkgId()] ? "down" : "right") + " icon" }),
+                upd ? React.createElement(sui.Button, { class: "primary label", icon: "refresh", title: lf("Refresh package {0}", p.getPkgId()), onClick: function (e) { return _this.updatePkg(e, p); }, onKeyDown: function (e) { return e.stopPropagation(); } }) : '',
+                del ? React.createElement(sui.Button, { class: "primary label", icon: "trash", title: lf("Delete package {0}", p.getPkgId()), onClick: function (e) { return _this.removePkg(e, p); }, onKeyDown: function (e) { return e.stopPropagation(); } }) : '',
+                p.getPkgId())
         ].concat(expands[p.getPkgId()] ? this.filesOf(p) : []);
     };
     FileList.prototype.togglePkg = function (p) {
@@ -6420,8 +6768,8 @@ var FileList = (function (_super) {
             body: lf("A new JavaScript file, custom.ts, will be added to your project. You can define custom functions and blocks in that file.")
         }).then(function (v) {
             if (!v)
-                return;
-            return _this.props.parent.updateFileAsync(customFile, "\n/**\n * " + lf("Use this file to define custom functions and blocks.") + "\n * " + lf("Read more at {0}", pxt.appTarget.appTheme.homeUrl + 'blocks/custom') + "\n */\n\nenum MyEnum {\n    //% block=\"one\"\n    One,\n    //% block=\"two\"\n    Two\n}\n\n/**\n * " + lf("Custom blocks") + "\n */\n//% weight=100 color=#0fbc11 icon=\"\uF0C3\"\nnamespace custom {\n    /**\n     * TODO: " + lf("describe your function here") + "\n     * @param n " + lf("describe parameter here") + ", eg: 5\n     * @param s " + lf("describe parameter here") + ", eg: \"Hello\"\n     * @param e " + lf("describe parameter here") + "\n     */    \n    //% block\n    export function foo(n: number, s: string, e: MyEnum): void {\n        // Add code here\n    }\n\n    /**\n     * TODO: " + lf("describe your function here") + "\n     * @param value " + lf("describe value here") + ", eg: 5\n     */    \n    //% block\n    export function fib(value: number): number {\n        return value <= 1 ? value : fib(value -1) + fib(value - 2);\n    }\n}\n", true);
+                return undefined;
+            return _this.props.parent.updateFileAsync(customFile, "\n/**\n * " + lf("Use this file to define custom functions and blocks.") + "\n * " + lf("Read more at {0}", pxt.appTarget.appTheme.homeUrl + 'blocks/custom') + "\n */\n\nenum MyEnum {\n    //% block=\"one\"\n    One,\n    //% block=\"two\"\n    Two\n}\n\n/**\n * " + lf("Custom blocks") + "\n */\n//% weight=100 color=#0fbc11 icon=\"\uF0C3\"\nnamespace custom {\n    /**\n     * TODO: " + lf("describe your function here") + "\n     * @param n " + lf("describe parameter here") + ", eg: 5\n     * @param s " + lf("describe parameter here") + ", eg: \"Hello\"\n     * @param e " + lf("describe parameter here") + "\n     */\n    //% block\n    export function foo(n: number, s: string, e: MyEnum): void {\n        // Add code here\n    }\n\n    /**\n     * TODO: " + lf("describe your function here") + "\n     * @param value " + lf("describe value here") + ", eg: 5\n     */\n    //% block\n    export function fib(value: number): number {\n        return value <= 1 ? value : fib(value -1) + fib(value - 2);\n    }\n}\n", true);
         });
     };
     FileList.prototype.renderCore = function () {
@@ -6429,14 +6777,20 @@ var FileList = (function (_super) {
         var show = !!this.props.parent.state.showFiles;
         var targetTheme = pxt.appTarget.appTheme;
         var plus = show && !pkg.mainEditorPkg().files[customFile];
-        return React.createElement("div", {role: "tree", className: "ui tiny vertical " + (targetTheme.invertedMenu ? "inverted" : '') + " menu filemenu landscape only"}, React.createElement("div", {role: "treeitem", "aria-expanded": show, "aria-label": lf("File explorer toolbar"), key: "projectheader", className: "link item", onClick: function () { return _this.toggleVisibility(); }, tabIndex: 0, onKeyDown: sui.fireClickOnEnter}, lf("Explorer"), React.createElement(sui.Icon, {icon: "chevron " + (show ? "down" : "right") + " icon"}), plus ? React.createElement(sui.Button, {class: "primary label", icon: "plus", title: lf("Add custom blocks?"), onClick: function (e) { _this.addCustomBlocksFile(); e.stopPropagation(); }, onKeyDown: function (e) { return e.stopPropagation(); }}) : undefined), show ? Util.concat(pkg.allEditorPkgs().map(function (p) { return _this.filesWithHeader(p); })) : undefined);
+        return React.createElement("div", { role: "tree", className: "ui tiny vertical " + (targetTheme.invertedMenu ? "inverted" : '') + " menu filemenu landscape only" },
+            React.createElement("div", { role: "treeitem", "aria-expanded": show, "aria-label": lf("File explorer toolbar"), key: "projectheader", className: "link item", onClick: function () { return _this.toggleVisibility(); }, tabIndex: 0, onKeyDown: sui.fireClickOnEnter },
+                lf("Explorer"),
+                React.createElement(sui.Icon, { icon: "chevron " + (show ? "down" : "right") + " icon" }),
+                plus ? React.createElement(sui.Button, { class: "primary label", icon: "plus", title: lf("Add custom blocks?"), onClick: function (e) { _this.addCustomBlocksFile(); e.stopPropagation(); }, onKeyDown: function (e) { return e.stopPropagation(); } }) : undefined),
+            show ? Util.concat(pkg.allEditorPkgs().map(function (p) { return _this.filesWithHeader(p); })) : undefined);
     };
     return FileList;
 }(data.Component));
 exports.FileList = FileList;
 
-},{"./core":13,"./data":14,"./package":32,"./sui":44,"react":277}],22:[function(require,module,exports){
+},{"./core":13,"./data":14,"./package":32,"./sui":44,"react":274}],22:[function(require,module,exports){
 "use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
 var db = require("./db");
 var core = require("./core");
 var data = require("./data");
@@ -6647,18 +7001,28 @@ exports.provider = {
 
 },{"./core":13,"./data":14,"./db":15}],23:[function(require,module,exports){
 "use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
 function parseExampleMarkdown(name, md) {
     if (!md)
         return undefined;
-    var m = /```(blocks?|typescript)\s*((.|\s)+?)\s*```/i.exec(md);
+    var m = /```(blocks?|typescript)\s+((.|\s)+?)\s*```/i.exec(md);
     if (!m)
         return undefined;
+    var pm = /```package\s+((.|\s)+?)\s*```/i.exec(md);
+    var dependencies = undefined;
+    if (pm) {
+        dependencies = {};
+        pm[1].split('\n').map(function (s) { return s.replace(/\s*/g, ''); }).filter(function (s) { return !!s; })
+            .map(function (l) { return l.split('='); })
+            .forEach(function (kv) { return dependencies[kv[0]] = kv[1] || "*"; });
+    }
     return {
         name: name,
         filesOverride: {
             "main.blocks": "<xml xmlns=\"http://www.w3.org/1999/xhtml\"></xml>",
             "main.ts": m[2]
-        }
+        },
+        dependencies: dependencies
     };
 }
 function parseGalleryMardown(md) {
@@ -6712,20 +7076,27 @@ exports.loadExampleAsync = loadExampleAsync;
 
 },{}],24:[function(require,module,exports){
 "use strict";
-var __extends = (this && this.__extends) || function (d, b) {
-    for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
-    function __() { this.constructor = d; }
-    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
-};
+var __extends = (this && this.__extends) || (function () {
+    var extendStatics = Object.setPrototypeOf ||
+        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+    return function (d, b) {
+        extendStatics(d, b);
+        function __() { this.constructor = d; }
+        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
 var Cloud = pxt.Cloud;
 var U = pxt.Util;
 var iface;
 var devPath;
-var HIDError = (function (_super) {
+var HIDError = /** @class */ (function (_super) {
     __extends(HIDError, _super);
     function HIDError(msg) {
-        _super.call(this, msg);
-        this.message = msg;
+        var _this = _super.call(this, msg) || this;
+        _this.message = msg;
+        return _this;
     }
     return HIDError;
 }(Error));
@@ -6763,10 +7134,10 @@ function mkBridgeAsync() {
         .then(function () { return b; });
 }
 pxt.HF2.mkPacketIOAsync = mkBridgeAsync;
-var BridgeIO = (function () {
+var BridgeIO = /** @class */ (function () {
     function BridgeIO(rawMode) {
-        var _this = this;
         if (rawMode === void 0) { rawMode = false; }
+        var _this = this;
         this.rawMode = rawMode;
         this.onData = function (v) { };
         this.onEvent = function (v) { };
@@ -6880,6 +7251,7 @@ exports.initAsync = initAsync;
 
 },{}],25:[function(require,module,exports){
 "use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
 var data = require("./data");
 var mem = require("./memoryworkspace");
 function getHeaders() {
@@ -6943,11 +7315,17 @@ exports.provider = {
 
 },{"./data":14,"./memoryworkspace":28}],26:[function(require,module,exports){
 "use strict";
-var __extends = (this && this.__extends) || function (d, b) {
-    for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
-    function __() { this.constructor = d; }
-    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
-};
+var __extends = (this && this.__extends) || (function () {
+    var extendStatics = Object.setPrototypeOf ||
+        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+    return function (d, b) {
+        extendStatics(d, b);
+        function __() { this.constructor = d; }
+        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
 var React = require("react");
 var sui = require("./sui");
 var codecard = require("./codecard");
@@ -6977,6 +7355,7 @@ var allLanguages = {
     "pt-PT": { englishName: "Portuguese (Portugal)", localizedName: "Português (Portugal)" },
     "ro": { englishName: "Romanian", localizedName: "Română" },
     "ru": { englishName: "Russian", localizedName: "Русский" },
+    "ta": { englishName: "Tamil", localizedName: "தமிழ்" },
     "si-LK": { englishName: "Sinhala (Sri Lanka)", localizedName: "සිංහල (ශ්රී ලංකා)" },
     "sr": { englishName: "Serbian", localizedName: "Srpski" },
     "sv-SE": { englishName: "Swedish (Sweden)", localizedName: "Svenska (Sverige)" },
@@ -6984,11 +7363,15 @@ var allLanguages = {
     "uk": { englishName: "Ukrainian", localizedName: "Українська" },
     "vi": { englishName: "Vietnamese", localizedName: "Tiếng việt" },
     "zh-CN": { englishName: "Chinese (Simplified, China)", localizedName: "简体中文 (中国)" },
-    "zh-TW": { englishName: "Chinese (Traditional, Taiwan)", localizedName: "中文 (台湾)" },
+    "zh-TW": { englishName: "Chinese (Traditional, Taiwan)", localizedName: "正體中文 (臺灣)" },
 };
 var pxtLangCookieId = "PXT_LANG";
 var langCookieExpirationDays = 30;
 var defaultLanguages = ["en"];
+function setInitialLang(lang) {
+    exports.initialLang = lang;
+}
+exports.setInitialLang = setInitialLang;
 function getCookieLang() {
     var cookiePropRegex = new RegExp(pxt.Util.escapeForRegex(pxtLangCookieId) + "=(.*?)(?:;|$)");
     var cookieValue = cookiePropRegex.exec(document.cookie);
@@ -7007,13 +7390,14 @@ function setCookieLang(langId) {
     }
 }
 exports.setCookieLang = setCookieLang;
-var LanguagePicker = (function (_super) {
+var LanguagePicker = /** @class */ (function (_super) {
     __extends(LanguagePicker, _super);
     function LanguagePicker(props) {
-        _super.call(this, props);
-        this.state = {
+        var _this = _super.call(this, props) || this;
+        _this.state = {
             visible: false
         };
+        return _this;
     }
     LanguagePicker.prototype.fetchLanguages = function () {
         if (!pxt.appTarget.appTheme.selectLanguage)
@@ -7050,52 +7434,108 @@ var LanguagePicker = (function (_super) {
         var fetchedLangs = this.fetchLanguages();
         var languagesToShow = fetchedLangs && fetchedLangs.length ? fetchedLangs : defaultLanguages;
         var modalSize = languagesToShow.length > 4 ? "large" : "small";
-        return (React.createElement(sui.Modal, {open: this.state.visible, header: lf("Select Language"), size: modalSize, onClose: function () { return _this.hide(); }, dimmer: true, closeIcon: true, allowResetFocus: true, closeOnDimmerClick: true, closeOnDocumentClick: true, closeOnEscape: true}, !fetchedLangs ?
-            React.createElement("div", {className: "ui message info"}, lf("loading...")) : undefined, fetchedLangs ? React.createElement("div", {className: "group"}, React.createElement("div", {className: "ui cards centered", role: "listbox"}, languagesToShow.map(function (langId) {
-            return React.createElement(codecard.CodeCardView, {className: "card-selected focused", key: langId, name: allLanguages[langId].localizedName, ariaLabel: allLanguages[langId].englishName, role: "option", description: allLanguages[langId].englishName, onClick: function () { return _this.changeLanguage(langId); }});
-        }))) : undefined, React.createElement("p", null, React.createElement("br", null), React.createElement("br", null), React.createElement("a", {href: "https://crowdin.com/project/" + targetTheme.crowdinProject, target: "_blank", "aria-label": lf("Help us translate")}, lf("Help us translate")))));
+        return (React.createElement(sui.Modal, { open: this.state.visible, header: lf("Select Language"), size: modalSize, onClose: function () { return _this.hide(); }, dimmer: true, closeIcon: true, allowResetFocus: true, closeOnDimmerClick: true, closeOnDocumentClick: true, closeOnEscape: true },
+            !fetchedLangs ?
+                React.createElement("div", { className: "ui message info" }, lf("loading...")) : undefined,
+            fetchedLangs ? React.createElement("div", { className: "group" },
+                React.createElement("div", { className: "ui cards centered", role: "listbox" }, languagesToShow.map(function (langId) {
+                    return React.createElement(codecard.CodeCardView, { className: "card-selected focused", key: langId, name: allLanguages[langId].localizedName, ariaLabel: allLanguages[langId].englishName, role: "option", description: allLanguages[langId].englishName, onClick: function () { return _this.changeLanguage(langId); } });
+                }))) : undefined,
+            React.createElement("p", null,
+                React.createElement("br", null),
+                React.createElement("br", null),
+                React.createElement("a", { href: "https://crowdin.com/project/" + targetTheme.crowdinProject, target: "_blank", "aria-label": lf("Help us translate") }, lf("Help us translate")))));
     };
     return LanguagePicker;
 }(data.Component));
 exports.LanguagePicker = LanguagePicker;
 
-},{"./codecard":10,"./data":14,"./sui":44,"react":277}],27:[function(require,module,exports){
+},{"./codecard":10,"./data":14,"./sui":44,"react":274}],27:[function(require,module,exports){
 "use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
 var pkg = require("./package");
 var core = require("./core");
 var compiler = require("./compiler");
-function makeAsync() {
-    return compiler.compileAsync({ native: true })
+var FRAME_ID = 'instructions';
+function loadMakeFrameAsync(container) {
+    return new Promise(function (resolve, reject) {
+        function waitForReady(ev) {
+            var data = ev.data;
+            if (data.type == "ready" && data.frameid == FRAME_ID) {
+                window.removeEventListener('message', waitForReady);
+                resolve(iframe);
+            }
+        }
+        // register for ready message
+        window.addEventListener('message', waitForReady);
+        // load iframe in background
+        // do not set an ID on this iframe
+        var iframe = document.createElement("iframe");
+        iframe.frameBorder = "0";
+        iframe.setAttribute("allowfullscreen", "true");
+        iframe.setAttribute("sandbox", "allow-popups allow-forms allow-scripts allow-same-origin allow-modals");
+        iframe.setAttribute("style", "position:absolute;top:0;left:0;width:100%;height:100%;");
+        iframe.src = pxt.webConfig.partsUrl + '#' + FRAME_ID;
+        container.appendChild(iframe);
+    });
+}
+function renderAsync(container) {
+    var iframe;
+    return loadMakeFrameAsync(container)
+        .then(function (frame) {
+        iframe = frame;
+        return compiler.compileAsync({ native: true });
+    })
         .then(function (resp) {
         var p = pkg.mainEditorPkg();
-        var code = p.files["main.ts"];
-        var data = {
-            name: p.header.name || lf("Untitled"),
-            code: code ? code.content : "basic.showString(\"Hi!\");",
-            board: JSON.stringify(pxt.appTarget.simulator.boardDefinition)
-        };
-        var parts = ts.pxtc.computeUsedParts(resp);
-        if (parts.length) {
-            data.parts = parts.join(" ");
-            data.partdefs = JSON.stringify(pkg.mainPkg.computePartDefinitions(parts));
-        }
+        var name = p.header.name || lf("Untitled");
+        var boardDef = pxt.appTarget.simulator.boardDefinition;
+        var parts = ts.pxtc.computeUsedParts(resp).sort();
+        var partDefinitions = pkg.mainPkg.computePartDefinitions(parts);
         var fnArgs = resp.usedArguments;
-        if (fnArgs)
-            data.fnArgs = JSON.stringify(fnArgs);
-        data.package = Util.values(pkg.mainPkg.deps).filter(function (p) { return p.id != "this"; }).map(function (p) { return (p.id + "=" + p._verspec); }).join('\n');
-        var urlData = Object.keys(data).map(function (k) { return (k + "=" + encodeURIComponent(data[k])); }).join('&');
-        var url = pxt.webConfig.partsUrl + "?" + urlData;
-        return core.dialogAsync({
-            hideCancel: true,
-            header: lf("Make"),
-            size: "large",
-            htmlBody: "\n        <div class=\"ui container\">\n            <div style=\"position:relative;height:0;padding-bottom:40%;overflow:hidden;\">\n                <iframe style=\"position:absolute;top:0;left:0;width:100%;height:100%;\" src=\"" + url + "\" sandbox=\"allow-popups allow-forms allow-scripts allow-same-origin\"\n                    frameborder=\"0\"></iframe>\n            </div>\n        </div>",
-            buttons: [{
-                    label: lf("Open"),
-                    url: url,
-                    icon: "external"
-                }]
-        });
+        var cfg = {};
+        var cfgKey = {};
+        for (var _i = 0, _a = resp.configData || []; _i < _a.length; _i++) {
+            var ce = _a[_i];
+            cfg[ce.key + ""] = ce.value;
+            cfgKey[ce.name] = ce.key;
+        }
+        var configData = { cfg: cfg, cfgKey: cfgKey };
+        iframe.contentWindow.postMessage({
+            type: "instructions",
+            options: {
+                name: name,
+                boardDef: boardDef,
+                parts: parts,
+                partDefinitions: partDefinitions,
+                fnArgs: fnArgs,
+                configData: configData
+            }
+        }, "*");
+        return iframe;
+    });
+}
+function makeAsync() {
+    var iframe;
+    return core.dialogAsync({
+        hideCancel: true,
+        header: lf("Make"),
+        size: "large",
+        htmlBody: "\n        <div class=\"ui container\">\n            <div id=\"makecontainer\" style=\"position:relative;height:0;padding-bottom:40%;overflow:hidden;\">\n            </div>\n        </div>", onLoaded: function (_) {
+            renderAsync(_.find("#makecontainer")[0])
+                .done(function (r) { return iframe = r; });
+        },
+        buttons: [{
+                label: lf("Print"),
+                onclick: function () {
+                    if (iframe && iframe.contentWindow) {
+                        iframe.contentWindow.postMessage({
+                            type: "print"
+                        }, "*");
+                    }
+                },
+                icon: "print"
+            }]
     }).then(function (r) {
     });
 }
@@ -7103,6 +7543,7 @@ exports.makeAsync = makeAsync;
 
 },{"./compiler":11,"./core":13,"./package":32}],28:[function(require,module,exports){
 "use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
 var U = pxt.Util;
 exports.projects = {};
 var target = "";
@@ -7182,14 +7623,28 @@ exports.provider = {
 };
 
 },{}],29:[function(require,module,exports){
+"use strict";
 /// <reference path="../../localtypings/monaco.d.ts" />
 /// <reference path="../../built/pxteditor.d.ts" />
-"use strict";
-var __extends = (this && this.__extends) || function (d, b) {
-    for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
-    function __() { this.constructor = d; }
-    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+var __extends = (this && this.__extends) || (function () {
+    var extendStatics = Object.setPrototypeOf ||
+        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+    return function (d, b) {
+        extendStatics(d, b);
+        function __() { this.constructor = d; }
+        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+    };
+})();
+var __assign = (this && this.__assign) || Object.assign || function(t) {
+    for (var s, i = 1, n = arguments.length; i < n; i++) {
+        s = arguments[i];
+        for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p))
+            t[p] = s[p];
+    }
+    return t;
 };
+Object.defineProperty(exports, "__esModule", { value: true });
 var React = require("react");
 var pkg = require("./package");
 var core = require("./core");
@@ -7208,23 +7663,22 @@ var FileType;
     FileType[FileType["TypeScript"] = 1] = "TypeScript";
     FileType[FileType["Markdown"] = 2] = "Markdown";
 })(FileType || (FileType = {}));
-var Editor = (function (_super) {
+var Editor = /** @class */ (function (_super) {
     __extends(Editor, _super);
     function Editor() {
-        var _this = this;
-        _super.apply(this, arguments);
-        this.fileType = FileType.Unknown;
-        this.giveFocusOnLoading = false;
-        this.dragCurrentPos = { x: 0, y: 0 };
-        this.onDragBlockThrottled = Util.throttle(function () {
+        var _this = _super !== null && _super.apply(this, arguments) || this;
+        _this.fileType = FileType.Unknown;
+        _this.giveFocusOnLoading = false;
+        _this.dragCurrentPos = { x: 0, y: 0 };
+        _this.onDragBlockThrottled = Util.throttle(function () {
             var _a = _this.dragCurrentPos, x = _a.x, y = _a.y;
             var mouseTarget = _this.editor.getTargetAtClientPoint(x, y);
-            var position = mouseTarget.position;
-            if (position && _this.editor.getPosition() != position)
-                _this.editor.setPosition(position);
+            if (mouseTarget && mouseTarget.position && _this.editor.getPosition() != mouseTarget.position)
+                _this.editor.setPosition(mouseTarget.position);
             _this.editor.focus();
         }, 200);
-        this.highlightDecorations = [];
+        _this.highlightDecorations = [];
+        return _this;
     }
     Editor.prototype.hasBlocks = function () {
         if (!this.currFile)
@@ -7242,7 +7696,7 @@ var Editor = (function (_super) {
         }
         var promise = Promise.resolve().then(function () {
             if (!_this.hasBlocks())
-                return;
+                return undefined;
             var blockFile = _this.currFile.getVirtualFileName();
             if (!blockFile) {
                 var mainPkg_1 = pkg.mainEditorPkg();
@@ -7250,7 +7704,7 @@ var Editor = (function (_super) {
                     if (mainPkg_1) {
                         _this.parent.setFile(mainPkg_1.files["main.ts"]);
                     }
-                    return;
+                    return undefined;
                 }
                 _this.currFile = mainPkg_1.files["main.ts"];
                 blockFile = _this.currFile.getVirtualFileName();
@@ -7343,10 +7797,10 @@ var Editor = (function (_super) {
         }).then(function (b) {
             // discard
             if (!b) {
-                pxt.tickEvent("typescript.keepText");
+                pxt.tickEvent("typescript.keepText", undefined, { interactiveConsent: true });
             }
             else {
-                pxt.tickEvent("typescript.discardText");
+                pxt.tickEvent("typescript.discardText", undefined, { interactiveConsent: true });
                 _this.parent.saveBlocksToTypeScriptAsync().then(function (src) {
                     _this.overrideFile(src);
                     _this.parent.setFile(bf);
@@ -7359,10 +7813,12 @@ var Editor = (function (_super) {
     };
     Editor.prototype.display = function () {
         var _this = this;
-        return (React.createElement("div", {id: "monacoEditorArea", className: "full-abs"}, React.createElement(MonacoToolbox, {ref: function (e) { return _this.monacoToolbox = e; }, parent: this}), React.createElement("div", {id: 'monacoEditorInner'})));
+        return (React.createElement("div", { id: "monacoEditorArea", className: "full-abs" },
+            React.createElement(MonacoToolbox, { ref: function (e) { return _this.monacoToolbox = e; }, parent: this }),
+            React.createElement("div", { id: 'monacoEditorInner' })));
     };
     Editor.prototype.addPackage = function () {
-        pxt.tickEvent("monaco.addpackage");
+        pxt.tickEvent("monaco.addpackage", undefined, { interactiveConsent: true });
         this.hideFlyout();
         this.parent.addPackage();
     };
@@ -7372,22 +7828,31 @@ var Editor = (function (_super) {
         var invertedColorluminosityMultipler = 0.6;
         var rules = [];
         if (!hc && withNamespaces) {
+            var colors_1 = {};
             this.getNamespaces().forEach(function (ns) {
                 var metaData = _this.getNamespaceAttrs(ns);
                 var blocks = snippets.isBuiltin(ns) ? snippets.getBuiltinCategory(ns).blocks : _this.nsMap[ns];
                 if (metaData.color && blocks) {
-                    var hexcolor_1 = pxt.blocks.convertColour(metaData.color);
-                    hexcolor_1 = (inverted ? Blockly.PXTUtils.fadeColour(hexcolor_1, invertedColorluminosityMultipler, true) : hexcolor_1).replace('#', '');
+                    var hexcolor_1 = fixColor(metaData.color);
                     blocks.forEach(function (fn) {
                         rules.push({ token: "identifier.ts " + fn.name, foreground: hexcolor_1 });
                     });
                     rules.push({ token: "identifier.ts " + ns, foreground: hexcolor_1 });
+                    colors_1[ns] = metaData.color;
                 }
             });
             rules.push({ token: "identifier.ts if", foreground: '5B80A5', });
             rules.push({ token: "identifier.ts else", foreground: '5B80A5', });
             rules.push({ token: "identifier.ts while", foreground: '5BA55B', });
             rules.push({ token: "identifier.ts for", foreground: '5BA55B', });
+            var pauseUntil = pxt.appTarget.runtime && pxt.appTarget.runtime.pauseUntilBlock;
+            if (pauseUntil) {
+                var call = pauseUntil.callName || "pauseUntil";
+                var color = pauseUntil.color || colors_1[pauseUntil.category];
+                if (color) {
+                    rules.push({ token: "identifier.ts " + call, foreground: fixColor(color) });
+                }
+            }
         }
         var colors = pxt.appTarget.appTheme.monacoColors || {};
         monaco.editor.defineTheme('pxtTheme', {
@@ -7397,6 +7862,10 @@ var Editor = (function (_super) {
             colors: hc ? {} : colors
         });
         monaco.editor.setTheme('pxtTheme');
+        function fixColor(hexcolor) {
+            hexcolor = pxt.blocks.convertColour(hexcolor);
+            return (inverted ? Blockly.PXTUtils.fadeColour(hexcolor, invertedColorluminosityMultipler, true) : hexcolor).replace('#', '');
+        }
     };
     Editor.prototype.setHighContrast = function (hc) {
         this.defineEditorTheme(hc);
@@ -7728,7 +8197,7 @@ var Editor = (function (_super) {
             var monacoHeadingText = document.createElement('div');
             monacoHeadingText.className = "monacoFlyoutHeadingText";
             monacoHeadingText.style.display = 'inline-block';
-            monacoHeadingText.style.fontSize = (fontSize + 5) + "px";
+            monacoHeadingText.style.fontSize = fontSize + 5 + "px";
             monacoHeadingText.textContent = category ? category : "" + Util.capitalize(ns);
             monacoHeadingLabel.appendChild(monacoHeadingIcon);
             monacoHeadingLabel.appendChild(monacoHeadingText);
@@ -7770,7 +8239,7 @@ var Editor = (function (_super) {
                 var groupLabelLine = document.createElement('hr');
                 groupLabelLine.className = 'monacoFlyoutLabelLine';
                 groupLabelLine.align = 'left';
-                groupLabelLine.style.width = Math.min(parseInt(labelLineWidth) || groupLabelText.offsetWidth, 350) + "px";
+                groupLabelLine.style.width = Math.min(labelLineWidth ? parseInt(labelLineWidth) : groupLabelText.offsetWidth, 350) + "px";
                 groupLabel.appendChild(groupLabelLine);
             }
             // Add the blocks in that group
@@ -7855,7 +8324,7 @@ var Editor = (function (_super) {
             var fnState = filters ? (filters.fns && filters.fns[fn.name] != undefined ? filters.fns[fn.name] : (categoryState != undefined ? categoryState : filters.defaultState)) : undefined;
             monacoBlockDisabled = fnState == pxt.editor.FilterState.Disabled;
             if (fnState == pxt.editor.FilterState.Hidden)
-                return;
+                return undefined;
             var monacoBlockArea = document.createElement('div');
             monacoBlockArea.className = "monacoBlock " + (monacoBlockDisabled ? 'monacoDisabledBlock' : '');
             monacoFlyout.appendChild(monacoBlockArea);
@@ -7867,31 +8336,59 @@ var Editor = (function (_super) {
             var comment = fn.attributes.jsDoc;
             var snippetPrefix = fn.noNamespace ? "" : ns;
             var isInstance = false;
+            var addNamespace = false;
+            var namespaceToUse = "";
             var element = fn;
             if (element.attributes.block) {
                 if (element.attributes.defaultInstance) {
                     snippetPrefix = element.attributes.defaultInstance;
                 }
-                else if (element.kind == pxtc.SymbolKind.Method || element.kind == pxtc.SymbolKind.Property) {
-                    var params = pxt.blocks.parameterNames(element);
-                    snippetPrefix = params.attrNames["this"].name;
-                    isInstance = true;
-                }
                 else if (element.namespace) {
                     var nsInfo_1 = _this.blockInfo.apis.byQName[element.namespace];
-                    if (nsInfo_1.kind === pxtc.SymbolKind.Class) {
-                        return;
-                    }
-                    else if (nsInfo_1.attributes.fixedInstances) {
-                        var instances = Util.values(_this.blockInfo.apis.byQName).filter(function (value) {
+                    if (nsInfo_1.attributes.fixedInstances) {
+                        var instances_1 = Util.values(_this.blockInfo.apis.byQName);
+                        var getExtendsTypesFor_1 = function (name) {
+                            return instances_1
+                                .filter(function (v) { return v.extendsTypes; })
+                                .filter(function (v) { return v.extendsTypes.reduce(function (x, y) { return x || y.indexOf(name) != -1; }, false); })
+                                .reduce(function (x, y) { return x.concat(y.extendsTypes); }, []);
+                        };
+                        // if blockNamespace exists, e.g., "pins", use it for snippet
+                        // else use nsInfo.namespace, e.g., "motors"
+                        namespaceToUse = element.attributes.blockNamespace || nsInfo_1.namespace || "";
+                        // all fixed instances for this namespace
+                        var fixedInstances = instances_1.filter(function (value) {
                             return value.kind === pxtc.SymbolKind.Variable &&
-                                value.attributes.fixedInstance &&
-                                value.retType === nsInfo_1.name;
+                                value.attributes.fixedInstance;
+                        });
+                        // first try to get fixed instances whose retType matches nsInfo.name
+                        // e.g., DigitalPin
+                        var exactInstances = fixedInstances.filter(function (value) {
+                            return value.retType == nsInfo_1.name;
                         })
                             .sort(function (v1, v2) { return v1.name.localeCompare(v2.name); });
-                        if (instances.length) {
-                            snippetPrefix = instances[0].namespace + "." + instances[0].name;
+                        // second choice: use fixed instances whose retType extends type of nsInfo.name
+                        // e.g., nsInfo.name == AnalogPin and instance retType == PwmPin
+                        var extendedInstances = fixedInstances.filter(function (value) {
+                            return getExtendsTypesFor_1(nsInfo_1.name).indexOf(value.retType) !== -1;
+                        })
+                            .sort(function (v1, v2) { return v1.name.localeCompare(v2.name); });
+                        if (exactInstances.length) {
+                            snippetPrefix = "" + exactInstances[0].name;
                         }
+                        else if (extendedInstances.length) {
+                            snippetPrefix = "" + extendedInstances[0].name;
+                        }
+                        isInstance = true;
+                        addNamespace = true;
+                    }
+                    else if (element.kind == pxtc.SymbolKind.Method || element.kind == pxtc.SymbolKind.Property) {
+                        var params = pxt.blocks.parameterNames(element);
+                        snippetPrefix = params.attrNames["this"].name;
+                        isInstance = true;
+                    }
+                    else if (nsInfo_1.kind === pxtc.SymbolKind.Class) {
+                        return undefined;
                     }
                 }
             }
@@ -7909,12 +8406,13 @@ var Editor = (function (_super) {
             if (!monacoBlockDisabled) {
                 monacoBlock.draggable = true;
                 monacoBlock.onclick = function (e) {
-                    pxt.tickEvent("monaco.toolbox.itemclick");
+                    pxt.tickEvent("monaco.toolbox.itemclick", undefined, { interactiveConsent: true });
                     monacoEditor.hideFlyout();
                     var model = monacoEditor.editor.getModel();
                     var currPos = monacoEditor.editor.getPosition();
                     var cursor = model.getOffsetAt(currPos);
                     var insertText = snippetPrefix ? snippetPrefix + "." + snippet : snippet;
+                    insertText = addNamespace ? firstWord(namespaceToUse) + "." + insertText : insertText;
                     insertText = (currPos.column > 1) ? '\n' + insertText :
                         model.getWordUntilPosition(currPos) != undefined && model.getWordUntilPosition(currPos).word != '' ?
                             insertText + '\n' : insertText;
@@ -7942,12 +8440,13 @@ var Editor = (function (_super) {
                     //monacoEditor.editor.setSelection(new monaco.Range(currPos.lineNumber, currPos.column, endPos.lineNumber, endPos.column));
                 };
                 monacoBlock.ondragstart = function (e) {
-                    pxt.tickEvent("monaco.toolbox.itemdrag");
+                    pxt.tickEvent("monaco.toolbox.itemdrag", undefined, { interactiveConsent: true });
                     var clone = monacoBlock.cloneNode(true);
                     setTimeout(function () {
                         monacoFlyout.style.transform = "translateX(-9999px)";
                     });
                     var insertText = snippetPrefix ? snippetPrefix + "." + snippet : snippet;
+                    insertText = addNamespace ? firstWord(namespaceToUse) + "." + insertText : insertText;
                     e.dataTransfer.setData('text', insertText); // IE11 only supports text
                 };
                 monacoBlock.ondragend = function (e) {
@@ -8209,7 +8708,17 @@ var Editor = (function (_super) {
         var monacoErrors = [];
         if (file && file.diagnostics) {
             var model = monaco.editor.getModel(monaco.Uri.parse("pkg:" + file.getName()));
-            var _loop_1 = function(d) {
+            var _loop_1 = function (d) {
+                var addErrorMessage = function (message) {
+                    monacoErrors.push({
+                        severity: monaco.Severity.Error,
+                        message: message,
+                        startLineNumber: d.line + 1,
+                        startColumn: d.column,
+                        endLineNumber: d.endLine == undefined ? endPos.lineNumber : d.endLine + 1,
+                        endColumn: d.endColumn == undefined ? endPos.column : d.endColumn
+                    });
+                };
                 var endPos = model.getPositionAt(d.start + d.length);
                 if (typeof d.messageText === 'string') {
                     addErrorMessage(d.messageText);
@@ -8220,16 +8729,6 @@ var Editor = (function (_super) {
                         addErrorMessage(curr.messageText);
                         curr = curr.next;
                     }
-                }
-                function addErrorMessage(message) {
-                    monacoErrors.push({
-                        severity: monaco.Severity.Error,
-                        message: message,
-                        startLineNumber: d.line + 1,
-                        startColumn: d.column,
-                        endLineNumber: d.endLine == undefined ? endPos.lineNumber : d.endLine + 1,
-                        endColumn: d.endColumn == undefined ? endPos.column : d.endColumn
-                    });
                 }
             };
             for (var _i = 0, _a = file.diagnostics; _i < _a.length; _i++) {
@@ -8266,18 +8765,25 @@ var Editor = (function (_super) {
             }
             res[ns].push(fn);
         });
+        if (snippets.getPauseUntil()) {
+            var cat = pxt.appTarget.runtime.pauseUntilBlock.category;
+            if (res[cat]) {
+                res[cat].push(snippets.getPauseUntil());
+            }
+        }
         return res;
     };
     return Editor;
 }(srceditor.Editor));
 exports.Editor = Editor;
-var MonacoToolbox = (function (_super) {
+var MonacoToolbox = /** @class */ (function (_super) {
     __extends(MonacoToolbox, _super);
     function MonacoToolbox(props) {
-        _super.call(this, props);
-        this.state = {
+        var _this = _super.call(this, props) || this;
+        _this.state = {
             showAdvanced: false
         };
+        return _this;
     }
     MonacoToolbox.prototype.getElement = function () {
         return this.rootElement;
@@ -8373,7 +8879,7 @@ var MonacoToolbox = (function (_super) {
         var parent = this.props.parent;
         var _a = this.state, namespaces = _a.namespaces, showAdvanced = _a.showAdvanced, visible = _a.visible, selectedNs = _a.selectedNs;
         if (!namespaces || !visible)
-            return React.createElement("div", {style: { display: 'none' }});
+            return React.createElement("div", { style: { display: 'none' } });
         // Filter toolbox categories
         var filters = parent.parent.state.editorState && parent.parent.state.editorState.filters;
         function filterCategory(ns, fns) {
@@ -8460,23 +8966,30 @@ var MonacoToolbox = (function (_super) {
             return md.advanced;
         }), true) : [];
         this.items = nonAdvancedCategories.concat(advancedCategories);
-        return React.createElement("div", {ref: function (e) { return _this.rootElement = e; }, id: 'monacoEditorToolbox', className: 'monacoToolboxDiv'}, React.createElement("div", {className: "blocklyTreeRoot"}, React.createElement("div", {role: "tree"}, nonAdvancedCategories.map(function (treeRow) { return (React.createElement(CategoryItem, {key: treeRow.ns, toolbox: _this, selected: selectedNs == treeRow.ns, treeRow: treeRow, onCategoryClick: _this.setSelection.bind(_this)})); }), hasAdvanced ? React.createElement(TreeSeparator, {key: "advancedseparator"}) : undefined, hasAdvanced ? React.createElement(CategoryItem, {toolbox: this, treeRow: { ns: "", category: pxt.blocks.advancedTitle(), color: pxt.blocks.getNamespaceColor('advanced'), icon: showAdvanced ? 'advancedexpanded' : 'advancedcollapsed' }, onCategoryClick: this.advancedClicked.bind(this)}) : undefined, showAdvanced ? advancedCategories.map(function (treeRow) { return (React.createElement(CategoryItem, {key: treeRow.ns, toolbox: _this, selected: selectedNs == treeRow.ns, treeRow: treeRow, onCategoryClick: _this.setSelection.bind(_this)})); }) : undefined, hasPackages && showAdvanced ? React.createElement(TreeRow, {treeRow: { ns: "", category: pxt.blocks.addPackageTitle(), color: '#717171', icon: "addpackage" }, onClick: this.addPackage.bind(this)}) : undefined)));
+        return React.createElement("div", { ref: function (e) { return _this.rootElement = e; }, id: 'monacoEditorToolbox', className: 'monacoToolboxDiv' },
+            React.createElement("div", { className: "blocklyTreeRoot" },
+                React.createElement("div", { role: "tree" },
+                    nonAdvancedCategories.map(function (treeRow) { return (React.createElement(CategoryItem, { key: treeRow.ns, toolbox: _this, selected: selectedNs == treeRow.ns, treeRow: treeRow, onCategoryClick: _this.setSelection.bind(_this) })); }),
+                    hasAdvanced ? React.createElement(TreeSeparator, { key: "advancedseparator" }) : undefined,
+                    hasAdvanced ? React.createElement(CategoryItem, { toolbox: this, treeRow: { ns: "", category: pxt.blocks.advancedTitle(), color: pxt.blocks.getNamespaceColor('advanced'), icon: showAdvanced ? 'advancedexpanded' : 'advancedcollapsed' }, onCategoryClick: this.advancedClicked.bind(this) }) : undefined,
+                    showAdvanced ? advancedCategories.map(function (treeRow) { return (React.createElement(CategoryItem, { key: treeRow.ns, toolbox: _this, selected: selectedNs == treeRow.ns, treeRow: treeRow, onCategoryClick: _this.setSelection.bind(_this) })); }) : undefined,
+                    hasPackages && showAdvanced ? React.createElement(TreeRow, { treeRow: { ns: "", category: pxt.blocks.addPackageTitle(), color: '#717171', icon: "addpackage" }, onClick: this.addPackage.bind(this) }) : undefined)));
     };
     return MonacoToolbox;
 }(data.Component));
 exports.MonacoToolbox = MonacoToolbox;
-var CategoryItem = (function (_super) {
+var CategoryItem = /** @class */ (function (_super) {
     __extends(CategoryItem, _super);
     function CategoryItem(props) {
-        var _this = this;
-        _super.call(this, props);
-        this.handleClick = function () {
+        var _this = _super.call(this, props) || this;
+        _this.handleClick = function () {
             if (_this.props.onCategoryClick)
                 _this.props.onCategoryClick(_this.props.treeRow, _this.props.treeRow.index);
         };
-        this.state = {
+        _this.state = {
             selected: props.selected
         };
+        return _this;
     }
     CategoryItem.prototype.getTreeRow = function () {
         return this.treeRowElement;
@@ -8528,15 +9041,16 @@ var CategoryItem = (function (_super) {
                 sui.fireClickOnEnter.call(_this, e);
             }
         };
-        return React.createElement(TreeItem, null, React.createElement(TreeRow, React.__spread({ref: function (e) { return _this.treeRowElement = e; }}, this.props, {selected: selected, onClick: this.handleClick, onKeyDown: onKeyDown.bind(this)})));
+        return React.createElement(TreeItem, null,
+            React.createElement(TreeRow, __assign({ ref: function (e) { return _this.treeRowElement = e; } }, this.props, { selected: selected, onClick: this.handleClick, onKeyDown: onKeyDown.bind(this) })));
     };
     return CategoryItem;
 }(data.Component));
 exports.CategoryItem = CategoryItem;
-var TreeRow = (function (_super) {
+var TreeRow = /** @class */ (function (_super) {
     __extends(TreeRow, _super);
     function TreeRow() {
-        _super.apply(this, arguments);
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     TreeRow.prototype.focus = function () {
         this.treeRow.focus();
@@ -8598,36 +9112,44 @@ var TreeRow = (function (_super) {
         if (icon && injectIconClass) {
             pxt.blocks.appendToolboxIconCss(iconClass, icon);
         }
-        return React.createElement("div", {ref: function (e) { return _this.treeRow = e; }, className: treeRowClass, style: treeRowStyle, tabIndex: 0, onMouseEnter: onmouseenter, onMouseLeave: onmouseleave, onClick: onClick, onKeyDown: onKeyDown ? onKeyDown : sui.fireClickOnEnter}, React.createElement("span", {className: "blocklyTreeIcon", role: "presentation"}), React.createElement("span", {style: { display: 'inline-block' }, className: "blocklyTreeIcon " + iconClass, role: "presentation"}), React.createElement("span", {className: "blocklyTreeLabel"}, category ? category : "" + Util.capitalize(ns)));
+        return React.createElement("div", { ref: function (e) { return _this.treeRow = e; }, className: treeRowClass, style: treeRowStyle, tabIndex: 0, onMouseEnter: onmouseenter, onMouseLeave: onmouseleave, onClick: onClick, onKeyDown: onKeyDown ? onKeyDown : sui.fireClickOnEnter },
+            React.createElement("span", { className: "blocklyTreeIcon", role: "presentation" }),
+            React.createElement("span", { style: { display: 'inline-block' }, className: "blocklyTreeIcon " + iconClass, role: "presentation" }),
+            React.createElement("span", { className: "blocklyTreeLabel" }, category ? category : "" + Util.capitalize(ns)));
     };
     return TreeRow;
 }(data.Component));
 exports.TreeRow = TreeRow;
-var TreeSeparator = (function (_super) {
+var TreeSeparator = /** @class */ (function (_super) {
     __extends(TreeSeparator, _super);
     function TreeSeparator() {
-        _super.apply(this, arguments);
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     TreeSeparator.prototype.renderCore = function () {
-        return React.createElement(TreeItem, null, React.createElement("div", {className: "blocklyTreeSeparator"}));
+        return React.createElement(TreeItem, null,
+            React.createElement("div", { className: "blocklyTreeSeparator" }));
     };
     return TreeSeparator;
 }(data.Component));
 exports.TreeSeparator = TreeSeparator;
-var TreeItem = (function (_super) {
+var TreeItem = /** @class */ (function (_super) {
     __extends(TreeItem, _super);
     function TreeItem() {
-        _super.apply(this, arguments);
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     TreeItem.prototype.renderCore = function () {
-        return React.createElement("div", {role: "treeitem"}, this.props.children);
+        return React.createElement("div", { role: "treeitem" }, this.props.children);
     };
     return TreeItem;
 }(data.Component));
 exports.TreeItem = TreeItem;
+function firstWord(s) {
+    return /[^\.]+/.exec(s)[0];
+}
 
-},{"./compiler":11,"./core":13,"./data":14,"./monacoSnippets":30,"./package":32,"./srceditor":43,"./sui":44,"react":277}],30:[function(require,module,exports){
+},{"./compiler":11,"./core":13,"./data":14,"./monacoSnippets":30,"./package":32,"./srceditor":43,"./sui":44,"react":274}],30:[function(require,module,exports){
 "use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
 exports.loops = {
     name: lf("{id:category}Loops"),
     nameid: 'loops',
@@ -9035,6 +9557,31 @@ exports.functions = {
         paramDefl: {}
     }
 };
+var pauseUntil;
+function getPauseUntil() {
+    if (pauseUntil)
+        return pauseUntil;
+    var opts = pxt.appTarget.runtime && pxt.appTarget.runtime.pauseUntilBlock;
+    if (opts) {
+        var callName = opts.callName || "pauseUntil";
+        var snippet = callName + "(() => true)";
+        if (opts.namespace) {
+            snippet = opts.namespace + "." + snippet;
+        }
+        pauseUntil = {
+            name: callName,
+            snippet: snippet,
+            attributes: {
+                weight: opts.weight == null ? 0 : opts.weight,
+                jsDoc: pxt.blocks.blockDefinitions()[pxtc.PAUSE_UNTIL_TYPE].tooltip,
+                advanced: false
+            },
+            noNamespace: true
+        };
+    }
+    return pauseUntil;
+}
+exports.getPauseUntil = getPauseUntil;
 function getBuiltinCategory(ns) {
     switch (ns) {
         case exports.loops.nameid: return exports.loops;
@@ -9143,26 +9690,32 @@ function overrideToolbox(def) {
 exports.overrideToolbox = overrideToolbox;
 
 },{}],31:[function(require,module,exports){
-/// <reference path="../../typings/globals/react/index.d.ts" />
-/// <reference path="../../typings/globals/react-dom/index.d.ts" />
-/// <reference path="../../built/pxtlib.d.ts" />
 "use strict";
-var __extends = (this && this.__extends) || function (d, b) {
-    for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
-    function __() { this.constructor = d; }
-    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
-};
+/// <reference path="../../built/pxtlib.d.ts" />
+var __extends = (this && this.__extends) || (function () {
+    var extendStatics = Object.setPrototypeOf ||
+        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+    return function (d, b) {
+        extendStatics(d, b);
+        function __() { this.constructor = d; }
+        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
 var React = require("react");
+var data = require("./data");
 var sui = require("./sui");
 var electron = require("./electron");
 var Cloud = pxt.Cloud;
-var GenericBanner = (function (_super) {
+var GenericBanner = /** @class */ (function (_super) {
     __extends(GenericBanner, _super);
     function GenericBanner(props) {
-        _super.call(this, props);
-        this.delayTime = this.props.delayTime || 0;
-        this.doneSleeping = this.sleepDone();
-        this.bannerType = this.props.bannerType || "default";
+        var _this = _super.call(this, props) || this;
+        _this.delayTime = _this.props.delayTime || 0;
+        _this.doneSleeping = _this.sleepDone();
+        _this.bannerType = _this.props.bannerType || "default";
+        return _this;
     }
     GenericBanner.prototype.componentDidMount = function () {
         var _this = this;
@@ -9188,29 +9741,33 @@ var GenericBanner = (function (_super) {
             this.timer = setTimeout(function () { return _this.hide("automatic"); }, this.delayTime + this.props.displayTime);
         }
         this.props.parent.setBanner(true);
-        this.render();
+        this.renderCore();
     };
     GenericBanner.prototype.hide = function (mode) {
         pxt.tickEvent("notificationBanner." + mode + "Close");
         pxt.storage.setLocal("lastBannerClosedTime", Util.nowSeconds().toString());
         this.props.parent.setBanner(false);
-        this.render();
+        this.renderCore();
     };
-    GenericBanner.prototype.render = function () {
+    GenericBanner.prototype.renderCore = function () {
         var _this = this;
         return ((this.props.parent.state.bannerVisible && this.doneSleeping) ?
-            React.createElement("div", {id: "notificationBanner", className: "ui attached " + this.bannerType + " message"}, React.createElement("div", {className: "bannerLeft"}, React.createElement("div", {className: "content"}, this.props.children)), React.createElement("div", {className: "bannerRight"}, React.createElement(sui.Icon, {icon: "close", tabIndex: 0, onClick: function () { _this.hide("manual"); clearTimeout(_this.timer); }}))) :
+            React.createElement("div", { id: "notificationBanner", className: "ui attached " + this.bannerType + " message" },
+                React.createElement("div", { className: "bannerLeft" },
+                    React.createElement("div", { className: "content" }, this.props.children)),
+                React.createElement("div", { className: "bannerRight" },
+                    React.createElement(sui.Icon, { icon: "close", tabIndex: 0, onClick: function () { _this.hide("manual"); clearTimeout(_this.timer); } }))) :
             React.createElement("div", null));
     };
     return GenericBanner;
-}(React.Component));
+}(data.Component));
 exports.GenericBanner = GenericBanner;
-var NotificationBanner = (function (_super) {
+var NotificationBanner = /** @class */ (function (_super) {
     __extends(NotificationBanner, _super);
     function NotificationBanner() {
-        _super.apply(this, arguments);
+        return _super !== null && _super.apply(this, arguments) || this;
     }
-    NotificationBanner.prototype.render = function () {
+    NotificationBanner.prototype.renderCore = function () {
         var targetTheme = pxt.appTarget.appTheme;
         var isApp = electron.isElectron || pxt.winrt.isWinRT();
         var isLocalServe = location.hostname === "localhost";
@@ -9218,22 +9775,30 @@ var NotificationBanner = (function (_super) {
             && (targetTheme.appPathNames || []).indexOf(location.pathname) === -1;
         var showExperimentalBanner = !isLocalServe && isApp && isExperimentalUrlPath;
         var isWindows10 = pxt.BrowserUtils.isWindows10();
-        var showWindowsStoreBanner = isWindows10 && Cloud.isOnline() && targetTheme.windowsStoreLink && !isApp;
+        var targetConfig = this.getData("target-config:");
+        var showWindowsStoreBanner = isWindows10 && Cloud.isOnline() && targetConfig && targetConfig.windowsStoreLink && !isApp;
         if (showWindowsStoreBanner) {
-            return (React.createElement(GenericBanner, {parent: this.props.parent, delayTime: 10000, displayTime: 45000, sleepTime: 604800}, React.createElement(sui.Link, {class: "link", target: "_blank", ariaLabel: lf("View app in the Windows store"), href: pxt.appTarget.appTheme.windowsStoreLink, onClick: function () { return pxt.tickEvent("banner.linkClicked"); }}, React.createElement("img", {className: "bannerIcon", src: Util.pathJoin(pxt.webConfig.commitCdnUrl, "images/windowsstorebag.png")})), React.createElement(sui.Link, {class: "link", target: "_blank", ariaLabel: lf("View app in the Windows store"), href: pxt.appTarget.appTheme.windowsStoreLink, onClick: function () { return pxt.tickEvent("banner.linkClicked"); }}, lf("Want a faster download? Get the app!"))));
+            return (React.createElement(GenericBanner, { parent: this.props.parent, delayTime: 10000, displayTime: 45000, sleepTime: 604800 },
+                React.createElement(sui.Link, { class: "link", target: "_blank", ariaLabel: lf("View app in the Windows store"), href: targetConfig.windowsStoreLink, onClick: function () { return pxt.tickEvent("banner.linkClicked", undefined, { interactiveConsent: true }); } },
+                    React.createElement("img", { className: "bannerIcon", src: Util.pathJoin(pxt.webConfig.commitCdnUrl, "images/windowsstorebag.png") })),
+                React.createElement(sui.Link, { class: "link", target: "_blank", ariaLabel: lf("View app in the Windows store"), href: targetConfig.windowsStoreLink, onClick: function () { return pxt.tickEvent("banner.linkClicked", undefined, { interactiveConsent: true }); } }, lf("Want a faster download? Get the app!"))));
         }
         if (showExperimentalBanner) {
             var liveUrl = pxt.appTarget.appTheme.homeUrl + location.search + location.hash;
-            return (React.createElement(GenericBanner, {parent: this.props.parent, bannerType: "negative"}, React.createElement(sui.Icon, {icon: "warning circle"}), React.createElement("div", {className: "header"}, lf("You are viewing an experimental version of the editor")), React.createElement(sui.Link, {class: "link", ariaLabel: lf("Go back to live editor"), href: liveUrl}, lf("Take me back"))));
+            return (React.createElement(GenericBanner, { parent: this.props.parent, bannerType: "negative" },
+                React.createElement(sui.Icon, { icon: "warning circle" }),
+                React.createElement("div", { className: "header" }, lf("You are viewing an experimental version of the editor")),
+                React.createElement(sui.Link, { class: "link", ariaLabel: lf("Go back to live editor"), href: liveUrl }, lf("Take me back"))));
         }
         return React.createElement("div", null);
     };
     return NotificationBanner;
-}(React.Component));
+}(data.Component));
 exports.NotificationBanner = NotificationBanner;
 
-},{"./electron":18,"./sui":44,"react":277}],32:[function(require,module,exports){
+},{"./data":14,"./electron":18,"./sui":44,"react":274}],32:[function(require,module,exports){
 "use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
 var workspace = require("./workspace");
 var data = require("./data");
 var core = require("./core");
@@ -9252,7 +9817,7 @@ function setupAppTarget(trgbundle) {
     pxt.setAppTarget(trgbundle);
 }
 exports.setupAppTarget = setupAppTarget;
-var File = (function () {
+var File = /** @class */ (function () {
     function File(epkg, name, content) {
         this.epkg = epkg;
         this.name = name;
@@ -9331,7 +9896,7 @@ var File = (function () {
     return File;
 }());
 exports.File = File;
-var EditorPackage = (function () {
+var EditorPackage = /** @class */ (function () {
     function EditorPackage(ksPkg, topPkg) {
         this.ksPkg = ksPkg;
         this.topPkg = topPkg;
@@ -9368,8 +9933,8 @@ var EditorPackage = (function () {
         if (!p || p.verProtocol() != "github")
             return Promise.resolve();
         var parsed = pxt.github.parseRepoId(p.verArgument());
-        return pxt.packagesConfigAsync()
-            .then(function (config) { return pxt.github.latestVersionAsync(parsed.fullName, config); })
+        return pxt.targetConfigAsync()
+            .then(function (config) { return pxt.github.latestVersionAsync(parsed.fullName, config.packages); })
             .then(function (tag) { parsed.tag = tag; })
             .then(function () { return pxt.github.pkgConfigAsync(parsed.fullName, parsed.tag); })
             .catch(core.handleNetworkError)
@@ -9491,7 +10056,7 @@ var EditorPackage = (function () {
     return EditorPackage;
 }());
 exports.EditorPackage = EditorPackage;
-var Host = (function () {
+var Host = /** @class */ (function () {
     function Host() {
     }
     Host.prototype.readFile = function (module, filename) {
@@ -9645,15 +10210,19 @@ data.mountVirtualApi("pkg-status", {
 });
 
 },{"./core":13,"./data":14,"./db":15,"./workspace":48}],33:[function(require,module,exports){
-/// <reference path="../../typings/globals/react/index.d.ts" />
-/// <reference path="../../typings/globals/react-dom/index.d.ts" />
-/// <reference path="../../built/pxtlib.d.ts" />
 "use strict";
-var __extends = (this && this.__extends) || function (d, b) {
-    for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
-    function __() { this.constructor = d; }
-    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
-};
+/// <reference path="../../built/pxtlib.d.ts" />
+var __extends = (this && this.__extends) || (function () {
+    var extendStatics = Object.setPrototypeOf ||
+        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+    return function (d, b) {
+        extendStatics(d, b);
+        function __() { this.constructor = d; }
+        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
 var React = require("react");
 var ReactDOM = require("react-dom");
 var data = require("./data");
@@ -9663,16 +10232,17 @@ var compiler = require("./compiler");
 var codecard = require("./codecard");
 var gallery = require("./gallery");
 var carousel = require("./carousel");
-var Projects = (function (_super) {
+var Projects = /** @class */ (function (_super) {
     __extends(Projects, _super);
     function Projects(props) {
-        _super.call(this, props);
-        this.prevUrlData = [];
-        this.prevGalleries = {};
-        this.galleryFetchErrors = {};
-        this.state = {
+        var _this = _super.call(this, props) || this;
+        _this.prevUrlData = [];
+        _this.prevGalleries = {};
+        _this.galleryFetchErrors = {};
+        _this.state = {
             visible: false
         };
+        return _this;
     }
     Projects.prototype.fetchGallery = function (tab, path) {
         var res = this.getData("gallery:" + encodeURIComponent(path));
@@ -9766,7 +10336,7 @@ var Projects = (function (_super) {
         var gals = Util.mapMap(galleries, function (k) { return _this.fetchGallery(k, galleries[k]); });
         var chgHeader = function (hdr) {
             pxt.tickEvent("projects.header");
-            core.showLoading("changeheader", lf("Loading..."));
+            core.showLoading("changeheader", lf("loading..."));
             _this.props.parent.loadHeaderAsync(hdr)
                 .done(function () {
                 core.hideLoading("changeheader");
@@ -9775,6 +10345,11 @@ var Projects = (function (_super) {
         var chgGallery = function (scr) {
             pxt.tickEvent("projects.gallery", { name: scr.name });
             switch (scr.cardType) {
+                case "template":
+                    var prj = pxt.Util.clone(pxt.appTarget.blocksprj);
+                    prj.config.dependencies = {}; // clear all dependencies
+                    chgCode(scr, true, prj);
+                    break;
                 case "example":
                     chgCode(scr, true);
                     break;
@@ -9803,11 +10378,13 @@ var Projects = (function (_super) {
                     }
             }
         };
-        var chgCode = function (scr, loadBlocks) {
-            core.showLoading("changingcode", lf("Loading..."));
+        var chgCode = function (scr, loadBlocks, prj) {
+            core.showLoading("changingcode", lf("loading..."));
             gallery.loadExampleAsync(scr.name.toLowerCase(), scr.url)
                 .done(function (opts) {
                 if (opts) {
+                    if (prj)
+                        opts.prj = prj;
                     if (loadBlocks) {
                         return _this.props.parent.createProjectAsync(opts)
                             .then(function () {
@@ -9834,7 +10411,7 @@ var Projects = (function (_super) {
             });
         };
         var importProject = function () {
-            pxt.tickEvent("projects.importdialog");
+            pxt.tickEvent("projects.importdialog", undefined, { interactiveConsent: true });
             _this.props.parent.importProjectDialog();
         };
         var selectLang = function () {
@@ -9846,25 +10423,46 @@ var Projects = (function (_super) {
         var tabClasses = sui.cx([
             'ui segment bottom attached tab active tabsegment'
         ]);
-        return React.createElement("div", {ref: "homeContainer", className: tabClasses}, showHeroBanner ?
-            React.createElement("div", {className: "ui segment getting-started-segment", style: { backgroundImage: "url(" + encodeURI(targetTheme.homeScreenHero) + ")" }}) : undefined, React.createElement("div", {key: "mystuff_gallerysegment", className: "ui segment gallerysegment mystuff-segment"}, React.createElement("div", {className: "ui grid equal width padded heading"}, React.createElement("div", {className: "column"}, React.createElement("h2", {className: "ui header"}, lf("My Projects"), " ")), React.createElement("div", {className: "column right aligned"}, pxt.appTarget.compile || (pxt.appTarget.cloud && pxt.appTarget.cloud.sharing && pxt.appTarget.cloud.publishing && pxt.appTarget.cloud.importing) ?
-            React.createElement(sui.Button, {key: "import", icon: "upload", class: "mini import-dialog-btn", textClass: "landscape only", text: lf("Import"), title: lf("Import a project"), onClick: function () { return importProject(); }}) : undefined)), React.createElement("div", {className: "content"}, React.createElement(ProjectsCarousel, {key: "mystuff_carousel", parent: this.props.parent, name: 'recent', onClick: function (scr) { return chgHeader(scr); }}))), Object.keys(galleries).map(function (galleryName) {
-            return React.createElement("div", {key: galleryName + "_gallerysegment", className: "ui segment gallerysegment"}, React.createElement("h2", {className: "ui header heading"}, Util.rlf(galleryName), " "), React.createElement("div", {className: "content"}, React.createElement(ProjectsCarousel, {ref: "" + (selectedCategory == galleryName ? 'activeCarousel' : ''), key: galleryName + "_carousel", parent: _this.props.parent, name: galleryName, path: galleries[galleryName], onClick: function (scr) { return chgGallery(scr); }, setSelected: function (index) { return _this.setSelected(galleryName, index); }, selectedIndex: selectedCategory == galleryName ? selectedIndex : undefined})));
-        }), targetTheme.organizationUrl || targetTheme.organizationUrl || targetTheme.privacyUrl ? React.createElement("div", {className: "ui horizontal small divided link list homefooter"}, targetTheme.organizationUrl && targetTheme.organization ? React.createElement("a", {className: "item focused", target: "_blank", rel: "noopener", href: targetTheme.organizationUrl}, targetTheme.organization) : undefined, targetTheme.selectLanguage ? React.createElement(sui.Link, {class: "item focused", text: lf("Language"), onClick: function () { return selectLang(); }, onKeyDown: sui.fireClickOnEnter}) : undefined, targetTheme.termsOfUseUrl ? React.createElement("a", {target: "_blank", className: "item focused", href: targetTheme.termsOfUseUrl, rel: "noopener"}, lf("Terms of Use")) : undefined, targetTheme.privacyUrl ? React.createElement("a", {target: "_blank", className: "item focused", href: targetTheme.privacyUrl, rel: "noopener"}, lf("Privacy")) : undefined) : undefined);
+        return React.createElement("div", { ref: "homeContainer", className: tabClasses },
+            showHeroBanner ?
+                React.createElement("div", { className: "ui segment getting-started-segment", style: { backgroundImage: "url(" + encodeURI(targetTheme.homeScreenHero) + ")" } }) : undefined,
+            React.createElement("div", { key: "mystuff_gallerysegment", className: "ui segment gallerysegment mystuff-segment" },
+                React.createElement("div", { className: "ui grid equal width padded heading" },
+                    React.createElement("div", { className: "column" },
+                        React.createElement("h2", { className: "ui header" },
+                            lf("My Projects"),
+                            " ")),
+                    React.createElement("div", { className: "column right aligned" }, pxt.appTarget.compile || (pxt.appTarget.cloud && pxt.appTarget.cloud.sharing && pxt.appTarget.cloud.publishing && pxt.appTarget.cloud.importing) ?
+                        React.createElement(sui.Button, { key: "import", icon: "upload", class: "mini import-dialog-btn", textClass: "landscape only", text: lf("Import"), title: lf("Import a project"), onClick: function () { return importProject(); } }) : undefined)),
+                React.createElement("div", { className: "content" },
+                    React.createElement(ProjectsCarousel, { key: "mystuff_carousel", parent: this.props.parent, name: 'recent', onClick: function (scr) { return chgHeader(scr); } }))),
+            Object.keys(galleries).map(function (galleryName) {
+                return React.createElement("div", { key: galleryName + "_gallerysegment", className: "ui segment gallerysegment" },
+                    React.createElement("h2", { className: "ui header heading" },
+                        Util.rlf(galleryName),
+                        " "),
+                    React.createElement("div", { className: "content" },
+                        React.createElement(ProjectsCarousel, { ref: "" + (selectedCategory == galleryName ? 'activeCarousel' : ''), key: galleryName + "_carousel", parent: _this.props.parent, name: galleryName, path: galleries[galleryName], onClick: function (scr) { return chgGallery(scr); }, setSelected: function (index) { return _this.setSelected(galleryName, index); }, selectedIndex: selectedCategory == galleryName ? selectedIndex : undefined })));
+            }),
+            targetTheme.organizationUrl || targetTheme.organizationUrl || targetTheme.privacyUrl ? React.createElement("div", { className: "ui horizontal small divided link list homefooter" },
+                targetTheme.organizationUrl && targetTheme.organization ? React.createElement("a", { className: "item focused", target: "_blank", rel: "noopener", href: targetTheme.organizationUrl }, targetTheme.organization) : undefined,
+                targetTheme.selectLanguage ? React.createElement(sui.Link, { class: "item focused", text: lf("Language"), onClick: function () { return selectLang(); }, onKeyDown: sui.fireClickOnEnter }) : undefined,
+                targetTheme.termsOfUseUrl ? React.createElement("a", { target: "_blank", className: "item focused", href: targetTheme.termsOfUseUrl, rel: "noopener" }, lf("Terms of Use")) : undefined,
+                targetTheme.privacyUrl ? React.createElement("a", { target: "_blank", className: "item focused", href: targetTheme.privacyUrl, rel: "noopener" }, lf("Privacy")) : undefined) : undefined);
     };
     return Projects;
 }(data.Component));
 exports.Projects = Projects;
-var ProjectsMenu = (function (_super) {
+var ProjectsMenu = /** @class */ (function (_super) {
     __extends(ProjectsMenu, _super);
     function ProjectsMenu() {
-        _super.apply(this, arguments);
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     ProjectsMenu.prototype.brandIconClick = function () {
-        pxt.tickEvent("projects.brand");
+        pxt.tickEvent("projects.brand", undefined, { interactiveConsent: true });
     };
     ProjectsMenu.prototype.orgIconClick = function () {
-        pxt.tickEvent("projects.org");
+        pxt.tickEvent("projects.org", undefined, { interactiveConsent: true });
     };
     ProjectsMenu.prototype.shouldComponentUpdate = function (nextProps, nextState, nextContext) {
         return false;
@@ -9873,23 +10471,37 @@ var ProjectsMenu = (function (_super) {
         var _this = this;
         var targetTheme = pxt.appTarget.appTheme;
         var sharingEnabled = pxt.appTarget.cloud && pxt.appTarget.cloud.sharing;
-        return React.createElement("div", {className: "ui borderless fixed " + (targetTheme.invertedMenu ? "inverted" : '') + " menu", role: "menubar"}, React.createElement("div", {className: "left menu"}, React.createElement("a", {href: targetTheme.logoUrl, "aria-label": lf("{0} Logo", targetTheme.boardName), role: "menuitem", target: "blank", rel: "noopener", className: "ui item logo brand", onClick: function () { return _this.brandIconClick(); }}, targetTheme.logo || targetTheme.portraitLogo
-            ? React.createElement("img", {className: "ui logo " + (targetTheme.logo ? " portrait hide" : ''), src: Util.toDataUri(targetTheme.logo || targetTheme.portraitLogo), alt: lf("{0} Logo", targetTheme.boardName)})
-            : React.createElement("span", {className: "name"}, targetTheme.boardName), targetTheme.portraitLogo ? (React.createElement("img", {className: 'ui mini image portrait only', src: Util.toDataUri(targetTheme.portraitLogo), alt: lf("{0} Logo", targetTheme.boardName)})) : null)), React.createElement("div", {className: "ui item"}, React.createElement(sui.Icon, {icon: "icon home large"}), " ", lf("Home")), React.createElement("div", {className: "right menu"}, React.createElement("a", {href: targetTheme.organizationUrl, target: "blank", rel: "noopener", className: "ui item logo organization", onClick: function () { return _this.orgIconClick(); }}, targetTheme.organizationWideLogo || targetTheme.organizationLogo
-            ? React.createElement("img", {className: "ui logo " + (targetTheme.organizationWideLogo ? " portrait hide" : ''), src: Util.toDataUri(targetTheme.organizationWideLogo || targetTheme.organizationLogo), alt: lf("{0} Logo", targetTheme.organization)})
-            : React.createElement("span", {className: "name"}, targetTheme.organization), targetTheme.organizationLogo ? (React.createElement("img", {className: 'ui mini image portrait only', src: Util.toDataUri(targetTheme.organizationLogo), alt: lf("{0} Logo", targetTheme.organization)})) : null)), targetTheme.betaUrl ? React.createElement("a", {href: "" + targetTheme.betaUrl, className: "ui red mini corner top left attached label betalabel", role: "menuitem"}, lf("Beta")) : undefined);
+        return React.createElement("div", { className: "ui borderless fixed " + (targetTheme.invertedMenu ? "inverted" : '') + " menu", role: "menubar" },
+            React.createElement("div", { className: "left menu" },
+                React.createElement("a", { href: targetTheme.logoUrl, "aria-label": lf("{0} Logo", targetTheme.boardName), role: "menuitem", target: "blank", rel: "noopener", className: "ui item logo brand", onClick: function () { return _this.brandIconClick(); } },
+                    targetTheme.logo || targetTheme.portraitLogo
+                        ? React.createElement("img", { className: "ui logo " + (targetTheme.logo ? " portrait hide" : ''), src: Util.toDataUri(targetTheme.logo || targetTheme.portraitLogo), alt: lf("{0} Logo", targetTheme.boardName) })
+                        : React.createElement("span", { className: "name" }, targetTheme.boardName),
+                    targetTheme.portraitLogo ? (React.createElement("img", { className: 'ui mini image portrait only', src: Util.toDataUri(targetTheme.portraitLogo), alt: lf("{0} Logo", targetTheme.boardName) })) : null)),
+            React.createElement("div", { className: "ui item" },
+                React.createElement(sui.Icon, { icon: "icon home large" }),
+                " ",
+                lf("Home")),
+            React.createElement("div", { className: "right menu" },
+                React.createElement("a", { href: targetTheme.organizationUrl, target: "blank", rel: "noopener", className: "ui item logo organization", onClick: function () { return _this.orgIconClick(); } },
+                    targetTheme.organizationWideLogo || targetTheme.organizationLogo
+                        ? React.createElement("img", { className: "ui logo " + (targetTheme.organizationWideLogo ? " portrait hide" : ''), src: Util.toDataUri(targetTheme.organizationWideLogo || targetTheme.organizationLogo), alt: lf("{0} Logo", targetTheme.organization) })
+                        : React.createElement("span", { className: "name" }, targetTheme.organization),
+                    targetTheme.organizationLogo ? (React.createElement("img", { className: 'ui mini image portrait only', src: Util.toDataUri(targetTheme.organizationLogo), alt: lf("{0} Logo", targetTheme.organization) })) : null)),
+            targetTheme.betaUrl ? React.createElement("a", { href: "" + targetTheme.betaUrl, className: "ui red mini corner top left attached label betalabel", role: "menuitem" }, lf("Beta")) : undefined);
     };
     return ProjectsMenu;
 }(data.Component));
 exports.ProjectsMenu = ProjectsMenu;
-var ProjectsCarousel = (function (_super) {
+var ProjectsCarousel = /** @class */ (function (_super) {
     __extends(ProjectsCarousel, _super);
     function ProjectsCarousel(props) {
-        _super.call(this, props);
-        this.prevGalleries = [];
-        this.prevHeaders = [];
-        this.hasFetchErrors = false;
-        this.state = {};
+        var _this = _super.call(this, props) || this;
+        _this.prevGalleries = [];
+        _this.prevHeaders = [];
+        _this.hasFetchErrors = false;
+        _this.state = {};
+        return _this;
     }
     ProjectsCarousel.prototype.componentDidMount = function () {
         if (this.props.parent.state.header) {
@@ -9916,7 +10528,7 @@ var ProjectsCarousel = (function (_super) {
         return headers;
     };
     ProjectsCarousel.prototype.newProject = function () {
-        pxt.tickEvent("projects.new");
+        pxt.tickEvent("projects.new", undefined, { interactiveConsent: true });
         this.props.parent.newProject();
     };
     ProjectsCarousel.prototype.closeDetail = function () {
@@ -9950,43 +10562,47 @@ var ProjectsCarousel = (function (_super) {
             this.hasFetchErrors = false;
             var cards = this.fetchGallery(path);
             if (this.hasFetchErrors) {
-                return React.createElement("div", {className: "ui carouselouter"}, React.createElement("div", {className: "carouselcontainer", tabIndex: 0, onClick: function () { return _this.setState({}); }}, React.createElement("p", {className: "ui grey inverted segment"}, lf("Oops, please connect to the Internet and try again."))));
+                return React.createElement("div", { className: "ui carouselouter" },
+                    React.createElement("div", { className: "carouselcontainer", tabIndex: 0, onClick: function () { return _this.setState({}); } },
+                        React.createElement("p", { className: "ui grey inverted segment" }, lf("Oops, please connect to the Internet and try again."))));
             }
             else {
-                return React.createElement("div", null, React.createElement(carousel.Carousel, {ref: "carousel", bleedPercent: 20, selectedIndex: selectedIndex}, cards.map(function (scr, index) {
-                    return React.createElement("div", {key: path + scr.name}, React.createElement(codecard.CodeCardView, {className: "example", key: 'gallery' + scr.name, name: scr.name, url: scr.url, imageUrl: scr.imageUrl, youTubeId: scr.youTubeId, label: scr.label, labelClass: scr.labelClass, onClick: function () { return onClick(scr, index); }}));
-                })), React.createElement("div", {ref: "detailView", className: "detailview " + (cards.filter(function (scr, index) { return index == selectedIndex; }).length > 0 ? 'visible' : '')}, cards.filter(function (scr, index) { return index == selectedIndex; }).length > 0 ? React.createElement("div", {tabIndex: 0, className: "close"}, React.createElement(sui.Icon, {icon: "remove circle", onClick: function () { return _this.closeDetail(); }}), " ") : undefined, cards.filter(function (scr, index) { return index == selectedIndex; }).map(function (scr) {
-                    return React.createElement(ProjectsDetail, {parent: _this.props.parent, name: scr.name, key: 'detail' + scr.name, description: scr.description, url: scr.url, imageUrl: scr.imageUrl, largeImageUrl: scr.largeImageUrl, youTubeId: scr.youTubeId, onClick: function () { return _this.props.onClick(scr); }, cardType: scr.cardType});
-                })));
+                return React.createElement("div", null,
+                    React.createElement(carousel.Carousel, { ref: "carousel", bleedPercent: 20, selectedIndex: selectedIndex }, cards.map(function (scr, index) {
+                        return React.createElement("div", { key: path + scr.name },
+                            React.createElement(codecard.CodeCardView, { className: "example", key: 'gallery' + scr.name, name: scr.name, url: scr.url, imageUrl: scr.imageUrl, youTubeId: scr.youTubeId, label: scr.label, labelClass: scr.labelClass, onClick: function () { return onClick(scr, index); } }));
+                    })),
+                    React.createElement("div", { ref: "detailView", className: "detailview " + (cards.filter(function (scr, index) { return index == selectedIndex; }).length > 0 ? 'visible' : '') },
+                        cards.filter(function (scr, index) { return index == selectedIndex; }).length > 0 ? React.createElement("div", { tabIndex: 0, className: "close" },
+                            React.createElement(sui.Icon, { icon: "remove circle", onClick: function () { return _this.closeDetail(); } }),
+                            " ") : undefined,
+                        cards.filter(function (scr, index) { return index == selectedIndex; }).map(function (scr) {
+                            return React.createElement(ProjectsDetail, { parent: _this.props.parent, name: scr.name, key: 'detail' + scr.name, description: scr.description, url: scr.url, imageUrl: scr.imageUrl, largeImageUrl: scr.largeImageUrl, youTubeId: scr.youTubeId, onClick: function () { return _this.props.onClick(scr); }, cardType: scr.cardType });
+                        })));
             }
         }
         else {
             var headers = this.fetchLocalData();
-            headers.unshift({
-                id: 'new',
-                name: lf("New Project")
-            });
-            if (headers.length == 0) {
-                return React.createElement("div", {className: "ui carouselouter"}, React.createElement("div", {className: "carouselcontainer"}, React.createElement("p", null, lf("This is where you will you find your code."))));
-            }
-            else {
-                return React.createElement(carousel.Carousel, {bleedPercent: 20}, headers.map(function (scr, index) {
-                    return React.createElement("div", {key: 'local' + scr.id + scr.recentUse}, scr.id == 'new' ?
-                        React.createElement("div", {className: "ui card link newprojectcard focused", tabIndex: 0, title: lf("Creates a new empty project"), onClick: function () { return _this.newProject(); }, onKeyDown: sui.fireClickOnEnter}, React.createElement("div", {className: "content"}, React.createElement(sui.Icon, {icon: "huge add circle"}), React.createElement("span", {className: "header"}, scr.name)))
-                        :
-                            React.createElement(codecard.CodeCardView, {ref: function (view) { if (index === 1)
-                                _this.latestProject = view; }, cardType: "file", className: "file", name: scr.name, time: scr.recentUse, url: scr.pubId && scr.pubCurrent ? "/" + scr.pubId : "", onClick: function () { return onClick(scr); }}));
+            var showNewProject = pxt.appTarget.appTheme && !pxt.appTarget.appTheme.hideNewProjectButton;
+            return React.createElement(carousel.Carousel, { bleedPercent: 20 },
+                showNewProject ? React.createElement("div", { className: "ui card link newprojectcard focused", tabIndex: 0, title: lf("Creates a new empty project"), onClick: function () { return _this.newProject(); }, onKeyDown: sui.fireClickOnEnter },
+                    React.createElement("div", { className: "content" },
+                        React.createElement(sui.Icon, { icon: "huge add circle" }),
+                        React.createElement("span", { className: "header" }, lf("New Project")))) : undefined,
+                headers.map(function (scr, index) {
+                    return React.createElement("div", { key: 'local' + scr.id + scr.recentUse },
+                        React.createElement(codecard.CodeCardView, { ref: function (view) { if (index === 1)
+                                _this.latestProject = view; }, cardType: "file", className: "file", name: scr.name, time: scr.recentUse, url: scr.pubId && scr.pubCurrent ? "/" + scr.pubId : "", onClick: function () { return onClick(scr); } }));
                 }));
-            }
         }
     };
     return ProjectsCarousel;
 }(data.Component));
 exports.ProjectsCarousel = ProjectsCarousel;
-var ProjectsDetail = (function (_super) {
+var ProjectsDetail = /** @class */ (function (_super) {
     __extends(ProjectsDetail, _super);
     function ProjectsDetail() {
-        _super.apply(this, arguments);
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     ProjectsDetail.prototype.renderCore = function () {
         var _a = this.props, name = _a.name, description = _a.description, imageUrl = _a.imageUrl, largeImageUrl = _a.largeImageUrl, youTubeId = _a.youTubeId, url = _a.url, onClick = _a.onClick, cardType = _a.cardType;
@@ -9996,6 +10612,8 @@ var ProjectsDetail = (function (_super) {
             clickLabel = lf("Start Tutorial");
         else if (cardType == "codeExample" || cardType == "example")
             clickLabel = lf("Open Example");
+        else if (cardType == "template")
+            clickLabel = lf("New Project");
         else if (youTubeId)
             clickLabel = lf("Play Video");
         var actions = [{
@@ -10004,22 +10622,33 @@ var ProjectsDetail = (function (_super) {
                 icon: '',
                 className: 'huge positive'
             }];
-        return React.createElement("div", {className: "ui grid stackable padded"}, image ? React.createElement("div", {className: "imagewrapper"}, React.createElement("div", {className: "image", style: { backgroundImage: "url(\"" + image + "\")" }})) : undefined, React.createElement("div", {className: "column eight wide"}, React.createElement("div", {className: "segment"}, React.createElement("div", {className: "header"}, " ", name, " "), React.createElement("p", {className: "detail"}, description), React.createElement("div", {className: "actions"}, actions.map(function (action) {
-            return React.createElement(sui.Button, {key: "action_" + action.label, icon: action.icon, text: action.label, class: "approve " + (action.icon ? 'icon right labeled' : '') + " " + (action.className || ''), onClick: function () {
-                action.onClick();
-            }, onKeyDown: sui.fireClickOnEnter});
-        })))));
+        return React.createElement("div", { className: "ui grid stackable padded" },
+            image ? React.createElement("div", { className: "imagewrapper" },
+                React.createElement("div", { className: "image", style: { backgroundImage: "url(\"" + image + "\")" } })) : undefined,
+            React.createElement("div", { className: "column eight wide" },
+                React.createElement("div", { className: "segment" },
+                    React.createElement("div", { className: "header" },
+                        " ",
+                        name,
+                        " "),
+                    React.createElement("p", { className: "detail" }, description),
+                    React.createElement("div", { className: "actions" }, actions.map(function (action) {
+                        return React.createElement(sui.Button, { key: "action_" + action.label, icon: action.icon, text: action.label, class: "approve " + (action.icon ? 'icon right labeled' : '') + " " + (action.className || ''), onClick: function () {
+                                action.onClick();
+                            }, onKeyDown: sui.fireClickOnEnter });
+                    })))));
     };
     return ProjectsDetail;
 }(data.Component));
 exports.ProjectsDetail = ProjectsDetail;
-var ImportDialog = (function (_super) {
+var ImportDialog = /** @class */ (function (_super) {
     __extends(ImportDialog, _super);
     function ImportDialog(props) {
-        _super.call(this, props);
-        this.state = {
+        var _this = _super.call(this, props) || this;
+        _this.state = {
             visible: false
         };
+        return _this;
     }
     ImportDialog.prototype.hide = function () {
         this.setState({ visible: false });
@@ -10034,29 +10663,33 @@ var ImportDialog = (function (_super) {
         var _this = this;
         var visible = this.state.visible;
         var importHex = function () {
-            pxt.tickEvent("projects.import");
+            pxt.tickEvent("projects.import", undefined, { interactiveConsent: true });
             _this.hide();
             _this.props.parent.importFileDialog();
         };
         var importUrl = function () {
-            pxt.tickEvent("projects.importurl");
+            pxt.tickEvent("projects.importurl", undefined, { interactiveConsent: true });
             _this.hide();
             _this.props.parent.importUrlDialog();
         };
-        return (React.createElement(sui.Modal, {open: this.state.visible, className: "importdialog", header: lf("Import"), size: "small", onClose: function () { return _this.close(); }, dimmer: true, closeIcon: true, closeOnDimmerClick: true, closeOnDocumentClick: true, closeOnEscape: true}, React.createElement("div", {className: "ui cards"}, pxt.appTarget.compile ?
-            React.createElement(codecard.CodeCardView, {ariaLabel: lf("Open files from your computer"), className: "focused", role: "button", key: 'import', icon: "upload", iconColor: "secondary", name: lf("Import File..."), description: lf("Open files from your computer"), onClick: function () { return importHex(); }}) : undefined, pxt.appTarget.cloud && pxt.appTarget.cloud.sharing && pxt.appTarget.cloud.publishing && pxt.appTarget.cloud.importing ?
-            React.createElement(codecard.CodeCardView, {ariaLabel: lf("Open a shared project URL"), className: "focused", role: "button", key: 'importurl', icon: "cloud download", iconColor: "secondary", name: lf("Import URL..."), description: lf("Open a shared project URL"), onClick: function () { return importUrl(); }}) : undefined)));
+        return (React.createElement(sui.Modal, { open: this.state.visible, className: "importdialog", header: lf("Import"), size: "small", onClose: function () { return _this.close(); }, dimmer: true, closeIcon: true, closeOnDimmerClick: true, closeOnDocumentClick: true, closeOnEscape: true },
+            React.createElement("div", { className: "ui cards" },
+                pxt.appTarget.compile ?
+                    React.createElement(codecard.CodeCardView, { ariaLabel: lf("Open files from your computer"), className: "focused", role: "button", key: 'import', icon: "upload", iconColor: "secondary", name: lf("Import File..."), description: lf("Open files from your computer"), onClick: function () { return importHex(); } }) : undefined,
+                pxt.appTarget.cloud && pxt.appTarget.cloud.sharing && pxt.appTarget.cloud.publishing && pxt.appTarget.cloud.importing ?
+                    React.createElement(codecard.CodeCardView, { ariaLabel: lf("Open a shared project URL"), className: "focused", role: "button", key: 'importurl', icon: "cloud download", iconColor: "secondary", name: lf("Import URL..."), description: lf("Open a shared project URL"), onClick: function () { return importUrl(); } }) : undefined)));
     };
     return ImportDialog;
 }(data.Component));
 exports.ImportDialog = ImportDialog;
-var ExitAndSaveDialog = (function (_super) {
+var ExitAndSaveDialog = /** @class */ (function (_super) {
     __extends(ExitAndSaveDialog, _super);
     function ExitAndSaveDialog(props) {
-        _super.call(this, props);
-        this.state = {
+        var _this = _super.call(this, props) || this;
+        _this.state = {
             visible: false
         };
+        return _this;
     }
     ExitAndSaveDialog.prototype.hide = function () {
         this.setState({ visible: false });
@@ -10088,14 +10721,14 @@ var ExitAndSaveDialog = (function (_super) {
         var save = function () {
             _this.hide();
             if (_this.props.parent.state.projectName != newName)
-                pxt.tickEvent("exitandsave.projectrename");
+                pxt.tickEvent("exitandsave.projectrename", undefined, { interactiveConsent: true });
             _this.props.parent.updateHeaderNameAsync(newName)
                 .done(function () {
                 _this.props.parent.openHome();
             });
         };
         var cancel = function () {
-            pxt.tickEvent("exitandsave.cancel");
+            pxt.tickEvent("exitandsave.cancel", undefined, { interactiveConsent: true });
             _this.hide();
         };
         var onChange = function (name) {
@@ -10111,19 +10744,27 @@ var ExitAndSaveDialog = (function (_super) {
                 icon: 'cancel',
                 onClick: cancel
             }];
-        return (React.createElement(sui.Modal, {open: visible, className: "exitandsave", header: lf("Exit Project"), size: "tiny", onClose: function () { return _this.hide(); }, dimmer: true, actions: actions, closeIcon: true, closeOnDimmerClick: true, closeOnDocumentClick: true, closeOnEscape: true}, React.createElement("div", {className: "ui form"}, React.createElement(sui.Input, {id: "projectNameInput", class: "focused", label: lf("Project Name"), ariaLabel: lf("Type a name for your project"), value: projectName, onChange: onChange}))));
+        return (React.createElement(sui.Modal, { open: visible, className: "exitandsave", header: lf("Exit Project"), size: "tiny", onClose: function () { return _this.hide(); }, dimmer: true, actions: actions, closeIcon: true, closeOnDimmerClick: true, closeOnDocumentClick: true, closeOnEscape: true },
+            React.createElement("div", { className: "ui form" },
+                React.createElement(sui.Input, { id: "projectNameInput", class: "focused", label: lf("Project Name"), ariaLabel: lf("Type a name for your project"), value: projectName, onChange: onChange }))));
     };
     return ExitAndSaveDialog;
 }(data.Component));
 exports.ExitAndSaveDialog = ExitAndSaveDialog;
 
-},{"./carousel":7,"./codecard":10,"./compiler":11,"./core":13,"./data":14,"./gallery":23,"./sui":44,"react":277,"react-dom":148}],34:[function(require,module,exports){
+},{"./carousel":7,"./codecard":10,"./compiler":11,"./core":13,"./data":14,"./gallery":23,"./sui":44,"react":274,"react-dom":145}],34:[function(require,module,exports){
 "use strict";
-var __extends = (this && this.__extends) || function (d, b) {
-    for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
-    function __() { this.constructor = d; }
-    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
-};
+var __extends = (this && this.__extends) || (function () {
+    var extendStatics = Object.setPrototypeOf ||
+        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+    return function (d, b) {
+        extendStatics(d, b);
+        function __() { this.constructor = d; }
+        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
 var React = require("react");
 var pkg = require("./package");
 var srceditor = require("./srceditor");
@@ -10131,12 +10772,13 @@ var sui = require("./sui");
 var core = require("./core");
 var Util = pxt.Util;
 var lf = Util.lf;
-var Editor = (function (_super) {
+var Editor = /** @class */ (function (_super) {
     __extends(Editor, _super);
     function Editor() {
-        _super.apply(this, arguments);
-        this.config = {};
-        this.changeMade = false;
+        var _this = _super !== null && _super.apply(this, arguments) || this;
+        _this.config = {};
+        _this.changeMade = false;
+        return _this;
     }
     Editor.prototype.prepare = function () {
         this.isReady = true;
@@ -10218,9 +10860,17 @@ var Editor = (function (_super) {
             // trigger update            
             save();
         };
-        return (React.createElement("div", {className: "ui content"}, React.createElement("h3", {className: "ui small header"}, React.createElement("div", {className: "content"}, lf("Project Settings"))), React.createElement("div", {className: "ui segment form text"}, React.createElement(sui.Input, {id: "fileNameInput", label: lf("Name"), ariaLabel: lf("Type a name for your project"), value: c.name, onChange: setFileName}), userConfigs.map(function (uc) {
-            return React.createElement(sui.Checkbox, {key: "userconfig-" + uc.description, inputLabel: uc.description, checked: isUserConfigActive(uc), onChange: function () { return applyUserConfig(uc); }});
-        }), React.createElement(sui.Field, null, React.createElement(sui.Button, {text: lf("Save"), class: "green " + (this.isSaving ? 'disabled' : ''), onClick: function () { return save(); }}), React.createElement(sui.Button, {text: lf("Edit Settings As text"), onClick: function () { return _this.editSettingsText(); }})))));
+        return (React.createElement("div", { className: "ui content" },
+            React.createElement("h3", { className: "ui small header" },
+                React.createElement("div", { className: "content" }, lf("Project Settings"))),
+            React.createElement("div", { className: "ui segment form text" },
+                React.createElement(sui.Input, { id: "fileNameInput", label: lf("Name"), ariaLabel: lf("Type a name for your project"), value: c.name, onChange: setFileName }),
+                userConfigs.map(function (uc) {
+                    return React.createElement(sui.Checkbox, { key: "userconfig-" + uc.description, inputLabel: uc.description, checked: isUserConfigActive(uc), onChange: function () { return applyUserConfig(uc); } });
+                }),
+                React.createElement(sui.Field, null,
+                    React.createElement(sui.Button, { text: lf("Save"), class: "green " + (this.isSaving ? 'disabled' : ''), onClick: function () { return save(); } }),
+                    React.createElement(sui.Button, { text: lf("Edit Settings As text"), onClick: function () { return _this.editSettingsText(); } })))));
     };
     Editor.prototype.isIncomplete = function () {
         return !this.changeMade;
@@ -10264,8 +10914,9 @@ var Editor = (function (_super) {
 }(srceditor.Editor));
 exports.Editor = Editor;
 
-},{"./core":13,"./package":32,"./srceditor":43,"./sui":44,"react":277}],35:[function(require,module,exports){
+},{"./core":13,"./package":32,"./srceditor":43,"./sui":44,"react":274}],35:[function(require,module,exports){
 "use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
 var workspace = require("./workspace");
 var data = require("./data");
 function renderIcon(img) {
@@ -10310,15 +10961,19 @@ function saveAsync(header, screenshot) {
 exports.saveAsync = saveAsync;
 
 },{"./data":14,"./workspace":48}],36:[function(require,module,exports){
-/// <reference path="../../typings/globals/react/index.d.ts" />
-/// <reference path="../../typings/globals/react-dom/index.d.ts" />
-/// <reference path="../../built/pxtlib.d.ts" />
 "use strict";
-var __extends = (this && this.__extends) || function (d, b) {
-    for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
-    function __() { this.constructor = d; }
-    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
-};
+/// <reference path="../../built/pxtlib.d.ts" />
+var __extends = (this && this.__extends) || (function () {
+    var extendStatics = Object.setPrototypeOf ||
+        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+    return function (d, b) {
+        extendStatics(d, b);
+        function __() { this.constructor = d; }
+        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
 var React = require("react");
 var ReactDOM = require("react-dom");
 var data = require("./data");
@@ -10326,17 +10981,18 @@ var sui = require("./sui");
 var pkg = require("./package");
 var core = require("./core");
 var codecard = require("./codecard");
-var ScriptSearch = (function (_super) {
+var ScriptSearch = /** @class */ (function (_super) {
     __extends(ScriptSearch, _super);
     function ScriptSearch(props) {
-        _super.call(this, props);
-        this.prevGhData = [];
-        this.prevUrlData = [];
-        this.prevGalleries = [];
-        this.state = {
+        var _this = _super.call(this, props) || this;
+        _this.prevGhData = [];
+        _this.prevUrlData = [];
+        _this.prevGalleries = [];
+        _this.state = {
             searchFor: '',
             visible: false
         };
+        return _this;
     }
     ScriptSearch.prototype.hide = function () {
         this.setState({ visible: false });
@@ -10525,30 +11181,50 @@ var ScriptSearch = (function (_super) {
             return false;
         };
         var headerText = lf("Extensions");
-        return (React.createElement(sui.Modal, {open: this.state.visible, dimmer: true, header: headerText, className: "searchdialog", longer: true, size: "fullscreen", onClose: function () { return _this.setState({ visible: false }); }, closeIcon: true, helpUrl: "/packages", closeOnDimmerClick: true, closeOnEscape: true, description: lf("Add a package to the project")}, React.createElement("div", {className: "ui vertical segment"}, React.createElement("div", {className: "ui search"}, React.createElement("div", {className: "ui fluid action input", role: "search"}, React.createElement("div", {"aria-live": "polite", className: "accessible-hidden"}, lf("{0} result matching '{1}'", bundles.length + ghdata.length + urldata.length, this.state.searchFor)), React.createElement("input", {ref: "searchInput", className: "focused", type: "text", placeholder: lf("Search or enter project URL..."), onKeyUp: kupd}), React.createElement("button", {title: lf("Search"), className: "ui right icon button", onClick: upd}, React.createElement(sui.Icon, {icon: "search"})))), React.createElement("div", {className: "ui cards", role: "listbox"}, urldata.map(function (scr) {
-            return React.createElement(codecard.CodeCardView, {key: 'url' + scr.id, name: scr.name, description: scr.description, url: "/" + scr.id, onClick: function () { return addUrl(scr); }, color: "red", role: "option"});
-        }), bundles.map(function (scr) {
-            return React.createElement(codecard.CodeCardView, {key: 'bundled' + scr.name, name: scr.name, description: scr.description, url: "/" + scr.installedVersion, imageUrl: scr.icon, onClick: function () { return addBundle(scr); }, role: "option"});
-        }), ghdata.filter(function (repo) { return repo.status == pxt.github.GitRepoStatus.Approved; }).map(function (scr) {
-            return React.createElement(codecard.CodeCardView, {name: scr.name.replace(/^pxt-/, ""), description: scr.description, key: 'gha' + scr.fullName, onClick: function () { return installGh(scr); }, url: 'github:' + scr.fullName, color: "blue", imageUrl: pxt.github.repoIconUrl(scr), label: /\bbeta\b/i.test(scr.description) ? lf("Beta") : undefined, role: "option"});
-        }), ghdata.filter(function (repo) { return repo.status != pxt.github.GitRepoStatus.Approved; }).map(function (scr) {
-            return React.createElement(codecard.CodeCardView, {name: scr.name.replace(/^pxt-/, ""), description: (scr.description || ""), extracontent: lf("User provided package, not endorsed by Microsoft."), key: 'ghd' + scr.fullName, onClick: function () { return installGh(scr); }, imageUrl: pxt.github.repoIconUrl(scr), url: 'github:' + scr.fullName, color: "red", role: "option"});
-        })), isEmpty() ?
-            React.createElement("div", {className: "ui items"}, React.createElement("div", {className: "ui item"}, lf("We couldn't find any packages matching '{0}'", this.state.searchFor)))
-            : undefined)));
+        return (React.createElement(sui.Modal, { open: this.state.visible, dimmer: true, header: headerText, className: "searchdialog", longer: true, size: "fullscreen", onClose: function () { return _this.setState({ visible: false }); }, closeIcon: true, helpUrl: "/packages", closeOnDimmerClick: true, closeOnEscape: true, description: lf("Add a package to the project") },
+            React.createElement("div", { className: "ui vertical segment" },
+                React.createElement("div", { className: "ui search" },
+                    React.createElement("div", { className: "ui fluid action input", role: "search" },
+                        React.createElement("div", { "aria-live": "polite", className: "accessible-hidden" }, lf("{0} result matching '{1}'", bundles.length + ghdata.length + urldata.length, this.state.searchFor)),
+                        React.createElement("input", { ref: "searchInput", className: "focused", type: "text", placeholder: lf("Search or enter project URL..."), onKeyUp: kupd }),
+                        React.createElement("button", { title: lf("Search"), className: "ui right icon button", onClick: upd },
+                            React.createElement(sui.Icon, { icon: "search" })))),
+                React.createElement("div", { className: "ui cards", role: "listbox" },
+                    urldata.map(function (scr) {
+                        return React.createElement(codecard.CodeCardView, { key: 'url' + scr.id, name: scr.name, description: scr.description, url: "/" + scr.id, onClick: function () { return addUrl(scr); }, color: "red", role: "option" });
+                    }),
+                    bundles.map(function (scr) {
+                        return React.createElement(codecard.CodeCardView, { key: 'bundled' + scr.name, name: scr.name, description: scr.description, url: "/" + scr.installedVersion, imageUrl: scr.icon, onClick: function () { return addBundle(scr); }, role: "option" });
+                    }),
+                    ghdata.filter(function (repo) { return repo.status == pxt.github.GitRepoStatus.Approved; }).map(function (scr) {
+                        return React.createElement(codecard.CodeCardView, { name: scr.name.replace(/^pxt-/, ""), description: scr.description, key: 'gha' + scr.fullName, onClick: function () { return installGh(scr); }, url: 'github:' + scr.fullName, color: "blue", imageUrl: pxt.github.repoIconUrl(scr), label: /\bbeta\b/i.test(scr.description) ? lf("Beta") : undefined, role: "option" });
+                    }),
+                    ghdata.filter(function (repo) { return repo.status != pxt.github.GitRepoStatus.Approved; }).map(function (scr) {
+                        return React.createElement(codecard.CodeCardView, { name: scr.name.replace(/^pxt-/, ""), description: (scr.description || ""), extracontent: lf("User provided package, not endorsed by Microsoft."), key: 'ghd' + scr.fullName, onClick: function () { return installGh(scr); }, imageUrl: pxt.github.repoIconUrl(scr), url: 'github:' + scr.fullName, color: "red", role: "option" });
+                    })),
+                isEmpty() ?
+                    React.createElement("div", { className: "ui items" },
+                        React.createElement("div", { className: "ui item" }, lf("We couldn't find any packages matching '{0}'", this.state.searchFor)))
+                    : undefined)));
     };
     return ScriptSearch;
 }(data.Component));
 exports.ScriptSearch = ScriptSearch;
 
-},{"./codecard":10,"./core":13,"./data":14,"./package":32,"./sui":44,"react":277,"react-dom":148}],37:[function(require,module,exports){
-/// <reference path="../../localtypings/smoothie.d.ts" />
+},{"./codecard":10,"./core":13,"./data":14,"./package":32,"./sui":44,"react":274,"react-dom":145}],37:[function(require,module,exports){
 "use strict";
-var __extends = (this && this.__extends) || function (d, b) {
-    for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
-    function __() { this.constructor = d; }
-    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
-};
+/// <reference path="../../localtypings/smoothie.d.ts" />
+var __extends = (this && this.__extends) || (function () {
+    var extendStatics = Object.setPrototypeOf ||
+        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+    return function (d, b) {
+        extendStatics(d, b);
+        function __() { this.constructor = d; }
+        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
 var React = require("react");
 var core = require("./core");
 var srceditor = require("./srceditor");
@@ -10556,21 +11232,30 @@ var sui = require("./sui");
 var data = require("./data");
 var Util = pxt.Util;
 var lf = Util.lf;
-var Editor = (function (_super) {
+var Editor = /** @class */ (function (_super) {
     __extends(Editor, _super);
     function Editor(parent) {
-        _super.call(this, parent);
-        this.parent = parent;
-        this.charts = [];
-        this.chartIdx = 0;
-        this.sourceMap = {};
-        this.consoleBuffer = "";
-        this.isSim = true;
-        this.maxConsoleLineLength = 255;
-        this.maxConsoleEntries = 100;
-        this.active = true;
-        this.maxChartTime = 18000;
-        window.addEventListener("message", this.processMessage.bind(this), false);
+        var _this = _super.call(this, parent) || this;
+        _this.parent = parent;
+        _this.savedMessageQueue = [];
+        _this.maxSavedMessages = 1000;
+        _this.charts = [];
+        _this.chartIdx = 0;
+        _this.sourceMap = {};
+        _this.consoleBuffer = "";
+        _this.isSim = true;
+        _this.maxConsoleLineLength = 255;
+        _this.maxConsoleEntries = 500;
+        _this.active = true;
+        _this.maxChartTime = 18000;
+        _this.lineColors = ["#f00", "#00f", "#0f0", "#ff0"];
+        _this.hcLineColors = ["000"];
+        _this.currentLineColors = _this.lineColors;
+        _this.highContrast = false;
+        window.addEventListener("message", _this.processEvent.bind(_this), false);
+        var serialTheme = pxt.appTarget.serial && pxt.appTarget.serial.editorTheme;
+        _this.lineColors = (serialTheme && serialTheme.lineColors) || _this.lineColors;
+        return _this;
     }
     Editor.prototype.getId = function () {
         return "serialEditor";
@@ -10580,31 +11265,70 @@ var Editor = (function (_super) {
         return false;
     };
     Editor.prototype.setVisible = function (b) {
+        if (this.parent.state.highContrast !== this.highContrast) {
+            this.setHighContrast(this.parent.state.highContrast);
+        }
         this.isVisible = b;
         if (this.isVisible) {
+            this.processQueuedMessages();
             this.startRecording();
         }
         else {
             this.pauseRecording();
+            this.clear();
+        }
+    };
+    Editor.prototype.setHighContrast = function (hc) {
+        if (hc !== this.highContrast) {
+            this.highContrast = hc;
+            if (hc) {
+                this.currentLineColors = this.hcLineColors;
+            }
+            else {
+                this.currentLineColors = this.lineColors;
+            }
+            this.clear();
         }
     };
     Editor.prototype.acceptsFile = function (file) {
         return file.name === pxt.SERIAL_EDITOR_FILE;
     };
     Editor.prototype.setSim = function (b) {
-        this.isSim = b;
-        this.clear();
+        if (this.isSim != b) {
+            this.isSim = b;
+            this.clear();
+        }
     };
-    Editor.prototype.processMessage = function (ev) {
+    Editor.prototype.saveMessageForLater = function (m) {
+        this.savedMessageQueue.push(m);
+        if (this.savedMessageQueue.length > this.maxSavedMessages) {
+            this.savedMessageQueue.shift();
+        }
+    };
+    Editor.prototype.processQueuedMessages = function () {
+        var _this = this;
+        this.savedMessageQueue.forEach(function (m) { return _this.processMessage(m); });
+        this.savedMessageQueue = [];
+    };
+    Editor.prototype.processEvent = function (ev) {
         var msg = ev.data;
-        if (!this.active || msg.type !== "serial")
+        if (msg.type !== "serial")
             return;
         var smsg = msg;
+        smsg.receivedTime = smsg.receivedTime || Util.now();
+        if (!this.active) {
+            this.saveMessageForLater(smsg);
+            return;
+        }
+        this.processMessage(smsg);
+    };
+    Editor.prototype.processMessage = function (smsg) {
         var sim = !!smsg.sim;
         if (sim != this.isSim)
             return;
         var data = smsg.data || "";
         var source = smsg.id || "?";
+        var receivedTime = smsg.receivedTime || Util.now();
         if (!this.sourceMap[source]) {
             var sourceIdx = Object.keys(this.sourceMap).length + 1;
             this.sourceMap[source] = lf("source") + sourceIdx.toString();
@@ -10615,13 +11339,13 @@ var Editor = (function (_super) {
             var variable = m[2] || '';
             var nvalue = parseFloat(m[3]);
             if (!isNaN(nvalue)) {
-                this.appendGraphEntry(niceSource, variable, nvalue);
+                this.appendGraphEntry(niceSource, variable, nvalue, receivedTime);
                 return;
             }
         }
         this.appendConsoleEntry(data);
     };
-    Editor.prototype.appendGraphEntry = function (source, variable, nvalue) {
+    Editor.prototype.appendGraphEntry = function (source, variable, nvalue, receivedTime) {
         //See if there is a "home chart" that this point belongs to -
         //if not, create a new chart
         var homeChart = undefined;
@@ -10633,12 +11357,12 @@ var Editor = (function (_super) {
             }
         }
         if (!homeChart) {
-            homeChart = new Chart(source, variable, this.chartIdx);
+            homeChart = new Chart(source, variable, this.chartIdx, this.currentLineColors);
             this.chartIdx++;
             this.charts.push(homeChart);
             this.chartRoot.appendChild(homeChart.getElement());
         }
-        homeChart.addPoint(variable, nvalue);
+        homeChart.addPoint(variable, nvalue, receivedTime);
     };
     Editor.prototype.appendConsoleEntry = function (data) {
         for (var i = 0; i < data.length; ++i) {
@@ -10716,7 +11440,7 @@ var Editor = (function (_super) {
         this.chartDropper = setInterval(this.dropStaleCharts.bind(this), 20000);
     };
     Editor.prototype.toggleRecording = function () {
-        pxt.tickEvent("serial.toggleRecording");
+        pxt.tickEvent("serial.toggleRecording", undefined, { interactiveConsent: true });
         if (this.active)
             this.pauseRecording();
         else
@@ -10738,62 +11462,79 @@ var Editor = (function (_super) {
         }
         this.charts = [];
         this.consoleBuffer = "";
+        this.savedMessageQueue = [];
+        this.sourceMap = {};
     };
     Editor.prototype.downloadCSV = function () {
+        var sep = lf("{id:csvseparator}\t");
         var lines = [];
         this.charts.forEach(function (chart) { return Object.keys(chart.lines).forEach(function (k) { return lines.push({ name: k + " (" + chart.source + ")", line: chart.lines[k] }); }); });
-        var csv = lines.map(function (line) { return ("time (s), " + line.name); }).join(', ') + '\r\n';
+        var csv = lines.map(function (line) { return "time (s)" + sep + " " + line.name; }).join(sep + ' ') + '\r\n';
         var datas = lines.map(function (line) { return line.line.data; });
         var nl = datas.map(function (data) { return data.length; }).reduce(function (l, c) { return Math.max(l, c); });
         var nc = this.charts.length;
-        var _loop_1 = function(i) {
-            csv += datas.map(function (data) { return i < data.length ? (data[i][0] - data[0][0]) / 1000 + ", " + data[i][1] : ' , '; }).join(', ');
+        var _loop_1 = function (i) {
+            csv += datas.map(function (data) { return i < data.length ? (data[i][0] - data[0][0]) / 1000 + ", " + data[i][1] : " " + sep + " "; }).join(sep + ' ');
             csv += '\r\n';
         };
         for (var i = 0; i < nl; ++i) {
             _loop_1(i);
         }
-        pxt.commands.browserDownloadAsync(csv, "data.csv", "text/csv");
+        pxt.commands.browserDownloadAsync(csv, lf("{id:csvfilename}data") + ".csv", "text/csv");
         core.infoNotification(lf("Exporting data...."));
     };
     Editor.prototype.goBack = function () {
-        pxt.tickEvent("serial.backButton");
+        pxt.tickEvent("serial.backButton", undefined, { interactiveConsent: true });
         this.parent.openPreviousEditor();
     };
     Editor.prototype.display = function () {
         var _this = this;
-        return (React.createElement("div", {id: "serialArea"}, React.createElement("div", {id: "serialHeader", className: "ui"}, React.createElement("div", {className: "leftHeaderWrapper"}, React.createElement("div", {className: "leftHeader"}, React.createElement(sui.Button, {title: lf("Go back"), class: "ui icon circular small button editorBack", ariaLabel: lf("Go back"), onClick: this.goBack.bind(this)}, React.createElement(sui.Icon, {icon: "arrow left"})))), React.createElement("div", {className: "rightHeader"}, React.createElement(sui.Button, {title: lf("Export data"), class: "ui icon blue button editorExport", ariaLabel: lf("Export data"), onClick: function () { return _this.downloadCSV(); }}, React.createElement(sui.Icon, {icon: "download"})), React.createElement(StartPauseButton, {ref: function (e) { return _this.startPauseButton = e; }, active: this.active, toggle: this.toggleRecording.bind(this)}), React.createElement("span", {className: "ui small header"}, this.isSim ? lf("Simulator") : lf("Device")))), React.createElement("div", {id: "serialCharts", className: "noconsole", ref: function (e) { return _this.chartRoot = e; }}), React.createElement("div", {id: "serialConsole", className: "noconsole", ref: function (e) { return _this.consoleRoot = e; }})));
+        return (React.createElement("div", { id: "serialArea" },
+            React.createElement("div", { id: "serialHeader", className: "ui" },
+                React.createElement("div", { className: "leftHeaderWrapper" },
+                    React.createElement("div", { className: "leftHeader" },
+                        React.createElement(sui.Button, { title: lf("Go back"), class: "ui icon circular small button editorBack", ariaLabel: lf("Go back"), onClick: this.goBack.bind(this) },
+                            React.createElement(sui.Icon, { icon: "arrow left" })))),
+                React.createElement("div", { className: "rightHeader" },
+                    React.createElement(sui.Button, { title: lf("Export data"), class: "ui icon blue button editorExport", ariaLabel: lf("Export data"), onClick: function () { return _this.downloadCSV(); } },
+                        React.createElement(sui.Icon, { icon: "download" })),
+                    React.createElement(StartPauseButton, { ref: function (e) { return _this.startPauseButton = e; }, active: this.active, toggle: this.toggleRecording.bind(this) }),
+                    React.createElement("span", { className: "ui small header" }, this.isSim ? lf("Simulator") : lf("Device")))),
+            React.createElement("div", { id: "serialCharts", className: "noconsole", ref: function (e) { return _this.chartRoot = e; } }),
+            React.createElement("div", { id: "serialConsole", className: "noconsole", ref: function (e) { return _this.consoleRoot = e; } })));
     };
     Editor.prototype.domUpdate = function () {
     };
     return Editor;
 }(srceditor.Editor));
 exports.Editor = Editor;
-var StartPauseButton = (function (_super) {
+var StartPauseButton = /** @class */ (function (_super) {
     __extends(StartPauseButton, _super);
     function StartPauseButton(props) {
-        _super.call(this, props);
-        this.state = {
-            active: this.props.active
+        var _this = _super.call(this, props) || this;
+        _this.state = {
+            active: _this.props.active
         };
+        return _this;
     }
     StartPauseButton.prototype.renderCore = function () {
         var toggle = this.props.toggle;
         var active = this.state.active;
-        return React.createElement(sui.Button, {title: active ? lf("Pause recording") : lf("Start recording"), class: "ui left floated icon button " + (active ? "green" : "red circular") + " toggleRecord", onClick: toggle}, React.createElement(sui.Icon, {icon: active ? "pause icon" : "circle icon"}));
+        return React.createElement(sui.Button, { title: active ? lf("Pause recording") : lf("Start recording"), class: "ui left floated icon button " + (active ? "green" : "red circular") + " toggleRecord", onClick: toggle },
+            React.createElement(sui.Icon, { icon: active ? "pause icon" : "circle icon" }));
     };
     return StartPauseButton;
 }(data.Component));
 exports.StartPauseButton = StartPauseButton;
-var Chart = (function () {
-    function Chart(source, variable, chartIdx) {
+var Chart = /** @class */ (function () {
+    function Chart(source, variable, chartIdx, lineColors) {
         var _this = this;
         this.rootElement = document.createElement("div");
         this.lines = {};
         this.isStale = false;
         this.lastUpdatedTime = 0;
-        var serialTheme = pxt.appTarget.serial && pxt.appTarget.serial.editorTheme;
         // Initialize chart
+        var serialTheme = pxt.appTarget.serial && pxt.appTarget.serial.editorTheme;
         var chartConfig = {
             interpolation: 'bezier',
             labels: {
@@ -10813,7 +11554,7 @@ var Chart = (function () {
             tooltip: true,
             tooltipFormatter: function (ts, data) { return _this.tooltip(ts, data); }
         };
-        this.lineColors = serialTheme && serialTheme.lineColors || ["#f00", "#00f", "#0f0", "#ff0"];
+        this.lineColors = lineColors;
         this.chartIdx = chartIdx;
         this.chart = new SmoothieChart(chartConfig);
         this.rootElement.className = "ui segment";
@@ -10836,24 +11577,10 @@ var Chart = (function () {
             line.__name = Util.htmlEscape(name.substring(this.variable.length + 1));
             this.chart.addTimeSeries(line, {
                 strokeStyle: lineColor,
-                fillStyle: this.hexToHalfOpacityRgba(lineColor),
-                lineWidth: 1
+                lineWidth: 3
             });
         }
         return line;
-    };
-    Chart.prototype.hexToHalfOpacityRgba = function (hex) {
-        var shorthandRegex = /^#?([a-f\d])([a-f\d])([a-f\d])$/i;
-        hex = hex.replace(shorthandRegex, function (m, r, g, b) {
-            return r + r + g + g + b + b;
-        });
-        var m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-        if (!m) {
-            return hex;
-        }
-        var nums = m.slice(1, 4).map(function (n) { return parseInt(n, 16); });
-        nums.push(0.3);
-        return "rgba(" + nums.join(",") + ")";
     };
     Chart.prototype.makeLabel = function () {
         this.label = document.createElement("div");
@@ -10877,9 +11604,9 @@ var Chart = (function () {
         return this.source == source
             && this.variable == variable.replace(/\..*$/, '');
     };
-    Chart.prototype.addPoint = function (name, value) {
+    Chart.prototype.addPoint = function (name, value, timestamp) {
         var line = this.getLine(name);
-        line.append(Util.now(), value);
+        line.append(timestamp, value);
         this.lastUpdatedTime = Util.now();
         if (Object.keys(this.lines).length == 1) {
             // update label with last value
@@ -10898,24 +11625,79 @@ var Chart = (function () {
     };
     return Chart;
 }());
+var ResourceImporter = /** @class */ (function () {
+    function ResourceImporter() {
+    }
+    ResourceImporter.prototype.canImport = function (data) {
+        return data.type == "text/plain";
+    };
+    ResourceImporter.prototype.importAsync = function (project, data) {
+        return ts.pxtc.Util.fileReadAsTextAsync(data)
+            .then(function (txt) {
+            if (!txt) {
+                core.errorNotification(lf("Ooops, could not read file"));
+                return;
+            }
+            // parse times
+            var lines = txt.split(/\n/g).map(function (line) {
+                // extract timespace
+                var t = /^\s*(\d+)>/.exec(line);
+                if (t)
+                    line = line.substr(t[0].length);
+                return {
+                    type: "serial",
+                    data: line + "\n",
+                    id: data.name,
+                    receivedTime: t ? parseFloat(t[1]) : undefined
+                };
+            });
+            if (!lines.length)
+                return;
+            // normalize timestamps
+            var now = Util.now();
+            var linest = lines.filter(function (line) { return !!line.receivedTime; });
+            if (linest.length) {
+                var tmax_1 = linest[linest.length - 1].receivedTime || 0;
+                linest.forEach(function (line) { return line.receivedTime += now - tmax_1; });
+            }
+            // show console
+            // send as serial message
+            lines.forEach(function (line) { return window.postMessage(line, "*"); });
+        });
+    };
+    return ResourceImporter;
+}());
+exports.ResourceImporter = ResourceImporter;
 
-},{"./core":13,"./data":14,"./srceditor":43,"./sui":44,"react":277}],38:[function(require,module,exports){
-/// <reference path="../../built/pxtsim.d.ts" />
+},{"./core":13,"./data":14,"./srceditor":43,"./sui":44,"react":274}],38:[function(require,module,exports){
 "use strict";
-var __extends = (this && this.__extends) || function (d, b) {
-    for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
-    function __() { this.constructor = d; }
-    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
-};
+/// <reference path="../../built/pxtsim.d.ts" />
+var __extends = (this && this.__extends) || (function () {
+    var extendStatics = Object.setPrototypeOf ||
+        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+    return function (d, b) {
+        extendStatics(d, b);
+        function __() { this.constructor = d; }
+        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
 var React = require("react");
 var sui = require("./sui");
-var SerialIndicator = (function (_super) {
+var SerialIndicator = /** @class */ (function (_super) {
     __extends(SerialIndicator, _super);
     function SerialIndicator(props) {
-        _super.call(this, props);
-        this.state = { active: false };
-        window.addEventListener("message", this.setActive.bind(this));
+        var _this = _super.call(this, props) || this;
+        _this.state = { active: false };
+        return _this;
     }
+    SerialIndicator.prototype.componentDidMount = function () {
+        window.addEventListener("message", this.setActive.bind(this));
+    };
+    SerialIndicator.prototype.componentWillUnmount = function () {
+        window.addEventListener("message", this.setActive.bind(this));
+    };
     SerialIndicator.prototype.setActive = function (ev) {
         var msg = ev.data;
         if (!this.state.active && msg.type === "serial") {
@@ -10931,54 +11713,62 @@ var SerialIndicator = (function (_super) {
     SerialIndicator.prototype.render = function () {
         if (!this.state.active)
             return React.createElement("div", null);
-        return (React.createElement("div", {title: lf("Open console"), className: "ui label circular", tabIndex: 0, onClick: this.props.onClick, onKeyDown: sui.fireClickOnEnter}, React.createElement("div", {className: "detail"}, React.createElement(sui.Icon, {icon: "bar graph"})), lf("Show console"), React.createElement("div", {className: "detail"}, this.props.isSim ? lf("Simulator") : lf("Device"))));
+        return (React.createElement("div", { title: lf("Open console"), className: "ui label circular", tabIndex: 0, onClick: this.props.onClick, onKeyDown: sui.fireClickOnEnter },
+            React.createElement("div", { className: "detail" },
+                React.createElement("img", { alt: lf("Animated bar chart"), className: "barcharticon", src: Util.pathJoin(pxt.webConfig.commitCdnUrl, "images/Bars_black.gif") })),
+            lf("Show console"),
+            React.createElement("div", { className: "detail" }, this.props.isSim ? lf("Simulator") : lf("Device"))));
     };
     return SerialIndicator;
 }(React.Component));
 exports.SerialIndicator = SerialIndicator;
 
-},{"./sui":44,"react":277}],39:[function(require,module,exports){
+},{"./sui":44,"react":274}],39:[function(require,module,exports){
 "use strict";
-var __extends = (this && this.__extends) || function (d, b) {
-    for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
-    function __() { this.constructor = d; }
-    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
-};
+var __extends = (this && this.__extends) || (function () {
+    var extendStatics = Object.setPrototypeOf ||
+        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+    return function (d, b) {
+        extendStatics(d, b);
+        function __() { this.constructor = d; }
+        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
 var React = require("react");
 var data = require("./data");
 var sui = require("./sui");
-var pkg = require("./package");
+var ShareMode;
 (function (ShareMode) {
-    ShareMode[ShareMode["Screenshot"] = 0] = "Screenshot";
+    ShareMode[ShareMode["Code"] = 0] = "Code";
     ShareMode[ShareMode["Url"] = 1] = "Url";
     ShareMode[ShareMode["Editor"] = 2] = "Editor";
     ShareMode[ShareMode["Simulator"] = 3] = "Simulator";
-    ShareMode[ShareMode["Cli"] = 4] = "Cli";
-})(exports.ShareMode || (exports.ShareMode = {}));
-var ShareMode = exports.ShareMode;
-var ShareEditor = (function (_super) {
+})(ShareMode = exports.ShareMode || (exports.ShareMode = {}));
+var ShareEditor = /** @class */ (function (_super) {
     __extends(ShareEditor, _super);
     function ShareEditor(props) {
-        _super.call(this, props);
-        this.state = {
+        var _this = _super.call(this, props) || this;
+        _this.state = {
             currentPubId: undefined,
             pubCurrent: false,
             visible: false,
             advancedMenu: false
         };
+        return _this;
     }
     ShareEditor.prototype.hide = function () {
         this.setState({ visible: false });
     };
     ShareEditor.prototype.show = function (header) {
-        this.setState({ visible: true, mode: ShareMode.Screenshot, pubCurrent: header.pubCurrent, sharingError: false });
+        this.setState({ visible: true, mode: ShareMode.Code, pubCurrent: header.pubCurrent, sharingError: false });
     };
     ShareEditor.prototype.shouldComponentUpdate = function (nextProps, nextState, nextContext) {
         return this.state.visible != nextState.visible
             || this.state.advancedMenu != nextState.advancedMenu
             || this.state.mode != nextState.mode
             || this.state.pubCurrent != nextState.pubCurrent
-            || this.state.screenshotId != nextState.screenshotId
             || this.state.currentPubId != nextState.currentPubId
             || this.state.sharingError != nextState.sharingError;
     };
@@ -11006,15 +11796,14 @@ var ShareEditor = (function (_super) {
                 rootUrl += '/';
             var isBlocks = this.props.parent.getPreferredEditor() == pxt.BLOCKS_PROJECT_NAME;
             var pubCurrent = header ? header.pubCurrent : false;
-            var currentPubId_1 = (header ? header.pubId : undefined) || this.state.currentPubId;
-            ready = (!!currentPubId_1 && header.pubCurrent);
+            var currentPubId = (header ? header.pubId : undefined) || this.state.currentPubId;
+            ready = (!!currentPubId && header.pubCurrent);
             if (ready) {
-                url = "" + shareUrl + currentPubId_1;
-                var editUrl = rootUrl + "#pub:" + currentPubId_1;
+                url = "" + shareUrl + currentPubId;
+                var editUrl = rootUrl + "#pub:" + currentPubId;
                 switch (mode) {
-                    case ShareMode.Cli:
-                        embed = "pxt target " + pxt.appTarget.id + "\npxt extract " + url;
-                        help = lf("Run this command from a shell.");
+                    case ShareMode.Code:
+                        embed = pxt.docs.codeEmbedUrl(rootUrl, header.pubId);
                         break;
                     case ShareMode.Editor:
                         embed = pxt.docs.embedUrl(rootUrl, "pub", header.pubId);
@@ -11030,45 +11819,11 @@ var ShareEditor = (function (_super) {
                     case ShareMode.Url:
                         embed = editUrl;
                         break;
-                    default:
-                        if (isBlocks && pxt.blocks.layout.screenshotEnabled()) {
-                            // Render screenshot
-                            if (this.state.screenshotId == currentPubId_1) {
-                                if (this.state.screenshotUri)
-                                    embed = "<a href=\"" + editUrl + "\"><img src=\"" + this.state.screenshotUri + "\" /></a>";
-                                else
-                                    embed = lf("Ooops, no screenshot available.");
-                            }
-                            else {
-                                pxt.debug("rendering share-editor screenshot png");
-                                embed = lf("rendering...");
-                                pxt.blocks.layout.toPngAsync(this.props.parent.editor.editor)
-                                    .done(function (uri) { return _this.setState({ screenshotId: currentPubId_1, screenshotUri: uri }); });
-                            }
-                        }
-                        else {
-                            // Render javascript code
-                            pxt.debug("rendering share-editor javascript markdown");
-                            embed = lf("rendering...");
-                            var main = pkg.getEditorPkg(pkg.mainPkg);
-                            var file = main.getMainFile();
-                            if (pkg.File.blocksFileNameRx.test(file.getName()) && file.getVirtualFileName())
-                                file = main.lookupFile("this/" + file.getVirtualFileName()) || file;
-                            if (pkg.File.tsFileNameRx.test(file.getName())) {
-                                var fileContents = file.content;
-                                var mdContent = pxt.docs.renderMarkdown({
-                                    template: "@body@",
-                                    markdown: "```javascript\n" + fileContents + "\n```"
-                                });
-                                embed = "<a style=\"text-decoration: none;\" href=\"" + editUrl + "\">" + mdContent + "</a>";
-                            }
-                        }
-                        break;
                 }
             }
         }
         var publish = function () {
-            pxt.tickEvent("menu.embed.publish");
+            pxt.tickEvent("menu.embed.publish", undefined, { interactiveConsent: true });
             _this.setState({ sharingError: false });
             _this.props.parent.anonymousPublishAsync()
                 .catch(function (e) {
@@ -11080,10 +11835,10 @@ var ShareEditor = (function (_super) {
             });
             _this.forceUpdate();
         };
-        var formats = [{ mode: ShareMode.Screenshot, label: lf("Screenshot") },
+        var formats = [
+            { mode: ShareMode.Code, label: lf("Code") },
             { mode: ShareMode.Editor, label: lf("Editor") },
             { mode: ShareMode.Simulator, label: lf("Simulator") },
-            { mode: ShareMode.Cli, label: lf("Command line") }
         ];
         var action = !ready ? lf("Publish project") : undefined;
         var actionLoading = this.props.parent.state.publishing && !this.state.sharingError;
@@ -11102,17 +11857,17 @@ var ShareEditor = (function (_super) {
                 twitterText = lf("Check out what I made with @{0}!", socialOptions.orgTwitterHandle);
             }
             fbUrl = "https://www.facebook.com/sharer/sharer.php?u=" + encodeURIComponent(url);
-            twitterUrl = ("https://twitter.com/intent/tweet?url=" + encodeURIComponent(url)) +
+            twitterUrl = "https://twitter.com/intent/tweet?url=" + encodeURIComponent(url) +
                 ("&text=" + encodeURIComponent(twitterText)) +
                 (socialOptions.hashtags ? "&hashtags=" + encodeURIComponent(socialOptions.hashtags) : '');
             (socialOptions.related ? "&related=" + encodeURIComponent(socialOptions.related) : '');
         }
         var showFbPopup = function () {
-            pxt.tickEvent('share.facebook');
+            pxt.tickEvent('share.facebook', undefined, { interactiveConsent: true });
             sui.popupWindow(fbUrl, lf("Share on Facebook"), 600, 600);
         };
         var showTwtPopup = function () {
-            pxt.tickEvent('share.twitter');
+            pxt.tickEvent('share.twitter', undefined, { interactiveConsent: true });
             sui.popupWindow(twitterUrl, lf("Share on Twitter"), 600, 600);
         };
         var actions = [];
@@ -11125,62 +11880,86 @@ var ShareEditor = (function (_super) {
                 className: 'primary'
             });
         }
-        return (React.createElement(sui.Modal, {open: this.state.visible, className: "sharedialog", header: lf("Share Project"), size: "small", onClose: function () { return _this.setState({ visible: false }); }, dimmer: true, actions: actions, closeIcon: true, closeOnDimmerClick: true, closeOnDocumentClick: true, closeOnEscape: true}, React.createElement("div", {className: "ui form"}, action ?
-            React.createElement("div", null, React.createElement("p", null, lf("You need to publish your project to share it or embed it in other web pages.") + " " +
-                lf("You acknowledge having consent to publish this project.")), this.state.sharingError ?
-                React.createElement("p", {className: "ui red inverted segment"}, lf("Oops! There was an error. Please ensure you are connected to the Internet and try again."))
-                : undefined)
-            : undefined, url && ready ? React.createElement("div", null, React.createElement("p", null, lf("Your project is ready! Use the address below to share your projects.")), React.createElement(sui.Input, {id: "projectUri", class: "focused mini", readOnly: true, lines: 1, value: url, copy: true, selectOnClick: true, "aria-describedby": "projectUriLabel"}), React.createElement("label", {htmlFor: "projectUri", id: "projectUriLabel", className: "accessible-hidden"}, lf("This is the read-only internet address of your project.")), showSocialIcons ? React.createElement("div", {className: "social-icons"}, React.createElement("a", {className: "ui button large icon facebook", tabIndex: 0, "aria-label": "Facebook", onClick: function (e) { showFbPopup(); e.preventDefault(); return false; }}, React.createElement(sui.Icon, {icon: "facebook"})), React.createElement("a", {className: "ui button large icon twitter", tabIndex: 0, "aria-label": "Twitter", onClick: function (e) { showTwtPopup(); e.preventDefault(); return false; }}, React.createElement(sui.Icon, {icon: "twitter"}))) : undefined)
-            : undefined, ready && !hideEmbed ? React.createElement("div", null, React.createElement("div", {className: "ui divider"}), React.createElement(sui.Link, {class: "focused", icon: "chevron " + (advancedMenu ? "down" : "right"), text: lf("Embed"), ariaExpanded: advancedMenu, onClick: function () { return _this.setState({ advancedMenu: !advancedMenu }); }}), advancedMenu ?
-            React.createElement(sui.Menu, {pointing: true, secondary: true}, formats.map(function (f) {
-                return React.createElement(sui.MenuItem, {key: "tab" + f.label, id: "tab" + f.mode, active: mode == f.mode, name: f.label, onClick: function () { return _this.setState({ mode: f.mode }); }});
-            })) : undefined, advancedMenu ?
-            React.createElement(sui.Field, null, React.createElement(sui.Input, {id: "embedCode", class: "mini", readOnly: true, lines: 4, value: embed, copy: ready, disabled: !ready, selectOnClick: true}), React.createElement("label", {htmlFor: "embedCode", id: "embedCodeLabel", className: "accessible-hidden"}, lf("This is the read-only code for the selected tab."))) : null) : undefined)));
+        return (React.createElement(sui.Modal, { open: this.state.visible, className: "sharedialog", header: lf("Share Project"), size: "small", onClose: function () { return _this.setState({ visible: false }); }, dimmer: true, actions: actions, closeIcon: true, closeOnDimmerClick: true, closeOnDocumentClick: true, closeOnEscape: true },
+            React.createElement("div", { className: "ui form" },
+                action ?
+                    React.createElement("div", null,
+                        React.createElement("p", null, lf("You need to publish your project to share it or embed it in other web pages.") + " " +
+                            lf("You acknowledge having consent to publish this project.")),
+                        this.state.sharingError ?
+                            React.createElement("p", { className: "ui red inverted segment" }, lf("Oops! There was an error. Please ensure you are connected to the Internet and try again."))
+                            : undefined)
+                    : undefined,
+                url && ready ? React.createElement("div", null,
+                    React.createElement("p", null, lf("Your project is ready! Use the address below to share your projects.")),
+                    React.createElement(sui.Input, { id: "projectUri", class: "focused mini", readOnly: true, lines: 1, value: url, copy: true, selectOnClick: true, "aria-describedby": "projectUriLabel" }),
+                    React.createElement("label", { htmlFor: "projectUri", id: "projectUriLabel", className: "accessible-hidden" }, lf("This is the read-only internet address of your project.")),
+                    showSocialIcons ? React.createElement("div", { className: "social-icons" },
+                        React.createElement("a", { className: "ui button large icon facebook", tabIndex: 0, "aria-label": "Facebook", onClick: function (e) { showFbPopup(); e.preventDefault(); return false; } },
+                            React.createElement(sui.Icon, { icon: "facebook" })),
+                        React.createElement("a", { className: "ui button large icon twitter", tabIndex: 0, "aria-label": "Twitter", onClick: function (e) { showTwtPopup(); e.preventDefault(); return false; } },
+                            React.createElement(sui.Icon, { icon: "twitter" }))) : undefined)
+                    : undefined,
+                ready && !hideEmbed ? React.createElement("div", null,
+                    React.createElement("div", { className: "ui divider" }),
+                    React.createElement(sui.Link, { class: "focused", icon: "chevron " + (advancedMenu ? "down" : "right"), text: lf("Embed"), ariaExpanded: advancedMenu, onClick: function () { return _this.setState({ advancedMenu: !advancedMenu }); } }),
+                    advancedMenu ?
+                        React.createElement(sui.Menu, { pointing: true, secondary: true }, formats.map(function (f) {
+                            return React.createElement(sui.MenuItem, { key: "tab" + f.label, id: "tab" + f.mode, active: mode == f.mode, name: f.label, onClick: function () { return _this.setState({ mode: f.mode }); } });
+                        })) : undefined,
+                    advancedMenu ?
+                        React.createElement(sui.Field, null,
+                            React.createElement(sui.Input, { id: "embedCode", class: "mini", readOnly: true, lines: 4, value: embed, copy: ready, disabled: !ready, selectOnClick: true }),
+                            React.createElement("label", { htmlFor: "embedCode", id: "embedCodeLabel", className: "accessible-hidden" }, lf("This is the read-only code for the selected tab."))) : null) : undefined)));
     };
     return ShareEditor;
 }(data.Component));
 exports.ShareEditor = ShareEditor;
 
-},{"./data":14,"./package":32,"./sui":44,"react":277}],40:[function(require,module,exports){
-/// <reference path="../../typings/globals/react/index.d.ts" />
-/// <reference path="../../typings/globals/react-dom/index.d.ts" />
-/// <reference path="../../built/pxtlib.d.ts" />
+},{"./data":14,"./sui":44,"react":274}],40:[function(require,module,exports){
 "use strict";
-var __extends = (this && this.__extends) || function (d, b) {
-    for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
-    function __() { this.constructor = d; }
-    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
-};
+/// <reference path="../../built/pxtlib.d.ts" />
+var __extends = (this && this.__extends) || (function () {
+    var extendStatics = Object.setPrototypeOf ||
+        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+    return function (d, b) {
+        extendStatics(d, b);
+        function __() { this.constructor = d; }
+        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
 var React = require("react");
 var data = require("./data");
 var sui = require("./sui");
-var SimulatorToolbar = (function (_super) {
+var SimulatorToolbar = /** @class */ (function (_super) {
     __extends(SimulatorToolbar, _super);
     function SimulatorToolbar() {
-        _super.apply(this, arguments);
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     SimulatorToolbar.prototype.openInstructions = function () {
-        pxt.tickEvent("simulator.make");
+        pxt.tickEvent("simulator.make", undefined, { interactiveConsent: true });
         this.props.parent.openInstructions();
     };
     SimulatorToolbar.prototype.startStopSimulator = function () {
-        pxt.tickEvent('simulator.startstop');
+        pxt.tickEvent('simulator.startstop', undefined, { interactiveConsent: true });
         this.props.parent.startStopSimulator();
     };
     SimulatorToolbar.prototype.restartSimulator = function () {
-        pxt.tickEvent('simulator.restart');
+        pxt.tickEvent('simulator.restart', undefined, { interactiveConsent: true });
         this.props.parent.restartSimulator();
     };
     SimulatorToolbar.prototype.toggleTrace = function () {
-        pxt.tickEvent("simulator.trace");
+        pxt.tickEvent("simulator.trace", undefined, { interactiveConsent: true });
         this.props.parent.toggleTrace();
     };
     SimulatorToolbar.prototype.toggleMute = function () {
-        pxt.tickEvent("simulator.mute", { view: 'computer', muteTo: '' + !this.props.parent.state.mute });
+        pxt.tickEvent("simulator.mute", { view: 'computer', muteTo: '' + !this.props.parent.state.mute }, { interactiveConsent: true });
         this.props.parent.toggleMute();
     };
     SimulatorToolbar.prototype.toggleSimulatorFullscreen = function () {
-        pxt.tickEvent("simulator.fullscreen", { view: 'computer', fullScreenTo: '' + !this.props.parent.state.fullscreen });
+        pxt.tickEvent("simulator.fullscreen", { view: 'computer', fullScreenTo: '' + !this.props.parent.state.fullscreen }, { interactiveConsent: true });
         this.props.parent.toggleSimulatorFullscreen();
     };
     SimulatorToolbar.prototype.renderCore = function () {
@@ -11213,16 +11992,25 @@ var SimulatorToolbar = (function (_super) {
         var traceTooltip = parentState.tracing ? lf("Disable Slow-Mo") : lf("Slow-Mo");
         var fullscreenTooltip = isFullscreen ? lf("Exit fullscreen mode") : lf("Launch in fullscreen");
         var muteTooltip = isMuted ? lf("Unmute audio") : lf("Mute audio");
-        return React.createElement("aside", {className: "ui item grid centered portrait hide simtoolbar", role: "complementary", "aria-label": lf("Simulator toolbar")}, React.createElement("div", {className: "ui icon tiny buttons " + (isFullscreen ? 'massive' : ''), style: { padding: "0" }}, make ? React.createElement(sui.Button, {icon: 'configure', class: "fluid sixty secondary", text: lf("Make"), title: makeTooltip, onClick: function () { return _this.openInstructions(); }}) : undefined, run ? React.createElement(sui.Button, {key: 'runbtn', class: "play-button " + (isRunning ? "stop" : "play"), icon: isRunning ? "stop" : "play", title: runTooltip, onClick: function () { return _this.startStopSimulator(); }}) : undefined, restart ? React.createElement(sui.Button, {key: 'restartbtn', class: "restart-button", icon: "refresh", title: restartTooltip, onClick: function () { return _this.restartSimulator(); }}) : undefined, trace ? React.createElement(sui.Button, {key: 'debug', class: "trace-button " + (isTracing ? 'orange' : ''), icon: "xicon turtle", title: traceTooltip, onClick: function () { return _this.toggleTrace(); }}) : undefined), React.createElement("div", {className: "ui icon tiny buttons " + (isFullscreen ? 'massive' : ''), style: { padding: "0" }}, audio ? React.createElement(sui.Button, {key: 'mutebtn', class: "mute-button " + (isMuted ? 'red' : ''), icon: "" + (isMuted ? 'volume off' : 'volume up'), title: muteTooltip, onClick: function () { return _this.toggleMute(); }}) : undefined, fullscreen ? React.createElement(sui.Button, {key: 'fullscreenbtn', class: "fullscreen-button", icon: "xicon " + (isFullscreen ? 'fullscreencollapse' : 'fullscreen'), title: fullscreenTooltip, onClick: function () { return _this.toggleSimulatorFullscreen(); }}) : undefined));
+        return React.createElement("aside", { className: "ui item grid centered portrait hide simtoolbar", role: "complementary", "aria-label": lf("Simulator toolbar") },
+            React.createElement("div", { className: "ui icon tiny buttons " + (isFullscreen ? 'massive' : ''), style: { padding: "0" } },
+                make ? React.createElement(sui.Button, { icon: 'configure', class: "secondary", title: makeTooltip, onClick: function () { return _this.openInstructions(); } }) : undefined,
+                run ? React.createElement(sui.Button, { key: 'runbtn', class: "play-button " + (isRunning ? "stop" : "play"), icon: isRunning ? "stop" : "play", title: runTooltip, onClick: function () { return _this.startStopSimulator(); } }) : undefined,
+                restart ? React.createElement(sui.Button, { key: 'restartbtn', class: "restart-button", icon: "refresh", title: restartTooltip, onClick: function () { return _this.restartSimulator(); } }) : undefined,
+                trace ? React.createElement(sui.Button, { key: 'debug', class: "trace-button " + (isTracing ? 'orange' : ''), icon: "xicon turtle", title: traceTooltip, onClick: function () { return _this.toggleTrace(); } }) : undefined),
+            React.createElement("div", { className: "ui icon tiny buttons " + (isFullscreen ? 'massive' : ''), style: { padding: "0" } },
+                audio ? React.createElement(sui.Button, { key: 'mutebtn', class: "mute-button " + (isMuted ? 'red' : ''), icon: "" + (isMuted ? 'volume off' : 'volume up'), title: muteTooltip, onClick: function () { return _this.toggleMute(); } }) : undefined,
+                fullscreen ? React.createElement(sui.Button, { key: 'fullscreenbtn', class: "fullscreen-button", icon: "xicon " + (isFullscreen ? 'fullscreencollapse' : 'fullscreen'), title: fullscreenTooltip, onClick: function () { return _this.toggleSimulatorFullscreen(); } }) : undefined));
     };
     return SimulatorToolbar;
 }(data.Component));
 exports.SimulatorToolbar = SimulatorToolbar;
 
-},{"./data":14,"./sui":44,"react":277}],41:[function(require,module,exports){
+},{"./data":14,"./sui":44,"react":274}],41:[function(require,module,exports){
+"use strict";
 /// <reference path="../../built/pxtsim.d.ts" />
 /// <reference path="../../localtypings/pxtparts.d.ts" />
-"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
 var core = require("./core");
 var U = pxt.U;
 exports.FAST_TRACE_INTERVAL = 100;
@@ -11235,6 +12023,10 @@ var tutorialMode;
 var displayedModals = {};
 var dirty = false;
 var $debugger;
+function setTranslations(translations) {
+    exports.simTranslations = translations;
+}
+exports.setTranslations = setTranslations;
 function init(root, cfg) {
     $(root).html("\n        <div id=\"simulators\" class='simulator'>\n        </div>\n        <div id=\"debugger\" class=\"ui item landscape only\">\n        </div>\n        ");
     $debugger = $('#debugger');
@@ -11529,6 +12321,7 @@ function updateDebuggerButtons(brk) {
 
 },{"./core":13}],42:[function(require,module,exports){
 "use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
 var audio = require("./audio");
 var sounds = {};
 var volume = 0.2;
@@ -11574,8 +12367,9 @@ exports.initTutorial = initTutorial;
 
 },{"./audio":4}],43:[function(require,module,exports){
 "use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
 var React = require("react");
-var Editor = (function () {
+var Editor = /** @class */ (function () {
     function Editor(parent) {
         this.parent = parent;
         this.isVisible = false;
@@ -11603,7 +12397,7 @@ var Editor = (function () {
         return "editor";
     };
     Editor.prototype.displayOuter = function () {
-        return (React.createElement("div", {className: 'full-abs', key: this.getId(), id: this.getId(), style: { display: this.isVisible ? "block" : "none" }}, this.display()));
+        return (React.createElement("div", { className: 'full-abs', key: this.getId(), id: this.getId(), style: { display: this.isVisible ? "block" : "none" } }, this.display()));
     };
     Editor.prototype.display = function () {
         return null;
@@ -11660,13 +12454,19 @@ var Editor = (function () {
 }());
 exports.Editor = Editor;
 
-},{"react":277}],44:[function(require,module,exports){
+},{"react":274}],44:[function(require,module,exports){
 "use strict";
-var __extends = (this && this.__extends) || function (d, b) {
-    for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
-    function __() { this.constructor = d; }
-    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
-};
+var __extends = (this && this.__extends) || (function () {
+    var extendStatics = Object.setPrototypeOf ||
+        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+    return function (d, b) {
+        extendStatics(d, b);
+        function __() { this.constructor = d; }
+        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
 var React = require("react");
 var ReactDOM = require("react-dom");
 var data = require("./data");
@@ -11681,8 +12481,8 @@ function genericClassName(cls, props, ignoreIcon) {
 }
 function genericContent(props) {
     var retVal = [
-        props.icon ? (React.createElement(Icon, {key: 'iconkey', icon: props.icon + (props.text ? " icon-and-text " : "") + (props.iconClass ? " " + props.iconClass : '')})) : null,
-        props.text ? (React.createElement("span", {key: 'textkey', className: 'ui text' + (props.textClass ? ' ' + props.textClass : '')}, props.text)) : null,
+        props.icon ? (React.createElement(Icon, { key: 'iconkey', icon: props.icon + (props.text ? " icon-and-text " : "") + (props.iconClass ? " " + props.iconClass : '') })) : null,
+        props.text ? (React.createElement("span", { key: 'textkey', className: 'ui text' + (props.textClass ? ' ' + props.textClass : '') }, props.text)) : null,
     ];
     if (props.icon && props.rightIcon)
         retVal = retVal.reverse();
@@ -11707,10 +12507,10 @@ function fireClickOnEnter(e) {
     }
 }
 exports.fireClickOnEnter = fireClickOnEnter;
-var UiElement = (function (_super) {
+var UiElement = /** @class */ (function (_super) {
     __extends(UiElement, _super);
     function UiElement() {
-        _super.apply(this, arguments);
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     UiElement.prototype.popup = function () {
         if (this.props.popup) {
@@ -11735,14 +12535,13 @@ var UiElement = (function (_super) {
     return UiElement;
 }(data.Component));
 exports.UiElement = UiElement;
-var DropdownMenuItem = (function (_super) {
+var DropdownMenuItem = /** @class */ (function (_super) {
     __extends(DropdownMenuItem, _super);
     function DropdownMenuItem() {
-        var _this = this;
-        _super.apply(this, arguments);
-        this.isOpened = false;
-        this.preventHide = false;
-        this.menuItemKeyDown = function (e) {
+        var _this = _super !== null && _super.apply(this, arguments) || this;
+        _this.isOpened = false;
+        _this.preventHide = false;
+        _this.menuItemKeyDown = function (e) {
             var charCode = (typeof e.which == "number") ? e.which : e.keyCode;
             if (charCode === core.TAB_KEY) {
                 _this.close();
@@ -11753,7 +12552,7 @@ var DropdownMenuItem = (function (_super) {
                 _this.child("").focus();
             }
         };
-        this.dropDownKeyDown = function (e) {
+        _this.dropDownKeyDown = function (e) {
             var charCode = (typeof e.which == "number") ? e.which : e.keyCode;
             if (charCode === core.ENTER_KEY || charCode === core.SPACE_KEY) {
                 if (_this.isOpened) {
@@ -11764,6 +12563,7 @@ var DropdownMenuItem = (function (_super) {
                 }
             }
         };
+        return _this;
     }
     DropdownMenuItem.prototype.close = function () {
         this.preventHide = false;
@@ -11816,71 +12616,82 @@ var DropdownMenuItem = (function (_super) {
         this.popup();
     };
     DropdownMenuItem.prototype.renderCore = function () {
-        return (React.createElement("div", {className: genericClassName("ui dropdown item", this.props), role: "menuitem", title: this.props.title, tabIndex: this.props.tabIndex, "aria-haspopup": "true"}, genericContent(this.props), React.createElement("div", {className: "menu", role: "menu", "aria-expanded": this.isOpened, "aria-label": lf("Dropdown menu {0}", this.props.title), "aria-hidden": !this.isOpened}, this.props.children)));
+        return (React.createElement("div", { className: genericClassName("ui dropdown item", this.props), role: "menuitem", title: this.props.title, tabIndex: this.props.tabIndex, "aria-haspopup": "true" },
+            genericContent(this.props),
+            React.createElement("div", { className: "menu", role: "menu", "aria-expanded": this.isOpened, "aria-label": lf("Dropdown menu {0}", this.props.title), "aria-hidden": !this.isOpened }, this.props.children)));
     };
     return DropdownMenuItem;
 }(UiElement));
 exports.DropdownMenuItem = DropdownMenuItem;
-var Icon = (function (_super) {
+var Icon = /** @class */ (function (_super) {
     __extends(Icon, _super);
     function Icon() {
-        _super.apply(this, arguments);
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     Icon.prototype.renderCore = function () {
-        return React.createElement("i", {className: "icon " + this.props.icon, onClick: this.props.onClick, "aria-hidden": true, role: "presentation"}, this.props.children);
+        return React.createElement("i", { className: "icon " + this.props.icon, onClick: this.props.onClick, "aria-hidden": true, role: "presentation" }, this.props.children);
     };
     return Icon;
 }(data.Component));
 exports.Icon = Icon;
-var Item = (function (_super) {
+var Item = /** @class */ (function (_super) {
     __extends(Item, _super);
     function Item() {
-        _super.apply(this, arguments);
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     Item.prototype.renderCore = function () {
         var _a = this.props, text = _a.text, title = _a.title, ariaLabel = _a.ariaLabel;
-        return (React.createElement("div", {className: genericClassName("ui item link", this.props, true) + (" " + (this.props.active ? 'active' : '')), role: this.props.role, "aria-label": ariaLabel || title || text, title: title || text, tabIndex: this.props.tabIndex || 0, key: this.props.value, "data-value": this.props.value, onClick: this.props.onClick, onKeyDown: this.props.onKeyDown || fireClickOnEnter}, genericContent(this.props), this.props.children));
+        return (React.createElement("div", { className: genericClassName("ui item link", this.props, true) + (" " + (this.props.active ? 'active' : '')), role: this.props.role, "aria-label": ariaLabel || title || text, title: title || text, tabIndex: this.props.tabIndex || 0, key: this.props.value, "data-value": this.props.value, onClick: this.props.onClick, onKeyDown: this.props.onKeyDown || fireClickOnEnter },
+            genericContent(this.props),
+            this.props.children));
     };
     return Item;
 }(data.Component));
 exports.Item = Item;
-var ButtonMenuItem = (function (_super) {
+var ButtonMenuItem = /** @class */ (function (_super) {
     __extends(ButtonMenuItem, _super);
     function ButtonMenuItem() {
-        _super.apply(this, arguments);
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     ButtonMenuItem.prototype.renderCore = function () {
-        return (React.createElement("div", {className: genericClassName("ui item link", this.props, true) + (" " + (this.props.active ? 'active' : '')), role: this.props.role, title: this.props.title || this.props.text, tabIndex: this.props.tabIndex || 0, key: this.props.value, "data-value": this.props.value, onClick: this.props.onClick, onKeyDown: this.props.onKeyDown || fireClickOnEnter}, React.createElement("div", {className: genericClassName("ui button", this.props)}, genericContent(this.props), this.props.children)));
+        return (React.createElement("div", { className: genericClassName("ui item link", this.props, true) + (" " + (this.props.active ? 'active' : '')), role: this.props.role, title: this.props.title || this.props.text, tabIndex: this.props.tabIndex || 0, key: this.props.value, "data-value": this.props.value, onClick: this.props.onClick, onKeyDown: this.props.onKeyDown || fireClickOnEnter },
+            React.createElement("div", { className: genericClassName("ui button", this.props) },
+                genericContent(this.props),
+                this.props.children)));
     };
     return ButtonMenuItem;
 }(UiElement));
 exports.ButtonMenuItem = ButtonMenuItem;
-var Button = (function (_super) {
+var Button = /** @class */ (function (_super) {
     __extends(Button, _super);
     function Button() {
-        _super.apply(this, arguments);
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     Button.prototype.renderCore = function () {
-        return (React.createElement("button", {className: genericClassName("ui button", this.props) + " " + (this.props.disabled ? "disabled" : ""), id: this.props.id, role: this.props.role, title: this.props.title, tabIndex: this.props.tabIndex || 0, "aria-label": this.props.ariaLabel, "aria-expanded": this.props.ariaExpanded, onClick: this.props.onClick, onKeyDown: this.props.onKeyDown}, genericContent(this.props), this.props.children));
+        return (React.createElement("button", { className: genericClassName("ui button", this.props) + " " + (this.props.disabled ? "disabled" : ""), id: this.props.id, role: this.props.role, title: this.props.title, tabIndex: this.props.tabIndex || 0, "aria-label": this.props.ariaLabel, "aria-expanded": this.props.ariaExpanded, onClick: this.props.onClick, onKeyDown: this.props.onKeyDown },
+            genericContent(this.props),
+            this.props.children));
     };
     return Button;
 }(UiElement));
 exports.Button = Button;
-var Link = (function (_super) {
+var Link = /** @class */ (function (_super) {
     __extends(Link, _super);
     function Link() {
-        _super.apply(this, arguments);
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     Link.prototype.renderCore = function () {
-        return (React.createElement("a", {className: genericClassName("ui", this.props) + " " + (this.props.disabled ? "disabled" : ""), id: this.props.id, href: this.props.href, target: this.props.target, role: this.props.role, title: this.props.title, tabIndex: this.props.tabIndex || 0, "aria-label": this.props.ariaLabel, "aria-expanded": this.props.ariaExpanded, onClick: this.props.onClick, onKeyDown: this.props.onKeyDown}, genericContent(this.props), this.props.children));
+        return (React.createElement("a", { className: genericClassName("ui", this.props) + " " + (this.props.disabled ? "disabled" : ""), id: this.props.id, href: this.props.href, target: this.props.target, role: this.props.role, title: this.props.title, tabIndex: this.props.tabIndex || 0, "aria-label": this.props.ariaLabel, "aria-expanded": this.props.ariaExpanded, onClick: this.props.onClick, onKeyDown: this.props.onKeyDown },
+            genericContent(this.props),
+            this.props.children));
     };
     return Link;
 }(UiElement));
 exports.Link = Link;
-var Popup = (function (_super) {
+var Popup = /** @class */ (function (_super) {
     __extends(Popup, _super);
     function Popup() {
-        _super.apply(this, arguments);
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     Popup.prototype.componentDidMount = function () {
         this.child(".popup-button").popup({
@@ -11897,26 +12708,31 @@ var Popup = (function (_super) {
         this.child(".popup-button").popup('refresh');
     };
     Popup.prototype.renderCore = function () {
-        return (React.createElement("div", {role: this.props.role}, React.createElement("div", {className: genericClassName("ui button popup-button", this.props)}, genericContent(this.props)), React.createElement("div", {className: "ui popup transition hidden"}, this.props.children)));
+        return (React.createElement("div", { role: this.props.role },
+            React.createElement("div", { className: genericClassName("ui button popup-button", this.props) }, genericContent(this.props)),
+            React.createElement("div", { className: "ui popup transition hidden" }, this.props.children)));
     };
     return Popup;
 }(data.Component));
 exports.Popup = Popup;
-var Field = (function (_super) {
+var Field = /** @class */ (function (_super) {
     __extends(Field, _super);
     function Field() {
-        _super.apply(this, arguments);
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     Field.prototype.renderCore = function () {
-        return (React.createElement("div", {className: "field"}, this.props.label ? React.createElement("label", {htmlFor: !this.props.ariaLabel ? this.props.htmlFor : undefined}, this.props.label) : null, this.props.ariaLabel && this.props.htmlFor ? (React.createElement("label", {htmlFor: this.props.htmlFor, className: "accessible-hidden"}, this.props.ariaLabel)) : "", this.props.children));
+        return (React.createElement("div", { className: "field" },
+            this.props.label ? React.createElement("label", { htmlFor: !this.props.ariaLabel ? this.props.htmlFor : undefined }, this.props.label) : null,
+            this.props.ariaLabel && this.props.htmlFor ? (React.createElement("label", { htmlFor: this.props.htmlFor, className: "accessible-hidden" }, this.props.ariaLabel)) : "",
+            this.props.children));
     };
     return Field;
 }(data.Component));
 exports.Field = Field;
-var Input = (function (_super) {
+var Input = /** @class */ (function (_super) {
     __extends(Input, _super);
     function Input() {
-        _super.apply(this, arguments);
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     Input.prototype.copy = function () {
         var p = this.props;
@@ -11942,7 +12758,7 @@ var Input = (function (_super) {
         var _this = this;
         var p = this.props;
         var copyBtn = p.copy && document.queryCommandSupported('copy')
-            ? React.createElement(Button, {class: "ui right labeled primary icon button", text: lf("Copy"), icon: "copy", onClick: function () { return _this.copy(); }})
+            ? React.createElement(Button, { class: "ui right labeled primary icon button", text: lf("Copy"), icon: "copy", onClick: function () { return _this.copy(); } })
             : null;
         var value = (this.state && this.state.value !== undefined) ? this.state.value : p.value;
         var onChange = function (newValue) {
@@ -11953,28 +12769,35 @@ var Input = (function (_super) {
                 p.onChange(newValue);
             }
         };
-        return (React.createElement(Field, {ariaLabel: p.ariaLabel, htmlFor: p.id, label: p.label}, React.createElement("div", {className: "ui input" + (p.inputLabel ? " labelled" : "") + (p.copy ? " action fluid" : "") + (p.disabled ? " disabled" : "")}, p.inputLabel ? (React.createElement("div", {className: "ui label"}, p.inputLabel)) : "", !p.lines || p.lines == 1 ? React.createElement("input", {id: p.id, className: p.class || "", type: p.type || "text", placeholder: p.placeholder, value: value, readOnly: !!p.readOnly, onClick: function (e) { return p.selectOnClick ? e.target.setSelectionRange(0, 9999) : undefined; }, onChange: function (v) { return onChange(v.target.value); }})
-            : React.createElement("textarea", {id: p.id, className: "ui input " + (p.class || "") + (p.inputLabel ? " labelled" : ""), rows: p.lines, placeholder: p.placeholder, value: value, readOnly: !!p.readOnly, onClick: function (e) { return p.selectOnClick ? e.target.setSelectionRange(0, 9999) : undefined; }, onChange: function (v) { return onChange(v.target.value); }}), copyBtn)));
+        return (React.createElement(Field, { ariaLabel: p.ariaLabel, htmlFor: p.id, label: p.label },
+            React.createElement("div", { className: "ui input" + (p.inputLabel ? " labelled" : "") + (p.copy ? " action fluid" : "") + (p.disabled ? " disabled" : "") },
+                p.inputLabel ? (React.createElement("div", { className: "ui label" }, p.inputLabel)) : "",
+                !p.lines || p.lines == 1 ? React.createElement("input", { id: p.id, className: p.class || "", type: p.type || "text", placeholder: p.placeholder, value: value, readOnly: !!p.readOnly, onClick: function (e) { return p.selectOnClick ? e.target.setSelectionRange(0, 9999) : undefined; }, onChange: function (v) { return onChange(v.target.value); } })
+                    : React.createElement("textarea", { id: p.id, className: "ui input " + (p.class || "") + (p.inputLabel ? " labelled" : ""), rows: p.lines, placeholder: p.placeholder, value: value, readOnly: !!p.readOnly, onClick: function (e) { return p.selectOnClick ? e.target.setSelectionRange(0, 9999) : undefined; }, onChange: function (v) { return onChange(v.target.value); } }),
+                copyBtn)));
     };
     return Input;
 }(data.Component));
 exports.Input = Input;
-var Checkbox = (function (_super) {
+var Checkbox = /** @class */ (function (_super) {
     __extends(Checkbox, _super);
     function Checkbox() {
-        _super.apply(this, arguments);
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     Checkbox.prototype.renderCore = function () {
         var p = this.props;
-        return React.createElement(Field, {label: p.label}, React.createElement("div", {className: "ui toggle checkbox"}, React.createElement("input", {type: "checkbox", checked: p.checked, onChange: function (v) { return p.onChange(v.target.value); }}), p.inputLabel ? React.createElement("label", null, p.inputLabel) : undefined));
+        return React.createElement(Field, { label: p.label },
+            React.createElement("div", { className: "ui toggle checkbox" },
+                React.createElement("input", { type: "checkbox", checked: p.checked, onChange: function (v) { return p.onChange(v.target.value); } }),
+                p.inputLabel ? React.createElement("label", null, p.inputLabel) : undefined));
     };
     return Checkbox;
 }(data.Component));
 exports.Checkbox = Checkbox;
-var Segment = (function (_super) {
+var Segment = /** @class */ (function (_super) {
     __extends(Segment, _super);
     function Segment() {
-        _super.apply(this, arguments);
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     Segment.prototype.renderCore = function () {
         var _a = this.props, attached = _a.attached, basic = _a.basic, children = _a.children, circular = _a.circular, className = _a.className, clearing = _a.clearing, color = _a.color, compact = _a.compact, disabled = _a.disabled, floated = _a.floated, inverted = _a.inverted, loading = _a.loading, padded = _a.padded, piled = _a.piled, raised = _a.raised, secondary = _a.secondary, size = _a.size, stacked = _a.stacked, tertiary = _a.tertiary, textAlign = _a.textAlign, vertical = _a.vertical;
@@ -12002,21 +12825,21 @@ var Segment = (function (_super) {
             'segment',
             className,
         ]);
-        return (React.createElement("div", {className: classes}, children));
+        return (React.createElement("div", { className: classes }, children));
     };
     return Segment;
 }(data.Component));
 exports.Segment = Segment;
-var MenuItem = (function (_super) {
+var MenuItem = /** @class */ (function (_super) {
     __extends(MenuItem, _super);
     function MenuItem(props) {
-        var _this = this;
-        _super.call(this, props);
-        this.handleClick = function (e) {
+        var _this = _super.call(this, props) || this;
+        _this.handleClick = function (e) {
             var onClick = _this.props.onClick;
             if (onClick)
                 onClick(e, _this.props);
         };
+        return _this;
     }
     MenuItem.prototype.renderCore = function () {
         var _a = this.props, active = _a.active, children = _a.children, className = _a.className, color = _a.color, content = _a.content, fitted = _a.fitted, header = _a.header, icon = _a.icon, link = _a.link, name = _a.name, onClick = _a.onClick, position = _a.position, ariaControls = _a.ariaControls, id = _a.id;
@@ -12032,19 +12855,20 @@ var MenuItem = (function (_super) {
             className
         ]);
         if (children) {
-            return React.createElement("div", {className: classes, onClick: this.handleClick}, children);
+            return React.createElement("div", { className: classes, onClick: this.handleClick }, children);
         }
-        return (React.createElement("div", {id: id, tabIndex: active ? 0 : -1, className: classes, onClick: this.handleClick, role: "tab", "aria-controls": ariaControls, "aria-selected": active, "aria-label": content || name}, icon ? React.createElement(Icon, {icon: icon}) : undefined, content || name));
+        return (React.createElement("div", { id: id, tabIndex: active ? 0 : -1, className: classes, onClick: this.handleClick, role: "tab", "aria-controls": ariaControls, "aria-selected": active, "aria-label": content || name },
+            icon ? React.createElement(Icon, { icon: icon }) : undefined,
+            content || name));
     };
     return MenuItem;
 }(data.Component));
 exports.MenuItem = MenuItem;
-var Menu = (function (_super) {
+var Menu = /** @class */ (function (_super) {
     __extends(Menu, _super);
     function Menu(props) {
-        var _this = this;
-        _super.call(this, props);
-        this.handleKeyboardNavigation = function (e) {
+        var _this = _super.call(this, props) || this;
+        _this.handleKeyboardNavigation = function (e) {
             var charCode = (typeof e.which == "number") ? e.which : e.keyCode;
             var leftOrUpKey = charCode === 37 || charCode === 38;
             var rightorBottomKey = charCode === 39 || charCode === 40;
@@ -12085,6 +12909,7 @@ var Menu = (function (_super) {
                 selectedTab.focus();
             }
         };
+        return _this;
     }
     Menu.prototype.componentDidMount = function () {
         var _this = this;
@@ -12117,32 +12942,31 @@ var Menu = (function (_super) {
             className,
             'menu'
         ]);
-        return (React.createElement("div", {className: classes, role: "tablist"}, children));
+        return (React.createElement("div", { className: classes, role: "tablist" }, children));
     };
     return Menu;
 }(data.Component));
 exports.Menu = Menu;
-var Modal = (function (_super) {
+var Modal = /** @class */ (function (_super) {
     __extends(Modal, _super);
     function Modal(props) {
-        var _this = this;
-        _super.call(this, props);
-        this.getMountNode = function () { return _this.props.mountNode || document.body; };
-        this.handleClose = function (e) {
+        var _this = _super.call(this, props) || this;
+        _this.getMountNode = function () { return _this.props.mountNode || document.body; };
+        _this.handleClose = function (e) {
             if (_this.state.open != false)
                 _this.setState({ open: false });
             var onClose = _this.props.onClose;
             if (onClose)
                 onClose(e, _this.props);
         };
-        this.handleOpen = function (e) {
+        _this.handleOpen = function (e) {
             var onOpen = _this.props.onOpen;
             if (onOpen)
                 onOpen(e, _this.props);
             if (_this.state.open != true)
                 _this.setState({ open: true, scrolling: false });
         };
-        this.setPosition = function () {
+        _this.setPosition = function () {
             if (_this.ref) {
                 var dimmer = _this.props.dimmer;
                 var mountNode = _this.getMountNode();
@@ -12181,7 +13005,7 @@ var Modal = (function (_super) {
             }
             _this.animationId = requestAnimationFrame(_this.setPosition);
         };
-        this.handlePortalMount = function () {
+        _this.handlePortalMount = function () {
             var dimmer = _this.props.dimmer;
             var mountNode = _this.getMountNode();
             if (dimmer) {
@@ -12193,8 +13017,8 @@ var Modal = (function (_super) {
             }
             _this.setPosition();
         };
-        this.handleRef = function (c) { return (_this.ref = c); };
-        this.handlePortalUnmount = function () {
+        _this.handleRef = function (c) { return (_this.ref = c); };
+        _this.handlePortalUnmount = function () {
             var mountNode = _this.getMountNode();
             mountNode.classList.remove('blurring');
             mountNode.classList.remove('dimmable');
@@ -12203,11 +13027,12 @@ var Modal = (function (_super) {
             if (_this.animationId)
                 cancelAnimationFrame(_this.animationId);
         };
-        this.id = Util.guidGen();
-        this.state = {
-            open: this.props.open,
+        _this.id = Util.guidGen();
+        _this.state = {
+            open: _this.props.open,
             scrolling: false
         };
+        return _this;
     }
     Modal.prototype.componentWillUnmount = function () {
         this.handlePortalUnmount();
@@ -12240,14 +13065,22 @@ var Modal = (function (_super) {
             className,
         ]);
         var closeIconName = closeIcon === true ? 'close' : closeIcon;
-        var modalJSX = (React.createElement("div", {className: classes, style: { marginTop: marginTop }, ref: this.handleRef, role: "dialog", "aria-labelledby": this.props.header ? this.id + 'title' : undefined, "aria-describedby": this.props.description ? this.id + 'description' : this.id + 'desc'}, this.props.header ? React.createElement("div", {id: this.id + 'title', className: "header " + (this.props.headerClass || "")}, this.props.header, this.props.helpUrl ?
-            React.createElement("a", {className: "ui huge icon clear focused", href: this.props.helpUrl, target: "_docs", role: "button", "aria-label": lf("Help on {0} dialog", this.props.header)}, React.createElement(Icon, {icon: "help"}))
-            : undefined) : undefined, this.props.description ? React.createElement("label", {id: this.id + 'description', className: "accessible-hidden"}, this.props.description) : undefined, React.createElement("div", {id: this.id + 'desc', className: (longer ? 'scrolling' : '') + " content"}, children), this.props.actions && this.props.actions.length > 0 ?
-            React.createElement("div", {className: "actions"}, this.props.actions.map(function (action) {
-                return React.createElement(Button, {key: "action_" + action.label, icon: action.icon, text: action.label, class: "approve " + (action.icon ? 'icon right labeled' : '') + " " + (action.className || '') + " " + (action.loading ? "loading disabled" : "") + " focused", onClick: function () {
-                    action.onClick();
-                }, onKeyDown: fireClickOnEnter});
-            })) : undefined, closeIcon ? React.createElement(Button, {icon: closeIconName, class: "huge clear right floated closeIcon focused", onClick: function () { return _this.handleClose(null); }, tabIndex: 0, ariaLabel: lf("Close dialog")}) : undefined));
+        var modalJSX = (React.createElement("div", { className: classes, style: { marginTop: marginTop }, ref: this.handleRef, role: "dialog", "aria-labelledby": this.props.header ? this.id + 'title' : undefined, "aria-describedby": this.props.description ? this.id + 'description' : this.id + 'desc' },
+            this.props.header ? React.createElement("div", { id: this.id + 'title', className: "header " + (this.props.headerClass || "") },
+                this.props.header,
+                this.props.helpUrl ?
+                    React.createElement("a", { className: "ui huge icon clear focused", href: this.props.helpUrl, target: "_docs", role: "button", "aria-label": lf("Help on {0} dialog", this.props.header) },
+                        React.createElement(Icon, { icon: "help" }))
+                    : undefined) : undefined,
+            this.props.description ? React.createElement("label", { id: this.id + 'description', className: "accessible-hidden" }, this.props.description) : undefined,
+            React.createElement("div", { id: this.id + 'desc', className: (longer ? 'scrolling' : '') + " content" }, children),
+            this.props.actions && this.props.actions.length > 0 ?
+                React.createElement("div", { className: "actions" }, this.props.actions.map(function (action) {
+                    return React.createElement(Button, { key: "action_" + action.label, icon: action.icon, text: action.label, class: "approve " + (action.icon ? 'icon right labeled' : '') + " " + (action.className || '') + " " + (action.loading ? "loading disabled" : "") + " focused", onClick: function () {
+                            action.onClick();
+                        }, onKeyDown: fireClickOnEnter });
+                })) : undefined,
+            closeIcon ? React.createElement(Button, { icon: closeIconName, class: "huge clear right floated closeIcon focused", onClick: function () { return _this.handleClose(null); }, tabIndex: 0, ariaLabel: lf("Close dialog") }) : undefined));
         var dimmerClasses = !dimmer
             ? null
             : cx([
@@ -12260,17 +13093,16 @@ var Modal = (function (_super) {
                 dimmerClassName
             ]);
         var blurring = dimmer === 'blurring';
-        return (React.createElement(Portal, {closeOnRootNodeClick: closeOnDimmerClick, closeOnDocumentClick: closeOnDocumentClick, closeOnEscape: closeOnEscape, className: dimmerClasses, mountNode: this.getMountNode(), onMount: this.handlePortalMount, onUnmount: this.handlePortalUnmount, onClose: this.handleClose, onOpen: this.handleOpen, open: open, allowResetFocus: allowResetFocus}, modalJSX));
+        return (React.createElement(Portal, { closeOnRootNodeClick: closeOnDimmerClick, closeOnDocumentClick: closeOnDocumentClick, closeOnEscape: closeOnEscape, className: dimmerClasses, mountNode: this.getMountNode(), onMount: this.handlePortalMount, onUnmount: this.handlePortalUnmount, onClose: this.handleClose, onOpen: this.handleOpen, open: open, allowResetFocus: allowResetFocus }, modalJSX));
     };
     return Modal;
 }(data.Component));
 exports.Modal = Modal;
-var Portal = (function (_super) {
+var Portal = /** @class */ (function (_super) {
     __extends(Portal, _super);
     function Portal(props) {
-        var _this = this;
-        _super.call(this, props);
-        this.handleDocumentClick = function (e) {
+        var _this = _super.call(this, props) || this;
+        _this.handleDocumentClick = function (e) {
             var _a = _this.props, closeOnDocumentClick = _a.closeOnDocumentClick, closeOnRootNodeClick = _a.closeOnRootNodeClick;
             if (!_this.rootNode || !_this.portalNode || _this.portalNode.contains(e.target))
                 return;
@@ -12279,7 +13111,7 @@ var Portal = (function (_super) {
                 _this.close(e);
             }
         };
-        this.handleEscape = function (e) {
+        _this.handleEscape = function (e) {
             var charCode = (typeof e.which == "number") ? e.which : e.keyCode;
             if (charCode !== 27) {
                 return;
@@ -12290,21 +13122,21 @@ var Portal = (function (_super) {
                 _this.close(e);
             }
         };
-        this.close = function (e) {
+        _this.close = function (e) {
             if (_this.state.open != false)
                 _this.setState({ open: false });
             var onClose = _this.props.onClose;
             if (onClose)
                 onClose(e);
         };
-        this.open = function (e) {
+        _this.open = function (e) {
             var onOpen = _this.props.onOpen;
             if (onOpen)
                 onOpen(e);
             if (_this.state.open != true)
                 _this.setState({ open: true });
         };
-        this.mountPortal = function () {
+        _this.mountPortal = function () {
             if (_this.rootNode)
                 return;
             var _a = _this.props.mountNode, mountNode = _a === void 0 ? document.body : _a;
@@ -12316,7 +13148,7 @@ var Portal = (function (_super) {
             if (onMount)
                 onMount();
         };
-        this.unmountPortal = function () {
+        _this.unmountPortal = function () {
             if (!_this.rootNode)
                 return;
             ReactDOM.unmountComponentAtNode(_this.rootNode);
@@ -12333,7 +13165,8 @@ var Portal = (function (_super) {
                 _this.focusedNodeBeforeOpening = null;
             }
         };
-        this.focusedNodeBeforeOpening = null;
+        _this.focusedNodeBeforeOpening = null;
+        return _this;
     }
     Portal.prototype.componentDidMount = function () {
         if (this.state.open) {
@@ -12381,8 +13214,9 @@ var Portal = (function (_super) {
 }(data.Component));
 exports.Portal = Portal;
 
-},{"./core":13,"./data":14,"react":277,"react-dom":148}],45:[function(require,module,exports){
+},{"./core":13,"./data":14,"react":274,"react-dom":145}],45:[function(require,module,exports){
 "use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
 var pkg = require("./package");
 var compiler = require("./compiler");
 var iface;
@@ -12411,7 +13245,8 @@ exports.td2tsAsync = td2tsAsync;
 
 },{"./compiler":11,"./package":32}],46:[function(require,module,exports){
 "use strict";
-var defaultToolboxString = "<xml id=\"blocklyToolboxDefinition\" style=\"display: none\">\n    <category name=\"Loops\" nameid=\"loops\" colour=\"#107c10\" category=\"50\" web-icon=\"\uF01E\" iconclass=\"blocklyTreeIconloops\" expandedclass=\"blocklyTreeIconloops\">    \n        <block type=\"controls_repeat_ext\">\n            <value name=\"TIMES\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">4</field>\n                </shadow>\n            </value>\n        </block>\n        <block type=\"device_while\">\n            <value name=\"COND\">\n                <shadow type=\"logic_boolean\"></shadow>\n            </value>\n        </block>\n        <block type=\"controls_simple_for\">\n            <value name=\"TO\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">4</field>\n                </shadow>\n            </value>\n        </block>\n        <block type=\"controls_for_of\">\n            <value name=\"LIST\">\n                <shadow type=\"variables_get\">\n                    <field name=\"VAR\">list</field>\n                </shadow>\n            </value>\n        </block>\n    </category>\n    <category name=\"Logic\" nameid=\"logic\" colour=\"#006970\" category=\"49\" web-icon=\"\uF074\" iconclass=\"blocklyTreeIconlogic\" expandedclass=\"blocklyTreeIconlogic\">    \n        <label text=\"Conditionals\" web-class=\"blocklyFlyoutGroup\" web-line=\"1.5\"/>\n        <block type=\"controls_if\" gap=\"8\">\n            <value name=\"IF0\">\n                <shadow type=\"logic_boolean\">\n                    <field name=\"BOOL\">TRUE</field>\n                </shadow>\n            </value>\n        </block>\n        <block type=\"controls_if\" gap=\"8\">\n            <mutation else=\"1\"></mutation>\n            <value name=\"IF0\">\n                <shadow type=\"logic_boolean\">\n                    <field name=\"BOOL\">TRUE</field>\n                </shadow>\n            </value>\n        </block>\n        <label text=\"Comparison\" web-class=\"blocklyFlyoutGroup\" web-line=\"1.5\"/>\n        <block type=\"logic_compare\" gap=\"8\">\n            <value name=\"A\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n            <value name=\"B\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n        </block>\n        <block type=\"logic_compare\">\n            <field name=\"OP\">LT</field>\n            <value name=\"A\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n            <value name=\"B\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n        </block>\n        <label text=\"Boolean\" web-class=\"blocklyFlyoutGroup\" web-line=\"1.5\"/>\n        <block type=\"logic_operation\" gap=\"8\"></block>\n        <block type=\"logic_operation\" gap=\"8\">\n            <field name=\"OP\">OR</field>\n        </block>\n        <block type=\"logic_negate\"></block>\n        <block type=\"logic_boolean\" gap=\"8\"></block>\n        <block type=\"logic_boolean\">\n            <field name=\"BOOL\">FALSE</field>\n        </block>\n    </category>\n    <category name=\"Variables\" nameid=\"variables\" colour=\"#A80000\" custom=\"VARIABLE\" category=\"48\" iconclass=\"blocklyTreeIconvariables\" expandedclass=\"blocklyTreeIconvariables\">\n    </category>\n    <category name=\"Math\" nameid=\"math\" colour=\"#712672\" category=\"47\" web-icon=\"\uF1EC\" iconclass=\"blocklyTreeIconmath\" expandedclass=\"blocklyTreeIconmath\">    \n        <block type=\"math_arithmetic\" gap=\"8\">\n            <value name=\"A\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n            <value name=\"B\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n        </block>\n        <block type=\"math_arithmetic\" gap=\"8\">\n            <value name=\"A\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n            <value name=\"B\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n            <field name=\"OP\">MINUS</field>\n        </block>\n        <block type=\"math_arithmetic\" gap=\"8\">\n            <value name=\"A\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n            <value name=\"B\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n            <field name=\"OP\">MULTIPLY</field>\n        </block>\n        <block type=\"math_arithmetic\" gap=\"8\">\n            <value name=\"A\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n            <value name=\"B\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n            <field name=\"OP\">DIVIDE</field>\n        </block>\n        <block type=\"math_number\" gap=\"8\">\n            <field name=\"NUM\">0</field>\n        </block>\n        <block type=\"math_modulo\">\n            <value name=\"DIVIDEND\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n            <value name=\"DIVISOR\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">1</field>\n                </shadow>\n            </value>\n        </block>\n        <block type=\"math_op2\" gap=\"8\">\n            <value name=\"x\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n            <value name=\"y\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n        </block>\n        <block type=\"math_op2\" gap=\"8\">\n            <value name=\"x\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n            <value name=\"y\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n            <field name=\"op\">max</field>\n        </block>\n        <block type=\"math_op3\">\n            <value name=\"x\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n        </block>\n    </category>\n    <category name=\"Functions\" nameid=\"functions\" colour=\"#005a9e\" custom=\"PROCEDURE\" category=\"46\" iconclass=\"blocklyTreeIconfunctions\" expandedclass=\"blocklyTreeIconfunctions\" advanced=\"true\">\n    </category>\n    <category colour=\"#66672C\" name=\"Arrays\" nameid=\"arrays\" category=\"45\" web-icon=\"\uF0CB\" iconclass=\"blocklyTreeIconarrays\" expandedclass=\"blocklyTreeIconarrays\" advanced=\"true\">\n        <block type=\"lists_create_with\">\n            <mutation items=\"1\"></mutation>\n            <value name=\"ADD0\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n        </block>\n        <block type=\"lists_create_with\">\n            <mutation items=\"2\"></mutation>\n            <value name=\"ADD0\">\n                <shadow type=\"text\">\n                    <field name=\"TEXT\"></field>\n                </shadow>\n            </value>\n            <value name=\"ADD1\">\n                <shadow type=\"text\">\n                    <field name=\"TEXT\"></field>\n                </shadow>\n            </value>\n        </block>\n        <block type=\"lists_length\"></block>\n        <block type=\"lists_index_get\">\n            <value name=\"LIST\">\n                <block type=\"variables_get\">\n                    <field name=\"VAR\">" + lf("{id:var}list") + "</field>\n                </block>\n            </value>\n            <value name=\"INDEX\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n        </block>\n        <block type=\"lists_index_set\">\n            <value name=\"LIST\">\n                <block type=\"variables_get\">\n                    <field name=\"VAR\">" + lf("{id:var}list") + "</field>\n                </block>\n            </value>\n            <value name=\"INDEX\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n        </block>\n    </category>\n    <category colour=\"#996600\" name=\"Text\" nameid=\"text\" category=\"46\" web-icon=\"\uF035\" iconclass=\"blocklyTreeIcontext\" expandedclass=\"blocklyTreeIcontext\" advanced=\"true\">\n        <block type=\"text\"></block>\n        <block type=\"text_length\">\n            <value name=\"VALUE\">\n                <shadow type=\"text\">\n                    <field name=\"TEXT\">" + lf("Hello") + "</field>\n                </shadow>\n            </value>\n        </block>\n        <block type=\"text_join\">\n            <mutation items=\"2\"></mutation>\n            <value name=\"ADD0\">\n                <shadow type=\"text\">\n                    <field name=\"TEXT\">" + lf("Hello") + "</field>\n                </shadow>\n            </value>\n            <value name=\"ADD1\">\n                <shadow type=\"text\">\n                    <field name=\"TEXT\">" + lf("World") + "</field>\n                </shadow>\n            </value>\n        </block>\n    </category>\n</xml>";
+Object.defineProperty(exports, "__esModule", { value: true });
+var defaultToolboxString = "<xml id=\"blocklyToolboxDefinition\" style=\"display: none\">\n    <category name=\"Loops\" nameid=\"loops\" colour=\"#107c10\" category=\"50\" web-icon=\"\uF01E\" iconclass=\"blocklyTreeIconloops\" expandedclass=\"blocklyTreeIconloops\">    \n        <block type=\"controls_repeat_ext\">\n            <value name=\"TIMES\">\n                <shadow type=\"math_whole_number\">\n                    <field name=\"NUM\">4</field>\n                </shadow>\n            </value>\n        </block>\n        <block type=\"device_while\">\n            <value name=\"COND\">\n                <shadow type=\"logic_boolean\"></shadow>\n            </value>\n        </block>\n        <block type=\"controls_simple_for\">\n            <value name=\"TO\">\n                <shadow type=\"math_whole_number\">\n                    <field name=\"NUM\">4</field>\n                </shadow>\n            </value>\n        </block>\n        <block type=\"controls_for_of\">\n            <value name=\"LIST\">\n                <shadow type=\"variables_get\">\n                    <field name=\"VAR\">list</field>\n                </shadow>\n            </value>\n        </block>\n    </category>\n    <category name=\"Logic\" nameid=\"logic\" colour=\"#006970\" category=\"49\" web-icon=\"\uF074\" iconclass=\"blocklyTreeIconlogic\" expandedclass=\"blocklyTreeIconlogic\">    \n        <label text=\"Conditionals\" web-class=\"blocklyFlyoutGroup\" web-line=\"1.5\"/>\n        <block type=\"controls_if\" gap=\"8\">\n            <value name=\"IF0\">\n                <shadow type=\"logic_boolean\">\n                    <field name=\"BOOL\">TRUE</field>\n                </shadow>\n            </value>\n        </block>\n        <block type=\"controls_if\" gap=\"8\">\n            <mutation else=\"1\"></mutation>\n            <value name=\"IF0\">\n                <shadow type=\"logic_boolean\">\n                    <field name=\"BOOL\">TRUE</field>\n                </shadow>\n            </value>\n        </block>\n        <label text=\"Comparison\" web-class=\"blocklyFlyoutGroup\" web-line=\"1.5\"/>\n        <block type=\"logic_compare\" gap=\"8\">\n            <value name=\"A\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n            <value name=\"B\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n        </block>\n        <block type=\"logic_compare\">\n            <field name=\"OP\">LT</field>\n            <value name=\"A\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n            <value name=\"B\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n        </block>\n        <label text=\"Boolean\" web-class=\"blocklyFlyoutGroup\" web-line=\"1.5\"/>\n        <block type=\"logic_operation\" gap=\"8\"></block>\n        <block type=\"logic_operation\" gap=\"8\">\n            <field name=\"OP\">OR</field>\n        </block>\n        <block type=\"logic_negate\"></block>\n        <block type=\"logic_boolean\" gap=\"8\"></block>\n        <block type=\"logic_boolean\">\n            <field name=\"BOOL\">FALSE</field>\n        </block>\n    </category>\n    <category name=\"Variables\" nameid=\"variables\" colour=\"#A80000\" custom=\"VARIABLE\" category=\"48\" iconclass=\"blocklyTreeIconvariables\" expandedclass=\"blocklyTreeIconvariables\">\n    </category>\n    <category name=\"Math\" nameid=\"math\" colour=\"#712672\" category=\"47\" web-icon=\"\uF1EC\" iconclass=\"blocklyTreeIconmath\" expandedclass=\"blocklyTreeIconmath\">    \n        <block type=\"math_arithmetic\" gap=\"8\">\n            <value name=\"A\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n            <value name=\"B\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n        </block>\n        <block type=\"math_arithmetic\" gap=\"8\">\n            <value name=\"A\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n            <value name=\"B\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n            <field name=\"OP\">MINUS</field>\n        </block>\n        <block type=\"math_arithmetic\" gap=\"8\">\n            <value name=\"A\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n            <value name=\"B\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n            <field name=\"OP\">MULTIPLY</field>\n        </block>\n        <block type=\"math_arithmetic\" gap=\"8\">\n            <value name=\"A\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n            <value name=\"B\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n            <field name=\"OP\">DIVIDE</field>\n        </block>\n        <block type=\"math_number\" gap=\"8\">\n            <field name=\"NUM\">0</field>\n        </block>\n        <block type=\"math_modulo\">\n            <value name=\"DIVIDEND\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n            <value name=\"DIVISOR\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">1</field>\n                </shadow>\n            </value>\n        </block>\n        <block type=\"math_op2\" gap=\"8\">\n            <value name=\"x\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n            <value name=\"y\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n        </block>\n        <block type=\"math_op2\" gap=\"8\">\n            <value name=\"x\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n            <value name=\"y\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n            <field name=\"op\">max</field>\n        </block>\n        <block type=\"math_op3\">\n            <value name=\"x\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n        </block>\n    </category>\n    <category name=\"Functions\" nameid=\"functions\" colour=\"#005a9e\" custom=\"PROCEDURE\" category=\"46\" iconclass=\"blocklyTreeIconfunctions\" expandedclass=\"blocklyTreeIconfunctions\" advanced=\"true\">\n    </category>\n    <category colour=\"#66672C\" name=\"Arrays\" nameid=\"arrays\" category=\"45\" web-icon=\"\uF0CB\" iconclass=\"blocklyTreeIconarrays\" expandedclass=\"blocklyTreeIconarrays\" advanced=\"true\">\n        <block type=\"lists_create_with\">\n            <mutation items=\"1\"></mutation>\n            <value name=\"ADD0\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n        </block>\n        <block type=\"lists_create_with\">\n            <mutation items=\"2\"></mutation>\n            <value name=\"ADD0\">\n                <shadow type=\"text\">\n                    <field name=\"TEXT\"></field>\n                </shadow>\n            </value>\n            <value name=\"ADD1\">\n                <shadow type=\"text\">\n                    <field name=\"TEXT\"></field>\n                </shadow>\n            </value>\n        </block>\n        <block type=\"lists_length\"></block>\n        <block type=\"lists_index_get\">\n            <value name=\"LIST\">\n                <block type=\"variables_get\">\n                    <field name=\"VAR\">" + lf("{id:var}list") + "</field>\n                </block>\n            </value>\n            <value name=\"INDEX\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n        </block>\n        <block type=\"lists_index_set\">\n            <value name=\"LIST\">\n                <block type=\"variables_get\">\n                    <field name=\"VAR\">" + lf("{id:var}list") + "</field>\n                </block>\n            </value>\n            <value name=\"INDEX\">\n                <shadow type=\"math_number\">\n                    <field name=\"NUM\">0</field>\n                </shadow>\n            </value>\n        </block>\n    </category>\n    <category colour=\"#996600\" name=\"Text\" nameid=\"text\" category=\"46\" web-icon=\"\uF035\" iconclass=\"blocklyTreeIcontext\" expandedclass=\"blocklyTreeIcontext\" advanced=\"true\">\n        <block type=\"text\"></block>\n        <block type=\"text_length\">\n            <value name=\"VALUE\">\n                <shadow type=\"text\">\n                    <field name=\"TEXT\">" + lf("Hello") + "</field>\n                </shadow>\n            </value>\n        </block>\n        <block type=\"text_join\">\n            <mutation items=\"2\"></mutation>\n            <value name=\"ADD0\">\n                <shadow type=\"text\">\n                    <field name=\"TEXT\">" + lf("Hello") + "</field>\n                </shadow>\n            </value>\n            <value name=\"ADD1\">\n                <shadow type=\"text\">\n                    <field name=\"TEXT\">" + lf("World") + "</field>\n                </shadow>\n            </value>\n        </block>\n    </category>\n</xml>";
 var cachedToolboxDom;
 function getBaseToolboxDom() {
     if (!cachedToolboxDom) {
@@ -12426,29 +13261,33 @@ function overrideBaseToolbox(xml) {
 exports.overrideBaseToolbox = overrideBaseToolbox;
 
 },{}],47:[function(require,module,exports){
-/// <reference path="../../typings/globals/react/index.d.ts" />
-/// <reference path="../../typings/globals/react-dom/index.d.ts" />
-/// <reference path="../../built/pxtlib.d.ts" />
 "use strict";
-var __extends = (this && this.__extends) || function (d, b) {
-    for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
-    function __() { this.constructor = d; }
-    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
-};
+/// <reference path="../../built/pxtlib.d.ts" />
+var __extends = (this && this.__extends) || (function () {
+    var extendStatics = Object.setPrototypeOf ||
+        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+    return function (d, b) {
+        extendStatics(d, b);
+        function __() { this.constructor = d; }
+        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
 var React = require("react");
 var data = require("./data");
 var sui = require("./sui");
 var sounds = require("./sounds");
 var core = require("./core");
-var TutorialMenuItem = (function (_super) {
+var TutorialMenuItem = /** @class */ (function (_super) {
     __extends(TutorialMenuItem, _super);
     function TutorialMenuItem(props) {
-        _super.call(this, props);
+        return _super.call(this, props) || this;
     }
     TutorialMenuItem.prototype.openTutorialStep = function (step) {
         var options = this.props.parent.state.tutorialOptions;
         options.tutorialStep = step;
-        pxt.tickEvent("tutorial.step", { tutorial: options.tutorial, step: step });
+        pxt.tickEvent("tutorial.step", { tutorial: options.tutorial, step: step }, { interactiveConsent: true });
         this.props.parent.setTutorialStep(step);
     };
     TutorialMenuItem.prototype.render = function () {
@@ -12459,19 +13298,22 @@ var TutorialMenuItem = (function (_super) {
         var currentStep = tutorialStep;
         if (!tutorialReady)
             return React.createElement("div", null);
-        return React.createElement("div", {className: "ui item"}, React.createElement("div", {className: "ui item tutorial-menuitem", role: "menubar"}, tutorialStepInfo.map(function (step, index) {
-            return (index == currentStep) ?
-                React.createElement("span", {className: "step-label", key: 'tutorialStep' + index}, React.createElement("a", {className: "ui circular label " + (currentStep == index ? 'blue selected' : 'inverted') + " " + (!tutorialReady ? 'disabled' : ''), role: "menuitem", "aria-label": lf("Tutorial step {0}. This is the current step", index + 1), tabIndex: 0, onClick: function () { return _this.openTutorialStep(index); }, onKeyDown: sui.fireClickOnEnter}, index + 1)) :
-                React.createElement("span", {className: "step-label", key: 'tutorialStep' + index, "data-tooltip": "" + (index + 1), "data-inverted": "", "data-position": "bottom center"}, React.createElement("a", {className: "ui empty circular label " + (!tutorialReady ? 'disabled' : '') + " clear", role: "menuitem", "aria-label": lf("Tutorial step {0}", index + 1), tabIndex: 0, onClick: function () { return _this.openTutorialStep(index); }, onKeyDown: sui.fireClickOnEnter}));
-        })));
+        return React.createElement("div", { className: "ui item" },
+            React.createElement("div", { className: "ui item tutorial-menuitem", role: "menubar" }, tutorialStepInfo.map(function (step, index) {
+                return (index == currentStep) ?
+                    React.createElement("span", { className: "step-label", key: 'tutorialStep' + index },
+                        React.createElement("a", { className: "ui circular label " + (currentStep == index ? 'blue selected' : 'inverted') + " " + (!tutorialReady ? 'disabled' : ''), role: "menuitem", "aria-label": lf("Tutorial step {0}. This is the current step", index + 1), tabIndex: 0, onClick: function () { return _this.openTutorialStep(index); }, onKeyDown: sui.fireClickOnEnter }, index + 1)) :
+                    React.createElement("span", { className: "step-label", key: 'tutorialStep' + index, "data-tooltip": "" + (index + 1), "data-inverted": "", "data-position": "bottom center" },
+                        React.createElement("a", { className: "ui empty circular label " + (!tutorialReady ? 'disabled' : '') + " clear", role: "menuitem", "aria-label": lf("Tutorial step {0}", index + 1), tabIndex: 0, onClick: function () { return _this.openTutorialStep(index); }, onKeyDown: sui.fireClickOnEnter }));
+            })));
     };
     return TutorialMenuItem;
 }(data.Component));
 exports.TutorialMenuItem = TutorialMenuItem;
-var TutorialContent = (function (_super) {
+var TutorialContent = /** @class */ (function (_super) {
     __extends(TutorialContent, _super);
     function TutorialContent(props) {
-        _super.call(this, props);
+        return _super.call(this, props) || this;
     }
     TutorialContent.notify = function (message) {
         var tc = document.getElementById("tutorialcontent");
@@ -12510,15 +13352,15 @@ var TutorialContent = (function (_super) {
         var tutorialUrl = this.state.tutorialUrl;
         if (!tutorialUrl)
             return null;
-        return React.createElement("iframe", {id: "tutorialcontent", style: { "width": "1px", "height": "1px" }, src: tutorialUrl, role: "complementary", sandbox: "allow-scripts allow-same-origin allow-popups allow-forms"});
+        return React.createElement("iframe", { id: "tutorialcontent", style: { "width": "1px", "height": "1px" }, src: tutorialUrl, role: "complementary", sandbox: "allow-scripts allow-same-origin allow-popups allow-forms" });
     };
     return TutorialContent;
 }(data.Component));
 exports.TutorialContent = TutorialContent;
-var TutorialHint = (function (_super) {
+var TutorialHint = /** @class */ (function (_super) {
     __extends(TutorialHint, _super);
     function TutorialHint(props) {
-        _super.call(this, props);
+        return _super.call(this, props) || this;
     }
     TutorialHint.prototype.showHint = function () {
         this.setState({ visible: true });
@@ -12530,40 +13372,53 @@ var TutorialHint = (function (_super) {
         var tutorialReady = options.tutorialReady, tutorialStepInfo = options.tutorialStepInfo, tutorialStep = options.tutorialStep, tutorialName = options.tutorialName;
         if (!tutorialReady)
             return React.createElement("div", null);
-        var tutorialHint = tutorialStepInfo[tutorialStep].content;
-        var tutorialFullscreen = tutorialStepInfo[tutorialStep].fullscreen;
-        // TODO: Use step name instead of tutorial Name in full screen mode.
-        var header = tutorialFullscreen ? tutorialName : lf("Hint");
+        var step = tutorialStepInfo[tutorialStep];
+        var tutorialHint = step.content;
+        var tutorialFullscreen = step.fullscreen;
+        var tutorialUnplugged = !!step.unplugged && tutorialStep < tutorialStepInfo.length - 1;
+        var header = tutorialFullscreen ? (step.titleContent || tutorialName) : lf("Hint");
         var hide = function () { return _this.setState({ visible: false }); };
-        var actions = [{
+        var next = function () {
+            var nextStep = tutorialStep + 1;
+            options.tutorialStep = nextStep;
+            pxt.tickEvent("tutorial.hint.next", { tutorial: options.tutorial, step: nextStep });
+            _this.props.parent.setTutorialStep(nextStep);
+        };
+        var actions = [tutorialUnplugged ? {
+                label: lf("Next"),
+                onClick: next,
+                icon: 'check',
+                className: 'green'
+            } : {
                 label: lf("Ok"),
                 onClick: hide,
                 icon: 'check',
                 className: 'green'
             }];
-        return React.createElement(sui.Modal, {open: visible, className: "hintdialog", size: "", longer: true, header: header, closeIcon: true, onClose: function () { return _this.setState({ visible: false }); }, dimmer: true, actions: actions, closeOnDimmerClick: true, closeOnDocumentClick: true, closeOnEscape: true}, React.createElement("div", {dangerouslySetInnerHTML: { __html: tutorialHint }}));
+        return React.createElement(sui.Modal, { open: visible, className: "hintdialog", size: "", longer: true, header: header, closeIcon: true, onClose: hide, dimmer: true, actions: actions, closeOnDimmerClick: true, closeOnDocumentClick: true, closeOnEscape: true },
+            React.createElement("div", { dangerouslySetInnerHTML: { __html: tutorialHint } }));
     };
     return TutorialHint;
 }(data.Component));
 exports.TutorialHint = TutorialHint;
-var TutorialCard = (function (_super) {
+var TutorialCard = /** @class */ (function (_super) {
     __extends(TutorialCard, _super);
     function TutorialCard(props) {
-        var _this = this;
-        _super.call(this, props);
-        this.closeLightboxOnEscape = function (e) {
+        var _this = _super.call(this, props) || this;
+        _this.closeLightboxOnEscape = function (e) {
             var charCode = (typeof e.which == "number") ? e.which : e.keyCode;
             if (charCode === 27) {
                 _this.closeLightbox();
             }
         };
+        return _this;
     }
     TutorialCard.prototype.previousTutorialStep = function () {
         var options = this.props.parent.state.tutorialOptions;
         var currentStep = options.tutorialStep;
         var previousStep = currentStep - 1;
         options.tutorialStep = previousStep;
-        pxt.tickEvent("tutorial.previous", { tutorial: options.tutorial, step: previousStep });
+        pxt.tickEvent("tutorial.previous", { tutorial: options.tutorial, step: previousStep }, { interactiveConsent: true });
         this.props.parent.setTutorialStep(previousStep);
     };
     TutorialCard.prototype.nextTutorialStep = function () {
@@ -12571,7 +13426,7 @@ var TutorialCard = (function (_super) {
         var currentStep = options.tutorialStep;
         var nextStep = currentStep + 1;
         options.tutorialStep = nextStep;
-        pxt.tickEvent("tutorial.next", { tutorial: options.tutorial, step: nextStep });
+        pxt.tickEvent("tutorial.next", { tutorial: options.tutorial, step: nextStep }, { interactiveConsent: true });
         this.props.parent.setTutorialStep(nextStep);
     };
     TutorialCard.prototype.finishTutorial = function () {
@@ -12626,18 +13481,28 @@ var TutorialCard = (function (_super) {
         if (hasHint) {
             tutorialAriaLabel += lf("Press Space or Enter to show a hint.");
         }
-        return React.createElement("div", {id: "tutorialcard", className: "ui " + (tutorialReady ? 'tutorialReady' : '')}, React.createElement("div", {className: 'ui buttons'}, React.createElement("div", {className: "ui segment attached tutorialsegment"}, React.createElement("div", {className: 'avatar-image', onClick: function () { return _this.showHint(); }, onKeyDown: sui.fireClickOnEnter}), hasHint ? React.createElement(sui.Button, {class: "mini blue hintbutton hidelightbox", text: lf("Hint"), tabIndex: -1, onClick: function () { return _this.showHint(); }, onKeyDown: sui.fireClickOnEnter}) : undefined, React.createElement("div", {className: "tutorialmessage " + (hasHint ? 'focused' : undefined), role: "alert", "aria-label": tutorialAriaLabel, tabIndex: hasHint ? 0 : -1, onClick: function () { if (hasHint)
-            _this.showHint(); }, onKeyDown: sui.fireClickOnEnter}, React.createElement("div", {className: "content", dangerouslySetInnerHTML: { __html: tutorialHeaderContent }})), React.createElement(sui.Button, {id: "tutorialOkButton", class: "large green okbutton showlightbox focused", text: lf("Ok"), onClick: function () { return _this.closeLightbox(); }, onKeyDown: sui.fireClickOnEnter})), hasNext ? React.createElement(sui.Button, {icon: "right chevron", rightIcon: true, class: "nextbutton right attached green " + (!hasNext ? 'disabled' : ''), text: lf("Next"), ariaLabel: lf("Go to the next step of the tutorial."), onClick: function () { return _this.nextTutorialStep(); }, onKeyDown: sui.fireClickOnEnter}) : undefined, hasFinish ? React.createElement(sui.Button, {icon: "left checkmark", class: "orange right attached " + (!tutorialReady ? 'disabled' : 'focused'), text: lf("Finish"), ariaLabel: lf("Finish the tutorial."), onClick: function () { return _this.finishTutorial(); }, onKeyDown: sui.fireClickOnEnter}) : undefined));
+        return React.createElement("div", { id: "tutorialcard", className: "ui " + (tutorialReady ? 'tutorialReady' : '') },
+            React.createElement("div", { className: 'ui buttons' },
+                React.createElement("div", { className: "ui segment attached tutorialsegment" },
+                    React.createElement("div", { className: 'avatar-image', onClick: function () { return _this.showHint(); }, onKeyDown: sui.fireClickOnEnter }),
+                    hasHint ? React.createElement(sui.Button, { class: "mini blue hintbutton hidelightbox", text: lf("Hint"), tabIndex: -1, onClick: function () { return _this.showHint(); }, onKeyDown: sui.fireClickOnEnter }) : undefined,
+                    React.createElement("div", { className: "tutorialmessage " + (hasHint ? 'focused' : undefined), role: "alert", "aria-label": tutorialAriaLabel, tabIndex: hasHint ? 0 : -1, onClick: function () { if (hasHint)
+                            _this.showHint(); }, onKeyDown: sui.fireClickOnEnter },
+                        React.createElement("div", { className: "content", dangerouslySetInnerHTML: { __html: tutorialHeaderContent } })),
+                    React.createElement(sui.Button, { id: "tutorialOkButton", class: "large green okbutton showlightbox focused", text: lf("Ok"), onClick: function () { return _this.closeLightbox(); }, onKeyDown: sui.fireClickOnEnter })),
+                hasNext ? React.createElement(sui.Button, { icon: "right chevron", rightIcon: true, class: "nextbutton right attached green " + (!hasNext ? 'disabled' : ''), text: lf("Next"), ariaLabel: lf("Go to the next step of the tutorial."), onClick: function () { return _this.nextTutorialStep(); }, onKeyDown: sui.fireClickOnEnter }) : undefined,
+                hasFinish ? React.createElement(sui.Button, { icon: "left checkmark", class: "orange right attached " + (!tutorialReady ? 'disabled' : 'focused'), text: lf("Finish"), ariaLabel: lf("Finish the tutorial."), onClick: function () { return _this.finishTutorial(); }, onKeyDown: sui.fireClickOnEnter }) : undefined));
     };
     return TutorialCard;
 }(data.Component));
 exports.TutorialCard = TutorialCard;
 
-},{"./core":13,"./data":14,"./sounds":42,"./sui":44,"react":277}],48:[function(require,module,exports){
+},{"./core":13,"./data":14,"./sounds":42,"./sui":44,"react":274}],48:[function(require,module,exports){
+"use strict";
 /// <reference path="../../built/pxtlib.d.ts" />
 /// <reference path="../../built/pxteditor.d.ts" />
 /// <reference path="../../built/pxtwinrt.d.ts" />
-"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
 var db = require("./db");
 var core = require("./core");
 var data = require("./data");
@@ -18630,631 +19495,9 @@ module.exports = ret;
 },{"./es5":13}]},{},[4])(4)
 });                    ;if (typeof window !== 'undefined' && window !== null) {                               window.P = window.Promise;                                                     } else if (typeof self !== 'undefined' && self !== null) {                             self.P = self.Promise;                                                         }
 }).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"_process":146}],52:[function(require,module,exports){
+},{"_process":143}],52:[function(require,module,exports){
 
 },{}],53:[function(require,module,exports){
-if (typeof Object.create === 'function') {
-  // implementation from standard node.js 'util' module
-  module.exports = function inherits(ctor, superCtor) {
-    ctor.super_ = superCtor
-    ctor.prototype = Object.create(superCtor.prototype, {
-      constructor: {
-        value: ctor,
-        enumerable: false,
-        writable: true,
-        configurable: true
-      }
-    });
-  };
-} else {
-  // old school shim for old browsers
-  module.exports = function inherits(ctor, superCtor) {
-    ctor.super_ = superCtor
-    var TempCtor = function () {}
-    TempCtor.prototype = superCtor.prototype
-    ctor.prototype = new TempCtor()
-    ctor.prototype.constructor = ctor
-  }
-}
-
-},{}],54:[function(require,module,exports){
-module.exports = function isBuffer(arg) {
-  return arg && typeof arg === 'object'
-    && typeof arg.copy === 'function'
-    && typeof arg.fill === 'function'
-    && typeof arg.readUInt8 === 'function';
-}
-},{}],55:[function(require,module,exports){
-(function (process,global){
-// Copyright Joyent, Inc. and other Node contributors.
-//
-// Permission is hereby granted, free of charge, to any person obtaining a
-// copy of this software and associated documentation files (the
-// "Software"), to deal in the Software without restriction, including
-// without limitation the rights to use, copy, modify, merge, publish,
-// distribute, sublicense, and/or sell copies of the Software, and to permit
-// persons to whom the Software is furnished to do so, subject to the
-// following conditions:
-//
-// The above copyright notice and this permission notice shall be included
-// in all copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
-// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
-// NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-// DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-// OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
-// USE OR OTHER DEALINGS IN THE SOFTWARE.
-
-var formatRegExp = /%[sdj%]/g;
-exports.format = function(f) {
-  if (!isString(f)) {
-    var objects = [];
-    for (var i = 0; i < arguments.length; i++) {
-      objects.push(inspect(arguments[i]));
-    }
-    return objects.join(' ');
-  }
-
-  var i = 1;
-  var args = arguments;
-  var len = args.length;
-  var str = String(f).replace(formatRegExp, function(x) {
-    if (x === '%%') return '%';
-    if (i >= len) return x;
-    switch (x) {
-      case '%s': return String(args[i++]);
-      case '%d': return Number(args[i++]);
-      case '%j':
-        try {
-          return JSON.stringify(args[i++]);
-        } catch (_) {
-          return '[Circular]';
-        }
-      default:
-        return x;
-    }
-  });
-  for (var x = args[i]; i < len; x = args[++i]) {
-    if (isNull(x) || !isObject(x)) {
-      str += ' ' + x;
-    } else {
-      str += ' ' + inspect(x);
-    }
-  }
-  return str;
-};
-
-
-// Mark that a method should not be used.
-// Returns a modified function which warns once by default.
-// If --no-deprecation is set, then it is a no-op.
-exports.deprecate = function(fn, msg) {
-  // Allow for deprecating things in the process of starting up.
-  if (isUndefined(global.process)) {
-    return function() {
-      return exports.deprecate(fn, msg).apply(this, arguments);
-    };
-  }
-
-  if (process.noDeprecation === true) {
-    return fn;
-  }
-
-  var warned = false;
-  function deprecated() {
-    if (!warned) {
-      if (process.throwDeprecation) {
-        throw new Error(msg);
-      } else if (process.traceDeprecation) {
-        console.trace(msg);
-      } else {
-        console.error(msg);
-      }
-      warned = true;
-    }
-    return fn.apply(this, arguments);
-  }
-
-  return deprecated;
-};
-
-
-var debugs = {};
-var debugEnviron;
-exports.debuglog = function(set) {
-  if (isUndefined(debugEnviron))
-    debugEnviron = process.env.NODE_DEBUG || '';
-  set = set.toUpperCase();
-  if (!debugs[set]) {
-    if (new RegExp('\\b' + set + '\\b', 'i').test(debugEnviron)) {
-      var pid = process.pid;
-      debugs[set] = function() {
-        var msg = exports.format.apply(exports, arguments);
-        console.error('%s %d: %s', set, pid, msg);
-      };
-    } else {
-      debugs[set] = function() {};
-    }
-  }
-  return debugs[set];
-};
-
-
-/**
- * Echos the value of a value. Trys to print the value out
- * in the best way possible given the different types.
- *
- * @param {Object} obj The object to print out.
- * @param {Object} opts Optional options object that alters the output.
- */
-/* legacy: obj, showHidden, depth, colors*/
-function inspect(obj, opts) {
-  // default options
-  var ctx = {
-    seen: [],
-    stylize: stylizeNoColor
-  };
-  // legacy...
-  if (arguments.length >= 3) ctx.depth = arguments[2];
-  if (arguments.length >= 4) ctx.colors = arguments[3];
-  if (isBoolean(opts)) {
-    // legacy...
-    ctx.showHidden = opts;
-  } else if (opts) {
-    // got an "options" object
-    exports._extend(ctx, opts);
-  }
-  // set default options
-  if (isUndefined(ctx.showHidden)) ctx.showHidden = false;
-  if (isUndefined(ctx.depth)) ctx.depth = 2;
-  if (isUndefined(ctx.colors)) ctx.colors = false;
-  if (isUndefined(ctx.customInspect)) ctx.customInspect = true;
-  if (ctx.colors) ctx.stylize = stylizeWithColor;
-  return formatValue(ctx, obj, ctx.depth);
-}
-exports.inspect = inspect;
-
-
-// http://en.wikipedia.org/wiki/ANSI_escape_code#graphics
-inspect.colors = {
-  'bold' : [1, 22],
-  'italic' : [3, 23],
-  'underline' : [4, 24],
-  'inverse' : [7, 27],
-  'white' : [37, 39],
-  'grey' : [90, 39],
-  'black' : [30, 39],
-  'blue' : [34, 39],
-  'cyan' : [36, 39],
-  'green' : [32, 39],
-  'magenta' : [35, 39],
-  'red' : [31, 39],
-  'yellow' : [33, 39]
-};
-
-// Don't use 'blue' not visible on cmd.exe
-inspect.styles = {
-  'special': 'cyan',
-  'number': 'yellow',
-  'boolean': 'yellow',
-  'undefined': 'grey',
-  'null': 'bold',
-  'string': 'green',
-  'date': 'magenta',
-  // "name": intentionally not styling
-  'regexp': 'red'
-};
-
-
-function stylizeWithColor(str, styleType) {
-  var style = inspect.styles[styleType];
-
-  if (style) {
-    return '\u001b[' + inspect.colors[style][0] + 'm' + str +
-           '\u001b[' + inspect.colors[style][1] + 'm';
-  } else {
-    return str;
-  }
-}
-
-
-function stylizeNoColor(str, styleType) {
-  return str;
-}
-
-
-function arrayToHash(array) {
-  var hash = {};
-
-  array.forEach(function(val, idx) {
-    hash[val] = true;
-  });
-
-  return hash;
-}
-
-
-function formatValue(ctx, value, recurseTimes) {
-  // Provide a hook for user-specified inspect functions.
-  // Check that value is an object with an inspect function on it
-  if (ctx.customInspect &&
-      value &&
-      isFunction(value.inspect) &&
-      // Filter out the util module, it's inspect function is special
-      value.inspect !== exports.inspect &&
-      // Also filter out any prototype objects using the circular check.
-      !(value.constructor && value.constructor.prototype === value)) {
-    var ret = value.inspect(recurseTimes, ctx);
-    if (!isString(ret)) {
-      ret = formatValue(ctx, ret, recurseTimes);
-    }
-    return ret;
-  }
-
-  // Primitive types cannot have properties
-  var primitive = formatPrimitive(ctx, value);
-  if (primitive) {
-    return primitive;
-  }
-
-  // Look up the keys of the object.
-  var keys = Object.keys(value);
-  var visibleKeys = arrayToHash(keys);
-
-  if (ctx.showHidden) {
-    keys = Object.getOwnPropertyNames(value);
-  }
-
-  // IE doesn't make error fields non-enumerable
-  // http://msdn.microsoft.com/en-us/library/ie/dww52sbt(v=vs.94).aspx
-  if (isError(value)
-      && (keys.indexOf('message') >= 0 || keys.indexOf('description') >= 0)) {
-    return formatError(value);
-  }
-
-  // Some type of object without properties can be shortcutted.
-  if (keys.length === 0) {
-    if (isFunction(value)) {
-      var name = value.name ? ': ' + value.name : '';
-      return ctx.stylize('[Function' + name + ']', 'special');
-    }
-    if (isRegExp(value)) {
-      return ctx.stylize(RegExp.prototype.toString.call(value), 'regexp');
-    }
-    if (isDate(value)) {
-      return ctx.stylize(Date.prototype.toString.call(value), 'date');
-    }
-    if (isError(value)) {
-      return formatError(value);
-    }
-  }
-
-  var base = '', array = false, braces = ['{', '}'];
-
-  // Make Array say that they are Array
-  if (isArray(value)) {
-    array = true;
-    braces = ['[', ']'];
-  }
-
-  // Make functions say that they are functions
-  if (isFunction(value)) {
-    var n = value.name ? ': ' + value.name : '';
-    base = ' [Function' + n + ']';
-  }
-
-  // Make RegExps say that they are RegExps
-  if (isRegExp(value)) {
-    base = ' ' + RegExp.prototype.toString.call(value);
-  }
-
-  // Make dates with properties first say the date
-  if (isDate(value)) {
-    base = ' ' + Date.prototype.toUTCString.call(value);
-  }
-
-  // Make error with message first say the error
-  if (isError(value)) {
-    base = ' ' + formatError(value);
-  }
-
-  if (keys.length === 0 && (!array || value.length == 0)) {
-    return braces[0] + base + braces[1];
-  }
-
-  if (recurseTimes < 0) {
-    if (isRegExp(value)) {
-      return ctx.stylize(RegExp.prototype.toString.call(value), 'regexp');
-    } else {
-      return ctx.stylize('[Object]', 'special');
-    }
-  }
-
-  ctx.seen.push(value);
-
-  var output;
-  if (array) {
-    output = formatArray(ctx, value, recurseTimes, visibleKeys, keys);
-  } else {
-    output = keys.map(function(key) {
-      return formatProperty(ctx, value, recurseTimes, visibleKeys, key, array);
-    });
-  }
-
-  ctx.seen.pop();
-
-  return reduceToSingleString(output, base, braces);
-}
-
-
-function formatPrimitive(ctx, value) {
-  if (isUndefined(value))
-    return ctx.stylize('undefined', 'undefined');
-  if (isString(value)) {
-    var simple = '\'' + JSON.stringify(value).replace(/^"|"$/g, '')
-                                             .replace(/'/g, "\\'")
-                                             .replace(/\\"/g, '"') + '\'';
-    return ctx.stylize(simple, 'string');
-  }
-  if (isNumber(value))
-    return ctx.stylize('' + value, 'number');
-  if (isBoolean(value))
-    return ctx.stylize('' + value, 'boolean');
-  // For some reason typeof null is "object", so special case here.
-  if (isNull(value))
-    return ctx.stylize('null', 'null');
-}
-
-
-function formatError(value) {
-  return '[' + Error.prototype.toString.call(value) + ']';
-}
-
-
-function formatArray(ctx, value, recurseTimes, visibleKeys, keys) {
-  var output = [];
-  for (var i = 0, l = value.length; i < l; ++i) {
-    if (hasOwnProperty(value, String(i))) {
-      output.push(formatProperty(ctx, value, recurseTimes, visibleKeys,
-          String(i), true));
-    } else {
-      output.push('');
-    }
-  }
-  keys.forEach(function(key) {
-    if (!key.match(/^\d+$/)) {
-      output.push(formatProperty(ctx, value, recurseTimes, visibleKeys,
-          key, true));
-    }
-  });
-  return output;
-}
-
-
-function formatProperty(ctx, value, recurseTimes, visibleKeys, key, array) {
-  var name, str, desc;
-  desc = Object.getOwnPropertyDescriptor(value, key) || { value: value[key] };
-  if (desc.get) {
-    if (desc.set) {
-      str = ctx.stylize('[Getter/Setter]', 'special');
-    } else {
-      str = ctx.stylize('[Getter]', 'special');
-    }
-  } else {
-    if (desc.set) {
-      str = ctx.stylize('[Setter]', 'special');
-    }
-  }
-  if (!hasOwnProperty(visibleKeys, key)) {
-    name = '[' + key + ']';
-  }
-  if (!str) {
-    if (ctx.seen.indexOf(desc.value) < 0) {
-      if (isNull(recurseTimes)) {
-        str = formatValue(ctx, desc.value, null);
-      } else {
-        str = formatValue(ctx, desc.value, recurseTimes - 1);
-      }
-      if (str.indexOf('\n') > -1) {
-        if (array) {
-          str = str.split('\n').map(function(line) {
-            return '  ' + line;
-          }).join('\n').substr(2);
-        } else {
-          str = '\n' + str.split('\n').map(function(line) {
-            return '   ' + line;
-          }).join('\n');
-        }
-      }
-    } else {
-      str = ctx.stylize('[Circular]', 'special');
-    }
-  }
-  if (isUndefined(name)) {
-    if (array && key.match(/^\d+$/)) {
-      return str;
-    }
-    name = JSON.stringify('' + key);
-    if (name.match(/^"([a-zA-Z_][a-zA-Z_0-9]*)"$/)) {
-      name = name.substr(1, name.length - 2);
-      name = ctx.stylize(name, 'name');
-    } else {
-      name = name.replace(/'/g, "\\'")
-                 .replace(/\\"/g, '"')
-                 .replace(/(^"|"$)/g, "'");
-      name = ctx.stylize(name, 'string');
-    }
-  }
-
-  return name + ': ' + str;
-}
-
-
-function reduceToSingleString(output, base, braces) {
-  var numLinesEst = 0;
-  var length = output.reduce(function(prev, cur) {
-    numLinesEst++;
-    if (cur.indexOf('\n') >= 0) numLinesEst++;
-    return prev + cur.replace(/\u001b\[\d\d?m/g, '').length + 1;
-  }, 0);
-
-  if (length > 60) {
-    return braces[0] +
-           (base === '' ? '' : base + '\n ') +
-           ' ' +
-           output.join(',\n  ') +
-           ' ' +
-           braces[1];
-  }
-
-  return braces[0] + base + ' ' + output.join(', ') + ' ' + braces[1];
-}
-
-
-// NOTE: These type checking functions intentionally don't use `instanceof`
-// because it is fragile and can be easily faked with `Object.create()`.
-function isArray(ar) {
-  return Array.isArray(ar);
-}
-exports.isArray = isArray;
-
-function isBoolean(arg) {
-  return typeof arg === 'boolean';
-}
-exports.isBoolean = isBoolean;
-
-function isNull(arg) {
-  return arg === null;
-}
-exports.isNull = isNull;
-
-function isNullOrUndefined(arg) {
-  return arg == null;
-}
-exports.isNullOrUndefined = isNullOrUndefined;
-
-function isNumber(arg) {
-  return typeof arg === 'number';
-}
-exports.isNumber = isNumber;
-
-function isString(arg) {
-  return typeof arg === 'string';
-}
-exports.isString = isString;
-
-function isSymbol(arg) {
-  return typeof arg === 'symbol';
-}
-exports.isSymbol = isSymbol;
-
-function isUndefined(arg) {
-  return arg === void 0;
-}
-exports.isUndefined = isUndefined;
-
-function isRegExp(re) {
-  return isObject(re) && objectToString(re) === '[object RegExp]';
-}
-exports.isRegExp = isRegExp;
-
-function isObject(arg) {
-  return typeof arg === 'object' && arg !== null;
-}
-exports.isObject = isObject;
-
-function isDate(d) {
-  return isObject(d) && objectToString(d) === '[object Date]';
-}
-exports.isDate = isDate;
-
-function isError(e) {
-  return isObject(e) &&
-      (objectToString(e) === '[object Error]' || e instanceof Error);
-}
-exports.isError = isError;
-
-function isFunction(arg) {
-  return typeof arg === 'function';
-}
-exports.isFunction = isFunction;
-
-function isPrimitive(arg) {
-  return arg === null ||
-         typeof arg === 'boolean' ||
-         typeof arg === 'number' ||
-         typeof arg === 'string' ||
-         typeof arg === 'symbol' ||  // ES6 symbol
-         typeof arg === 'undefined';
-}
-exports.isPrimitive = isPrimitive;
-
-exports.isBuffer = require('./support/isBuffer');
-
-function objectToString(o) {
-  return Object.prototype.toString.call(o);
-}
-
-
-function pad(n) {
-  return n < 10 ? '0' + n.toString(10) : n.toString(10);
-}
-
-
-var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep',
-              'Oct', 'Nov', 'Dec'];
-
-// 26 Feb 16:19:34
-function timestamp() {
-  var d = new Date();
-  var time = [pad(d.getHours()),
-              pad(d.getMinutes()),
-              pad(d.getSeconds())].join(':');
-  return [d.getDate(), months[d.getMonth()], time].join(' ');
-}
-
-
-// log is just a thin wrapper to console.log that prepends a timestamp
-exports.log = function() {
-  console.log('%s - %s', timestamp(), exports.format.apply(exports, arguments));
-};
-
-
-/**
- * Inherit the prototype methods from one constructor into another.
- *
- * The Function.prototype.inherits from lang.js rewritten as a standalone
- * function (not on Function.prototype). NOTE: If this file is to be loaded
- * during bootstrapping this function needs to be rewritten using some native
- * functions as prototype setup using normal JavaScript does not work as
- * expected during bootstrapping (see mirror.js in r114903).
- *
- * @param {function} ctor Constructor function which needs to inherit the
- *     prototype.
- * @param {function} superCtor Constructor function to inherit prototype from.
- */
-exports.inherits = require('inherits');
-
-exports._extend = function(origin, add) {
-  // Don't do anything if add isn't an object
-  if (!add || !isObject(add)) return origin;
-
-  var keys = Object.keys(add);
-  var i = keys.length;
-  while (i--) {
-    origin[keys[i]] = add[keys[i]];
-  }
-  return origin;
-};
-
-function hasOwnProperty(obj, prop) {
-  return Object.prototype.hasOwnProperty.call(obj, prop);
-}
-
-}).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./support/isBuffer":54,"_process":146,"inherits":53}],56:[function(require,module,exports){
 (function (global){
 /*!
  * The buffer module from node.js, for the browser.
@@ -21047,7 +21290,7 @@ function isnan (val) {
 }
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"base64-js":50,"ieee754":98,"isarray":102}],57:[function(require,module,exports){
+},{"base64-js":50,"ieee754":95,"isarray":99}],54:[function(require,module,exports){
 (function (Buffer){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -21158,7 +21401,7 @@ function objectToString(o) {
 }
 
 }).call(this,{"isBuffer":require("../../is-buffer/index.js")})
-},{"../../is-buffer/index.js":101}],58:[function(require,module,exports){
+},{"../../is-buffer/index.js":98}],55:[function(require,module,exports){
 var util = require('util')
   , AbstractIterator = require('abstract-leveldown').AbstractIterator
 
@@ -21194,7 +21437,7 @@ DeferredIterator.prototype._operation = function (method, args) {
 
 module.exports = DeferredIterator;
 
-},{"abstract-leveldown":63,"util":55}],59:[function(require,module,exports){
+},{"abstract-leveldown":60,"util":311}],56:[function(require,module,exports){
 (function (Buffer,process){
 var util              = require('util')
   , AbstractLevelDOWN = require('abstract-leveldown').AbstractLevelDOWN
@@ -21254,14 +21497,22 @@ module.exports                  = DeferredLevelDOWN
 module.exports.DeferredIterator = DeferredIterator
 
 }).call(this,{"isBuffer":require("../is-buffer/index.js")},require('_process'))
-},{"../is-buffer/index.js":101,"./deferred-iterator":58,"_process":146,"abstract-leveldown":63,"util":55}],60:[function(require,module,exports){
+},{"../is-buffer/index.js":98,"./deferred-iterator":55,"_process":143,"abstract-leveldown":60,"util":311}],57:[function(require,module,exports){
 (function (process){
-/* Copyright (c) 2013 Rod Vagg, MIT License */
+/* Copyright (c) 2017 Rod Vagg, MIT License */
 
 function AbstractChainedBatch (db) {
   this._db         = db
   this._operations = []
   this._written    = false
+}
+
+AbstractChainedBatch.prototype._serializeKey = function (key) {
+  return this._db._serializeKey(key)
+}
+
+AbstractChainedBatch.prototype._serializeValue = function (value) {
+  return this._db._serializeValue(value)
 }
 
 AbstractChainedBatch.prototype._checkWritten = function () {
@@ -21276,8 +21527,8 @@ AbstractChainedBatch.prototype.put = function (key, value) {
   if (err)
     throw err
 
-  if (!this._db._isBuffer(key)) key = String(key)
-  if (!this._db._isBuffer(value)) value = String(value)
+  key = this._serializeKey(key)
+  value = this._serializeValue(value)
 
   if (typeof this._put == 'function' )
     this._put(key, value)
@@ -21293,7 +21544,7 @@ AbstractChainedBatch.prototype.del = function (key) {
   var err = this._db._checkKey(key, 'key', this._db._isBuffer)
   if (err) throw err
 
-  if (!this._db._isBuffer(key)) key = String(key)
+  key = this._serializeKey(key)
 
   if (typeof this._del == 'function' )
     this._del(key)
@@ -21336,10 +21587,11 @@ AbstractChainedBatch.prototype.write = function (options, callback) {
 }
 
 module.exports = AbstractChainedBatch
+
 }).call(this,require('_process'))
-},{"_process":146}],61:[function(require,module,exports){
+},{"_process":143}],58:[function(require,module,exports){
 (function (process){
-/* Copyright (c) 2013 Rod Vagg, MIT License */
+/* Copyright (c) 2017 Rod Vagg, MIT License */
 
 function AbstractIterator (db) {
   this.db = db
@@ -21390,9 +21642,9 @@ AbstractIterator.prototype.end = function (callback) {
 module.exports = AbstractIterator
 
 }).call(this,require('_process'))
-},{"_process":146}],62:[function(require,module,exports){
+},{"_process":143}],59:[function(require,module,exports){
 (function (Buffer,process){
-/* Copyright (c) 2013 Rod Vagg, MIT License */
+/* Copyright (c) 2017 Rod Vagg, MIT License */
 
 var xtend                = require('xtend')
   , AbstractIterator     = require('./abstract-iterator')
@@ -21473,11 +21725,10 @@ AbstractLevelDOWN.prototype.get = function (key, options, callback) {
   if (typeof callback != 'function')
     throw new Error('get() requires a callback argument')
 
-  if (err = this._checkKey(key, 'key', this._isBuffer))
+  if (err = this._checkKey(key, 'key'))
     return callback(err)
 
-  if (!this._isBuffer(key))
-    key = String(key)
+  key = this._serializeKey(key)
 
   if (typeof options != 'object')
     options = {}
@@ -21499,16 +21750,11 @@ AbstractLevelDOWN.prototype.put = function (key, value, options, callback) {
   if (typeof callback != 'function')
     throw new Error('put() requires a callback argument')
 
-  if (err = this._checkKey(key, 'key', this._isBuffer))
+  if (err = this._checkKey(key, 'key'))
     return callback(err)
 
-  if (!this._isBuffer(key))
-    key = String(key)
-
-  // coerce value to string in node, don't touch it in browser
-  // (indexeddb can store any JS type)
-  if (value != null && !this._isBuffer(value) && !process.browser)
-    value = String(value)
+  key = this._serializeKey(key)
+  value = this._serializeValue(value)
 
   if (typeof options != 'object')
     options = {}
@@ -21528,11 +21774,10 @@ AbstractLevelDOWN.prototype.del = function (key, options, callback) {
   if (typeof callback != 'function')
     throw new Error('del() requires a callback argument')
 
-  if (err = this._checkKey(key, 'key', this._isBuffer))
+  if (err = this._checkKey(key, 'key'))
     return callback(err)
 
-  if (!this._isBuffer(key))
-    key = String(key)
+  key = this._serializeKey(key)
 
   if (typeof options != 'object')
     options = {}
@@ -21572,10 +21817,10 @@ AbstractLevelDOWN.prototype.batch = function (array, options, callback) {
     if (typeof e != 'object')
       continue
 
-    if (err = this._checkKey(e.type, 'type', this._isBuffer))
+    if (err = this._checkKey(e.type, 'type'))
       return callback(err)
 
-    if (err = this._checkKey(e.key, 'key', this._isBuffer))
+    if (err = this._checkKey(e.key, 'key'))
       return callback(err)
   }
 
@@ -21597,11 +21842,8 @@ AbstractLevelDOWN.prototype.approximateSize = function (start, end, callback) {
   if (typeof callback != 'function')
     throw new Error('approximateSize() requires a callback argument')
 
-  if (!this._isBuffer(start))
-    start = String(start)
-
-  if (!this._isBuffer(end))
-    end = String(end)
+  start = this._serializeKey(start)
+  end = this._serializeKey(end)
 
   if (typeof this._approximateSize == 'function')
     return this._approximateSize(start, end, callback)
@@ -21651,28 +21893,38 @@ AbstractLevelDOWN.prototype._isBuffer = function (obj) {
   return Buffer.isBuffer(obj)
 }
 
-AbstractLevelDOWN.prototype._checkKey = function (obj, type) {
+AbstractLevelDOWN.prototype._serializeKey = function (key) {
+  return this._isBuffer(key)
+    ? key
+    : String(key)
+}
 
+AbstractLevelDOWN.prototype._serializeValue = function (value) {
+  return this._isBuffer(value) || process.browser || value == null
+    ? value
+    : String(value)
+}
+
+AbstractLevelDOWN.prototype._checkKey = function (obj, type) {
   if (obj === null || obj === undefined)
     return new Error(type + ' cannot be `null` or `undefined`')
 
-  if (this._isBuffer(obj)) {
-    if (obj.length === 0)
-      return new Error(type + ' cannot be an empty Buffer')
-  } else if (String(obj) === '')
+  if (this._isBuffer(obj) && obj.length === 0)
+    return new Error(type + ' cannot be an empty Buffer')
+  else if (String(obj) === '')
     return new Error(type + ' cannot be an empty String')
 }
 
 module.exports = AbstractLevelDOWN
 
 }).call(this,{"isBuffer":require("../../../is-buffer/index.js")},require('_process'))
-},{"../../../is-buffer/index.js":101,"./abstract-chained-batch":60,"./abstract-iterator":61,"_process":146,"xtend":313}],63:[function(require,module,exports){
+},{"../../../is-buffer/index.js":98,"./abstract-chained-batch":57,"./abstract-iterator":58,"_process":143,"xtend":313}],60:[function(require,module,exports){
 exports.AbstractLevelDOWN    = require('./abstract-leveldown')
 exports.AbstractIterator     = require('./abstract-iterator')
 exports.AbstractChainedBatch = require('./abstract-chained-batch')
 exports.isLevelDOWN          = require('./is-leveldown')
 
-},{"./abstract-chained-batch":60,"./abstract-iterator":61,"./abstract-leveldown":62,"./is-leveldown":64}],64:[function(require,module,exports){
+},{"./abstract-chained-batch":57,"./abstract-iterator":58,"./abstract-leveldown":59,"./is-leveldown":61}],61:[function(require,module,exports){
 var AbstractLevelDOWN = require('./abstract-leveldown')
 
 function isLevelDOWN (db) {
@@ -21688,7 +21940,7 @@ function isLevelDOWN (db) {
 
 module.exports = isLevelDOWN
 
-},{"./abstract-leveldown":62}],65:[function(require,module,exports){
+},{"./abstract-leveldown":59}],62:[function(require,module,exports){
 /**
  * Copyright (c) 2013 Petka Antonov
  * 
@@ -21977,7 +22229,7 @@ function getCapacity(capacity) {
 
 module.exports = Deque;
 
-},{}],66:[function(require,module,exports){
+},{}],63:[function(require,module,exports){
 var prr = require('prr')
 
 function init (type, message, cause) {
@@ -22034,7 +22286,7 @@ module.exports = function (errno) {
   }
 }
 
-},{"prr":147}],67:[function(require,module,exports){
+},{"prr":144}],64:[function(require,module,exports){
 var all = module.exports.all = [
   {
     errno: -2,
@@ -22349,7 +22601,7 @@ all.forEach(function (error) {
 module.exports.custom = require('./custom')(module.exports)
 module.exports.create = module.exports.custom.createError
 
-},{"./custom":66}],68:[function(require,module,exports){
+},{"./custom":63}],65:[function(require,module,exports){
 (function (root, factory) {
   /* istanbul ignore next */
   if (typeof define === 'function' && define.amd) {
@@ -22567,7 +22819,7 @@ module.exports.create = module.exports.custom.createError
   return PromisePool
 })
 
-},{}],69:[function(require,module,exports){
+},{}],66:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -22871,7 +23123,7 @@ function isUndefined(arg) {
   return arg === void 0;
 }
 
-},{}],70:[function(require,module,exports){
+},{}],67:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -22958,7 +23210,7 @@ var EventListener = {
 
 module.exports = EventListener;
 }).call(this,require('_process'))
-},{"./emptyFunction":77,"_process":146}],71:[function(require,module,exports){
+},{"./emptyFunction":74,"_process":143}],68:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -22995,7 +23247,7 @@ var ExecutionEnvironment = {
 };
 
 module.exports = ExecutionEnvironment;
-},{}],72:[function(require,module,exports){
+},{}],69:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -23028,7 +23280,7 @@ function camelize(string) {
 }
 
 module.exports = camelize;
-},{}],73:[function(require,module,exports){
+},{}],70:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -23069,7 +23321,7 @@ function camelizeStyleName(string) {
 }
 
 module.exports = camelizeStyleName;
-},{"./camelize":72}],74:[function(require,module,exports){
+},{"./camelize":69}],71:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -23125,7 +23377,7 @@ function containsNode(_x, _x2) {
 }
 
 module.exports = containsNode;
-},{"./isTextNode":87}],75:[function(require,module,exports){
+},{"./isTextNode":84}],72:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -23211,7 +23463,7 @@ function createArrayFromMixed(obj) {
 }
 
 module.exports = createArrayFromMixed;
-},{"./toArray":95}],76:[function(require,module,exports){
+},{"./toArray":92}],73:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -23298,7 +23550,7 @@ function createNodesFromMarkup(markup, handleScript) {
 
 module.exports = createNodesFromMarkup;
 }).call(this,require('_process'))
-},{"./ExecutionEnvironment":71,"./createArrayFromMixed":75,"./getMarkupWrap":81,"./invariant":85,"_process":146}],77:[function(require,module,exports){
+},{"./ExecutionEnvironment":68,"./createArrayFromMixed":72,"./getMarkupWrap":78,"./invariant":82,"_process":143}],74:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -23337,7 +23589,7 @@ emptyFunction.thatReturnsArgument = function (arg) {
 };
 
 module.exports = emptyFunction;
-},{}],78:[function(require,module,exports){
+},{}],75:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -23360,7 +23612,7 @@ if (process.env.NODE_ENV !== 'production') {
 
 module.exports = emptyObject;
 }).call(this,require('_process'))
-},{"_process":146}],79:[function(require,module,exports){
+},{"_process":143}],76:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -23387,7 +23639,7 @@ function focusNode(node) {
 }
 
 module.exports = focusNode;
-},{}],80:[function(require,module,exports){
+},{}],77:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -23423,7 +23675,7 @@ function getActiveElement() /*?DOMElement*/{
 }
 
 module.exports = getActiveElement;
-},{}],81:[function(require,module,exports){
+},{}],78:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -23521,7 +23773,7 @@ function getMarkupWrap(nodeName) {
 
 module.exports = getMarkupWrap;
 }).call(this,require('_process'))
-},{"./ExecutionEnvironment":71,"./invariant":85,"_process":146}],82:[function(require,module,exports){
+},{"./ExecutionEnvironment":68,"./invariant":82,"_process":143}],79:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -23560,7 +23812,7 @@ function getUnboundedScrollPosition(scrollable) {
 }
 
 module.exports = getUnboundedScrollPosition;
-},{}],83:[function(require,module,exports){
+},{}],80:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -23594,7 +23846,7 @@ function hyphenate(string) {
 }
 
 module.exports = hyphenate;
-},{}],84:[function(require,module,exports){
+},{}],81:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -23634,7 +23886,7 @@ function hyphenateStyleName(string) {
 }
 
 module.exports = hyphenateStyleName;
-},{"./hyphenate":83}],85:[function(require,module,exports){
+},{"./hyphenate":80}],82:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -23687,7 +23939,7 @@ function invariant(condition, format, a, b, c, d, e, f) {
 
 module.exports = invariant;
 }).call(this,require('_process'))
-},{"_process":146}],86:[function(require,module,exports){
+},{"_process":143}],83:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -23711,7 +23963,7 @@ function isNode(object) {
 }
 
 module.exports = isNode;
-},{}],87:[function(require,module,exports){
+},{}],84:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -23737,7 +23989,7 @@ function isTextNode(object) {
 }
 
 module.exports = isTextNode;
-},{"./isNode":86}],88:[function(require,module,exports){
+},{"./isNode":83}],85:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -23788,7 +24040,7 @@ var keyMirror = function (obj) {
 
 module.exports = keyMirror;
 }).call(this,require('_process'))
-},{"./invariant":85,"_process":146}],89:[function(require,module,exports){
+},{"./invariant":82,"_process":143}],86:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -23824,7 +24076,7 @@ var keyOf = function (oneKeyObj) {
 };
 
 module.exports = keyOf;
-},{}],90:[function(require,module,exports){
+},{}],87:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -23876,7 +24128,7 @@ function mapObject(object, callback, context) {
 }
 
 module.exports = mapObject;
-},{}],91:[function(require,module,exports){
+},{}],88:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -23908,7 +24160,7 @@ function memoizeStringOnly(callback) {
 }
 
 module.exports = memoizeStringOnly;
-},{}],92:[function(require,module,exports){
+},{}],89:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -23932,7 +24184,7 @@ if (ExecutionEnvironment.canUseDOM) {
 }
 
 module.exports = performance || {};
-},{"./ExecutionEnvironment":71}],93:[function(require,module,exports){
+},{"./ExecutionEnvironment":68}],90:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -23967,7 +24219,7 @@ if (performance.now) {
 }
 
 module.exports = performanceNow;
-},{"./performance":92}],94:[function(require,module,exports){
+},{"./performance":89}],91:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -24018,7 +24270,7 @@ function shallowEqual(objA, objB) {
 }
 
 module.exports = shallowEqual;
-},{}],95:[function(require,module,exports){
+},{}],92:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -24078,7 +24330,7 @@ function toArray(obj) {
 
 module.exports = toArray;
 }).call(this,require('_process'))
-},{"./invariant":85,"_process":146}],96:[function(require,module,exports){
+},{"./invariant":82,"_process":143}],93:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2014-2015, Facebook, Inc.
@@ -24138,7 +24390,7 @@ if (process.env.NODE_ENV !== 'production') {
 
 module.exports = warning;
 }).call(this,require('_process'))
-},{"./emptyFunction":77,"_process":146}],97:[function(require,module,exports){
+},{"./emptyFunction":74,"_process":143}],94:[function(require,module,exports){
 "use strict"
 
 module.exports = createRBTree
@@ -25135,7 +25387,7 @@ function defaultCompare(a, b) {
 function createRBTree(compare) {
   return new RedBlackTree(compare || defaultCompare, null)
 }
-},{}],98:[function(require,module,exports){
+},{}],95:[function(require,module,exports){
 exports.read = function (buffer, offset, isLE, mLen, nBytes) {
   var e, m
   var eLen = nBytes * 8 - mLen - 1
@@ -25221,7 +25473,7 @@ exports.write = function (buffer, value, offset, isLE, mLen, nBytes) {
   buffer[offset + i - d] |= s * 128
 }
 
-},{}],99:[function(require,module,exports){
+},{}],96:[function(require,module,exports){
 (function (global){
 'use strict';
 var Mutation = global.MutationObserver || global.WebKitMutationObserver;
@@ -25294,9 +25546,32 @@ function immediate(task) {
 }
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],100:[function(require,module,exports){
-arguments[4][53][0].apply(exports,arguments)
-},{"dup":53}],101:[function(require,module,exports){
+},{}],97:[function(require,module,exports){
+if (typeof Object.create === 'function') {
+  // implementation from standard node.js 'util' module
+  module.exports = function inherits(ctor, superCtor) {
+    ctor.super_ = superCtor
+    ctor.prototype = Object.create(superCtor.prototype, {
+      constructor: {
+        value: ctor,
+        enumerable: false,
+        writable: true,
+        configurable: true
+      }
+    });
+  };
+} else {
+  // old school shim for old browsers
+  module.exports = function inherits(ctor, superCtor) {
+    ctor.super_ = superCtor
+    var TempCtor = function () {}
+    TempCtor.prototype = superCtor.prototype
+    ctor.prototype = new TempCtor()
+    ctor.prototype.constructor = ctor
+  }
+}
+
+},{}],98:[function(require,module,exports){
 /*!
  * Determine if an object is a Buffer
  *
@@ -25319,14 +25594,14 @@ function isSlowBuffer (obj) {
   return typeof obj.readFloatLE === 'function' && typeof obj.slice === 'function' && isBuffer(obj.slice(0, 0))
 }
 
-},{}],102:[function(require,module,exports){
+},{}],99:[function(require,module,exports){
 var toString = {}.toString;
 
 module.exports = Array.isArray || function (arr) {
   return toString.call(arr) == '[object Array]';
 };
 
-},{}],103:[function(require,module,exports){
+},{}],100:[function(require,module,exports){
 (function() { 
 
   var slice   = Array.prototype.slice,
@@ -25355,7 +25630,7 @@ module.exports = Array.isArray || function (arr) {
   this.extend = extend;
 
 }).call(this);
-},{}],104:[function(require,module,exports){
+},{}],101:[function(require,module,exports){
 var encodings = require('./lib/encodings');
 
 module.exports = Codec;
@@ -25463,7 +25738,7 @@ Codec.prototype.valueAsBuffer = function(opts){
 };
 
 
-},{"./lib/encodings":105}],105:[function(require,module,exports){
+},{"./lib/encodings":102}],102:[function(require,module,exports){
 (function (Buffer){
 
 exports.utf8 = exports['utf-8'] = {
@@ -25543,8 +25818,8 @@ function isBinary(data){
 
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":56}],106:[function(require,module,exports){
-/* Copyright (c) 2012-2015 LevelUP contributors
+},{"buffer":53}],103:[function(require,module,exports){
+/* Copyright (c) 2012-2017 LevelUP contributors
  * See list at <https://github.com/rvagg/node-levelup#contributing>
  * MIT License
  * <https://github.com/rvagg/node-levelup/blob/master/LICENSE.md>
@@ -25567,7 +25842,7 @@ module.exports = {
   , EncodingError       : createError('EncodingError', LevelUPError)
 }
 
-},{"errno":67}],107:[function(require,module,exports){
+},{"errno":64}],104:[function(require,module,exports){
 var inherits = require('inherits');
 var Readable = require('readable-stream').Readable;
 var extend = require('xtend');
@@ -25625,12 +25900,12 @@ ReadStream.prototype._cleanup = function(){
 };
 
 
-},{"inherits":100,"level-errors":106,"readable-stream":114,"xtend":313}],108:[function(require,module,exports){
+},{"inherits":97,"level-errors":103,"readable-stream":111,"xtend":313}],105:[function(require,module,exports){
 module.exports = Array.isArray || function (arr) {
   return Object.prototype.toString.call(arr) == '[object Array]';
 };
 
-},{}],109:[function(require,module,exports){
+},{}],106:[function(require,module,exports){
 (function (process){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -25723,7 +25998,7 @@ function forEach (xs, f) {
 }
 
 }).call(this,require('_process'))
-},{"./_stream_readable":111,"./_stream_writable":113,"_process":146,"core-util-is":57,"inherits":100}],110:[function(require,module,exports){
+},{"./_stream_readable":108,"./_stream_writable":110,"_process":143,"core-util-is":54,"inherits":97}],107:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -25771,7 +26046,7 @@ PassThrough.prototype._transform = function(chunk, encoding, cb) {
   cb(null, chunk);
 };
 
-},{"./_stream_transform":112,"core-util-is":57,"inherits":100}],111:[function(require,module,exports){
+},{"./_stream_transform":109,"core-util-is":54,"inherits":97}],108:[function(require,module,exports){
 (function (process){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -26726,7 +27001,7 @@ function indexOf (xs, x) {
 }
 
 }).call(this,require('_process'))
-},{"./_stream_duplex":109,"_process":146,"buffer":56,"core-util-is":57,"events":69,"inherits":100,"isarray":108,"stream":295,"string_decoder/":296,"util":52}],112:[function(require,module,exports){
+},{"./_stream_duplex":106,"_process":143,"buffer":53,"core-util-is":54,"events":66,"inherits":97,"isarray":105,"stream":292,"string_decoder/":293,"util":52}],109:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -26937,7 +27212,7 @@ function done(stream, er) {
   return stream.push(null);
 }
 
-},{"./_stream_duplex":109,"core-util-is":57,"inherits":100}],113:[function(require,module,exports){
+},{"./_stream_duplex":106,"core-util-is":54,"inherits":97}],110:[function(require,module,exports){
 (function (process){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -27418,7 +27693,7 @@ function endWritable(stream, state, cb) {
 }
 
 }).call(this,require('_process'))
-},{"./_stream_duplex":109,"_process":146,"buffer":56,"core-util-is":57,"inherits":100,"stream":295}],114:[function(require,module,exports){
+},{"./_stream_duplex":106,"_process":143,"buffer":53,"core-util-is":54,"inherits":97,"stream":292}],111:[function(require,module,exports){
 (function (process){
 exports = module.exports = require('./lib/_stream_readable.js');
 exports.Stream = require('stream');
@@ -27432,7 +27707,7 @@ if (!process.browser && process.env.READABLE_STREAM === 'disable') {
 }
 
 }).call(this,require('_process'))
-},{"./lib/_stream_duplex.js":109,"./lib/_stream_passthrough.js":110,"./lib/_stream_readable.js":111,"./lib/_stream_transform.js":112,"./lib/_stream_writable.js":113,"_process":146,"stream":295}],115:[function(require,module,exports){
+},{"./lib/_stream_duplex.js":106,"./lib/_stream_passthrough.js":107,"./lib/_stream_readable.js":108,"./lib/_stream_transform.js":109,"./lib/_stream_writable.js":110,"_process":143,"stream":292}],112:[function(require,module,exports){
 /* Copyright (c) 2012-2016 LevelUP contributors
  * See list at <https://github.com/level/levelup#contributing>
  * MIT License
@@ -27517,7 +27792,7 @@ Batch.prototype.write = function (callback) {
 
 module.exports = Batch
 
-},{"./util":117,"level-errors":106}],116:[function(require,module,exports){
+},{"./util":114,"level-errors":103}],113:[function(require,module,exports){
 (function (process){
 /* Copyright (c) 2012-2016 LevelUP contributors
  * See list at <https://github.com/level/levelup#contributing>
@@ -27920,7 +28195,7 @@ module.exports.repair  = deprecate(
 
 
 }).call(this,require('_process'))
-},{"./batch":115,"./util":117,"_process":146,"deferred-leveldown":59,"events":69,"level-codec":104,"level-errors":106,"level-iterator-stream":107,"prr":118,"util":55,"xtend":313}],117:[function(require,module,exports){
+},{"./batch":112,"./util":114,"_process":143,"deferred-leveldown":56,"events":66,"level-codec":101,"level-errors":103,"level-iterator-stream":104,"prr":115,"util":311,"xtend":313}],114:[function(require,module,exports){
 /* Copyright (c) 2012-2016 LevelUP contributors
  * See list at <https://github.com/level/levelup#contributing>
  * MIT License
@@ -27999,7 +28274,7 @@ module.exports = {
   , isDefined       : isDefined
 }
 
-},{"../package.json":119,"level-errors":106,"leveldown":52,"leveldown/package":52,"semver":52,"util":55,"xtend":313}],118:[function(require,module,exports){
+},{"../package.json":116,"level-errors":103,"leveldown":52,"leveldown/package":52,"semver":52,"util":311,"xtend":313}],115:[function(require,module,exports){
 /*!
   * prr
   * (c) 2013 Rod Vagg <rod@vagg.org>
@@ -28063,54 +28338,37 @@ module.exports = {
 
   return prr
 })
-},{}],119:[function(require,module,exports){
+},{}],116:[function(require,module,exports){
 module.exports={
   "_args": [
     [
-      {
-        "raw": "levelup@1.3.2",
-        "scope": null,
-        "escapedName": "levelup",
-        "name": "levelup",
-        "rawSpec": "1.3.2",
-        "spec": "1.3.2",
-        "type": "version"
-      },
-      "C:\\gh\\pxt\\node_modules\\pouchdb"
+      "levelup@1.3.2",
+      "C:\\gh\\pxt"
     ]
   ],
+  "_development": true,
   "_from": "levelup@1.3.2",
   "_id": "levelup@1.3.2",
-  "_inCache": true,
+  "_inBundle": false,
+  "_integrity": "sha1-syHTBx8OdcLfry8P6IZOW5o4e8k=",
   "_location": "/levelup",
-  "_nodeVersion": "6.1.0",
-  "_npmOperationalInternal": {
-    "host": "packages-16-east.internal.npmjs.com",
-    "tmp": "tmp/levelup-1.3.2.tgz_1463496525467_0.4644940535072237"
-  },
-  "_npmUser": {
-    "name": "ralphtheninja",
-    "email": "ralphtheninja@riseup.net"
-  },
-  "_npmVersion": "3.8.6",
   "_phantomChildren": {},
   "_requested": {
+    "type": "version",
+    "registry": true,
     "raw": "levelup@1.3.2",
-    "scope": null,
-    "escapedName": "levelup",
     "name": "levelup",
+    "escapedName": "levelup",
     "rawSpec": "1.3.2",
-    "spec": "1.3.2",
-    "type": "version"
+    "saveSpec": null,
+    "fetchSpec": "1.3.2"
   },
   "_requiredBy": [
     "/pouchdb"
   ],
   "_resolved": "https://registry.npmjs.org/levelup/-/levelup-1.3.2.tgz",
-  "_shasum": "b321d3071f0e75c2dfaf2f0fe8864e5b9a387bc9",
-  "_shrinkwrap": null,
-  "_spec": "levelup@1.3.2",
-  "_where": "C:\\gh\\pxt\\node_modules\\pouchdb",
+  "_spec": "1.3.2",
+  "_where": "C:\\gh\\pxt",
   "browser": {
     "leveldown": false,
     "leveldown/package": false,
@@ -28215,12 +28473,6 @@ module.exports={
     "tap": "~2.3.1",
     "tape": "~4.2.1"
   },
-  "directories": {},
-  "dist": {
-    "shasum": "b321d3071f0e75c2dfaf2f0fe8864e5b9a387bc9",
-    "tarball": "https://registry.npmjs.org/levelup/-/levelup-1.3.2.tgz"
-  },
-  "gitHead": "bcc242cfc4ec035f9228a5cd54903cb126659a00",
   "homepage": "https://github.com/level/levelup",
   "keywords": [
     "leveldb",
@@ -28233,23 +28485,7 @@ module.exports={
   ],
   "license": "MIT",
   "main": "lib/levelup.js",
-  "maintainers": [
-    {
-      "name": "rvagg",
-      "email": "rod@vagg.org"
-    },
-    {
-      "name": "ralphtheninja",
-      "email": "ralphtheninja@riseup.net"
-    },
-    {
-      "name": "juliangruber",
-      "email": "julian@juliangruber.com"
-    }
-  ],
   "name": "levelup",
-  "optionalDependencies": {},
-  "readme": "ERROR: No README data found!",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/level/levelup.git"
@@ -28260,7 +28496,7 @@ module.exports={
   "version": "1.3.2"
 }
 
-},{}],120:[function(require,module,exports){
+},{}],117:[function(require,module,exports){
 (function (Buffer){
 
 exports.compare = function (a, b) {
@@ -28359,7 +28595,7 @@ exports.filter = function (range, compare) {
 }
 
 }).call(this,{"isBuffer":require("../is-buffer/index.js")})
-},{"../is-buffer/index.js":101}],121:[function(require,module,exports){
+},{"../is-buffer/index.js":98}],118:[function(require,module,exports){
 (function (global){
 /**
  * marked - a markdown parser
@@ -28368,6 +28604,7 @@ exports.filter = function (range, compare) {
  */
 
 ;(function() {
+'use strict';
 
 /**
  * Block-Level Grammar
@@ -28812,21 +29049,21 @@ Lexer.prototype.token = function(src, top, bq) {
 
 var inline = {
   escape: /^\\([\\`*{}\[\]()#+\-.!_>])/,
-  autolink: /^<([^ >]+(@|:\/)[^ >]+)>/,
+  autolink: /^<([^ <>]+(@|:\/)[^ <>]+)>/,
   url: noop,
-  tag: /^<!--[\s\S]*?-->|^<\/?\w+(?:"[^"]*"|'[^']*'|[^'">])*?>/,
+  tag: /^<!--[\s\S]*?-->|^<\/?\w+(?:"[^"]*"|'[^']*'|[^<'">])*?>/,
   link: /^!?\[(inside)\]\(href\)/,
   reflink: /^!?\[(inside)\]\s*\[([^\]]*)\]/,
   nolink: /^!?\[((?:\[[^\]]*\]|[^\[\]])*)\]/,
   strong: /^__([\s\S]+?)__(?!_)|^\*\*([\s\S]+?)\*\*(?!\*)/,
   em: /^\b_((?:[^_]|__)+?)_\b|^\*((?:\*\*|[\s\S])+?)\*(?!\*)/,
-  code: /^(`+)\s*([\s\S]*?[^`])\s*\1(?!`)/,
+  code: /^(`+)([\s\S]*?[^`])\1(?!`)/,
   br: /^ {2,}\n(?!\s*$)/,
   del: noop,
   text: /^[\s\S]+?(?=[\\<!\[_*`]| {2,}\n|$)/
 };
 
-inline._inside = /(?:\[[^\]]*\]|[^\[\]]|\](?=[^\[]*\]))*/;
+inline._inside = /(?:\[[^\]]*\]|\\[\[\]]|[^\[\]]|\](?=[^\[]*\]))*/;
 inline._href = /\s*<?([\s\S]*?)>?(?:\s+['"]([\s\S]*?)['"])?\s*/;
 
 inline.link = replace(inline.link)
@@ -28941,9 +29178,11 @@ InlineLexer.prototype.output = function(src) {
     if (cap = this.rules.autolink.exec(src)) {
       src = src.substring(cap[0].length);
       if (cap[2] === '@') {
-        text = cap[1].charAt(6) === ':'
+        text = escape(
+          cap[1].charAt(6) === ':'
           ? this.mangle(cap[1].substring(7))
-          : this.mangle(cap[1]);
+          : this.mangle(cap[1])
+        );
         href = this.mangle('mailto:') + text;
       } else {
         text = escape(cap[1]);
@@ -29024,7 +29263,7 @@ InlineLexer.prototype.output = function(src) {
     // code
     if (cap = this.rules.code.exec(src)) {
       src = src.substring(cap[0].length);
-      out += this.renderer.codespan(escape(cap[2], true));
+      out += this.renderer.codespan(escape(cap[2].trim(), true));
       continue;
     }
 
@@ -29236,11 +29475,14 @@ Renderer.prototype.link = function(href, title, text) {
         .replace(/[^\w:]/g, '')
         .toLowerCase();
     } catch (e) {
-      return '';
+      return text;
     }
-    if (prot.indexOf('javascript:') === 0 || prot.indexOf('vbscript:') === 0) {
-      return '';
+    if (prot.indexOf('javascript:') === 0 || prot.indexOf('vbscript:') === 0 || prot.indexOf('data:') === 0) {
+      return text;
     }
+  }
+  if (this.options.baseUrl && !originIndependentUrl.test(href)) {
+    href = resolveUrl(this.options.baseUrl, href);
   }
   var out = '<a href="' + href + '"';
   if (title) {
@@ -29251,6 +29493,9 @@ Renderer.prototype.link = function(href, title, text) {
 };
 
 Renderer.prototype.image = function(href, title, text) {
+  if (this.options.baseUrl && !originIndependentUrl.test(href)) {
+    href = resolveUrl(this.options.baseUrl, href);
+  }
   var out = '<img src="' + href + '" alt="' + text + '"';
   if (title) {
     out += ' title="' + title + '"';
@@ -29457,8 +29702,8 @@ function escape(html, encode) {
 }
 
 function unescape(html) {
-	// explicitly match decimal, hex, and named HTML entities 
-  return html.replace(/&(#(?:\d+)|(?:#x[0-9A-Fa-f]+)|(?:\w+));?/g, function(_, n) {
+	// explicitly match decimal, hex, and named HTML entities
+  return html.replace(/&(#(?:\d+)|(?:#x[0-9A-Fa-f]+)|(?:\w+));?/ig, function(_, n) {
     n = n.toLowerCase();
     if (n === 'colon') return ':';
     if (n.charAt(0) === '#') {
@@ -29481,6 +29726,30 @@ function replace(regex, opt) {
     return self;
   };
 }
+
+function resolveUrl(base, href) {
+  if (!baseUrls[' ' + base]) {
+    // we can ignore everything in base after the last slash of its path component,
+    // but we might need to add _that_
+    // https://tools.ietf.org/html/rfc3986#section-3
+    if (/^[^:]+:\/*[^/]*$/.test(base)) {
+      baseUrls[' ' + base] = base + '/';
+    } else {
+      baseUrls[' ' + base] = base.replace(/[^/]*$/, '');
+    }
+  }
+  base = baseUrls[' ' + base];
+
+  if (href.slice(0, 2) === '//') {
+    return base.replace(/:[\s\S]*/, ':') + href;
+  } else if (href.charAt(0) === '/') {
+    return base.replace(/(:\/*[^/]*)[\s\S]*/, '$1') + href;
+  } else {
+    return base + href;
+  }
+}
+var baseUrls = {};
+var originIndependentUrl = /^$|^[a-z][a-z0-9+.-]*:|^[?#]/i;
 
 function noop() {}
 noop.exec = noop;
@@ -29583,7 +29852,7 @@ function marked(src, opt, callback) {
   } catch (e) {
     e.message += '\nPlease report this to https://github.com/chjj/marked.';
     if ((opt || marked.defaults).silent) {
-      return '<p>An error occured:</p><pre>'
+      return '<p>An error occurred:</p><pre>'
         + escape(e.message + '', true)
         + '</pre>';
     }
@@ -29616,7 +29885,8 @@ marked.defaults = {
   smartypants: false,
   headerPrefix: '',
   renderer: new Renderer,
-  xhtml: false
+  xhtml: false,
+  baseUrl: null
 };
 
 /**
@@ -29649,7 +29919,7 @@ if (typeof module !== 'undefined' && typeof exports === 'object') {
 }());
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],122:[function(require,module,exports){
+},{}],119:[function(require,module,exports){
 (function (process,global,Buffer){
 var inherits          = require('inherits')
   , AbstractLevelDOWN = require('abstract-leveldown').AbstractLevelDOWN
@@ -29893,381 +30163,17 @@ MemDOWN.destroy = function (name, callback) {
 module.exports = MemDOWN
 
 }).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {},require("buffer").Buffer)
-},{"_process":146,"abstract-leveldown":126,"buffer":56,"functional-red-black-tree":97,"inherits":100,"ltgt":120}],123:[function(require,module,exports){
-(function (process){
-/* Copyright (c) 2013 Rod Vagg, MIT License */
-
-function AbstractChainedBatch (db) {
-  this._db         = db
-  this._operations = []
-  this._written    = false
-}
-
-AbstractChainedBatch.prototype._serializeKey = function (key) {
-  return this._db._serializeKey(key)
-}
-
-AbstractChainedBatch.prototype._serializeValue = function (value) {
-  return this._db._serializeValue(value)
-}
-
-AbstractChainedBatch.prototype._checkWritten = function () {
-  if (this._written)
-    throw new Error('write() already called on this batch')
-}
-
-AbstractChainedBatch.prototype.put = function (key, value) {
-  this._checkWritten()
-
-  var err = this._db._checkKey(key, 'key', this._db._isBuffer)
-  if (err)
-    throw err
-
-  key = this._serializeKey(key)
-  value = this._serializeValue(value)
-
-  if (typeof this._put == 'function' )
-    this._put(key, value)
-  else
-    this._operations.push({ type: 'put', key: key, value: value })
-
-  return this
-}
-
-AbstractChainedBatch.prototype.del = function (key) {
-  this._checkWritten()
-
-  var err = this._db._checkKey(key, 'key', this._db._isBuffer)
-  if (err) throw err
-
-  key = this._serializeKey(key)
-
-  if (typeof this._del == 'function' )
-    this._del(key)
-  else
-    this._operations.push({ type: 'del', key: key })
-
-  return this
-}
-
-AbstractChainedBatch.prototype.clear = function () {
-  this._checkWritten()
-
-  this._operations = []
-
-  if (typeof this._clear == 'function' )
-    this._clear()
-
-  return this
-}
-
-AbstractChainedBatch.prototype.write = function (options, callback) {
-  this._checkWritten()
-
-  if (typeof options == 'function')
-    callback = options
-  if (typeof callback != 'function')
-    throw new Error('write() requires a callback argument')
-  if (typeof options != 'object')
-    options = {}
-
-  this._written = true
-
-  if (typeof this._write == 'function' )
-    return this._write(callback)
-
-  if (typeof this._db._batch == 'function')
-    return this._db._batch(this._operations, options, callback)
-
-  process.nextTick(callback)
-}
-
-module.exports = AbstractChainedBatch
-
-}).call(this,require('_process'))
-},{"_process":146}],124:[function(require,module,exports){
+},{"_process":143,"abstract-leveldown":123,"buffer":53,"functional-red-black-tree":94,"inherits":97,"ltgt":117}],120:[function(require,module,exports){
+arguments[4][57][0].apply(exports,arguments)
+},{"_process":143,"dup":57}],121:[function(require,module,exports){
+arguments[4][58][0].apply(exports,arguments)
+},{"_process":143,"dup":58}],122:[function(require,module,exports){
+arguments[4][59][0].apply(exports,arguments)
+},{"../../../is-buffer/index.js":98,"./abstract-chained-batch":120,"./abstract-iterator":121,"_process":143,"dup":59,"xtend":313}],123:[function(require,module,exports){
+arguments[4][60][0].apply(exports,arguments)
+},{"./abstract-chained-batch":120,"./abstract-iterator":121,"./abstract-leveldown":122,"./is-leveldown":124,"dup":60}],124:[function(require,module,exports){
 arguments[4][61][0].apply(exports,arguments)
-},{"_process":146,"dup":61}],125:[function(require,module,exports){
-(function (Buffer,process){
-/* Copyright (c) 2013 Rod Vagg, MIT License */
-
-var xtend                = require('xtend')
-  , AbstractIterator     = require('./abstract-iterator')
-  , AbstractChainedBatch = require('./abstract-chained-batch')
-
-function AbstractLevelDOWN (location) {
-  if (!arguments.length || location === undefined)
-    throw new Error('constructor requires at least a location argument')
-
-  if (typeof location != 'string')
-    throw new Error('constructor requires a location string argument')
-
-  this.location = location
-  this.status = 'new'
-}
-
-AbstractLevelDOWN.prototype.open = function (options, callback) {
-  var self      = this
-    , oldStatus = this.status
-
-  if (typeof options == 'function')
-    callback = options
-
-  if (typeof callback != 'function')
-    throw new Error('open() requires a callback argument')
-
-  if (typeof options != 'object')
-    options = {}
-
-  options.createIfMissing = options.createIfMissing != false
-  options.errorIfExists = !!options.errorIfExists
-
-  if (typeof this._open == 'function') {
-    this.status = 'opening'
-    this._open(options, function (err) {
-      if (err) {
-        self.status = oldStatus
-        return callback(err)
-      }
-      self.status = 'open'
-      callback()
-    })
-  } else {
-    this.status = 'open'
-    process.nextTick(callback)
-  }
-}
-
-AbstractLevelDOWN.prototype.close = function (callback) {
-  var self      = this
-    , oldStatus = this.status
-
-  if (typeof callback != 'function')
-    throw new Error('close() requires a callback argument')
-
-  if (typeof this._close == 'function') {
-    this.status = 'closing'
-    this._close(function (err) {
-      if (err) {
-        self.status = oldStatus
-        return callback(err)
-      }
-      self.status = 'closed'
-      callback()
-    })
-  } else {
-    this.status = 'closed'
-    process.nextTick(callback)
-  }
-}
-
-AbstractLevelDOWN.prototype.get = function (key, options, callback) {
-  var err
-
-  if (typeof options == 'function')
-    callback = options
-
-  if (typeof callback != 'function')
-    throw new Error('get() requires a callback argument')
-
-  if (err = this._checkKey(key, 'key'))
-    return callback(err)
-
-  key = this._serializeKey(key)
-
-  if (typeof options != 'object')
-    options = {}
-
-  options.asBuffer = options.asBuffer != false
-
-  if (typeof this._get == 'function')
-    return this._get(key, options, callback)
-
-  process.nextTick(function () { callback(new Error('NotFound')) })
-}
-
-AbstractLevelDOWN.prototype.put = function (key, value, options, callback) {
-  var err
-
-  if (typeof options == 'function')
-    callback = options
-
-  if (typeof callback != 'function')
-    throw new Error('put() requires a callback argument')
-
-  if (err = this._checkKey(key, 'key'))
-    return callback(err)
-
-  key = this._serializeKey(key)
-  value = this._serializeValue(value)
-
-  if (typeof options != 'object')
-    options = {}
-
-  if (typeof this._put == 'function')
-    return this._put(key, value, options, callback)
-
-  process.nextTick(callback)
-}
-
-AbstractLevelDOWN.prototype.del = function (key, options, callback) {
-  var err
-
-  if (typeof options == 'function')
-    callback = options
-
-  if (typeof callback != 'function')
-    throw new Error('del() requires a callback argument')
-
-  if (err = this._checkKey(key, 'key'))
-    return callback(err)
-
-  key = this._serializeKey(key)
-
-  if (typeof options != 'object')
-    options = {}
-
-  if (typeof this._del == 'function')
-    return this._del(key, options, callback)
-
-  process.nextTick(callback)
-}
-
-AbstractLevelDOWN.prototype.batch = function (array, options, callback) {
-  if (!arguments.length)
-    return this._chainedBatch()
-
-  if (typeof options == 'function')
-    callback = options
-
-  if (typeof array == 'function')
-    callback = array
-
-  if (typeof callback != 'function')
-    throw new Error('batch(array) requires a callback argument')
-
-  if (!Array.isArray(array))
-    return callback(new Error('batch(array) requires an array argument'))
-
-  if (!options || typeof options != 'object')
-    options = {}
-
-  var i = 0
-    , l = array.length
-    , e
-    , err
-
-  for (; i < l; i++) {
-    e = array[i]
-    if (typeof e != 'object')
-      continue
-
-    if (err = this._checkKey(e.type, 'type'))
-      return callback(err)
-
-    if (err = this._checkKey(e.key, 'key'))
-      return callback(err)
-  }
-
-  if (typeof this._batch == 'function')
-    return this._batch(array, options, callback)
-
-  process.nextTick(callback)
-}
-
-//TODO: remove from here, not a necessary primitive
-AbstractLevelDOWN.prototype.approximateSize = function (start, end, callback) {
-  if (   start == null
-      || end == null
-      || typeof start == 'function'
-      || typeof end == 'function') {
-    throw new Error('approximateSize() requires valid `start`, `end` and `callback` arguments')
-  }
-
-  if (typeof callback != 'function')
-    throw new Error('approximateSize() requires a callback argument')
-
-  start = this._serializeKey(start)
-  end = this._serializeKey(end)
-
-  if (typeof this._approximateSize == 'function')
-    return this._approximateSize(start, end, callback)
-
-  process.nextTick(function () {
-    callback(null, 0)
-  })
-}
-
-AbstractLevelDOWN.prototype._setupIteratorOptions = function (options) {
-  var self = this
-
-  options = xtend(options)
-
-  ;[ 'start', 'end', 'gt', 'gte', 'lt', 'lte' ].forEach(function (o) {
-    if (options[o] && self._isBuffer(options[o]) && options[o].length === 0)
-      delete options[o]
-  })
-
-  options.reverse = !!options.reverse
-  options.keys = options.keys != false
-  options.values = options.values != false
-  options.limit = 'limit' in options ? options.limit : -1
-  options.keyAsBuffer = options.keyAsBuffer != false
-  options.valueAsBuffer = options.valueAsBuffer != false
-
-  return options
-}
-
-AbstractLevelDOWN.prototype.iterator = function (options) {
-  if (typeof options != 'object')
-    options = {}
-
-  options = this._setupIteratorOptions(options)
-
-  if (typeof this._iterator == 'function')
-    return this._iterator(options)
-
-  return new AbstractIterator(this)
-}
-
-AbstractLevelDOWN.prototype._chainedBatch = function () {
-  return new AbstractChainedBatch(this)
-}
-
-AbstractLevelDOWN.prototype._isBuffer = function (obj) {
-  return Buffer.isBuffer(obj)
-}
-
-AbstractLevelDOWN.prototype._serializeKey = function (key) {
-  return this._isBuffer(key)
-    ? key
-    : String(key)
-}
-
-AbstractLevelDOWN.prototype._serializeValue = function (value) {
-  return this._isBuffer(value) || process.browser || value == null
-    ? value
-    : String(value)
-}
-
-AbstractLevelDOWN.prototype._checkKey = function (obj, type) {
-  if (obj === null || obj === undefined)
-    return new Error(type + ' cannot be `null` or `undefined`')
-
-  if (this._isBuffer(obj) && obj.length === 0)
-    return new Error(type + ' cannot be an empty Buffer')
-  else if (String(obj) === '')
-    return new Error(type + ' cannot be an empty String')
-}
-
-module.exports = AbstractLevelDOWN
-
-}).call(this,{"isBuffer":require("../../../is-buffer/index.js")},require('_process'))
-},{"../../../is-buffer/index.js":101,"./abstract-chained-batch":123,"./abstract-iterator":124,"_process":146,"xtend":313}],126:[function(require,module,exports){
-arguments[4][63][0].apply(exports,arguments)
-},{"./abstract-chained-batch":123,"./abstract-iterator":124,"./abstract-leveldown":125,"./is-leveldown":127,"dup":63}],127:[function(require,module,exports){
-arguments[4][64][0].apply(exports,arguments)
-},{"./abstract-leveldown":125,"dup":64}],128:[function(require,module,exports){
+},{"./abstract-leveldown":122,"dup":61}],125:[function(require,module,exports){
 'use strict';
 
 var MIN_MAGNITUDE = -324; // verified by -Number.MIN_VALUE
@@ -30622,7 +30528,7 @@ function numToIndexableString(num) {
   return result;
 }
 
-},{"./utils":129}],129:[function(require,module,exports){
+},{"./utils":126}],126:[function(require,module,exports){
 'use strict';
 
 function pad(str, padWith, upToLength) {
@@ -30693,7 +30599,7 @@ exports.intToDecimalForm = function (int) {
 
   return result;
 };
-},{}],130:[function(require,module,exports){
+},{}],127:[function(require,module,exports){
 'use strict';
 exports.Map = LazyMap; // TODO: use ES6 map
 exports.Set = LazySet; // TODO: use ES6 set
@@ -30764,9 +30670,9 @@ LazySet.prototype.delete = function (key) {
   return this.store.delete(key);
 };
 
-},{}],131:[function(require,module,exports){
+},{}],128:[function(require,module,exports){
 module.exports = require('../lib/extras/memory');
-},{"../lib/extras/memory":132}],132:[function(require,module,exports){
+},{"../lib/extras/memory":129}],129:[function(require,module,exports){
 (function (process,global,Buffer){
 'use strict';
 
@@ -33841,7 +33747,7 @@ if (!PDB) {
   MemoryPouchPlugin(PDB);
 }
 }).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {},require("buffer").Buffer)
-},{"_process":146,"argsarray":49,"buffer":56,"debug":134,"double-ended-queue":65,"events":69,"inherits":136,"js-extend":103,"levelup":116,"lie":137,"memdown":122,"pouchdb":133,"pouchdb-collections":130,"spark-md5":294,"sublevel-pouchdb":299,"through2":144,"vuvuzela":312}],133:[function(require,module,exports){
+},{"_process":143,"argsarray":49,"buffer":53,"debug":131,"double-ended-queue":62,"events":66,"inherits":133,"js-extend":100,"levelup":113,"lie":134,"memdown":119,"pouchdb":130,"pouchdb-collections":127,"spark-md5":291,"sublevel-pouchdb":296,"through2":141,"vuvuzela":312}],130:[function(require,module,exports){
 (function (process,global){
 'use strict';
 
@@ -44532,7 +44438,7 @@ PouchDB.plugin(IDBPouch)
 
 module.exports = PouchDB;
 }).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"_process":146,"argsarray":49,"debug":134,"es6-promise-pool":68,"events":69,"inherits":136,"js-extend":103,"lie":137,"pouchdb-collate":128,"pouchdb-collections":130,"scope-eval":293,"spark-md5":294,"vuvuzela":312}],134:[function(require,module,exports){
+},{"_process":143,"argsarray":49,"debug":131,"es6-promise-pool":65,"events":66,"inherits":133,"js-extend":100,"lie":134,"pouchdb-collate":125,"pouchdb-collections":127,"scope-eval":290,"spark-md5":291,"vuvuzela":312}],131:[function(require,module,exports){
 
 /**
  * This is the web browser implementation of `debug()`.
@@ -44702,7 +44608,7 @@ function localstorage(){
   } catch (e) {}
 }
 
-},{"./debug":135}],135:[function(require,module,exports){
+},{"./debug":132}],132:[function(require,module,exports){
 
 /**
  * This is the common logic for both the Node.js and web browser
@@ -44901,9 +44807,9 @@ function coerce(val) {
   return val;
 }
 
-},{"ms":138}],136:[function(require,module,exports){
-arguments[4][53][0].apply(exports,arguments)
-},{"dup":53}],137:[function(require,module,exports){
+},{"ms":135}],133:[function(require,module,exports){
+arguments[4][97][0].apply(exports,arguments)
+},{"dup":97}],134:[function(require,module,exports){
 'use strict';
 var immediate = require('immediate');
 
@@ -45158,7 +45064,7 @@ function race(iterable) {
   }
 }
 
-},{"immediate":99}],138:[function(require,module,exports){
+},{"immediate":96}],135:[function(require,module,exports){
 /**
  * Helpers.
  */
@@ -45285,7 +45191,7 @@ function plural(ms, n, name) {
   return Math.ceil(ms / n) + ' ' + name + 's';
 }
 
-},{}],139:[function(require,module,exports){
+},{}],136:[function(require,module,exports){
 // a duplex stream is just a stream that is both readable and writable.
 // Since JS doesn't have multiple prototypal inheritance, this class
 // prototypally inherits from Readable, and then parasitically from
@@ -45361,7 +45267,7 @@ function forEach(xs, f) {
     f(xs[i], i);
   }
 }
-},{"./_stream_readable":140,"./_stream_writable":142,"core-util-is":57,"inherits":136,"process-nextick-args":145}],140:[function(require,module,exports){
+},{"./_stream_readable":137,"./_stream_writable":139,"core-util-is":54,"inherits":133,"process-nextick-args":142}],137:[function(require,module,exports){
 (function (process){
 'use strict';
 
@@ -46244,7 +46150,7 @@ function indexOf(xs, x) {
   return -1;
 }
 }).call(this,require('_process'))
-},{"./_stream_duplex":139,"_process":146,"buffer":56,"core-util-is":57,"events":69,"inherits":136,"isarray":102,"process-nextick-args":145,"string_decoder/":296,"util":52}],141:[function(require,module,exports){
+},{"./_stream_duplex":136,"_process":143,"buffer":53,"core-util-is":54,"events":66,"inherits":133,"isarray":99,"process-nextick-args":142,"string_decoder/":293,"util":52}],138:[function(require,module,exports){
 // a transform stream is a readable/writable stream where you do
 // something with the data.  Sometimes it's called a "filter",
 // but that's not a great name for it, since that implies a thing where
@@ -46425,7 +46331,7 @@ function done(stream, er) {
 
   return stream.push(null);
 }
-},{"./_stream_duplex":139,"core-util-is":57,"inherits":136}],142:[function(require,module,exports){
+},{"./_stream_duplex":136,"core-util-is":54,"inherits":133}],139:[function(require,module,exports){
 (function (process){
 // A bit simpler than readable streams.
 // Implement an async ._write(chunk, encoding, cb), and it'll handle all
@@ -46944,10 +46850,10 @@ function CorkedRequest(state) {
   };
 }
 }).call(this,require('_process'))
-},{"./_stream_duplex":139,"_process":146,"buffer":56,"core-util-is":57,"events":69,"inherits":136,"process-nextick-args":145,"util-deprecate":311}],143:[function(require,module,exports){
+},{"./_stream_duplex":136,"_process":143,"buffer":53,"core-util-is":54,"events":66,"inherits":133,"process-nextick-args":142,"util-deprecate":308}],140:[function(require,module,exports){
 module.exports = require("./lib/_stream_transform.js")
 
-},{"./lib/_stream_transform.js":141}],144:[function(require,module,exports){
+},{"./lib/_stream_transform.js":138}],141:[function(require,module,exports){
 (function (process){
 var Transform = require('readable-stream/transform')
   , inherits  = require('util').inherits
@@ -47047,7 +46953,7 @@ module.exports.obj = through2(function (options, transform, flush) {
 })
 
 }).call(this,require('_process'))
-},{"_process":146,"readable-stream/transform":143,"util":55,"xtend":313}],145:[function(require,module,exports){
+},{"_process":143,"readable-stream/transform":140,"util":311,"xtend":313}],142:[function(require,module,exports){
 (function (process){
 'use strict';
 
@@ -47094,7 +47000,7 @@ function nextTick(fn, arg1, arg2, arg3) {
 }
 
 }).call(this,require('_process'))
-},{"_process":146}],146:[function(require,module,exports){
+},{"_process":143}],143:[function(require,module,exports){
 // shim for using process in browser
 var process = module.exports = {};
 
@@ -47280,14 +47186,14 @@ process.chdir = function (dir) {
 };
 process.umask = function() { return 0; };
 
-},{}],147:[function(require,module,exports){
-arguments[4][118][0].apply(exports,arguments)
-},{"dup":118}],148:[function(require,module,exports){
+},{}],144:[function(require,module,exports){
+arguments[4][115][0].apply(exports,arguments)
+},{"dup":115}],145:[function(require,module,exports){
 'use strict';
 
 module.exports = require('react/lib/ReactDOM');
 
-},{"react/lib/ReactDOM":183}],149:[function(require,module,exports){
+},{"react/lib/ReactDOM":180}],146:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -47324,7 +47230,7 @@ var AutoFocusUtils = {
 };
 
 module.exports = AutoFocusUtils;
-},{"./ReactMount":213,"./findDOMNode":256,"fbjs/lib/focusNode":79}],150:[function(require,module,exports){
+},{"./ReactMount":210,"./findDOMNode":253,"fbjs/lib/focusNode":76}],147:[function(require,module,exports){
 /**
  * Copyright 2013-2015 Facebook, Inc.
  * All rights reserved.
@@ -47730,7 +47636,7 @@ var BeforeInputEventPlugin = {
 };
 
 module.exports = BeforeInputEventPlugin;
-},{"./EventConstants":162,"./EventPropagators":166,"./FallbackCompositionState":167,"./SyntheticCompositionEvent":238,"./SyntheticInputEvent":242,"fbjs/lib/ExecutionEnvironment":71,"fbjs/lib/keyOf":89}],151:[function(require,module,exports){
+},{"./EventConstants":159,"./EventPropagators":163,"./FallbackCompositionState":164,"./SyntheticCompositionEvent":235,"./SyntheticInputEvent":239,"fbjs/lib/ExecutionEnvironment":68,"fbjs/lib/keyOf":86}],148:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -47870,7 +47776,7 @@ var CSSProperty = {
 };
 
 module.exports = CSSProperty;
-},{}],152:[function(require,module,exports){
+},{}],149:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -48048,7 +47954,7 @@ ReactPerf.measureMethods(CSSPropertyOperations, 'CSSPropertyOperations', {
 
 module.exports = CSSPropertyOperations;
 }).call(this,require('_process'))
-},{"./CSSProperty":151,"./ReactPerf":219,"./dangerousStyleValue":253,"_process":146,"fbjs/lib/ExecutionEnvironment":71,"fbjs/lib/camelizeStyleName":73,"fbjs/lib/hyphenateStyleName":84,"fbjs/lib/memoizeStringOnly":91,"fbjs/lib/warning":96}],153:[function(require,module,exports){
+},{"./CSSProperty":148,"./ReactPerf":216,"./dangerousStyleValue":250,"_process":143,"fbjs/lib/ExecutionEnvironment":68,"fbjs/lib/camelizeStyleName":70,"fbjs/lib/hyphenateStyleName":81,"fbjs/lib/memoizeStringOnly":88,"fbjs/lib/warning":93}],150:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -48144,7 +48050,7 @@ PooledClass.addPoolingTo(CallbackQueue);
 
 module.exports = CallbackQueue;
 }).call(this,require('_process'))
-},{"./Object.assign":170,"./PooledClass":171,"_process":146,"fbjs/lib/invariant":85}],154:[function(require,module,exports){
+},{"./Object.assign":167,"./PooledClass":168,"_process":143,"fbjs/lib/invariant":82}],151:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -48466,7 +48372,7 @@ var ChangeEventPlugin = {
 };
 
 module.exports = ChangeEventPlugin;
-},{"./EventConstants":162,"./EventPluginHub":163,"./EventPropagators":166,"./ReactUpdates":231,"./SyntheticEvent":240,"./getEventTarget":262,"./isEventSupported":267,"./isTextInputElement":268,"fbjs/lib/ExecutionEnvironment":71,"fbjs/lib/keyOf":89}],155:[function(require,module,exports){
+},{"./EventConstants":159,"./EventPluginHub":160,"./EventPropagators":163,"./ReactUpdates":228,"./SyntheticEvent":237,"./getEventTarget":259,"./isEventSupported":264,"./isTextInputElement":265,"fbjs/lib/ExecutionEnvironment":68,"fbjs/lib/keyOf":86}],152:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -48490,7 +48396,7 @@ var ClientReactRootIndex = {
 };
 
 module.exports = ClientReactRootIndex;
-},{}],156:[function(require,module,exports){
+},{}],153:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -48622,7 +48528,7 @@ ReactPerf.measureMethods(DOMChildrenOperations, 'DOMChildrenOperations', {
 
 module.exports = DOMChildrenOperations;
 }).call(this,require('_process'))
-},{"./Danger":159,"./ReactMultiChildUpdateTypes":215,"./ReactPerf":219,"./setInnerHTML":272,"./setTextContent":273,"_process":146,"fbjs/lib/invariant":85}],157:[function(require,module,exports){
+},{"./Danger":156,"./ReactMultiChildUpdateTypes":212,"./ReactPerf":216,"./setInnerHTML":269,"./setTextContent":270,"_process":143,"fbjs/lib/invariant":82}],154:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -48859,7 +48765,7 @@ var DOMProperty = {
 
 module.exports = DOMProperty;
 }).call(this,require('_process'))
-},{"_process":146,"fbjs/lib/invariant":85}],158:[function(require,module,exports){
+},{"_process":143,"fbjs/lib/invariant":82}],155:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -49087,7 +48993,7 @@ ReactPerf.measureMethods(DOMPropertyOperations, 'DOMPropertyOperations', {
 
 module.exports = DOMPropertyOperations;
 }).call(this,require('_process'))
-},{"./DOMProperty":157,"./ReactPerf":219,"./quoteAttributeValueForBrowser":270,"_process":146,"fbjs/lib/warning":96}],159:[function(require,module,exports){
+},{"./DOMProperty":154,"./ReactPerf":216,"./quoteAttributeValueForBrowser":267,"_process":143,"fbjs/lib/warning":93}],156:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -49235,7 +49141,7 @@ var Danger = {
 
 module.exports = Danger;
 }).call(this,require('_process'))
-},{"_process":146,"fbjs/lib/ExecutionEnvironment":71,"fbjs/lib/createNodesFromMarkup":76,"fbjs/lib/emptyFunction":77,"fbjs/lib/getMarkupWrap":81,"fbjs/lib/invariant":85}],160:[function(require,module,exports){
+},{"_process":143,"fbjs/lib/ExecutionEnvironment":68,"fbjs/lib/createNodesFromMarkup":73,"fbjs/lib/emptyFunction":74,"fbjs/lib/getMarkupWrap":78,"fbjs/lib/invariant":82}],157:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -49263,7 +49169,7 @@ var keyOf = require('fbjs/lib/keyOf');
 var DefaultEventPluginOrder = [keyOf({ ResponderEventPlugin: null }), keyOf({ SimpleEventPlugin: null }), keyOf({ TapEventPlugin: null }), keyOf({ EnterLeaveEventPlugin: null }), keyOf({ ChangeEventPlugin: null }), keyOf({ SelectEventPlugin: null }), keyOf({ BeforeInputEventPlugin: null })];
 
 module.exports = DefaultEventPluginOrder;
-},{"fbjs/lib/keyOf":89}],161:[function(require,module,exports){
+},{"fbjs/lib/keyOf":86}],158:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -49388,7 +49294,7 @@ var EnterLeaveEventPlugin = {
 };
 
 module.exports = EnterLeaveEventPlugin;
-},{"./EventConstants":162,"./EventPropagators":166,"./ReactMount":213,"./SyntheticMouseEvent":244,"fbjs/lib/keyOf":89}],162:[function(require,module,exports){
+},{"./EventConstants":159,"./EventPropagators":163,"./ReactMount":210,"./SyntheticMouseEvent":241,"fbjs/lib/keyOf":86}],159:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -49481,7 +49387,7 @@ var EventConstants = {
 };
 
 module.exports = EventConstants;
-},{"fbjs/lib/keyMirror":88}],163:[function(require,module,exports){
+},{"fbjs/lib/keyMirror":85}],160:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -49763,7 +49669,7 @@ var EventPluginHub = {
 
 module.exports = EventPluginHub;
 }).call(this,require('_process'))
-},{"./EventPluginRegistry":164,"./EventPluginUtils":165,"./ReactErrorUtils":204,"./accumulateInto":250,"./forEachAccumulated":258,"_process":146,"fbjs/lib/invariant":85,"fbjs/lib/warning":96}],164:[function(require,module,exports){
+},{"./EventPluginRegistry":161,"./EventPluginUtils":162,"./ReactErrorUtils":201,"./accumulateInto":247,"./forEachAccumulated":255,"_process":143,"fbjs/lib/invariant":82,"fbjs/lib/warning":93}],161:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -49986,7 +49892,7 @@ var EventPluginRegistry = {
 
 module.exports = EventPluginRegistry;
 }).call(this,require('_process'))
-},{"_process":146,"fbjs/lib/invariant":85}],165:[function(require,module,exports){
+},{"_process":143,"fbjs/lib/invariant":82}],162:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -50191,7 +50097,7 @@ var EventPluginUtils = {
 
 module.exports = EventPluginUtils;
 }).call(this,require('_process'))
-},{"./EventConstants":162,"./ReactErrorUtils":204,"_process":146,"fbjs/lib/invariant":85,"fbjs/lib/warning":96}],166:[function(require,module,exports){
+},{"./EventConstants":159,"./ReactErrorUtils":201,"_process":143,"fbjs/lib/invariant":82,"fbjs/lib/warning":93}],163:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -50329,7 +50235,7 @@ var EventPropagators = {
 
 module.exports = EventPropagators;
 }).call(this,require('_process'))
-},{"./EventConstants":162,"./EventPluginHub":163,"./accumulateInto":250,"./forEachAccumulated":258,"_process":146,"fbjs/lib/warning":96}],167:[function(require,module,exports){
+},{"./EventConstants":159,"./EventPluginHub":160,"./accumulateInto":247,"./forEachAccumulated":255,"_process":143,"fbjs/lib/warning":93}],164:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -50425,7 +50331,7 @@ assign(FallbackCompositionState.prototype, {
 PooledClass.addPoolingTo(FallbackCompositionState);
 
 module.exports = FallbackCompositionState;
-},{"./Object.assign":170,"./PooledClass":171,"./getTextContentAccessor":265}],168:[function(require,module,exports){
+},{"./Object.assign":167,"./PooledClass":168,"./getTextContentAccessor":262}],165:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -50656,7 +50562,7 @@ var HTMLDOMPropertyConfig = {
 };
 
 module.exports = HTMLDOMPropertyConfig;
-},{"./DOMProperty":157,"fbjs/lib/ExecutionEnvironment":71}],169:[function(require,module,exports){
+},{"./DOMProperty":154,"fbjs/lib/ExecutionEnvironment":68}],166:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -50793,7 +50699,7 @@ var LinkedValueUtils = {
 
 module.exports = LinkedValueUtils;
 }).call(this,require('_process'))
-},{"./ReactPropTypeLocations":221,"./ReactPropTypes":222,"_process":146,"fbjs/lib/invariant":85,"fbjs/lib/warning":96}],170:[function(require,module,exports){
+},{"./ReactPropTypeLocations":218,"./ReactPropTypes":219,"_process":143,"fbjs/lib/invariant":82,"fbjs/lib/warning":93}],167:[function(require,module,exports){
 /**
  * Copyright 2014-2015, Facebook, Inc.
  * All rights reserved.
@@ -50841,7 +50747,7 @@ function assign(target, sources) {
 }
 
 module.exports = assign;
-},{}],171:[function(require,module,exports){
+},{}],168:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -50963,7 +50869,7 @@ var PooledClass = {
 
 module.exports = PooledClass;
 }).call(this,require('_process'))
-},{"_process":146,"fbjs/lib/invariant":85}],172:[function(require,module,exports){
+},{"_process":143,"fbjs/lib/invariant":82}],169:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -51004,7 +50910,7 @@ React.__SECRET_DOM_DO_NOT_USE_OR_YOU_WILL_BE_FIRED = ReactDOM;
 React.__SECRET_DOM_SERVER_DO_NOT_USE_OR_YOU_WILL_BE_FIRED = ReactDOMServer;
 
 module.exports = React;
-},{"./Object.assign":170,"./ReactDOM":183,"./ReactDOMServer":193,"./ReactIsomorphic":211,"./deprecated":254}],173:[function(require,module,exports){
+},{"./Object.assign":167,"./ReactDOM":180,"./ReactDOMServer":190,"./ReactIsomorphic":208,"./deprecated":251}],170:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -51043,7 +50949,7 @@ var ReactBrowserComponentMixin = {
 
 module.exports = ReactBrowserComponentMixin;
 }).call(this,require('_process'))
-},{"./ReactInstanceMap":210,"./findDOMNode":256,"_process":146,"fbjs/lib/warning":96}],174:[function(require,module,exports){
+},{"./ReactInstanceMap":207,"./findDOMNode":253,"_process":143,"fbjs/lib/warning":93}],171:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -51368,7 +51274,7 @@ ReactPerf.measureMethods(ReactBrowserEventEmitter, 'ReactBrowserEventEmitter', {
 });
 
 module.exports = ReactBrowserEventEmitter;
-},{"./EventConstants":162,"./EventPluginHub":163,"./EventPluginRegistry":164,"./Object.assign":170,"./ReactEventEmitterMixin":205,"./ReactPerf":219,"./ViewportMetrics":249,"./isEventSupported":267}],175:[function(require,module,exports){
+},{"./EventConstants":159,"./EventPluginHub":160,"./EventPluginRegistry":161,"./Object.assign":167,"./ReactEventEmitterMixin":202,"./ReactPerf":216,"./ViewportMetrics":246,"./isEventSupported":264}],172:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2014-2015, Facebook, Inc.
@@ -51493,7 +51399,7 @@ var ReactChildReconciler = {
 
 module.exports = ReactChildReconciler;
 }).call(this,require('_process'))
-},{"./ReactReconciler":224,"./instantiateReactComponent":266,"./shouldUpdateReactComponent":274,"./traverseAllChildren":275,"_process":146,"fbjs/lib/warning":96}],176:[function(require,module,exports){
+},{"./ReactReconciler":221,"./instantiateReactComponent":263,"./shouldUpdateReactComponent":271,"./traverseAllChildren":272,"_process":143,"fbjs/lib/warning":93}],173:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -51676,7 +51582,7 @@ var ReactChildren = {
 };
 
 module.exports = ReactChildren;
-},{"./PooledClass":171,"./ReactElement":200,"./traverseAllChildren":275,"fbjs/lib/emptyFunction":77}],177:[function(require,module,exports){
+},{"./PooledClass":168,"./ReactElement":197,"./traverseAllChildren":272,"fbjs/lib/emptyFunction":74}],174:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -52450,7 +52356,7 @@ var ReactClass = {
 
 module.exports = ReactClass;
 }).call(this,require('_process'))
-},{"./Object.assign":170,"./ReactComponent":178,"./ReactElement":200,"./ReactNoopUpdateQueue":217,"./ReactPropTypeLocationNames":220,"./ReactPropTypeLocations":221,"_process":146,"fbjs/lib/emptyObject":78,"fbjs/lib/invariant":85,"fbjs/lib/keyMirror":88,"fbjs/lib/keyOf":89,"fbjs/lib/warning":96}],178:[function(require,module,exports){
+},{"./Object.assign":167,"./ReactComponent":175,"./ReactElement":197,"./ReactNoopUpdateQueue":214,"./ReactPropTypeLocationNames":217,"./ReactPropTypeLocations":218,"_process":143,"fbjs/lib/emptyObject":75,"fbjs/lib/invariant":82,"fbjs/lib/keyMirror":85,"fbjs/lib/keyOf":86,"fbjs/lib/warning":93}],175:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -52575,7 +52481,7 @@ if (process.env.NODE_ENV !== 'production') {
 
 module.exports = ReactComponent;
 }).call(this,require('_process'))
-},{"./ReactNoopUpdateQueue":217,"./canDefineProperty":252,"_process":146,"fbjs/lib/emptyObject":78,"fbjs/lib/invariant":85,"fbjs/lib/warning":96}],179:[function(require,module,exports){
+},{"./ReactNoopUpdateQueue":214,"./canDefineProperty":249,"_process":143,"fbjs/lib/emptyObject":75,"fbjs/lib/invariant":82,"fbjs/lib/warning":93}],176:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -52617,7 +52523,7 @@ var ReactComponentBrowserEnvironment = {
 };
 
 module.exports = ReactComponentBrowserEnvironment;
-},{"./ReactDOMIDOperations":188,"./ReactMount":213}],180:[function(require,module,exports){
+},{"./ReactDOMIDOperations":185,"./ReactMount":210}],177:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2014-2015, Facebook, Inc.
@@ -52671,7 +52577,7 @@ var ReactComponentEnvironment = {
 
 module.exports = ReactComponentEnvironment;
 }).call(this,require('_process'))
-},{"_process":146,"fbjs/lib/invariant":85}],181:[function(require,module,exports){
+},{"_process":143,"fbjs/lib/invariant":82}],178:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -53368,7 +53274,7 @@ var ReactCompositeComponent = {
 
 module.exports = ReactCompositeComponent;
 }).call(this,require('_process'))
-},{"./Object.assign":170,"./ReactComponentEnvironment":180,"./ReactCurrentOwner":182,"./ReactElement":200,"./ReactInstanceMap":210,"./ReactPerf":219,"./ReactPropTypeLocationNames":220,"./ReactPropTypeLocations":221,"./ReactReconciler":224,"./ReactUpdateQueue":230,"./shouldUpdateReactComponent":274,"_process":146,"fbjs/lib/emptyObject":78,"fbjs/lib/invariant":85,"fbjs/lib/warning":96}],182:[function(require,module,exports){
+},{"./Object.assign":167,"./ReactComponentEnvironment":177,"./ReactCurrentOwner":179,"./ReactElement":197,"./ReactInstanceMap":207,"./ReactPerf":216,"./ReactPropTypeLocationNames":217,"./ReactPropTypeLocations":218,"./ReactReconciler":221,"./ReactUpdateQueue":227,"./shouldUpdateReactComponent":271,"_process":143,"fbjs/lib/emptyObject":75,"fbjs/lib/invariant":82,"fbjs/lib/warning":93}],179:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -53399,7 +53305,7 @@ var ReactCurrentOwner = {
 };
 
 module.exports = ReactCurrentOwner;
-},{}],183:[function(require,module,exports){
+},{}],180:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -53494,7 +53400,7 @@ if (process.env.NODE_ENV !== 'production') {
 
 module.exports = React;
 }).call(this,require('_process'))
-},{"./ReactCurrentOwner":182,"./ReactDOMTextComponent":194,"./ReactDefaultInjection":197,"./ReactInstanceHandles":209,"./ReactMount":213,"./ReactPerf":219,"./ReactReconciler":224,"./ReactUpdates":231,"./ReactVersion":232,"./findDOMNode":256,"./renderSubtreeIntoContainer":271,"_process":146,"fbjs/lib/ExecutionEnvironment":71,"fbjs/lib/warning":96}],184:[function(require,module,exports){
+},{"./ReactCurrentOwner":179,"./ReactDOMTextComponent":191,"./ReactDefaultInjection":194,"./ReactInstanceHandles":206,"./ReactMount":210,"./ReactPerf":216,"./ReactReconciler":221,"./ReactUpdates":228,"./ReactVersion":229,"./findDOMNode":253,"./renderSubtreeIntoContainer":268,"_process":143,"fbjs/lib/ExecutionEnvironment":68,"fbjs/lib/warning":93}],181:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -53545,7 +53451,7 @@ var ReactDOMButton = {
 };
 
 module.exports = ReactDOMButton;
-},{}],185:[function(require,module,exports){
+},{}],182:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -54510,7 +54416,7 @@ assign(ReactDOMComponent.prototype, ReactDOMComponent.Mixin, ReactMultiChild.Mix
 
 module.exports = ReactDOMComponent;
 }).call(this,require('_process'))
-},{"./AutoFocusUtils":149,"./CSSPropertyOperations":152,"./DOMProperty":157,"./DOMPropertyOperations":158,"./EventConstants":162,"./Object.assign":170,"./ReactBrowserEventEmitter":174,"./ReactComponentBrowserEnvironment":179,"./ReactDOMButton":184,"./ReactDOMInput":189,"./ReactDOMOption":190,"./ReactDOMSelect":191,"./ReactDOMTextarea":195,"./ReactMount":213,"./ReactMultiChild":214,"./ReactPerf":219,"./ReactUpdateQueue":230,"./canDefineProperty":252,"./escapeTextContentForBrowser":255,"./isEventSupported":267,"./setInnerHTML":272,"./setTextContent":273,"./validateDOMNesting":276,"_process":146,"fbjs/lib/invariant":85,"fbjs/lib/keyOf":89,"fbjs/lib/shallowEqual":94,"fbjs/lib/warning":96}],186:[function(require,module,exports){
+},{"./AutoFocusUtils":146,"./CSSPropertyOperations":149,"./DOMProperty":154,"./DOMPropertyOperations":155,"./EventConstants":159,"./Object.assign":167,"./ReactBrowserEventEmitter":171,"./ReactComponentBrowserEnvironment":176,"./ReactDOMButton":181,"./ReactDOMInput":186,"./ReactDOMOption":187,"./ReactDOMSelect":188,"./ReactDOMTextarea":192,"./ReactMount":210,"./ReactMultiChild":211,"./ReactPerf":216,"./ReactUpdateQueue":227,"./canDefineProperty":249,"./escapeTextContentForBrowser":252,"./isEventSupported":264,"./setInnerHTML":269,"./setTextContent":270,"./validateDOMNesting":273,"_process":143,"fbjs/lib/invariant":82,"fbjs/lib/keyOf":86,"fbjs/lib/shallowEqual":91,"fbjs/lib/warning":93}],183:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -54690,7 +54596,7 @@ var ReactDOMFactories = mapObject({
 
 module.exports = ReactDOMFactories;
 }).call(this,require('_process'))
-},{"./ReactElement":200,"./ReactElementValidator":201,"_process":146,"fbjs/lib/mapObject":90}],187:[function(require,module,exports){
+},{"./ReactElement":197,"./ReactElementValidator":198,"_process":143,"fbjs/lib/mapObject":87}],184:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -54709,7 +54615,7 @@ var ReactDOMFeatureFlags = {
 };
 
 module.exports = ReactDOMFeatureFlags;
-},{}],188:[function(require,module,exports){
+},{}],185:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -54806,7 +54712,7 @@ ReactPerf.measureMethods(ReactDOMIDOperations, 'ReactDOMIDOperations', {
 
 module.exports = ReactDOMIDOperations;
 }).call(this,require('_process'))
-},{"./DOMChildrenOperations":156,"./DOMPropertyOperations":158,"./ReactMount":213,"./ReactPerf":219,"_process":146,"fbjs/lib/invariant":85}],189:[function(require,module,exports){
+},{"./DOMChildrenOperations":153,"./DOMPropertyOperations":155,"./ReactMount":210,"./ReactPerf":216,"_process":143,"fbjs/lib/invariant":82}],186:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -54962,7 +54868,7 @@ function _handleChange(event) {
 
 module.exports = ReactDOMInput;
 }).call(this,require('_process'))
-},{"./LinkedValueUtils":169,"./Object.assign":170,"./ReactDOMIDOperations":188,"./ReactMount":213,"./ReactUpdates":231,"_process":146,"fbjs/lib/invariant":85}],190:[function(require,module,exports){
+},{"./LinkedValueUtils":166,"./Object.assign":167,"./ReactDOMIDOperations":185,"./ReactMount":210,"./ReactUpdates":228,"_process":143,"fbjs/lib/invariant":82}],187:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -55054,7 +54960,7 @@ var ReactDOMOption = {
 
 module.exports = ReactDOMOption;
 }).call(this,require('_process'))
-},{"./Object.assign":170,"./ReactChildren":176,"./ReactDOMSelect":191,"_process":146,"fbjs/lib/warning":96}],191:[function(require,module,exports){
+},{"./Object.assign":167,"./ReactChildren":173,"./ReactDOMSelect":188,"_process":143,"fbjs/lib/warning":93}],188:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -55245,7 +55151,7 @@ function _handleChange(event) {
 
 module.exports = ReactDOMSelect;
 }).call(this,require('_process'))
-},{"./LinkedValueUtils":169,"./Object.assign":170,"./ReactMount":213,"./ReactUpdates":231,"_process":146,"fbjs/lib/warning":96}],192:[function(require,module,exports){
+},{"./LinkedValueUtils":166,"./Object.assign":167,"./ReactMount":210,"./ReactUpdates":228,"_process":143,"fbjs/lib/warning":93}],189:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -55458,7 +55364,7 @@ var ReactDOMSelection = {
 };
 
 module.exports = ReactDOMSelection;
-},{"./getNodeForCharacterOffset":264,"./getTextContentAccessor":265,"fbjs/lib/ExecutionEnvironment":71}],193:[function(require,module,exports){
+},{"./getNodeForCharacterOffset":261,"./getTextContentAccessor":262,"fbjs/lib/ExecutionEnvironment":68}],190:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -55485,7 +55391,7 @@ var ReactDOMServer = {
 };
 
 module.exports = ReactDOMServer;
-},{"./ReactDefaultInjection":197,"./ReactServerRendering":228,"./ReactVersion":232}],194:[function(require,module,exports){
+},{"./ReactDefaultInjection":194,"./ReactServerRendering":225,"./ReactVersion":229}],191:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -55615,7 +55521,7 @@ assign(ReactDOMTextComponent.prototype, {
 
 module.exports = ReactDOMTextComponent;
 }).call(this,require('_process'))
-},{"./DOMChildrenOperations":156,"./DOMPropertyOperations":158,"./Object.assign":170,"./ReactComponentBrowserEnvironment":179,"./ReactMount":213,"./escapeTextContentForBrowser":255,"./setTextContent":273,"./validateDOMNesting":276,"_process":146}],195:[function(require,module,exports){
+},{"./DOMChildrenOperations":153,"./DOMPropertyOperations":155,"./Object.assign":167,"./ReactComponentBrowserEnvironment":176,"./ReactMount":210,"./escapeTextContentForBrowser":252,"./setTextContent":270,"./validateDOMNesting":273,"_process":143}],192:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -55731,7 +55637,7 @@ function _handleChange(event) {
 
 module.exports = ReactDOMTextarea;
 }).call(this,require('_process'))
-},{"./LinkedValueUtils":169,"./Object.assign":170,"./ReactDOMIDOperations":188,"./ReactUpdates":231,"_process":146,"fbjs/lib/invariant":85,"fbjs/lib/warning":96}],196:[function(require,module,exports){
+},{"./LinkedValueUtils":166,"./Object.assign":167,"./ReactDOMIDOperations":185,"./ReactUpdates":228,"_process":143,"fbjs/lib/invariant":82,"fbjs/lib/warning":93}],193:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -55799,7 +55705,7 @@ var ReactDefaultBatchingStrategy = {
 };
 
 module.exports = ReactDefaultBatchingStrategy;
-},{"./Object.assign":170,"./ReactUpdates":231,"./Transaction":248,"fbjs/lib/emptyFunction":77}],197:[function(require,module,exports){
+},{"./Object.assign":167,"./ReactUpdates":228,"./Transaction":245,"fbjs/lib/emptyFunction":74}],194:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -55899,7 +55805,7 @@ module.exports = {
   inject: inject
 };
 }).call(this,require('_process'))
-},{"./BeforeInputEventPlugin":150,"./ChangeEventPlugin":154,"./ClientReactRootIndex":155,"./DefaultEventPluginOrder":160,"./EnterLeaveEventPlugin":161,"./HTMLDOMPropertyConfig":168,"./ReactBrowserComponentMixin":173,"./ReactComponentBrowserEnvironment":179,"./ReactDOMComponent":185,"./ReactDOMTextComponent":194,"./ReactDefaultBatchingStrategy":196,"./ReactDefaultPerf":198,"./ReactEventListener":206,"./ReactInjection":207,"./ReactInstanceHandles":209,"./ReactMount":213,"./ReactReconcileTransaction":223,"./SVGDOMPropertyConfig":233,"./SelectEventPlugin":234,"./ServerReactRootIndex":235,"./SimpleEventPlugin":236,"_process":146,"fbjs/lib/ExecutionEnvironment":71}],198:[function(require,module,exports){
+},{"./BeforeInputEventPlugin":147,"./ChangeEventPlugin":151,"./ClientReactRootIndex":152,"./DefaultEventPluginOrder":157,"./EnterLeaveEventPlugin":158,"./HTMLDOMPropertyConfig":165,"./ReactBrowserComponentMixin":170,"./ReactComponentBrowserEnvironment":176,"./ReactDOMComponent":182,"./ReactDOMTextComponent":191,"./ReactDefaultBatchingStrategy":193,"./ReactDefaultPerf":195,"./ReactEventListener":203,"./ReactInjection":204,"./ReactInstanceHandles":206,"./ReactMount":210,"./ReactReconcileTransaction":220,"./SVGDOMPropertyConfig":230,"./SelectEventPlugin":231,"./ServerReactRootIndex":232,"./SimpleEventPlugin":233,"_process":143,"fbjs/lib/ExecutionEnvironment":68}],195:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -56137,7 +56043,7 @@ var ReactDefaultPerf = {
 };
 
 module.exports = ReactDefaultPerf;
-},{"./DOMProperty":157,"./ReactDefaultPerfAnalysis":199,"./ReactMount":213,"./ReactPerf":219,"fbjs/lib/performanceNow":93}],199:[function(require,module,exports){
+},{"./DOMProperty":154,"./ReactDefaultPerfAnalysis":196,"./ReactMount":210,"./ReactPerf":216,"fbjs/lib/performanceNow":90}],196:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -56339,7 +56245,7 @@ var ReactDefaultPerfAnalysis = {
 };
 
 module.exports = ReactDefaultPerfAnalysis;
-},{"./Object.assign":170}],200:[function(require,module,exports){
+},{"./Object.assign":167}],197:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2014-2015, Facebook, Inc.
@@ -56589,7 +56495,7 @@ ReactElement.isValidElement = function (object) {
 
 module.exports = ReactElement;
 }).call(this,require('_process'))
-},{"./Object.assign":170,"./ReactCurrentOwner":182,"./canDefineProperty":252,"_process":146}],201:[function(require,module,exports){
+},{"./Object.assign":167,"./ReactCurrentOwner":179,"./canDefineProperty":249,"_process":143}],198:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2014-2015, Facebook, Inc.
@@ -56873,7 +56779,7 @@ var ReactElementValidator = {
 
 module.exports = ReactElementValidator;
 }).call(this,require('_process'))
-},{"./ReactCurrentOwner":182,"./ReactElement":200,"./ReactPropTypeLocationNames":220,"./ReactPropTypeLocations":221,"./canDefineProperty":252,"./getIteratorFn":263,"_process":146,"fbjs/lib/invariant":85,"fbjs/lib/warning":96}],202:[function(require,module,exports){
+},{"./ReactCurrentOwner":179,"./ReactElement":197,"./ReactPropTypeLocationNames":217,"./ReactPropTypeLocations":218,"./canDefineProperty":249,"./getIteratorFn":260,"_process":143,"fbjs/lib/invariant":82,"fbjs/lib/warning":93}],199:[function(require,module,exports){
 /**
  * Copyright 2014-2015, Facebook, Inc.
  * All rights reserved.
@@ -56929,7 +56835,7 @@ assign(ReactEmptyComponent.prototype, {
 ReactEmptyComponent.injection = ReactEmptyComponentInjection;
 
 module.exports = ReactEmptyComponent;
-},{"./Object.assign":170,"./ReactElement":200,"./ReactEmptyComponentRegistry":203,"./ReactReconciler":224}],203:[function(require,module,exports){
+},{"./Object.assign":167,"./ReactElement":197,"./ReactEmptyComponentRegistry":200,"./ReactReconciler":221}],200:[function(require,module,exports){
 /**
  * Copyright 2014-2015, Facebook, Inc.
  * All rights reserved.
@@ -56978,7 +56884,7 @@ var ReactEmptyComponentRegistry = {
 };
 
 module.exports = ReactEmptyComponentRegistry;
-},{}],204:[function(require,module,exports){
+},{}],201:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -57058,7 +56964,7 @@ if (process.env.NODE_ENV !== 'production') {
 
 module.exports = ReactErrorUtils;
 }).call(this,require('_process'))
-},{"_process":146}],205:[function(require,module,exports){
+},{"_process":143}],202:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -57097,7 +57003,7 @@ var ReactEventEmitterMixin = {
 };
 
 module.exports = ReactEventEmitterMixin;
-},{"./EventPluginHub":163}],206:[function(require,module,exports){
+},{"./EventPluginHub":160}],203:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -57309,7 +57215,7 @@ var ReactEventListener = {
 };
 
 module.exports = ReactEventListener;
-},{"./Object.assign":170,"./PooledClass":171,"./ReactInstanceHandles":209,"./ReactMount":213,"./ReactUpdates":231,"./getEventTarget":262,"fbjs/lib/EventListener":70,"fbjs/lib/ExecutionEnvironment":71,"fbjs/lib/getUnboundedScrollPosition":82}],207:[function(require,module,exports){
+},{"./Object.assign":167,"./PooledClass":168,"./ReactInstanceHandles":206,"./ReactMount":210,"./ReactUpdates":228,"./getEventTarget":259,"fbjs/lib/EventListener":67,"fbjs/lib/ExecutionEnvironment":68,"fbjs/lib/getUnboundedScrollPosition":79}],204:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -57348,7 +57254,7 @@ var ReactInjection = {
 };
 
 module.exports = ReactInjection;
-},{"./DOMProperty":157,"./EventPluginHub":163,"./ReactBrowserEventEmitter":174,"./ReactClass":177,"./ReactComponentEnvironment":180,"./ReactEmptyComponent":202,"./ReactNativeComponent":216,"./ReactPerf":219,"./ReactRootIndex":226,"./ReactUpdates":231}],208:[function(require,module,exports){
+},{"./DOMProperty":154,"./EventPluginHub":160,"./ReactBrowserEventEmitter":171,"./ReactClass":174,"./ReactComponentEnvironment":177,"./ReactEmptyComponent":199,"./ReactNativeComponent":213,"./ReactPerf":216,"./ReactRootIndex":223,"./ReactUpdates":228}],205:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -57473,7 +57379,7 @@ var ReactInputSelection = {
 };
 
 module.exports = ReactInputSelection;
-},{"./ReactDOMSelection":192,"fbjs/lib/containsNode":74,"fbjs/lib/focusNode":79,"fbjs/lib/getActiveElement":80}],209:[function(require,module,exports){
+},{"./ReactDOMSelection":189,"fbjs/lib/containsNode":71,"fbjs/lib/focusNode":76,"fbjs/lib/getActiveElement":77}],206:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -57778,7 +57684,7 @@ var ReactInstanceHandles = {
 
 module.exports = ReactInstanceHandles;
 }).call(this,require('_process'))
-},{"./ReactRootIndex":226,"_process":146,"fbjs/lib/invariant":85}],210:[function(require,module,exports){
+},{"./ReactRootIndex":223,"_process":143,"fbjs/lib/invariant":82}],207:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -57826,7 +57732,7 @@ var ReactInstanceMap = {
 };
 
 module.exports = ReactInstanceMap;
-},{}],211:[function(require,module,exports){
+},{}],208:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -57903,7 +57809,7 @@ var React = {
 
 module.exports = React;
 }).call(this,require('_process'))
-},{"./Object.assign":170,"./ReactChildren":176,"./ReactClass":177,"./ReactComponent":178,"./ReactDOMFactories":186,"./ReactElement":200,"./ReactElementValidator":201,"./ReactPropTypes":222,"./ReactVersion":232,"./onlyChild":269,"_process":146}],212:[function(require,module,exports){
+},{"./Object.assign":167,"./ReactChildren":173,"./ReactClass":174,"./ReactComponent":175,"./ReactDOMFactories":183,"./ReactElement":197,"./ReactElementValidator":198,"./ReactPropTypes":219,"./ReactVersion":229,"./onlyChild":266,"_process":143}],209:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -57949,7 +57855,7 @@ var ReactMarkupChecksum = {
 };
 
 module.exports = ReactMarkupChecksum;
-},{"./adler32":251}],213:[function(require,module,exports){
+},{"./adler32":248}],210:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -58802,7 +58708,7 @@ ReactPerf.measureMethods(ReactMount, 'ReactMount', {
 
 module.exports = ReactMount;
 }).call(this,require('_process'))
-},{"./DOMProperty":157,"./Object.assign":170,"./ReactBrowserEventEmitter":174,"./ReactCurrentOwner":182,"./ReactDOMFeatureFlags":187,"./ReactElement":200,"./ReactEmptyComponentRegistry":203,"./ReactInstanceHandles":209,"./ReactInstanceMap":210,"./ReactMarkupChecksum":212,"./ReactPerf":219,"./ReactReconciler":224,"./ReactUpdateQueue":230,"./ReactUpdates":231,"./instantiateReactComponent":266,"./setInnerHTML":272,"./shouldUpdateReactComponent":274,"./validateDOMNesting":276,"_process":146,"fbjs/lib/containsNode":74,"fbjs/lib/emptyObject":78,"fbjs/lib/invariant":85,"fbjs/lib/warning":96}],214:[function(require,module,exports){
+},{"./DOMProperty":154,"./Object.assign":167,"./ReactBrowserEventEmitter":171,"./ReactCurrentOwner":179,"./ReactDOMFeatureFlags":184,"./ReactElement":197,"./ReactEmptyComponentRegistry":200,"./ReactInstanceHandles":206,"./ReactInstanceMap":207,"./ReactMarkupChecksum":209,"./ReactPerf":216,"./ReactReconciler":221,"./ReactUpdateQueue":227,"./ReactUpdates":228,"./instantiateReactComponent":263,"./setInnerHTML":269,"./shouldUpdateReactComponent":271,"./validateDOMNesting":273,"_process":143,"fbjs/lib/containsNode":71,"fbjs/lib/emptyObject":75,"fbjs/lib/invariant":82,"fbjs/lib/warning":93}],211:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -59301,7 +59207,7 @@ var ReactMultiChild = {
 
 module.exports = ReactMultiChild;
 }).call(this,require('_process'))
-},{"./ReactChildReconciler":175,"./ReactComponentEnvironment":180,"./ReactCurrentOwner":182,"./ReactMultiChildUpdateTypes":215,"./ReactReconciler":224,"./flattenChildren":257,"_process":146}],215:[function(require,module,exports){
+},{"./ReactChildReconciler":172,"./ReactComponentEnvironment":177,"./ReactCurrentOwner":179,"./ReactMultiChildUpdateTypes":212,"./ReactReconciler":221,"./flattenChildren":254,"_process":143}],212:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -59334,7 +59240,7 @@ var ReactMultiChildUpdateTypes = keyMirror({
 });
 
 module.exports = ReactMultiChildUpdateTypes;
-},{"fbjs/lib/keyMirror":88}],216:[function(require,module,exports){
+},{"fbjs/lib/keyMirror":85}],213:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2014-2015, Facebook, Inc.
@@ -59431,7 +59337,7 @@ var ReactNativeComponent = {
 
 module.exports = ReactNativeComponent;
 }).call(this,require('_process'))
-},{"./Object.assign":170,"_process":146,"fbjs/lib/invariant":85}],217:[function(require,module,exports){
+},{"./Object.assign":167,"_process":143,"fbjs/lib/invariant":82}],214:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2015, Facebook, Inc.
@@ -59552,7 +59458,7 @@ var ReactNoopUpdateQueue = {
 
 module.exports = ReactNoopUpdateQueue;
 }).call(this,require('_process'))
-},{"_process":146,"fbjs/lib/warning":96}],218:[function(require,module,exports){
+},{"_process":143,"fbjs/lib/warning":93}],215:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -59646,7 +59552,7 @@ var ReactOwner = {
 
 module.exports = ReactOwner;
 }).call(this,require('_process'))
-},{"_process":146,"fbjs/lib/invariant":85}],219:[function(require,module,exports){
+},{"_process":143,"fbjs/lib/invariant":82}],216:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -59745,7 +59651,7 @@ function _noMeasure(objName, fnName, func) {
 
 module.exports = ReactPerf;
 }).call(this,require('_process'))
-},{"_process":146}],220:[function(require,module,exports){
+},{"_process":143}],217:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -59772,7 +59678,7 @@ if (process.env.NODE_ENV !== 'production') {
 
 module.exports = ReactPropTypeLocationNames;
 }).call(this,require('_process'))
-},{"_process":146}],221:[function(require,module,exports){
+},{"_process":143}],218:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -59795,7 +59701,7 @@ var ReactPropTypeLocations = keyMirror({
 });
 
 module.exports = ReactPropTypeLocations;
-},{"fbjs/lib/keyMirror":88}],222:[function(require,module,exports){
+},{"fbjs/lib/keyMirror":85}],219:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -60152,7 +60058,7 @@ function getClassName(propValue) {
 }
 
 module.exports = ReactPropTypes;
-},{"./ReactElement":200,"./ReactPropTypeLocationNames":220,"./getIteratorFn":263,"fbjs/lib/emptyFunction":77}],223:[function(require,module,exports){
+},{"./ReactElement":197,"./ReactPropTypeLocationNames":217,"./getIteratorFn":260,"fbjs/lib/emptyFunction":74}],220:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -60304,7 +60210,7 @@ assign(ReactReconcileTransaction.prototype, Transaction.Mixin, Mixin);
 PooledClass.addPoolingTo(ReactReconcileTransaction);
 
 module.exports = ReactReconcileTransaction;
-},{"./CallbackQueue":153,"./Object.assign":170,"./PooledClass":171,"./ReactBrowserEventEmitter":174,"./ReactDOMFeatureFlags":187,"./ReactInputSelection":208,"./Transaction":248}],224:[function(require,module,exports){
+},{"./CallbackQueue":150,"./Object.assign":167,"./PooledClass":168,"./ReactBrowserEventEmitter":171,"./ReactDOMFeatureFlags":184,"./ReactInputSelection":205,"./Transaction":245}],221:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -60412,7 +60318,7 @@ var ReactReconciler = {
 };
 
 module.exports = ReactReconciler;
-},{"./ReactRef":225}],225:[function(require,module,exports){
+},{"./ReactRef":222}],222:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -60491,7 +60397,7 @@ ReactRef.detachRefs = function (instance, element) {
 };
 
 module.exports = ReactRef;
-},{"./ReactOwner":218}],226:[function(require,module,exports){
+},{"./ReactOwner":215}],223:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -60521,7 +60427,7 @@ var ReactRootIndex = {
 };
 
 module.exports = ReactRootIndex;
-},{}],227:[function(require,module,exports){
+},{}],224:[function(require,module,exports){
 /**
  * Copyright 2014-2015, Facebook, Inc.
  * All rights reserved.
@@ -60545,7 +60451,7 @@ var ReactServerBatchingStrategy = {
 };
 
 module.exports = ReactServerBatchingStrategy;
-},{}],228:[function(require,module,exports){
+},{}],225:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -60631,7 +60537,7 @@ module.exports = {
   renderToStaticMarkup: renderToStaticMarkup
 };
 }).call(this,require('_process'))
-},{"./ReactDefaultBatchingStrategy":196,"./ReactElement":200,"./ReactInstanceHandles":209,"./ReactMarkupChecksum":212,"./ReactServerBatchingStrategy":227,"./ReactServerRenderingTransaction":229,"./ReactUpdates":231,"./instantiateReactComponent":266,"_process":146,"fbjs/lib/emptyObject":78,"fbjs/lib/invariant":85}],229:[function(require,module,exports){
+},{"./ReactDefaultBatchingStrategy":193,"./ReactElement":197,"./ReactInstanceHandles":206,"./ReactMarkupChecksum":209,"./ReactServerBatchingStrategy":224,"./ReactServerRenderingTransaction":226,"./ReactUpdates":228,"./instantiateReactComponent":263,"_process":143,"fbjs/lib/emptyObject":75,"fbjs/lib/invariant":82}],226:[function(require,module,exports){
 /**
  * Copyright 2014-2015, Facebook, Inc.
  * All rights reserved.
@@ -60719,7 +60625,7 @@ assign(ReactServerRenderingTransaction.prototype, Transaction.Mixin, Mixin);
 PooledClass.addPoolingTo(ReactServerRenderingTransaction);
 
 module.exports = ReactServerRenderingTransaction;
-},{"./CallbackQueue":153,"./Object.assign":170,"./PooledClass":171,"./Transaction":248,"fbjs/lib/emptyFunction":77}],230:[function(require,module,exports){
+},{"./CallbackQueue":150,"./Object.assign":167,"./PooledClass":168,"./Transaction":245,"fbjs/lib/emptyFunction":74}],227:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2015, Facebook, Inc.
@@ -60979,7 +60885,7 @@ var ReactUpdateQueue = {
 
 module.exports = ReactUpdateQueue;
 }).call(this,require('_process'))
-},{"./Object.assign":170,"./ReactCurrentOwner":182,"./ReactElement":200,"./ReactInstanceMap":210,"./ReactUpdates":231,"_process":146,"fbjs/lib/invariant":85,"fbjs/lib/warning":96}],231:[function(require,module,exports){
+},{"./Object.assign":167,"./ReactCurrentOwner":179,"./ReactElement":197,"./ReactInstanceMap":207,"./ReactUpdates":228,"_process":143,"fbjs/lib/invariant":82,"fbjs/lib/warning":93}],228:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -61205,7 +61111,7 @@ var ReactUpdates = {
 
 module.exports = ReactUpdates;
 }).call(this,require('_process'))
-},{"./CallbackQueue":153,"./Object.assign":170,"./PooledClass":171,"./ReactPerf":219,"./ReactReconciler":224,"./Transaction":248,"_process":146,"fbjs/lib/invariant":85}],232:[function(require,module,exports){
+},{"./CallbackQueue":150,"./Object.assign":167,"./PooledClass":168,"./ReactPerf":216,"./ReactReconciler":221,"./Transaction":245,"_process":143,"fbjs/lib/invariant":82}],229:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -61220,7 +61126,7 @@ module.exports = ReactUpdates;
 'use strict';
 
 module.exports = '0.14.9';
-},{}],233:[function(require,module,exports){
+},{}],230:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -61348,7 +61254,7 @@ var SVGDOMPropertyConfig = {
 };
 
 module.exports = SVGDOMPropertyConfig;
-},{"./DOMProperty":157}],234:[function(require,module,exports){
+},{"./DOMProperty":154}],231:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -61550,7 +61456,7 @@ var SelectEventPlugin = {
 };
 
 module.exports = SelectEventPlugin;
-},{"./EventConstants":162,"./EventPropagators":166,"./ReactInputSelection":208,"./SyntheticEvent":240,"./isTextInputElement":268,"fbjs/lib/ExecutionEnvironment":71,"fbjs/lib/getActiveElement":80,"fbjs/lib/keyOf":89,"fbjs/lib/shallowEqual":94}],235:[function(require,module,exports){
+},{"./EventConstants":159,"./EventPropagators":163,"./ReactInputSelection":205,"./SyntheticEvent":237,"./isTextInputElement":265,"fbjs/lib/ExecutionEnvironment":68,"fbjs/lib/getActiveElement":77,"fbjs/lib/keyOf":86,"fbjs/lib/shallowEqual":91}],232:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -61580,7 +61486,7 @@ var ServerReactRootIndex = {
 };
 
 module.exports = ServerReactRootIndex;
-},{}],236:[function(require,module,exports){
+},{}],233:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -62170,7 +62076,7 @@ var SimpleEventPlugin = {
 
 module.exports = SimpleEventPlugin;
 }).call(this,require('_process'))
-},{"./EventConstants":162,"./EventPropagators":166,"./ReactMount":213,"./SyntheticClipboardEvent":237,"./SyntheticDragEvent":239,"./SyntheticEvent":240,"./SyntheticFocusEvent":241,"./SyntheticKeyboardEvent":243,"./SyntheticMouseEvent":244,"./SyntheticTouchEvent":245,"./SyntheticUIEvent":246,"./SyntheticWheelEvent":247,"./getEventCharCode":259,"_process":146,"fbjs/lib/EventListener":70,"fbjs/lib/emptyFunction":77,"fbjs/lib/invariant":85,"fbjs/lib/keyOf":89}],237:[function(require,module,exports){
+},{"./EventConstants":159,"./EventPropagators":163,"./ReactMount":210,"./SyntheticClipboardEvent":234,"./SyntheticDragEvent":236,"./SyntheticEvent":237,"./SyntheticFocusEvent":238,"./SyntheticKeyboardEvent":240,"./SyntheticMouseEvent":241,"./SyntheticTouchEvent":242,"./SyntheticUIEvent":243,"./SyntheticWheelEvent":244,"./getEventCharCode":256,"_process":143,"fbjs/lib/EventListener":67,"fbjs/lib/emptyFunction":74,"fbjs/lib/invariant":82,"fbjs/lib/keyOf":86}],234:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -62210,7 +62116,7 @@ function SyntheticClipboardEvent(dispatchConfig, dispatchMarker, nativeEvent, na
 SyntheticEvent.augmentClass(SyntheticClipboardEvent, ClipboardEventInterface);
 
 module.exports = SyntheticClipboardEvent;
-},{"./SyntheticEvent":240}],238:[function(require,module,exports){
+},{"./SyntheticEvent":237}],235:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -62248,7 +62154,7 @@ function SyntheticCompositionEvent(dispatchConfig, dispatchMarker, nativeEvent, 
 SyntheticEvent.augmentClass(SyntheticCompositionEvent, CompositionEventInterface);
 
 module.exports = SyntheticCompositionEvent;
-},{"./SyntheticEvent":240}],239:[function(require,module,exports){
+},{"./SyntheticEvent":237}],236:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -62286,7 +62192,7 @@ function SyntheticDragEvent(dispatchConfig, dispatchMarker, nativeEvent, nativeE
 SyntheticMouseEvent.augmentClass(SyntheticDragEvent, DragEventInterface);
 
 module.exports = SyntheticDragEvent;
-},{"./SyntheticMouseEvent":244}],240:[function(require,module,exports){
+},{"./SyntheticMouseEvent":241}],237:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -62469,7 +62375,7 @@ PooledClass.addPoolingTo(SyntheticEvent, PooledClass.fourArgumentPooler);
 
 module.exports = SyntheticEvent;
 }).call(this,require('_process'))
-},{"./Object.assign":170,"./PooledClass":171,"_process":146,"fbjs/lib/emptyFunction":77,"fbjs/lib/warning":96}],241:[function(require,module,exports){
+},{"./Object.assign":167,"./PooledClass":168,"_process":143,"fbjs/lib/emptyFunction":74,"fbjs/lib/warning":93}],238:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -62507,7 +62413,7 @@ function SyntheticFocusEvent(dispatchConfig, dispatchMarker, nativeEvent, native
 SyntheticUIEvent.augmentClass(SyntheticFocusEvent, FocusEventInterface);
 
 module.exports = SyntheticFocusEvent;
-},{"./SyntheticUIEvent":246}],242:[function(require,module,exports){
+},{"./SyntheticUIEvent":243}],239:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -62546,7 +62452,7 @@ function SyntheticInputEvent(dispatchConfig, dispatchMarker, nativeEvent, native
 SyntheticEvent.augmentClass(SyntheticInputEvent, InputEventInterface);
 
 module.exports = SyntheticInputEvent;
-},{"./SyntheticEvent":240}],243:[function(require,module,exports){
+},{"./SyntheticEvent":237}],240:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -62632,7 +62538,7 @@ function SyntheticKeyboardEvent(dispatchConfig, dispatchMarker, nativeEvent, nat
 SyntheticUIEvent.augmentClass(SyntheticKeyboardEvent, KeyboardEventInterface);
 
 module.exports = SyntheticKeyboardEvent;
-},{"./SyntheticUIEvent":246,"./getEventCharCode":259,"./getEventKey":260,"./getEventModifierState":261}],244:[function(require,module,exports){
+},{"./SyntheticUIEvent":243,"./getEventCharCode":256,"./getEventKey":257,"./getEventModifierState":258}],241:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -62706,7 +62612,7 @@ function SyntheticMouseEvent(dispatchConfig, dispatchMarker, nativeEvent, native
 SyntheticUIEvent.augmentClass(SyntheticMouseEvent, MouseEventInterface);
 
 module.exports = SyntheticMouseEvent;
-},{"./SyntheticUIEvent":246,"./ViewportMetrics":249,"./getEventModifierState":261}],245:[function(require,module,exports){
+},{"./SyntheticUIEvent":243,"./ViewportMetrics":246,"./getEventModifierState":258}],242:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -62753,7 +62659,7 @@ function SyntheticTouchEvent(dispatchConfig, dispatchMarker, nativeEvent, native
 SyntheticUIEvent.augmentClass(SyntheticTouchEvent, TouchEventInterface);
 
 module.exports = SyntheticTouchEvent;
-},{"./SyntheticUIEvent":246,"./getEventModifierState":261}],246:[function(require,module,exports){
+},{"./SyntheticUIEvent":243,"./getEventModifierState":258}],243:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -62814,7 +62720,7 @@ function SyntheticUIEvent(dispatchConfig, dispatchMarker, nativeEvent, nativeEve
 SyntheticEvent.augmentClass(SyntheticUIEvent, UIEventInterface);
 
 module.exports = SyntheticUIEvent;
-},{"./SyntheticEvent":240,"./getEventTarget":262}],247:[function(require,module,exports){
+},{"./SyntheticEvent":237,"./getEventTarget":259}],244:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -62870,7 +62776,7 @@ function SyntheticWheelEvent(dispatchConfig, dispatchMarker, nativeEvent, native
 SyntheticMouseEvent.augmentClass(SyntheticWheelEvent, WheelEventInterface);
 
 module.exports = SyntheticWheelEvent;
-},{"./SyntheticMouseEvent":244}],248:[function(require,module,exports){
+},{"./SyntheticMouseEvent":241}],245:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -63104,7 +63010,7 @@ var Transaction = {
 
 module.exports = Transaction;
 }).call(this,require('_process'))
-},{"_process":146,"fbjs/lib/invariant":85}],249:[function(require,module,exports){
+},{"_process":143,"fbjs/lib/invariant":82}],246:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -63132,7 +63038,7 @@ var ViewportMetrics = {
 };
 
 module.exports = ViewportMetrics;
-},{}],250:[function(require,module,exports){
+},{}],247:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2014-2015, Facebook, Inc.
@@ -63194,7 +63100,7 @@ function accumulateInto(current, next) {
 
 module.exports = accumulateInto;
 }).call(this,require('_process'))
-},{"_process":146,"fbjs/lib/invariant":85}],251:[function(require,module,exports){
+},{"_process":143,"fbjs/lib/invariant":82}],248:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -63237,7 +63143,7 @@ function adler32(data) {
 }
 
 module.exports = adler32;
-},{}],252:[function(require,module,exports){
+},{}],249:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -63264,7 +63170,7 @@ if (process.env.NODE_ENV !== 'production') {
 
 module.exports = canDefineProperty;
 }).call(this,require('_process'))
-},{"_process":146}],253:[function(require,module,exports){
+},{"_process":143}],250:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -63320,7 +63226,7 @@ function dangerousStyleValue(name, value) {
 }
 
 module.exports = dangerousStyleValue;
-},{"./CSSProperty":151}],254:[function(require,module,exports){
+},{"./CSSProperty":148}],251:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -63371,7 +63277,7 @@ function deprecated(fnName, newModule, newPackage, ctx, fn) {
 
 module.exports = deprecated;
 }).call(this,require('_process'))
-},{"./Object.assign":170,"_process":146,"fbjs/lib/warning":96}],255:[function(require,module,exports){
+},{"./Object.assign":167,"_process":143,"fbjs/lib/warning":93}],252:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -63410,7 +63316,7 @@ function escapeTextContentForBrowser(text) {
 }
 
 module.exports = escapeTextContentForBrowser;
-},{}],256:[function(require,module,exports){
+},{}],253:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -63462,7 +63368,7 @@ function findDOMNode(componentOrElement) {
 
 module.exports = findDOMNode;
 }).call(this,require('_process'))
-},{"./ReactCurrentOwner":182,"./ReactInstanceMap":210,"./ReactMount":213,"_process":146,"fbjs/lib/invariant":85,"fbjs/lib/warning":96}],257:[function(require,module,exports){
+},{"./ReactCurrentOwner":179,"./ReactInstanceMap":207,"./ReactMount":210,"_process":143,"fbjs/lib/invariant":82,"fbjs/lib/warning":93}],254:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -63513,7 +63419,7 @@ function flattenChildren(children) {
 
 module.exports = flattenChildren;
 }).call(this,require('_process'))
-},{"./traverseAllChildren":275,"_process":146,"fbjs/lib/warning":96}],258:[function(require,module,exports){
+},{"./traverseAllChildren":272,"_process":143,"fbjs/lib/warning":93}],255:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -63543,7 +63449,7 @@ var forEachAccumulated = function (arr, cb, scope) {
 };
 
 module.exports = forEachAccumulated;
-},{}],259:[function(require,module,exports){
+},{}],256:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -63594,7 +63500,7 @@ function getEventCharCode(nativeEvent) {
 }
 
 module.exports = getEventCharCode;
-},{}],260:[function(require,module,exports){
+},{}],257:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -63698,7 +63604,7 @@ function getEventKey(nativeEvent) {
 }
 
 module.exports = getEventKey;
-},{"./getEventCharCode":259}],261:[function(require,module,exports){
+},{"./getEventCharCode":256}],258:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -63743,7 +63649,7 @@ function getEventModifierState(nativeEvent) {
 }
 
 module.exports = getEventModifierState;
-},{}],262:[function(require,module,exports){
+},{}],259:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -63773,7 +63679,7 @@ function getEventTarget(nativeEvent) {
 }
 
 module.exports = getEventTarget;
-},{}],263:[function(require,module,exports){
+},{}],260:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -63814,7 +63720,7 @@ function getIteratorFn(maybeIterable) {
 }
 
 module.exports = getIteratorFn;
-},{}],264:[function(require,module,exports){
+},{}],261:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -63888,7 +63794,7 @@ function getNodeForCharacterOffset(root, offset) {
 }
 
 module.exports = getNodeForCharacterOffset;
-},{}],265:[function(require,module,exports){
+},{}],262:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -63922,7 +63828,7 @@ function getTextContentAccessor() {
 }
 
 module.exports = getTextContentAccessor;
-},{"fbjs/lib/ExecutionEnvironment":71}],266:[function(require,module,exports){
+},{"fbjs/lib/ExecutionEnvironment":68}],263:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -64037,7 +63943,7 @@ function instantiateReactComponent(node) {
 
 module.exports = instantiateReactComponent;
 }).call(this,require('_process'))
-},{"./Object.assign":170,"./ReactCompositeComponent":181,"./ReactEmptyComponent":202,"./ReactNativeComponent":216,"_process":146,"fbjs/lib/invariant":85,"fbjs/lib/warning":96}],267:[function(require,module,exports){
+},{"./Object.assign":167,"./ReactCompositeComponent":178,"./ReactEmptyComponent":199,"./ReactNativeComponent":213,"_process":143,"fbjs/lib/invariant":82,"fbjs/lib/warning":93}],264:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -64098,7 +64004,7 @@ function isEventSupported(eventNameSuffix, capture) {
 }
 
 module.exports = isEventSupported;
-},{"fbjs/lib/ExecutionEnvironment":71}],268:[function(require,module,exports){
+},{"fbjs/lib/ExecutionEnvironment":68}],265:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -64139,7 +64045,7 @@ function isTextInputElement(elem) {
 }
 
 module.exports = isTextInputElement;
-},{}],269:[function(require,module,exports){
+},{}],266:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -64175,7 +64081,7 @@ function onlyChild(children) {
 
 module.exports = onlyChild;
 }).call(this,require('_process'))
-},{"./ReactElement":200,"_process":146,"fbjs/lib/invariant":85}],270:[function(require,module,exports){
+},{"./ReactElement":197,"_process":143,"fbjs/lib/invariant":82}],267:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -64202,7 +64108,7 @@ function quoteAttributeValueForBrowser(value) {
 }
 
 module.exports = quoteAttributeValueForBrowser;
-},{"./escapeTextContentForBrowser":255}],271:[function(require,module,exports){
+},{"./escapeTextContentForBrowser":252}],268:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -64219,7 +64125,7 @@ module.exports = quoteAttributeValueForBrowser;
 var ReactMount = require('./ReactMount');
 
 module.exports = ReactMount.renderSubtreeIntoContainer;
-},{"./ReactMount":213}],272:[function(require,module,exports){
+},{"./ReactMount":210}],269:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -64310,7 +64216,7 @@ if (ExecutionEnvironment.canUseDOM) {
 }
 
 module.exports = setInnerHTML;
-},{"fbjs/lib/ExecutionEnvironment":71}],273:[function(require,module,exports){
+},{"fbjs/lib/ExecutionEnvironment":68}],270:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -64351,7 +64257,7 @@ if (ExecutionEnvironment.canUseDOM) {
 }
 
 module.exports = setTextContent;
-},{"./escapeTextContentForBrowser":255,"./setInnerHTML":272,"fbjs/lib/ExecutionEnvironment":71}],274:[function(require,module,exports){
+},{"./escapeTextContentForBrowser":252,"./setInnerHTML":269,"fbjs/lib/ExecutionEnvironment":68}],271:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -64395,7 +64301,7 @@ function shouldUpdateReactComponent(prevElement, nextElement) {
 }
 
 module.exports = shouldUpdateReactComponent;
-},{}],275:[function(require,module,exports){
+},{}],272:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -64587,7 +64493,7 @@ function traverseAllChildren(children, callback, traverseContext) {
 
 module.exports = traverseAllChildren;
 }).call(this,require('_process'))
-},{"./ReactCurrentOwner":182,"./ReactElement":200,"./ReactInstanceHandles":209,"./getIteratorFn":263,"_process":146,"fbjs/lib/invariant":85,"fbjs/lib/warning":96}],276:[function(require,module,exports){
+},{"./ReactCurrentOwner":179,"./ReactElement":197,"./ReactInstanceHandles":206,"./getIteratorFn":260,"_process":143,"fbjs/lib/invariant":82,"fbjs/lib/warning":93}],273:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2015, Facebook, Inc.
@@ -64953,15 +64859,15 @@ if (process.env.NODE_ENV !== 'production') {
 
 module.exports = validateDOMNesting;
 }).call(this,require('_process'))
-},{"./Object.assign":170,"_process":146,"fbjs/lib/emptyFunction":77,"fbjs/lib/warning":96}],277:[function(require,module,exports){
+},{"./Object.assign":167,"_process":143,"fbjs/lib/emptyFunction":74,"fbjs/lib/warning":93}],274:[function(require,module,exports){
 'use strict';
 
 module.exports = require('./lib/React');
 
-},{"./lib/React":172}],278:[function(require,module,exports){
+},{"./lib/React":169}],275:[function(require,module,exports){
 module.exports = require('./lib/_stream_duplex.js');
 
-},{"./lib/_stream_duplex.js":279}],279:[function(require,module,exports){
+},{"./lib/_stream_duplex.js":276}],276:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -65086,7 +64992,7 @@ function forEach(xs, f) {
     f(xs[i], i);
   }
 }
-},{"./_stream_readable":281,"./_stream_writable":283,"core-util-is":57,"inherits":100,"process-nextick-args":145}],280:[function(require,module,exports){
+},{"./_stream_readable":278,"./_stream_writable":280,"core-util-is":54,"inherits":97,"process-nextick-args":142}],277:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -65134,7 +65040,7 @@ function PassThrough(options) {
 PassThrough.prototype._transform = function (chunk, encoding, cb) {
   cb(null, chunk);
 };
-},{"./_stream_transform":282,"core-util-is":57,"inherits":100}],281:[function(require,module,exports){
+},{"./_stream_transform":279,"core-util-is":54,"inherits":97}],278:[function(require,module,exports){
 (function (process,global){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -66144,7 +66050,7 @@ function indexOf(xs, x) {
   return -1;
 }
 }).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./_stream_duplex":279,"./internal/streams/BufferList":284,"./internal/streams/destroy":285,"./internal/streams/stream":286,"_process":146,"core-util-is":57,"events":69,"inherits":100,"isarray":102,"process-nextick-args":145,"safe-buffer":292,"string_decoder/":287,"util":52}],282:[function(require,module,exports){
+},{"./_stream_duplex":276,"./internal/streams/BufferList":281,"./internal/streams/destroy":282,"./internal/streams/stream":283,"_process":143,"core-util-is":54,"events":66,"inherits":97,"isarray":99,"process-nextick-args":142,"safe-buffer":289,"string_decoder/":284,"util":52}],279:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -66359,7 +66265,7 @@ function done(stream, er, data) {
 
   return stream.push(null);
 }
-},{"./_stream_duplex":279,"core-util-is":57,"inherits":100}],283:[function(require,module,exports){
+},{"./_stream_duplex":276,"core-util-is":54,"inherits":97}],280:[function(require,module,exports){
 (function (process,global){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -67026,7 +66932,7 @@ Writable.prototype._destroy = function (err, cb) {
   cb(err);
 };
 }).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./_stream_duplex":279,"./internal/streams/destroy":285,"./internal/streams/stream":286,"_process":146,"core-util-is":57,"inherits":100,"process-nextick-args":145,"safe-buffer":292,"util-deprecate":311}],284:[function(require,module,exports){
+},{"./_stream_duplex":276,"./internal/streams/destroy":282,"./internal/streams/stream":283,"_process":143,"core-util-is":54,"inherits":97,"process-nextick-args":142,"safe-buffer":289,"util-deprecate":308}],281:[function(require,module,exports){
 'use strict';
 
 /*<replacement>*/
@@ -67101,7 +67007,7 @@ module.exports = function () {
 
   return BufferList;
 }();
-},{"safe-buffer":292}],285:[function(require,module,exports){
+},{"safe-buffer":289}],282:[function(require,module,exports){
 'use strict';
 
 /*<replacement>*/
@@ -67174,10 +67080,10 @@ module.exports = {
   destroy: destroy,
   undestroy: undestroy
 };
-},{"process-nextick-args":145}],286:[function(require,module,exports){
+},{"process-nextick-args":142}],283:[function(require,module,exports){
 module.exports = require('events').EventEmitter;
 
-},{"events":69}],287:[function(require,module,exports){
+},{"events":66}],284:[function(require,module,exports){
 'use strict';
 
 var Buffer = require('safe-buffer').Buffer;
@@ -67450,10 +67356,10 @@ function simpleWrite(buf) {
 function simpleEnd(buf) {
   return buf && buf.length ? this.write(buf) : '';
 }
-},{"safe-buffer":292}],288:[function(require,module,exports){
+},{"safe-buffer":289}],285:[function(require,module,exports){
 module.exports = require('./readable').PassThrough
 
-},{"./readable":289}],289:[function(require,module,exports){
+},{"./readable":286}],286:[function(require,module,exports){
 exports = module.exports = require('./lib/_stream_readable.js');
 exports.Stream = exports;
 exports.Readable = exports;
@@ -67462,13 +67368,13 @@ exports.Duplex = require('./lib/_stream_duplex.js');
 exports.Transform = require('./lib/_stream_transform.js');
 exports.PassThrough = require('./lib/_stream_passthrough.js');
 
-},{"./lib/_stream_duplex.js":279,"./lib/_stream_passthrough.js":280,"./lib/_stream_readable.js":281,"./lib/_stream_transform.js":282,"./lib/_stream_writable.js":283}],290:[function(require,module,exports){
+},{"./lib/_stream_duplex.js":276,"./lib/_stream_passthrough.js":277,"./lib/_stream_readable.js":278,"./lib/_stream_transform.js":279,"./lib/_stream_writable.js":280}],287:[function(require,module,exports){
 module.exports = require('./readable').Transform
 
-},{"./readable":289}],291:[function(require,module,exports){
+},{"./readable":286}],288:[function(require,module,exports){
 module.exports = require('./lib/_stream_writable.js');
 
-},{"./lib/_stream_writable.js":283}],292:[function(require,module,exports){
+},{"./lib/_stream_writable.js":280}],289:[function(require,module,exports){
 /* eslint-disable node/no-deprecated-api */
 var buffer = require('buffer')
 var Buffer = buffer.Buffer
@@ -67532,7 +67438,7 @@ SafeBuffer.allocUnsafeSlow = function (size) {
   return buffer.SlowBuffer(size)
 }
 
-},{"buffer":56}],293:[function(require,module,exports){
+},{"buffer":53}],290:[function(require,module,exports){
 // Generated by CoffeeScript 1.9.2
 (function() {
   var hasProp = {}.hasOwnProperty,
@@ -67556,7 +67462,7 @@ SafeBuffer.allocUnsafeSlow = function (size) {
 
 }).call(this);
 
-},{}],294:[function(require,module,exports){
+},{}],291:[function(require,module,exports){
 (function (factory) {
     if (typeof exports === 'object') {
         // Node/CommonJS
@@ -68261,7 +68167,7 @@ SafeBuffer.allocUnsafeSlow = function (size) {
     return SparkMD5;
 }));
 
-},{}],295:[function(require,module,exports){
+},{}],292:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -68390,7 +68296,7 @@ Stream.prototype.pipe = function(dest, options) {
   return dest;
 };
 
-},{"events":69,"inherits":100,"readable-stream/duplex.js":278,"readable-stream/passthrough.js":288,"readable-stream/readable.js":289,"readable-stream/transform.js":290,"readable-stream/writable.js":291}],296:[function(require,module,exports){
+},{"events":66,"inherits":97,"readable-stream/duplex.js":275,"readable-stream/passthrough.js":285,"readable-stream/readable.js":286,"readable-stream/transform.js":287,"readable-stream/writable.js":288}],293:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -68613,7 +68519,7 @@ function base64DetectIncompleteChar(buffer) {
   this.charLength = this.charReceived ? 3 : 0;
 }
 
-},{"buffer":56}],297:[function(require,module,exports){
+},{"buffer":53}],294:[function(require,module,exports){
 module.exports = {
   encode: function (decodedKey) {
     return '\xff' + decodedKey[0] + '\xff' + decodedKey[1]
@@ -68628,7 +68534,7 @@ module.exports = {
 }
 
 
-},{}],298:[function(require,module,exports){
+},{}],295:[function(require,module,exports){
 /* Copyright (c) 2012-2014 LevelUP contributors
  * See list at <https://github.com/rvagg/node-levelup#contributing>
  * MIT License
@@ -68652,7 +68558,7 @@ module.exports = {
   , EncodingError       : createError('EncodingError', LevelUPError)
 }
 
-},{"errno":67}],299:[function(require,module,exports){
+},{"errno":64}],296:[function(require,module,exports){
 var nut   = require('./nut')
 var shell = require('./shell') //the shell surrounds the nut
 var Codec = require('level-codec')
@@ -68667,7 +68573,7 @@ module.exports = function (db) {
 }
 
 
-},{"./codec/legacy":297,"./nut":300,"./read-stream":301,"./shell":302,"level-codec":104}],300:[function(require,module,exports){
+},{"./codec/legacy":294,"./nut":297,"./read-stream":298,"./shell":299,"level-codec":101}],297:[function(require,module,exports){
 var ltgt = require('ltgt')
 
 function isFunction (f) {
@@ -68849,7 +68755,7 @@ module.exports = function (db, precodec, codec, compare) {
 
 }
 
-},{"ltgt":304}],301:[function(require,module,exports){
+},{"ltgt":301}],298:[function(require,module,exports){
 /* Copyright (c) 2012-2014 LevelUP contributors
  * See list at <https://github.com/rvagg/node-levelup#contributing>
  * MIT License <https://github.com/rvagg/node-levelup/blob/master/LICENSE.md>
@@ -68944,7 +68850,7 @@ ReadStream.prototype.toString = function () {
 module.exports = ReadStream
 
 
-},{"./errors":298,"inherits":100,"readable-stream":310}],302:[function(require,module,exports){
+},{"./errors":295,"inherits":97,"readable-stream":307}],299:[function(require,module,exports){
 (function (process){
 var EventEmitter = require('events').EventEmitter
 
@@ -69089,9 +68995,9 @@ var sublevel = module.exports = function (nut, prefix, createStream, options) {
 }
 
 }).call(this,require('_process'))
-},{"./errors":298,"_process":146,"events":69}],303:[function(require,module,exports){
-arguments[4][108][0].apply(exports,arguments)
-},{"dup":108}],304:[function(require,module,exports){
+},{"./errors":295,"_process":143,"events":66}],300:[function(require,module,exports){
+arguments[4][105][0].apply(exports,arguments)
+},{"dup":105}],301:[function(require,module,exports){
 (function (Buffer){
 
 exports.compare = function (a, b) {
@@ -69241,11 +69147,11 @@ exports.filter = function (range, compare) {
 }
 
 }).call(this,{"isBuffer":require("../../../is-buffer/index.js")})
-},{"../../../is-buffer/index.js":101}],305:[function(require,module,exports){
-arguments[4][109][0].apply(exports,arguments)
-},{"./_stream_readable":307,"./_stream_writable":309,"_process":146,"core-util-is":57,"dup":109,"inherits":100}],306:[function(require,module,exports){
-arguments[4][110][0].apply(exports,arguments)
-},{"./_stream_transform":308,"core-util-is":57,"dup":110,"inherits":100}],307:[function(require,module,exports){
+},{"../../../is-buffer/index.js":98}],302:[function(require,module,exports){
+arguments[4][106][0].apply(exports,arguments)
+},{"./_stream_readable":304,"./_stream_writable":306,"_process":143,"core-util-is":54,"dup":106,"inherits":97}],303:[function(require,module,exports){
+arguments[4][107][0].apply(exports,arguments)
+},{"./_stream_transform":305,"core-util-is":54,"dup":107,"inherits":97}],304:[function(require,module,exports){
 (function (process){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -70231,7 +70137,7 @@ function indexOf (xs, x) {
 }
 
 }).call(this,require('_process'))
-},{"_process":146,"buffer":56,"core-util-is":57,"events":69,"inherits":100,"isarray":303,"stream":295,"string_decoder/":296}],308:[function(require,module,exports){
+},{"_process":143,"buffer":53,"core-util-is":54,"events":66,"inherits":97,"isarray":300,"stream":292,"string_decoder/":293}],305:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -70443,7 +70349,7 @@ function done(stream, er) {
   return stream.push(null);
 }
 
-},{"./_stream_duplex":305,"core-util-is":57,"inherits":100}],309:[function(require,module,exports){
+},{"./_stream_duplex":302,"core-util-is":54,"inherits":97}],306:[function(require,module,exports){
 (function (process){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -70833,7 +70739,7 @@ function endWritable(stream, state, cb) {
 }
 
 }).call(this,require('_process'))
-},{"./_stream_duplex":305,"_process":146,"buffer":56,"core-util-is":57,"inherits":100,"stream":295}],310:[function(require,module,exports){
+},{"./_stream_duplex":302,"_process":143,"buffer":53,"core-util-is":54,"inherits":97,"stream":292}],307:[function(require,module,exports){
 var Stream = require('stream'); // hack to fix a circular dependency issue when used with browserify
 exports = module.exports = require('./lib/_stream_readable.js');
 exports.Stream = Stream;
@@ -70843,7 +70749,7 @@ exports.Duplex = require('./lib/_stream_duplex.js');
 exports.Transform = require('./lib/_stream_transform.js');
 exports.PassThrough = require('./lib/_stream_passthrough.js');
 
-},{"./lib/_stream_duplex.js":305,"./lib/_stream_passthrough.js":306,"./lib/_stream_readable.js":307,"./lib/_stream_transform.js":308,"./lib/_stream_writable.js":309,"stream":295}],311:[function(require,module,exports){
+},{"./lib/_stream_duplex.js":302,"./lib/_stream_passthrough.js":303,"./lib/_stream_readable.js":304,"./lib/_stream_transform.js":305,"./lib/_stream_writable.js":306,"stream":292}],308:[function(require,module,exports){
 (function (global){
 
 /**
@@ -70914,7 +70820,606 @@ function config (name) {
 }
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],312:[function(require,module,exports){
+},{}],309:[function(require,module,exports){
+arguments[4][97][0].apply(exports,arguments)
+},{"dup":97}],310:[function(require,module,exports){
+module.exports = function isBuffer(arg) {
+  return arg && typeof arg === 'object'
+    && typeof arg.copy === 'function'
+    && typeof arg.fill === 'function'
+    && typeof arg.readUInt8 === 'function';
+}
+},{}],311:[function(require,module,exports){
+(function (process,global){
+// Copyright Joyent, Inc. and other Node contributors.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a
+// copy of this software and associated documentation files (the
+// "Software"), to deal in the Software without restriction, including
+// without limitation the rights to use, copy, modify, merge, publish,
+// distribute, sublicense, and/or sell copies of the Software, and to permit
+// persons to whom the Software is furnished to do so, subject to the
+// following conditions:
+//
+// The above copyright notice and this permission notice shall be included
+// in all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
+// NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+// DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+// OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+// USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+var formatRegExp = /%[sdj%]/g;
+exports.format = function(f) {
+  if (!isString(f)) {
+    var objects = [];
+    for (var i = 0; i < arguments.length; i++) {
+      objects.push(inspect(arguments[i]));
+    }
+    return objects.join(' ');
+  }
+
+  var i = 1;
+  var args = arguments;
+  var len = args.length;
+  var str = String(f).replace(formatRegExp, function(x) {
+    if (x === '%%') return '%';
+    if (i >= len) return x;
+    switch (x) {
+      case '%s': return String(args[i++]);
+      case '%d': return Number(args[i++]);
+      case '%j':
+        try {
+          return JSON.stringify(args[i++]);
+        } catch (_) {
+          return '[Circular]';
+        }
+      default:
+        return x;
+    }
+  });
+  for (var x = args[i]; i < len; x = args[++i]) {
+    if (isNull(x) || !isObject(x)) {
+      str += ' ' + x;
+    } else {
+      str += ' ' + inspect(x);
+    }
+  }
+  return str;
+};
+
+
+// Mark that a method should not be used.
+// Returns a modified function which warns once by default.
+// If --no-deprecation is set, then it is a no-op.
+exports.deprecate = function(fn, msg) {
+  // Allow for deprecating things in the process of starting up.
+  if (isUndefined(global.process)) {
+    return function() {
+      return exports.deprecate(fn, msg).apply(this, arguments);
+    };
+  }
+
+  if (process.noDeprecation === true) {
+    return fn;
+  }
+
+  var warned = false;
+  function deprecated() {
+    if (!warned) {
+      if (process.throwDeprecation) {
+        throw new Error(msg);
+      } else if (process.traceDeprecation) {
+        console.trace(msg);
+      } else {
+        console.error(msg);
+      }
+      warned = true;
+    }
+    return fn.apply(this, arguments);
+  }
+
+  return deprecated;
+};
+
+
+var debugs = {};
+var debugEnviron;
+exports.debuglog = function(set) {
+  if (isUndefined(debugEnviron))
+    debugEnviron = process.env.NODE_DEBUG || '';
+  set = set.toUpperCase();
+  if (!debugs[set]) {
+    if (new RegExp('\\b' + set + '\\b', 'i').test(debugEnviron)) {
+      var pid = process.pid;
+      debugs[set] = function() {
+        var msg = exports.format.apply(exports, arguments);
+        console.error('%s %d: %s', set, pid, msg);
+      };
+    } else {
+      debugs[set] = function() {};
+    }
+  }
+  return debugs[set];
+};
+
+
+/**
+ * Echos the value of a value. Trys to print the value out
+ * in the best way possible given the different types.
+ *
+ * @param {Object} obj The object to print out.
+ * @param {Object} opts Optional options object that alters the output.
+ */
+/* legacy: obj, showHidden, depth, colors*/
+function inspect(obj, opts) {
+  // default options
+  var ctx = {
+    seen: [],
+    stylize: stylizeNoColor
+  };
+  // legacy...
+  if (arguments.length >= 3) ctx.depth = arguments[2];
+  if (arguments.length >= 4) ctx.colors = arguments[3];
+  if (isBoolean(opts)) {
+    // legacy...
+    ctx.showHidden = opts;
+  } else if (opts) {
+    // got an "options" object
+    exports._extend(ctx, opts);
+  }
+  // set default options
+  if (isUndefined(ctx.showHidden)) ctx.showHidden = false;
+  if (isUndefined(ctx.depth)) ctx.depth = 2;
+  if (isUndefined(ctx.colors)) ctx.colors = false;
+  if (isUndefined(ctx.customInspect)) ctx.customInspect = true;
+  if (ctx.colors) ctx.stylize = stylizeWithColor;
+  return formatValue(ctx, obj, ctx.depth);
+}
+exports.inspect = inspect;
+
+
+// http://en.wikipedia.org/wiki/ANSI_escape_code#graphics
+inspect.colors = {
+  'bold' : [1, 22],
+  'italic' : [3, 23],
+  'underline' : [4, 24],
+  'inverse' : [7, 27],
+  'white' : [37, 39],
+  'grey' : [90, 39],
+  'black' : [30, 39],
+  'blue' : [34, 39],
+  'cyan' : [36, 39],
+  'green' : [32, 39],
+  'magenta' : [35, 39],
+  'red' : [31, 39],
+  'yellow' : [33, 39]
+};
+
+// Don't use 'blue' not visible on cmd.exe
+inspect.styles = {
+  'special': 'cyan',
+  'number': 'yellow',
+  'boolean': 'yellow',
+  'undefined': 'grey',
+  'null': 'bold',
+  'string': 'green',
+  'date': 'magenta',
+  // "name": intentionally not styling
+  'regexp': 'red'
+};
+
+
+function stylizeWithColor(str, styleType) {
+  var style = inspect.styles[styleType];
+
+  if (style) {
+    return '\u001b[' + inspect.colors[style][0] + 'm' + str +
+           '\u001b[' + inspect.colors[style][1] + 'm';
+  } else {
+    return str;
+  }
+}
+
+
+function stylizeNoColor(str, styleType) {
+  return str;
+}
+
+
+function arrayToHash(array) {
+  var hash = {};
+
+  array.forEach(function(val, idx) {
+    hash[val] = true;
+  });
+
+  return hash;
+}
+
+
+function formatValue(ctx, value, recurseTimes) {
+  // Provide a hook for user-specified inspect functions.
+  // Check that value is an object with an inspect function on it
+  if (ctx.customInspect &&
+      value &&
+      isFunction(value.inspect) &&
+      // Filter out the util module, it's inspect function is special
+      value.inspect !== exports.inspect &&
+      // Also filter out any prototype objects using the circular check.
+      !(value.constructor && value.constructor.prototype === value)) {
+    var ret = value.inspect(recurseTimes, ctx);
+    if (!isString(ret)) {
+      ret = formatValue(ctx, ret, recurseTimes);
+    }
+    return ret;
+  }
+
+  // Primitive types cannot have properties
+  var primitive = formatPrimitive(ctx, value);
+  if (primitive) {
+    return primitive;
+  }
+
+  // Look up the keys of the object.
+  var keys = Object.keys(value);
+  var visibleKeys = arrayToHash(keys);
+
+  if (ctx.showHidden) {
+    keys = Object.getOwnPropertyNames(value);
+  }
+
+  // IE doesn't make error fields non-enumerable
+  // http://msdn.microsoft.com/en-us/library/ie/dww52sbt(v=vs.94).aspx
+  if (isError(value)
+      && (keys.indexOf('message') >= 0 || keys.indexOf('description') >= 0)) {
+    return formatError(value);
+  }
+
+  // Some type of object without properties can be shortcutted.
+  if (keys.length === 0) {
+    if (isFunction(value)) {
+      var name = value.name ? ': ' + value.name : '';
+      return ctx.stylize('[Function' + name + ']', 'special');
+    }
+    if (isRegExp(value)) {
+      return ctx.stylize(RegExp.prototype.toString.call(value), 'regexp');
+    }
+    if (isDate(value)) {
+      return ctx.stylize(Date.prototype.toString.call(value), 'date');
+    }
+    if (isError(value)) {
+      return formatError(value);
+    }
+  }
+
+  var base = '', array = false, braces = ['{', '}'];
+
+  // Make Array say that they are Array
+  if (isArray(value)) {
+    array = true;
+    braces = ['[', ']'];
+  }
+
+  // Make functions say that they are functions
+  if (isFunction(value)) {
+    var n = value.name ? ': ' + value.name : '';
+    base = ' [Function' + n + ']';
+  }
+
+  // Make RegExps say that they are RegExps
+  if (isRegExp(value)) {
+    base = ' ' + RegExp.prototype.toString.call(value);
+  }
+
+  // Make dates with properties first say the date
+  if (isDate(value)) {
+    base = ' ' + Date.prototype.toUTCString.call(value);
+  }
+
+  // Make error with message first say the error
+  if (isError(value)) {
+    base = ' ' + formatError(value);
+  }
+
+  if (keys.length === 0 && (!array || value.length == 0)) {
+    return braces[0] + base + braces[1];
+  }
+
+  if (recurseTimes < 0) {
+    if (isRegExp(value)) {
+      return ctx.stylize(RegExp.prototype.toString.call(value), 'regexp');
+    } else {
+      return ctx.stylize('[Object]', 'special');
+    }
+  }
+
+  ctx.seen.push(value);
+
+  var output;
+  if (array) {
+    output = formatArray(ctx, value, recurseTimes, visibleKeys, keys);
+  } else {
+    output = keys.map(function(key) {
+      return formatProperty(ctx, value, recurseTimes, visibleKeys, key, array);
+    });
+  }
+
+  ctx.seen.pop();
+
+  return reduceToSingleString(output, base, braces);
+}
+
+
+function formatPrimitive(ctx, value) {
+  if (isUndefined(value))
+    return ctx.stylize('undefined', 'undefined');
+  if (isString(value)) {
+    var simple = '\'' + JSON.stringify(value).replace(/^"|"$/g, '')
+                                             .replace(/'/g, "\\'")
+                                             .replace(/\\"/g, '"') + '\'';
+    return ctx.stylize(simple, 'string');
+  }
+  if (isNumber(value))
+    return ctx.stylize('' + value, 'number');
+  if (isBoolean(value))
+    return ctx.stylize('' + value, 'boolean');
+  // For some reason typeof null is "object", so special case here.
+  if (isNull(value))
+    return ctx.stylize('null', 'null');
+}
+
+
+function formatError(value) {
+  return '[' + Error.prototype.toString.call(value) + ']';
+}
+
+
+function formatArray(ctx, value, recurseTimes, visibleKeys, keys) {
+  var output = [];
+  for (var i = 0, l = value.length; i < l; ++i) {
+    if (hasOwnProperty(value, String(i))) {
+      output.push(formatProperty(ctx, value, recurseTimes, visibleKeys,
+          String(i), true));
+    } else {
+      output.push('');
+    }
+  }
+  keys.forEach(function(key) {
+    if (!key.match(/^\d+$/)) {
+      output.push(formatProperty(ctx, value, recurseTimes, visibleKeys,
+          key, true));
+    }
+  });
+  return output;
+}
+
+
+function formatProperty(ctx, value, recurseTimes, visibleKeys, key, array) {
+  var name, str, desc;
+  desc = Object.getOwnPropertyDescriptor(value, key) || { value: value[key] };
+  if (desc.get) {
+    if (desc.set) {
+      str = ctx.stylize('[Getter/Setter]', 'special');
+    } else {
+      str = ctx.stylize('[Getter]', 'special');
+    }
+  } else {
+    if (desc.set) {
+      str = ctx.stylize('[Setter]', 'special');
+    }
+  }
+  if (!hasOwnProperty(visibleKeys, key)) {
+    name = '[' + key + ']';
+  }
+  if (!str) {
+    if (ctx.seen.indexOf(desc.value) < 0) {
+      if (isNull(recurseTimes)) {
+        str = formatValue(ctx, desc.value, null);
+      } else {
+        str = formatValue(ctx, desc.value, recurseTimes - 1);
+      }
+      if (str.indexOf('\n') > -1) {
+        if (array) {
+          str = str.split('\n').map(function(line) {
+            return '  ' + line;
+          }).join('\n').substr(2);
+        } else {
+          str = '\n' + str.split('\n').map(function(line) {
+            return '   ' + line;
+          }).join('\n');
+        }
+      }
+    } else {
+      str = ctx.stylize('[Circular]', 'special');
+    }
+  }
+  if (isUndefined(name)) {
+    if (array && key.match(/^\d+$/)) {
+      return str;
+    }
+    name = JSON.stringify('' + key);
+    if (name.match(/^"([a-zA-Z_][a-zA-Z_0-9]*)"$/)) {
+      name = name.substr(1, name.length - 2);
+      name = ctx.stylize(name, 'name');
+    } else {
+      name = name.replace(/'/g, "\\'")
+                 .replace(/\\"/g, '"')
+                 .replace(/(^"|"$)/g, "'");
+      name = ctx.stylize(name, 'string');
+    }
+  }
+
+  return name + ': ' + str;
+}
+
+
+function reduceToSingleString(output, base, braces) {
+  var numLinesEst = 0;
+  var length = output.reduce(function(prev, cur) {
+    numLinesEst++;
+    if (cur.indexOf('\n') >= 0) numLinesEst++;
+    return prev + cur.replace(/\u001b\[\d\d?m/g, '').length + 1;
+  }, 0);
+
+  if (length > 60) {
+    return braces[0] +
+           (base === '' ? '' : base + '\n ') +
+           ' ' +
+           output.join(',\n  ') +
+           ' ' +
+           braces[1];
+  }
+
+  return braces[0] + base + ' ' + output.join(', ') + ' ' + braces[1];
+}
+
+
+// NOTE: These type checking functions intentionally don't use `instanceof`
+// because it is fragile and can be easily faked with `Object.create()`.
+function isArray(ar) {
+  return Array.isArray(ar);
+}
+exports.isArray = isArray;
+
+function isBoolean(arg) {
+  return typeof arg === 'boolean';
+}
+exports.isBoolean = isBoolean;
+
+function isNull(arg) {
+  return arg === null;
+}
+exports.isNull = isNull;
+
+function isNullOrUndefined(arg) {
+  return arg == null;
+}
+exports.isNullOrUndefined = isNullOrUndefined;
+
+function isNumber(arg) {
+  return typeof arg === 'number';
+}
+exports.isNumber = isNumber;
+
+function isString(arg) {
+  return typeof arg === 'string';
+}
+exports.isString = isString;
+
+function isSymbol(arg) {
+  return typeof arg === 'symbol';
+}
+exports.isSymbol = isSymbol;
+
+function isUndefined(arg) {
+  return arg === void 0;
+}
+exports.isUndefined = isUndefined;
+
+function isRegExp(re) {
+  return isObject(re) && objectToString(re) === '[object RegExp]';
+}
+exports.isRegExp = isRegExp;
+
+function isObject(arg) {
+  return typeof arg === 'object' && arg !== null;
+}
+exports.isObject = isObject;
+
+function isDate(d) {
+  return isObject(d) && objectToString(d) === '[object Date]';
+}
+exports.isDate = isDate;
+
+function isError(e) {
+  return isObject(e) &&
+      (objectToString(e) === '[object Error]' || e instanceof Error);
+}
+exports.isError = isError;
+
+function isFunction(arg) {
+  return typeof arg === 'function';
+}
+exports.isFunction = isFunction;
+
+function isPrimitive(arg) {
+  return arg === null ||
+         typeof arg === 'boolean' ||
+         typeof arg === 'number' ||
+         typeof arg === 'string' ||
+         typeof arg === 'symbol' ||  // ES6 symbol
+         typeof arg === 'undefined';
+}
+exports.isPrimitive = isPrimitive;
+
+exports.isBuffer = require('./support/isBuffer');
+
+function objectToString(o) {
+  return Object.prototype.toString.call(o);
+}
+
+
+function pad(n) {
+  return n < 10 ? '0' + n.toString(10) : n.toString(10);
+}
+
+
+var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep',
+              'Oct', 'Nov', 'Dec'];
+
+// 26 Feb 16:19:34
+function timestamp() {
+  var d = new Date();
+  var time = [pad(d.getHours()),
+              pad(d.getMinutes()),
+              pad(d.getSeconds())].join(':');
+  return [d.getDate(), months[d.getMonth()], time].join(' ');
+}
+
+
+// log is just a thin wrapper to console.log that prepends a timestamp
+exports.log = function() {
+  console.log('%s - %s', timestamp(), exports.format.apply(exports, arguments));
+};
+
+
+/**
+ * Inherit the prototype methods from one constructor into another.
+ *
+ * The Function.prototype.inherits from lang.js rewritten as a standalone
+ * function (not on Function.prototype). NOTE: If this file is to be loaded
+ * during bootstrapping this function needs to be rewritten using some native
+ * functions as prototype setup using normal JavaScript does not work as
+ * expected during bootstrapping (see mirror.js in r114903).
+ *
+ * @param {function} ctor Constructor function which needs to inherit the
+ *     prototype.
+ * @param {function} superCtor Constructor function to inherit prototype from.
+ */
+exports.inherits = require('inherits');
+
+exports._extend = function(origin, add) {
+  // Don't do anything if add isn't an object
+  if (!add || !isObject(add)) return origin;
+
+  var keys = Object.keys(add);
+  var i = keys.length;
+  while (i--) {
+    origin[keys[i]] = add[keys[i]];
+  }
+  return origin;
+};
+
+function hasOwnProperty(obj, prop) {
+  return Object.prototype.hasOwnProperty.call(obj, prop);
+}
+
+}).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
+},{"./support/isBuffer":310,"_process":143,"inherits":309}],312:[function(require,module,exports){
 'use strict';
 
 /**
