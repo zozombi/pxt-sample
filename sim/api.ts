@@ -1,5 +1,14 @@
 /// <reference path="../libs/core/enums.d.ts"/>
 
+namespace pxsim.hare {
+    //% weight=90
+    //% blockId=sampleHop block="hop %h"
+    //% h.fieldEditor="gridpicker"
+    export function hop(h: Hop): void {
+
+    }
+}
+
 namespace pxsim.turtle {
     /**
      * Moves the sprite forward
@@ -12,12 +21,28 @@ namespace pxsim.turtle {
     }
 
     /**
+     * Moves the sprite backward
+     * @param steps number of steps to move, eg: 1
+     */
+    //% weight=90
+    //% blockId=sampleBackward block="backward %steps"
+    export function backwardAsync(steps: number) {
+        return board().sprite.forwardAsync(-steps)
+    }
+
+    //% blockId=sampleGetX block="get turtle x"
+    export function getX() {
+        return board().sprite.x;
+    }
+
+    /**
      * Moves the sprite forward
      * @param direction the direction to turn, eg: Direction.Left
      * @param angle degrees to turn, eg:90
      */
     //% weight=85
     //% blockId=sampleTurn block="turn %direction|by %angle degrees"
+    //% angle.min=-180 angle.max=180
     export function turnAsync(direction: Direction, angle: number) {
         let b = board();
 

@@ -1,4 +1,12 @@
 // Auto-generated from simulator. Do not edit.
+declare namespace hare {
+    //% weight=90
+    //% blockId=sampleHop block="hop %h"
+    //% h.fieldEditor="gridpicker"
+    //% shim=hare::hop
+    function hop(h: Hop): void;
+
+}
 declare namespace turtle {
     /**
      * Moves the sprite forward
@@ -10,12 +18,26 @@ declare namespace turtle {
     function forward(steps: number): void;
 
     /**
+     * Moves the sprite backward
+     * @param steps number of steps to move, eg: 1
+     */
+    //% weight=90
+    //% blockId=sampleBackward block="backward %steps"
+    //% shim=turtle::backwardAsync promise
+    function backward(steps: number): void;
+
+    //% blockId=sampleGetX block="get turtle x"
+    //% shim=turtle::getX
+    function getX(): number;
+
+    /**
      * Moves the sprite forward
      * @param direction the direction to turn, eg: Direction.Left
      * @param angle degrees to turn, eg:90
      */
     //% weight=85
     //% blockId=sampleTurn block="turn %direction|by %angle degrees"
+    //% angle.min=-180 angle.max=180
     //% shim=turtle::turnAsync promise
     function turn(direction: Direction, angle: number): void;
 
