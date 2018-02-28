@@ -123,12 +123,12 @@ namespace pxsim {
         constructor() {
         }
         
-        private foobar() {}
+        public foobar() {}
 
         /**
          * Move the thing forward
          */
-        //%
+        //% blockId="spriteForward" block="forward %this |steps %steps"
         public forwardAsync(steps: number) {
             let deg = this.angle / 180 * Math.PI;
             this.x += Math.cos(deg) * steps * 10;
@@ -146,8 +146,7 @@ namespace pxsim {
 namespace pxsim.sprites {
     /**
      * Creates a new sprite
-     */
-    //% blockId="sampleCreate" block="createSprite"
+     //% blockId="sampleCreate" block="createSprite" */
     export function createSprite(): Sprite {
         return new Sprite();
     }

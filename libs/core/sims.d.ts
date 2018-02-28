@@ -101,7 +101,7 @@ declare namespace console {
         /**
          * Move the thing forward
          */
-        //%
+        //% blockId="spriteForward" block="forward %this |steps %steps"
         //% shim=.forwardAsync promise
         public forward(steps: number): void;
 
@@ -109,8 +109,7 @@ declare namespace console {
 declare namespace sprites {
     /**
      * Creates a new sprite
-     */
-    //% blockId="sampleCreate" block="createSprite"
+    //% blockId="sampleCreate" block="createSprite" */
     //% shim=sprites::createSprite
     function createSprite(): Sprite;
 
