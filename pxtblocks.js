@@ -175,13 +175,13 @@ var pxt;
             else if (check === "T") {
                 var func_1 = e.stdCallTable[b.type];
                 var isArrayGet = b.type === "lists_index_get";
-                if (isArrayGet || func_1 && func_1.args.length) {
+                if (isArrayGet || func_1 && func_1.comp.thisParameter) {
                     var parentInput = void 0;
                     if (isArrayGet) {
                         parentInput = b.inputList.filter(function (i) { return i.name === "LIST"; })[0];
                     }
                     else {
-                        parentInput = b.inputList.filter(function (i) { return i.name === func_1.args[0].field; })[0];
+                        parentInput = b.inputList.filter(function (i) { return i.name === func_1.comp.thisParameter.definitionName; })[0];
                     }
                     if (parentInput.connection && parentInput.connection.targetBlock()) {
                         var parentType = returnType(e, parentInput.connection.targetBlock());
@@ -250,12 +250,12 @@ var pxt;
         }
         // Unify the *return* type of the parameter [n] of block [b] with point [p].
         function unionParam(e, b, n, p) {
+            attachPlaceholderIf(e, b, n);
             try {
-                attachPlaceholderIf(e, b, n);
                 union(returnType(e, getInputTargetBlock(b, n)), p);
             }
             catch (e) {
-                throwBlockError("The parameter " + n + " of this block is of the wrong type. More precisely: " + e, b);
+                // TypeScript should catch this error and bubble it up
             }
         }
         function infer(e, w) {
@@ -300,11 +300,8 @@ var pxt;
                                             union(p1_1, p2);
                                         }
                                         catch (e) {
-                                            throwBlockError("Comparing objects of different types", b);
+                                            // TypeScript should catch this error and bubble it up
                                         }
-                                        var t = find(p1_1).type;
-                                        if (t != pString.type && t != pBoolean.type && t != pNumber.type && t != null)
-                                            throwBlockError("I can only compare strings, booleans and numbers", b);
                                         break;
                                 }
                                 break;
@@ -340,7 +337,7 @@ var pxt;
                                         union(p1, tr);
                                     }
                                     catch (e) {
-                                        throwBlockError("Assigning a value of the wrong type to variable " + x, b);
+                                        // TypeScript should catch this error and bubble it up
                                     }
                                 }
                                 break;
@@ -369,13 +366,13 @@ var pxt;
                             default:
                                 if (b.type in e.stdCallTable) {
                                     var call_1 = e.stdCallTable[b.type];
-                                    call_1.args.forEach(function (p, i) {
+                                    visibleParams(call_1, countOptionals(b)).forEach(function (p, i) {
                                         var isInstance = call_1.isExtensionMethod && i === 0;
-                                        if (p.field && !b.getFieldValue(p.field)) {
-                                            var i_1 = b.inputList.filter(function (i) { return i.name == p.field; })[0];
+                                        if (p.definitionName && !b.getFieldValue(p.definitionName)) {
+                                            var i_1 = b.inputList.filter(function (i) { return i.name == p.definitionName; })[0];
                                             if (i_1.connection && i_1.connection.check_) {
                                                 if (isInstance && connectionCheck(i_1) === "Array") {
-                                                    var gen = handleGenericType(b, p.field);
+                                                    var gen = handleGenericType(b, p.definitionName);
                                                     if (gen) {
                                                         return;
                                                     }
@@ -385,7 +382,7 @@ var pxt;
                                                 for (var j = 0; j < i_1.connection.check_.length; j++) {
                                                     try {
                                                         var t = i_1.connection.check_[j];
-                                                        unionParam(e, b, p.field, ground(t));
+                                                        unionParam(e, b, p.definitionName, ground(t));
                                                         break;
                                                     }
                                                     catch (e) {
@@ -481,7 +478,7 @@ var pxt;
             return parsed;
         }
         function checkNumber(n, b) {
-            if (n === Infinity || isNaN(n)) {
+            if (!isFinite(n) || isNaN(n)) {
                 throwBlockError(lf("Number entered is either too large or too small"), b);
             }
         }
@@ -607,6 +604,14 @@ var pxt;
             var res = blocks.mkGroup([listExpr, blocks.mkText("["), index, blocks.mkText("] = "), value]);
             return listBlock.type === "lists_create_with" ? prefixWithSemicolon(res) : res;
         }
+        function compileMathJsOp(e, b, comments) {
+            var op = b.getFieldValue("OP");
+            var args = [compileExpression(e, getInputTargetBlock(b, "ARG0"), comments)];
+            if (b.getInput("ARG1")) {
+                args.push(compileExpression(e, getInputTargetBlock(b, "ARG1"), comments));
+            }
+            return blocks.H.mathCall(op, args);
+        }
         function compileProcedure(e, b, comments) {
             var name = escapeVarName(b.getFieldValue("NAME"), e, true);
             var stmts = getInputTargetBlock(b, "STACK");
@@ -713,6 +718,9 @@ var pxt;
                     case "lists_index_set":
                         expr = compileListSet(e, b, comments);
                         break;
+                    case "math_js_op":
+                        expr = compileMathJsOp(e, b, comments);
+                        break;
                     case pxtc.TS_OUTPUT_TYPE:
                         expr = extractTsExpression(e, b, comments);
                         break;
@@ -720,12 +728,12 @@ var pxt;
                         var call = e.stdCallTable[b.type];
                         if (call) {
                             if (call.imageLiteral)
-                                expr = compileImage(e, b, call.imageLiteral, call.namespace, call.f, call.args.map(function (ar) { return compileArgument(e, b, ar, comments); }));
+                                expr = compileImage(e, b, call.imageLiteral, call.namespace, call.f, visibleParams(call, countOptionals(b)).map(function (ar) { return compileArgument(e, b, ar, comments); }));
                             else
                                 expr = compileStdCall(e, b, call, comments);
                         }
                         else {
-                            pxt.reportError("blocks", "unabled compile expression", { "details": b.type });
+                            pxt.reportError("blocks", "unable to compile expression", { "details": b.type });
                             expr = defaultValueForType(returnType(e, b));
                         }
                         break;
@@ -941,33 +949,30 @@ var pxt;
             var ref = blocks.mkText(bVar);
             return blocks.mkStmt(blocks.mkInfix(ref, "+=", expr));
         }
-        function eventArgs(call) {
-            return call.args.map(function (ar) { return ar.field; }).filter(function (ar) { return !!ar; });
+        function eventArgs(call, b) {
+            return visibleParams(call, countOptionals(b)).map(function (ar) { return ar.definitionName; }).filter(function (ar) { return !!ar; });
         }
         function compileCall(e, b, comments) {
             var call = e.stdCallTable[b.type];
             if (call.imageLiteral)
-                return blocks.mkStmt(compileImage(e, b, call.imageLiteral, call.namespace, call.f, call.args.map(function (ar) { return compileArgument(e, b, ar, comments); })));
+                return blocks.mkStmt(compileImage(e, b, call.imageLiteral, call.namespace, call.f, visibleParams(call, countOptionals(b)).map(function (ar) { return compileArgument(e, b, ar, comments); })));
             else if (call.hasHandler)
-                return compileEvent(e, b, call, eventArgs(call), call.namespace, comments);
+                return compileEvent(e, b, call, eventArgs(call, b), call.namespace, comments);
             else
                 return blocks.mkStmt(compileStdCall(e, b, call, comments));
         }
         function compileArgument(e, b, p, comments, beginningOfStatement) {
             if (beginningOfStatement === void 0) { beginningOfStatement = false; }
-            var lit = p.literal;
-            if (lit)
-                return lit instanceof String ? blocks.H.mkStringLiteral(lit) : blocks.H.mkNumberLiteral(lit);
-            var f = b.getFieldValue(p.field);
+            var f = b.getFieldValue(p.definitionName);
             if (f != null) {
-                if (b.getField(p.field) instanceof pxtblockly.FieldTextInput) {
+                if (b.getField(p.definitionName) instanceof pxtblockly.FieldTextInput) {
                     return blocks.H.mkStringLiteral(f);
                 }
                 return blocks.mkText(f);
             }
             else {
-                attachPlaceholderIf(e, b, p.field);
-                var target = getInputTargetBlock(b, p.field);
+                attachPlaceholderIf(e, b, p.definitionName);
+                var target = getInputTargetBlock(b, p.definitionName);
                 if (beginningOfStatement && target.type === "lists_create_with") {
                     // We have to be careful of array literals at the beginning of a statement
                     // because they can cause errors (i.e. they get parsed as an index). Add a
@@ -984,7 +989,7 @@ var pxt;
                 args = b.mutation.compileMutation(e, comments).children;
             }
             else {
-                args = func.args.map(function (p, i) { return compileArgument(e, b, p, comments, func.isExtensionMethod && i === 0 && !func.isExpression); });
+                args = visibleParams(func, countOptionals(b)).map(function (p, i) { return compileArgument(e, b, p, comments, func.isExtensionMethod && i === 0 && !func.isExpression); });
             }
             var externalInputs = !b.getInputsInline();
             if (func.isIdentity)
@@ -1062,10 +1067,10 @@ var pxt;
             if (isMutatingBlock(b) && b.mutation.getMutationType() === blocks.MutatorTypes.ObjectDestructuringMutator) {
                 argumentDeclaration = b.mutation.compileMutation(e, comments);
             }
-            else if (stdfun.handlerArgs.length) {
+            else if (stdfun.comp.handlerArgs.length) {
                 var handlerArgs = []; // = stdfun.handlerArgs.map(arg => escapeVarName(b.getFieldValue("HANDLER_" + arg.name), e));
-                for (var i = 0; i < stdfun.handlerArgs.length; i++) {
-                    var arg = stdfun.handlerArgs[i];
+                for (var i = 0; i < stdfun.comp.handlerArgs.length; i++) {
+                    var arg = stdfun.comp.handlerArgs[i];
                     var varName = b.getFieldValue("HANDLER_" + arg.name);
                     if (varName !== null) {
                         handlerArgs.push(escapeVarName(varName, e));
@@ -1250,29 +1255,17 @@ var pxt;
                         return;
                     }
                     e.renames.takenNames[fn.namespace] = true;
-                    var _a = pxt.blocks.parameterNames(fn), attrNames = _a.attrNames, handlerArgs = _a.handlerArgs;
-                    var instance = fn.kind == pxtc.SymbolKind.Method || fn.kind == pxtc.SymbolKind.Property;
-                    var args = (fn.parameters || []).map(function (p) {
-                        if (attrNames[p.name] && attrNames[p.name].name)
-                            return { field: attrNames[p.name].name };
-                        else
-                            return null;
-                    }).filter(function (a) { return !!a; });
-                    if (instance && !fn.attributes.defaultInstance) {
-                        args.unshift({
-                            field: attrNames["this"].name
-                        });
-                    }
+                    var comp = pxt.blocks.compileInfo(fn);
+                    var instance = !!comp.thisParameter;
                     e.stdCallTable[fn.attributes.blockId] = {
                         namespace: fn.namespace,
                         f: fn.name,
-                        args: args,
+                        comp: comp,
                         attrs: fn.attributes,
-                        handlerArgs: handlerArgs,
                         isExtensionMethod: instance,
                         isExpression: fn.retType && fn.retType !== "void",
                         imageLiteral: fn.attributes.imageLiteral,
-                        hasHandler: !!handlerArgs.length || fn.parameters && fn.parameters.some(function (p) { return (p.type == "() => void" || !!p.properties); }),
+                        hasHandler: !!comp.handlerArgs.length || fn.parameters && fn.parameters.some(function (p) { return (p.type == "() => void" || !!p.properties); }),
                         property: !fn.parameters,
                         isIdentity: fn.attributes.shim == "TD_ID"
                     };
@@ -1289,9 +1282,9 @@ var pxt;
                 else if (isMutatingBlock(b) && b.mutation.isDeclaredByMutation(name))
                     return true;
                 var stdFunc = e.stdCallTable[b.type];
-                if (stdFunc && stdFunc.handlerArgs.length) {
+                if (stdFunc && stdFunc.comp.handlerArgs.length) {
                     var foundIt_1 = false;
-                    stdFunc.handlerArgs.forEach(function (arg) {
+                    stdFunc.comp.handlerArgs.forEach(function (arg) {
                         if (foundIt_1)
                             return;
                         var varName = b.getFieldValue("HANDLER_" + arg.name);
@@ -1337,8 +1330,8 @@ var pxt;
                         }
                     }
                     var stdFunc = e.stdCallTable[b.type];
-                    if (stdFunc && stdFunc.handlerArgs.length) {
-                        stdFunc.handlerArgs.forEach(function (arg) {
+                    if (stdFunc && stdFunc.comp.handlerArgs.length) {
+                        stdFunc.comp.handlerArgs.forEach(function (arg) {
                             var varName = b.getFieldValue("HANDLER_" + arg.name);
                             if (varName != null) {
                                 trackLocalDeclaration(escapeVarName(varName, e), arg.type);
@@ -1454,7 +1447,7 @@ var pxt;
             var call = e.stdCallTable[b.type];
             if (call) {
                 // detect if same event is registered already
-                var compiledArgs = eventArgs(call).map(function (arg) { return compileArg(e, b, arg, []); });
+                var compiledArgs = eventArgs(call, b).map(function (arg) { return compileArg(e, b, arg, []); });
                 var key = JSON.stringify({ name: call.f, ns: call.namespace, compiledArgs: compiledArgs })
                     .replace(/"id"\s*:\s*"[^"]+"/g, ''); // remove blockly ids
                 return key;
@@ -1595,6 +1588,33 @@ var pxt;
                 return false;
             }
             return text.substr(text.length - suffix.length) === suffix;
+        }
+        function countOptionals(b) {
+            if (b.mutationToDom) {
+                var el = b.mutationToDom();
+                if (el.hasAttribute("_expanded")) {
+                    var val = parseInt(el.getAttribute("_expanded"));
+                    return isNaN(val) ? 0 : Math.max(val, 0);
+                }
+            }
+            return 0;
+        }
+        function visibleParams(_a, optionalCount) {
+            var comp = _a.comp;
+            var res = [];
+            if (comp.thisParameter) {
+                res.push(comp.thisParameter);
+            }
+            comp.parameters.forEach(function (p) {
+                if (p.isOptional && optionalCount > 0) {
+                    res.push(p);
+                    --optionalCount;
+                }
+                else if (!p.isOptional) {
+                    res.push(p);
+                }
+            });
+            return res;
         }
     })(blocks = pxt.blocks || (pxt.blocks = {}));
 })(pxt || (pxt = {}));
@@ -1818,11 +1838,11 @@ var pxt;
             var symbol = blocks_1.blockSymbol(type);
             if (!symbol || !b)
                 return;
-            var params = blocks_1.parameterNames(symbol).attrNames;
+            var comp = blocks_1.compileInfo(symbol);
             symbol.parameters.forEach(function (p, i) {
                 var ptype = info.apis.byQName[p.type];
                 if (ptype && ptype.kind == pxtc.SymbolKind.Enum) {
-                    var field = getFirstChildWithAttr(block, "field", "name", params[p.name].name);
+                    var field = getFirstChildWithAttr(block, "field", "name", comp.actualNameToParam[p.name].definitionName);
                     if (field) {
                         var en = enums[ptype.name + '.' + field.textContent];
                         if (en)
@@ -2152,8 +2172,15 @@ var pxt;
         blocks_6.advancedTitle = advancedTitle;
         function addPackageTitle() { return pxt.Util.lf("{id:category}Extensions"); }
         blocks_6.addPackageTitle = addPackageTitle;
+        // Add numbers before input names to prevent clashes with the ones added by BlocklyLoader
+        blocks_6.optionalDummyInputPrefix = "0_optional_dummy";
+        blocks_6.optionalInputWithFieldPrefix = "0_optional_field";
         // Matches arrays and tuple types
         var arrayTypeRegex = /^(?:Array<.+>)|(?:.+\[\])|(?:\[.+\])$/;
+        function isArrayType(type) {
+            return arrayTypeRegex.test(type);
+        }
+        blocks_6.isArrayType = isArrayType;
         var usedBlocks = {};
         var updateUsedBlocks = false;
         // list of built-in blocks, should be touched.
@@ -2176,28 +2203,34 @@ var pxt;
             return b ? b.fn : undefined;
         }
         blocks_6.blockSymbol = blockSymbol;
-        function createShadowValue(name, type, v, shadowType) {
-            if (v && v.slice(0, 1) == "\"")
-                v = JSON.parse(v);
-            if (type == "number" && shadowType == "value") {
+        function createShadowValue(p, shadowId, defaultV) {
+            defaultV = defaultV || p.defaultValue;
+            shadowId = shadowId || p.shadowBlockId;
+            var defaultValue;
+            if (defaultV && defaultV.slice(0, 1) == "\"")
+                defaultValue = JSON.parse(defaultV);
+            else {
+                defaultValue = defaultV;
+            }
+            if (p.type == "number" && shadowId == "value") {
                 var field = document.createElement("field");
-                field.setAttribute("name", name);
+                field.setAttribute("name", p.definitionName);
                 field.appendChild(document.createTextNode("0"));
                 return field;
             }
-            var isVariable = shadowType == "variables_get";
+            var isVariable = shadowId == "variables_get";
             var value = document.createElement("value");
-            value.setAttribute("name", name);
+            value.setAttribute("name", p.definitionName);
             var shadow = document.createElement(isVariable ? "block" : "shadow");
             value.appendChild(shadow);
-            var typeInfo = typeDefaults[type];
-            shadow.setAttribute("type", shadowType || typeInfo && typeInfo.block || type);
+            var typeInfo = typeDefaults[p.type];
+            shadow.setAttribute("type", shadowId || typeInfo && typeInfo.block || p.type);
             shadow.setAttribute("colour", Blockly.Colours.textField);
             if (typeInfo) {
                 var field = document.createElement("field");
                 shadow.appendChild(field);
                 var fieldName = void 0;
-                switch (shadowType) {
+                switch (shadowId) {
                     case "variables_get":
                         fieldName = "VAR";
                         break;
@@ -2210,73 +2243,68 @@ var pxt;
                 }
                 field.setAttribute("name", fieldName);
                 var value_1;
-                if (type == "boolean") {
-                    value_1 = document.createTextNode((v || typeInfo.defaultValue).toUpperCase());
+                if (p.type == "boolean") {
+                    value_1 = document.createTextNode((defaultValue || typeInfo.defaultValue).toUpperCase());
                 }
                 else {
-                    value_1 = document.createTextNode(v || typeInfo.defaultValue);
+                    value_1 = document.createTextNode(defaultValue || typeInfo.defaultValue);
                 }
                 field.appendChild(value_1);
             }
-            else if (isVariable && v) {
+            else if (isVariable && defaultValue) {
                 var field = document.createElement("field");
                 shadow.appendChild(field);
                 field.setAttribute("name", "VAR");
-                field.textContent = v;
+                field.textContent = defaultValue;
             }
             return value;
         }
-        function createToolboxBlock(info, fn, params) {
+        function createToolboxBlock(info, fn, comp) {
             //
             // toolbox update
             //
-            var attrNames = params.attrNames, handlerArgs = params.handlerArgs;
             var block = document.createElement("block");
             block.setAttribute("type", fn.attributes.blockId);
             if (fn.attributes.blockGap)
                 block.setAttribute("gap", fn.attributes.blockGap);
             else if (pxt.appTarget.appTheme && pxt.appTarget.appTheme.defaultBlockGap)
                 block.setAttribute("gap", pxt.appTarget.appTheme.defaultBlockGap.toString());
-            if ((fn.kind == pxtc.SymbolKind.Method || fn.kind == pxtc.SymbolKind.Property)
-                && attrNames["this"]) {
-                var attr = attrNames["this"];
-                block.appendChild(createShadowValue(attr.name, attr.type, attr.shadowValue || attr.name, attr.shadowType || "variables_get"));
+            if (comp.thisParameter) {
+                var t = comp.thisParameter;
+                block.appendChild(createShadowValue(t, t.shadowBlockId || "variables_get", t.defaultValue || t.definitionName));
             }
             if (fn.parameters) {
-                fn.parameters.filter(function (pr) { return !!attrNames[pr.name].name &&
-                    (/^(string|number|boolean)$/.test(attrNames[pr.name].type)
-                        || !!attrNames[pr.name].shadowType
-                        || !!attrNames[pr.name].shadowValue); })
+                comp.parameters.filter(function (pr) { return !pr.isOptional &&
+                    (/^(string|number|boolean)$/.test(pr.type) || pr.shadowBlockId || pr.defaultValue); })
                     .forEach(function (pr) {
-                    var attr = attrNames[pr.name];
                     var shadowValue;
                     var container;
-                    if (pr.options && pr.options['min'] && pr.options['max']) {
-                        shadowValue = createShadowValue(attr.name, attr.type, attr.shadowValue, 'math_number_minmax');
+                    if (pr.range) {
+                        shadowValue = createShadowValue(pr, "math_number_minmax");
                         container = document.createElement('mutation');
-                        container.setAttribute('min', pr.options['min'].value);
-                        container.setAttribute('max', pr.options['max'].value);
-                        container.setAttribute('label', pr.name.charAt(0).toUpperCase() + pr.name.slice(1));
-                        if (pr.options['fieldEditorOptions']) {
-                            if (pr.options['fieldEditorOptions'].value['step'])
-                                container.setAttribute('step', pr.options['fieldEditorOptions'].value['step']);
-                            if (pr.options['fieldEditorOptions'].value['color'])
-                                container.setAttribute('color', pr.options['fieldEditorOptions'].value['color']);
+                        container.setAttribute('min', pr.range.min.toString());
+                        container.setAttribute('max', pr.range.max.toString());
+                        container.setAttribute('label', pr.actualName.charAt(0).toUpperCase() + pr.actualName.slice(1));
+                        if (pr.fieldOptions) {
+                            if (pr.fieldOptions['step'])
+                                container.setAttribute('step', pr.fieldOptions['step']);
+                            if (pr.fieldOptions['color'])
+                                container.setAttribute('color', pr.fieldOptions['color']);
                         }
                     }
                     else {
-                        shadowValue = createShadowValue(attr.name, attr.type, attr.shadowValue, attr.shadowType);
+                        shadowValue = createShadowValue(pr);
                     }
-                    if (pr.options && pr.options['fieldEditorOptions']) {
+                    if (pr.fieldOptions) {
                         if (!container)
                             container = document.createElement('mutation');
-                        container.setAttribute("customfield", JSON.stringify(pr.options['fieldEditorOptions'].value));
+                        container.setAttribute("customfield", JSON.stringify(pr.fieldOptions));
                     }
                     if (shadowValue && container)
                         shadowValue.firstChild.appendChild(container);
                     block.appendChild(shadowValue);
                 });
-                handlerArgs.forEach(function (arg) {
+                comp.handlerArgs.forEach(function (arg) {
                     var field = document.createElement("field");
                     field.setAttribute("name", "HANDLER_" + arg.name);
                     field.textContent = arg.name;
@@ -2300,7 +2328,7 @@ var pxt;
             }
             return result;
         }
-        function injectToolbox(tb, info, fn, block, showCategories, pnames) {
+        function injectToolbox(tb, info, fn, block, showCategories, comp) {
             if (showCategories === void 0) { showCategories = CategoryMode.Basic; }
             // identity function are just a trick to get an enum drop down in the block
             // while allowing the parameter to be a number
@@ -2381,7 +2409,7 @@ var pxt;
                     usedBlocks[type] = true;
                 }
                 if (fn.attributes.optionalVariableArgs && fn.attributes.toolboxVariableArgs) {
-                    var handlerArgs_1 = pnames.handlerArgs;
+                    var handlerArgs_1 = comp.handlerArgs;
                     var mutationValues = fn.attributes.toolboxVariableArgs.split(";")
                         .map(function (v) { return parseInt(v); })
                         .filter(function (v) { return v <= handlerArgs_1.length && v >= 0; });
@@ -2589,7 +2617,7 @@ var pxt;
             });
             return newCategory;
         }
-        function injectBlockDefinition(info, fn, params, blockXml) {
+        function injectBlockDefinition(info, fn, comp, blockXml) {
             var id = fn.attributes.blockId;
             if (builtinBlocks[id]) {
                 pxt.reportError("blocks", 'trying to override builtin block', { "details": id });
@@ -2608,48 +2636,29 @@ var pxt;
                 fn: fn,
                 block: {
                     codeCard: mkCard(fn, blockXml),
-                    init: function () { initBlock(this, info, fn, params); }
+                    init: function () { initBlock(this, info, fn, comp); }
                 }
             };
             cachedBlocks[id] = cachedBlock;
             Blockly.Blocks[id] = cachedBlock.block;
             return true;
         }
-        function initField(i, ni, fn, ns, pre, right, type, nsinfo) {
-            if (pre && (pre.indexOf('`') > -1 || pre.indexOf('*') > -1)) {
-                // parse and create icon or bold fields for every inline icon / bold text
-                var regex = /([^`\*]+|(`([^`]+)`)|(\*([^\*]+)\*))/gi; // `icon` indicates icon, *test* indicates bold text
-                var match = void 0;
-                while (match = regex.exec(pre)) {
-                    var img = void 0;
-                    if (match[5] && match[4][0] === '*') {
-                        // Bold text, eg: *test*
-                        i.appendField(new pxtblockly.FieldBoldLabel(match[5]));
-                    }
-                    else if (match[3] && match[2][0] === '`' && (img = iconToFieldImage(match[3]))) {
-                        // Icon field, eg: `test`
-                        i.appendField(img);
-                    }
-                    else {
-                        i.appendField(match[1]);
-                    }
-                }
+        function newLabel(part) {
+            if (part.kind === "image") {
+                return iconToFieldImage(part.uri);
             }
-            else if (pre)
-                i.appendField(pre);
-            if (right)
-                i.setAlign(Blockly.ALIGN_LEFT);
-            // Ignore generic types
-            if (type && type != "T") {
-                if (arrayTypeRegex.test(type)) {
-                    // All array types get the same check regardless of their subtype
-                    i.setCheck("Array");
-                }
-                else {
-                    i.setCheck(type);
-                }
+            else if (part.cssClass) {
+                return new Blockly.FieldLabel(part.text, part.cssClass);
             }
-            return i;
+            else if (part.style.length) {
+                return new pxtblockly.FieldStyledLabel(part.text, {
+                    bold: part.style.indexOf("bold") !== -1,
+                    italics: part.style.indexOf("italics") !== -1
+                });
+            }
+            else {
+                return new Blockly.FieldLabel(part.text, undefined);
+            }
         }
         function cleanOuterHTML(el) {
             // remove IE11 junk
@@ -2672,9 +2681,7 @@ var pxt;
                 return inf.extendsTypes.indexOf(general) >= 0;
             return false;
         }
-        function initBlock(block, info, fn, params) {
-            var _this = this;
-            var attrNames = params.attrNames, handlerArgs = params.handlerArgs;
+        function initBlock(block, info, fn, comp) {
             var ns = (fn.attributes.blockNamespace || fn.namespace).split('.')[0];
             var instance = fn.kind == pxtc.SymbolKind.Method || fn.kind == pxtc.SymbolKind.Property;
             var nsinfo = info.apis.byQName[ns];
@@ -2698,163 +2705,54 @@ var pxt;
             block.setOutputShape(blockShape);
             if (fn.attributes.undeletable)
                 block.setDeletable(false);
-            blocks_6.parseFields(fn.attributes.block).map(function (field) {
-                var i;
-                if (!field.p) {
-                    i = initField(block.appendDummyInput(), field.ni, fn, nsinfo, field.n);
-                }
-                else {
-                    // find argument
-                    var pre = field.pre;
-                    var p_1 = field.p;
-                    var n = Object.keys(attrNames).filter(function (k) { return attrNames[k].name == p_1; })[0];
-                    if (!n) {
-                        console.error("block " + fn.attributes.blockId + ": unkown parameter " + p_1);
-                        return;
-                    }
-                    var pr_1 = attrNames[n];
-                    var typeInfo_1 = pxt.U.lookup(info.apis.byQName, pr_1.type);
-                    var isEnum_1 = typeInfo_1 && typeInfo_1.kind == pxtc.SymbolKind.Enum;
-                    var isFixed = typeInfo_1 && !!typeInfo_1.attributes.fixedInstances && !pr_1.shadowType;
-                    var customField = (fn.attributes.paramFieldEditor && fn.attributes.paramFieldEditor[p_1]);
-                    var fieldLabel = pr_1.name.charAt(0).toUpperCase() + pr_1.name.slice(1);
-                    var fieldType = pr_1.type;
-                    if (isEnum_1 || isFixed) {
-                        var syms = pxt.Util.values(info.apis.byQName)
-                            .filter(function (e) {
-                            return isEnum_1 ? e.namespace == pr_1.type
-                                : (e.kind == pxtc.SymbolKind.Variable
-                                    && e.attributes.fixedInstance
-                                    && isSubtype(info.apis, e.retType, typeInfo_1.qName));
-                        });
-                        if (syms.length == 0) {
-                            console.error("no instances of " + typeInfo_1.qName + " found");
-                        }
-                        var dd = syms.map(function (v) {
-                            var k = v.attributes.block || v.attributes.blockId || v.name;
-                            return [
-                                v.attributes.iconURL || v.attributes.blockImage ? {
-                                    src: v.attributes.iconURL || pxt.Util.pathJoin(pxt.webConfig.commitCdnUrl, "blocks/" + v.namespace.toLowerCase() + "/" + v.name.toLowerCase() + ".png"),
-                                    alt: k,
-                                    width: 36,
-                                    height: 36,
-                                    value: v.name
-                                } : k,
-                                v.namespace + "." + v.name
-                            ];
-                        });
-                        i = initField(block.appendDummyInput(), field.ni, fn, nsinfo, pre, true);
-                        // if a value is provided, move it first
-                        if (pr_1.shadowValue) {
-                            var shadowValueIndex_1 = -1;
-                            dd.some(function (v, i) {
-                                if (v[1] === pr_1.shadowValue) {
-                                    shadowValueIndex_1 = i;
-                                    return true;
-                                }
-                                return false;
-                            });
-                            if (shadowValueIndex_1 > -1) {
-                                var shadowValue = dd.splice(shadowValueIndex_1, 1)[0];
-                                dd.unshift(shadowValue);
-                            }
-                        }
-                        if (customField) {
-                            var defl = fn.attributes.paramDefl[pr_1.name] || "";
-                            var options_1 = {
-                                data: dd,
-                                colour: color,
-                                label: fieldLabel,
-                                type: fieldType
-                            };
-                            pxt.Util.jsonMergeFrom(options_1, fn.attributes.paramFieldEditorOptions && fn.attributes.paramFieldEditorOptions[pr_1.name] || {});
-                            i.appendField(blocks_6.createFieldEditor(customField, defl, options_1), attrNames[n].name);
-                        }
-                        else
-                            i.appendField(new Blockly.FieldDropdown(dd), attrNames[n].name);
-                    }
-                    else if (customField) {
-                        i = initField(block.appendDummyInput(), field.ni, fn, nsinfo, pre, true);
-                        var defl = fn.attributes.paramDefl[pr_1.name] || "";
-                        var options_2 = {
-                            colour: color,
-                            label: fieldLabel,
-                            type: fieldType
-                        };
-                        pxt.Util.jsonMergeFrom(options_2, fn.attributes.paramFieldEditorOptions && fn.attributes.paramFieldEditorOptions[pr_1.name] || {});
-                        i.appendField(blocks_6.createFieldEditor(customField, defl, options_2), attrNames[n].name);
-                    }
-                    else if (instance && n == "this") {
-                        if (!fn.attributes.defaultInstance) {
-                            i = initField(block.appendValueInput(p_1), field.ni, fn, nsinfo, pre, true, pr_1.type);
-                        }
-                    }
-                    else if (pr_1.type == "number") {
-                        if (pr_1.shadowType && pr_1.shadowType == "value") {
-                            i = block.appendDummyInput();
-                            if (pre)
-                                i.appendField(pre);
-                            i.appendField(new Blockly.FieldTextInput("0", Blockly.FieldTextInput.numberValidator), p_1);
-                        }
-                        else
-                            i = initField(block.appendValueInput(p_1), field.ni, fn, nsinfo, pre, true, "Number");
-                    }
-                    else if (pr_1.type == "boolean") {
-                        i = initField(block.appendValueInput(p_1), field.ni, fn, nsinfo, pre, true, "Boolean");
-                    }
-                    else if (pr_1.type == "string") {
-                        i = initField(block.appendValueInput(p_1), field.ni, fn, nsinfo, pre, true, "String");
-                    }
-                    else {
-                        i = initField(block.appendValueInput(p_1), field.ni, fn, nsinfo, pre, true, pr_1.type);
-                    }
-                }
-            });
+            buildBlockFromDef(fn.attributes._def);
             var hasHandler = false;
-            if (handlerArgs.length) {
-                hasHandler = true;
-                if (fn.attributes.optionalVariableArgs) {
-                    initVariableArgsBlock(block, handlerArgs);
-                }
-                else {
-                    var i_2 = block.appendDummyInput();
-                    handlerArgs.forEach(function (arg) {
-                        i_2.appendField(new Blockly.FieldVariable(arg.name), "HANDLER_" + arg.name);
-                    });
-                }
-            }
             if (fn.attributes.mutate) {
                 blocks_6.addMutation(block, fn, fn.attributes.mutate);
             }
             else if (fn.attributes.defaultInstance) {
                 blocks_6.addMutation(block, fn, blocks_6.MutatorTypes.DefaultInstanceMutator);
             }
-            var oldMutationToDom = block.mutationToDom;
-            var oldDomToMutation = block.domToMutation;
-            block.mutationToDom = function () {
-                var retVal = oldMutationToDom ? oldMutationToDom.call(_this) : document.createElement('mutation');
-                block.inputList.forEach(function (input) {
-                    input.fieldRow.forEach(function (fieldRow) {
-                        if (fieldRow.isFieldCustom_ && fieldRow.saveOptions) {
-                            var getOptions = fieldRow.saveOptions();
-                            retVal.setAttribute("customfield", JSON.stringify(getOptions));
-                        }
+            else if (fn.attributes._expandedDef && fn.attributes.expandableArgumentMode !== "disabled") {
+                var shouldToggle = fn.attributes.expandableArgumentMode === "toggle";
+                blocks_6.initExpandableBlock(block, fn.attributes._expandedDef, comp, shouldToggle, function () { return buildBlockFromDef(fn.attributes._expandedDef, true); });
+            }
+            else if (comp.handlerArgs.length) {
+                hasHandler = true;
+                if (fn.attributes.optionalVariableArgs) {
+                    blocks_6.initVariableArgsBlock(block, comp.handlerArgs);
+                }
+                else {
+                    var i_2 = block.appendDummyInput();
+                    comp.handlerArgs.forEach(function (arg) {
+                        i_2.appendField(new Blockly.FieldVariable(arg.name), "HANDLER_" + arg.name);
                     });
-                });
-                return retVal;
-            };
-            block.domToMutation = function (mutation) {
-                if (oldDomToMutation)
-                    oldDomToMutation.call(_this, mutation);
-                block.inputList.forEach(function (input) {
-                    input.fieldRow.forEach(function (fieldRow) {
-                        if (fieldRow.isFieldCustom_ && fieldRow.restoreOptions) {
-                            var options_3 = JSON.parse(mutation.getAttribute("customfield"));
-                            fieldRow.restoreOptions(options_3);
-                        }
+                }
+            }
+            // Add mutation to save and restore custom field settings
+            blocks_6.appendMutation(block, {
+                mutationToDom: function (el) {
+                    block.inputList.forEach(function (input) {
+                        input.fieldRow.forEach(function (fieldRow) {
+                            if (fieldRow.isFieldCustom_ && fieldRow.saveOptions) {
+                                var getOptions = fieldRow.saveOptions();
+                                el.setAttribute("customfield", JSON.stringify(getOptions));
+                            }
+                        });
                     });
-                });
-            };
+                    return el;
+                },
+                domToMutation: function (saved) {
+                    block.inputList.forEach(function (input) {
+                        input.fieldRow.forEach(function (fieldRow) {
+                            if (fieldRow.isFieldCustom_ && fieldRow.restoreOptions) {
+                                var options_1 = JSON.parse(saved.getAttribute("customfield"));
+                                fieldRow.restoreOptions(options_1);
+                            }
+                        });
+                    });
+                }
+            });
             if (fn.attributes.imageLiteral) {
                 for (var r = 0; r < 5; ++r) {
                     var ri = block.appendDummyInput();
@@ -2874,7 +2772,7 @@ var pxt;
                 block.setInputsInline(true);
             }
             else {
-                block.setInputsInline(fn.parameters.length < 4 && !fn.attributes.imageLiteral);
+                block.setInputsInline(!fn.parameters || (fn.parameters.length < 4 && !fn.attributes.imageLiteral));
             }
             var body = fn.parameters ? fn.parameters.filter(function (pr) { return pr.type == "() => void"; })[0] : undefined;
             if (body || hasHandler) {
@@ -2895,7 +2793,7 @@ var pxt;
                 case "void": break; // do nothing
                 //TODO
                 default:
-                    if (arrayTypeRegex.test(fn.retType)) {
+                    if (isArrayType(fn.retType)) {
                         block.setOutput(true, "Array");
                     }
                     else {
@@ -2907,6 +2805,148 @@ var pxt;
             block.setPreviousStatement(!(hasHandlers && !fn.attributes.handlerStatement) && fn.retType == "void");
             block.setNextStatement(!(hasHandlers && !fn.attributes.handlerStatement) && fn.retType == "void");
             block.setTooltip(fn.attributes.jsDoc);
+            function buildBlockFromDef(def, expanded) {
+                if (expanded === void 0) { expanded = false; }
+                var anonIndex = 0;
+                var firstParam = !expanded && !!comp.thisParameter;
+                var inputs = splitInputs(def);
+                inputs.forEach(function (inputParts) {
+                    var fields = [];
+                    var inputName;
+                    var inputCheck;
+                    var hasParameter = false;
+                    inputParts.forEach(function (part) {
+                        if (part.kind !== "param") {
+                            fields.push({ field: newLabel(part) });
+                        }
+                        else {
+                            // find argument
+                            var pr_1 = firstParam ? comp.thisParameter : comp.definitionNameToParam[part.name];
+                            firstParam = false;
+                            if (!pr_1) {
+                                console.error("block " + fn.attributes.blockId + ": unkown parameter " + part.name);
+                                return;
+                            }
+                            var typeInfo = pxt.U.lookup(info.apis.byQName, pr_1.type);
+                            hasParameter = true;
+                            var defName = pr_1.definitionName;
+                            var actName = pr_1.actualName;
+                            var isEnum = typeInfo && typeInfo.kind == pxtc.SymbolKind.Enum;
+                            var isFixed = typeInfo && !!typeInfo.attributes.fixedInstances && !pr_1.shadowBlockId;
+                            var isConstantShim = !!fn.attributes.constantShim;
+                            var customField = pr_1.fieldEditor;
+                            var fieldLabel = defName.charAt(0).toUpperCase() + defName.slice(1);
+                            var fieldType = pr_1.type;
+                            if (isEnum || isFixed || isConstantShim) {
+                                var syms = void 0;
+                                if (isEnum) {
+                                    syms = getEnumDropdownValues(info.apis, pr_1.type);
+                                }
+                                else if (isFixed) {
+                                    syms = getFixedInstanceDropdownValues(info.apis, typeInfo.qName);
+                                }
+                                else {
+                                    syms = getConstantDropdownValues(info.apis, fn.qName);
+                                }
+                                if (syms.length == 0) {
+                                    console.error("no instances of " + typeInfo.qName + " found");
+                                }
+                                var dd = syms.map(function (v) {
+                                    var k = v.attributes.block || v.attributes.blockId || v.name;
+                                    return [
+                                        v.attributes.iconURL || v.attributes.blockImage ? {
+                                            src: v.attributes.iconURL || pxt.Util.pathJoin(pxt.webConfig.commitCdnUrl, "blocks/" + v.namespace.toLowerCase() + "/" + v.name.toLowerCase() + ".png"),
+                                            alt: k,
+                                            width: 36,
+                                            height: 36,
+                                            value: v.name
+                                        } : k,
+                                        v.namespace + "." + v.name
+                                    ];
+                                });
+                                // if a value is provided, move it first
+                                if (pr_1.defaultValue) {
+                                    var shadowValueIndex_1 = -1;
+                                    dd.some(function (v, i) {
+                                        if (v[1] === pr_1.defaultValue) {
+                                            shadowValueIndex_1 = i;
+                                            return true;
+                                        }
+                                        return false;
+                                    });
+                                    if (shadowValueIndex_1 > -1) {
+                                        var shadowValue = dd.splice(shadowValueIndex_1, 1)[0];
+                                        dd.unshift(shadowValue);
+                                    }
+                                }
+                                if (customField) {
+                                    var defl = fn.attributes.paramDefl[actName] || "";
+                                    var options_2 = {
+                                        data: dd,
+                                        colour: color,
+                                        label: fieldLabel,
+                                        type: fieldType
+                                    };
+                                    pxt.Util.jsonMergeFrom(options_2, fn.attributes.paramFieldEditorOptions && fn.attributes.paramFieldEditorOptions[actName] || {});
+                                    fields.push(namedField(blocks_6.createFieldEditor(customField, defl, options_2), defName));
+                                }
+                                else
+                                    fields.push(namedField(new Blockly.FieldDropdown(dd), defName));
+                            }
+                            else if (customField) {
+                                var defl = fn.attributes.paramDefl[pr_1.actualName] || "";
+                                var options_3 = {
+                                    colour: color,
+                                    label: fieldLabel,
+                                    type: fieldType
+                                };
+                                pxt.Util.jsonMergeFrom(options_3, fn.attributes.paramFieldEditorOptions && fn.attributes.paramFieldEditorOptions[pr_1.actualName] || {});
+                                fields.push(namedField(blocks_6.createFieldEditor(customField, defl, options_3), pr_1.definitionName));
+                            }
+                            else {
+                                inputName = defName;
+                                if (instance && part.name === "this") {
+                                    inputCheck = pr_1.type;
+                                }
+                                else if (pr_1.type == "number") {
+                                    if (pr_1.shadowBlockId && pr_1.shadowBlockId == "value") {
+                                        inputName = undefined;
+                                        fields.push(namedField(new Blockly.FieldTextInput("0", Blockly.FieldTextInput.numberValidator), defName));
+                                    }
+                                    else {
+                                        inputCheck = "Number";
+                                    }
+                                }
+                                else if (pr_1.type == "boolean") {
+                                    inputCheck = "Boolean";
+                                }
+                                else if (pr_1.type == "string") {
+                                    inputCheck = "String";
+                                }
+                                else {
+                                    inputCheck = pr_1.type == "T" ? undefined : (isArrayType(pr_1.type) ? "Array" : pr_1.type);
+                                }
+                            }
+                        }
+                    });
+                    var input;
+                    if (inputName) {
+                        input = block.appendValueInput(inputName);
+                        input.setAlign(Blockly.ALIGN_LEFT);
+                    }
+                    else if (expanded) {
+                        var prefix = hasParameter ? blocks_6.optionalInputWithFieldPrefix : blocks_6.optionalDummyInputPrefix;
+                        input = block.appendDummyInput(prefix + (anonIndex++));
+                    }
+                    else {
+                        input = block.appendDummyInput();
+                    }
+                    if (inputCheck) {
+                        input.setCheck(inputCheck);
+                    }
+                    fields.forEach(function (f) { return input.appendField(f.field, f.name); });
+                });
+            }
         }
         function hasArrowFunction(fn) {
             var r = fn.parameters
@@ -2919,65 +2959,6 @@ var pxt;
             var e = categoryElement(tb, name);
             if (e && e.parentNode)
                 e.parentNode.removeChild(e);
-        }
-        function initVariableArgsBlock(b, handlerArgs) {
-            pxt.U.assert(!b.domToMutation);
-            pxt.U.assert(!b.mutationToDom);
-            var currentlyVisible = 0;
-            var actuallyVisible = 0;
-            var i = b.appendDummyInput();
-            var updateShape = function () {
-                if (currentlyVisible === actuallyVisible) {
-                    return;
-                }
-                if (currentlyVisible > actuallyVisible) {
-                    var diff = currentlyVisible - actuallyVisible;
-                    for (var j = 0; j < diff; j++) {
-                        var arg = handlerArgs[actuallyVisible + j];
-                        i.insertFieldAt(i.fieldRow.length - 1, new Blockly.FieldVariable(arg.name), "HANDLER_" + arg.name);
-                    }
-                }
-                else {
-                    var diff = actuallyVisible - currentlyVisible;
-                    for (var j = 0; j < diff; j++) {
-                        var arg = handlerArgs[actuallyVisible - j - 1];
-                        i.removeField("HANDLER_" + arg.name);
-                    }
-                }
-                if (currentlyVisible >= handlerArgs.length) {
-                    i.removeField("_HANDLER_ADD");
-                }
-                else if (actuallyVisible >= handlerArgs.length) {
-                    addPlusButton();
-                }
-                actuallyVisible = currentlyVisible;
-            };
-            Blockly.Extensions.apply('inline-svgs', b, false);
-            addPlusButton();
-            b.domToMutation = function (element) {
-                var numArgs = parseInt(element.getAttribute("numargs"));
-                currentlyVisible = Math.min(isNaN(numArgs) ? 0 : numArgs, handlerArgs.length);
-                updateShape();
-                for (var j = 0; j < currentlyVisible; j++) {
-                    var varName = element.getAttribute("arg" + j);
-                    b.setFieldValue(varName, "HANDLER_" + handlerArgs[j].name);
-                }
-            };
-            b.mutationToDom = function () {
-                var mut = document.createElement("mutation");
-                mut.setAttribute("numArgs", currentlyVisible.toString());
-                for (var j = 0; j < currentlyVisible; j++) {
-                    var varName = b.getFieldValue("HANDLER_" + handlerArgs[j].name);
-                    mut.setAttribute("arg" + j, varName);
-                }
-                return mut;
-            };
-            function addPlusButton() {
-                i.appendField(new Blockly.FieldImage(b.ADD_IMAGE_DATAURI, 24, 24, false, lf("Add argument"), function () {
-                    currentlyVisible = Math.min(currentlyVisible + 1, handlerArgs.length);
-                    updateShape();
-                }), "_HANDLER_ADD");
-            }
         }
         var FilterState;
         (function (FilterState) {
@@ -3020,11 +3001,11 @@ var pxt;
                     builtinBlocks[fn.attributes.blockId].symbol = fn;
                 }
                 else {
-                    var pnames = blocks_6.parameterNames(fn);
-                    var block = createToolboxBlock(blockInfo, fn, pnames);
-                    if (injectBlockDefinition(blockInfo, fn, pnames, block)) {
+                    var comp = blocks_6.compileInfo(fn);
+                    var block = createToolboxBlock(blockInfo, fn, comp);
+                    if (injectBlockDefinition(blockInfo, fn, comp, block)) {
                         if (tb && (!fn.attributes.debug || dbg))
-                            injectToolbox(tb, blockInfo, fn, block, showCategories, pnames);
+                            injectToolbox(tb, blockInfo, fn, block, showCategories, comp);
                         currentBlocks[fn.attributes.blockId] = 1;
                         if (!showAdvanced && !fn.attributes.blockHidden && !fn.attributes.deprecated) {
                             var ns = (fn.attributes.blockNamespace || fn.namespace).split('.')[0];
@@ -3741,6 +3722,7 @@ var pxt;
                 setHelpResources(this, id, name, tooltip, url, colour, colourSecondary, colourTertiary);
             };
         }
+        blocks_6.installHelpResources = installHelpResources;
         function initLists() {
             var msg = Blockly.Msg;
             // lists_create_with
@@ -4456,6 +4438,7 @@ var pxt;
             var mathModuloDef = pxt.blocks.getBlockDefinition(mathModuloId);
             msg.MATH_MODULO_TITLE = mathModuloDef.block["MATH_MODULO_TITLE"];
             installBuiltinHelpInfo(mathModuloId);
+            blocks_6.initMathOpBlock();
         }
         function getNamespaceColor(ns) {
             if (pxt.appTarget.appTheme.blockColors && pxt.appTarget.appTheme.blockColors[ns])
@@ -5102,6 +5085,47 @@ var pxt;
                 if (jresObject && jresObject.icon)
                     jresIconCache[jresId] = jresObject.icon;
             });
+        }
+        function splitInputs(def) {
+            var res = [];
+            var current = [];
+            def.parts.forEach(function (part) {
+                switch (part.kind) {
+                    case "break":
+                        newInput();
+                        break;
+                    case "param":
+                        current.push(part);
+                        newInput();
+                        break;
+                    case "image":
+                    case "label":
+                        current.push(part);
+                        break;
+                }
+            });
+            newInput();
+            return res;
+            function newInput() {
+                if (current.length) {
+                    res.push(current);
+                    current = [];
+                }
+            }
+        }
+        function namedField(field, name) {
+            return { field: field, name: name };
+        }
+        function getEnumDropdownValues(apis, enumName) {
+            return pxt.Util.values(apis.byQName).filter(function (sym) { return sym.namespace === enumName; });
+        }
+        function getFixedInstanceDropdownValues(apis, qName) {
+            return pxt.Util.values(apis.byQName).filter(function (sym) { return sym.kind === pxtc.SymbolKind.Variable
+                && sym.attributes.fixedInstance
+                && isSubtype(apis, sym.retType, qName); });
+        }
+        function getConstantDropdownValues(apis, qName) {
+            return pxt.Util.values(apis.byQName).filter(function (sym) { return sym.attributes.blockIdentity === qName; });
         }
     })(blocks = pxt.blocks || (pxt.blocks = {}));
 })(pxt || (pxt = {}));
@@ -5797,20 +5821,24 @@ var pxt;
                     img.appendChild(pre);
                 }
                 if (card.imageUrl) {
-                    var imageWrapper = document.createElement("div");
-                    imageWrapper.className = "ui imagewrapper";
+                    var imageWrapper_1 = document.createElement("div");
+                    imageWrapper_1.className = "ui imagewrapper";
                     var image = document.createElement("img");
                     image.className = "ui cardimage";
                     image.src = card.imageUrl;
                     image.alt = name;
+                    image.onerror = function () {
+                        // failed to load, remove
+                        imageWrapper_1.remove();
+                    };
                     image.setAttribute("role", "presentation");
-                    imageWrapper.appendChild(image);
-                    img.appendChild(imageWrapper);
+                    imageWrapper_1.appendChild(image);
+                    img.appendChild(imageWrapper_1);
                 }
                 if (card.youTubeId) {
                     var screenshot = document.createElement("img");
                     screenshot.className = "ui image";
-                    screenshot.src = "https://img.youtube.com/vi/" + card.youTubeId + "/maxresdefault.jpg";
+                    screenshot.src = "https://img.youtube.com/vi/" + card.youTubeId + "/0.jpg";
                     img.appendChild(screenshot);
                 }
                 if (card.cardType == "file") {
@@ -5848,20 +5876,312 @@ var pxt;
         })(codeCard = docs.codeCard || (docs.codeCard = {}));
     })(docs = pxt.docs || (pxt.docs = {}));
 })(pxt || (pxt = {}));
-/// <reference path="../../localtypings/pxtblockly.d.ts" />
-var pxtblockly;
-(function (pxtblockly) {
-    var FieldBoldLabel = /** @class */ (function (_super) {
-        __extends(FieldBoldLabel, _super);
-        function FieldBoldLabel(value, options, opt_validator) {
-            var _this = _super.call(this, value, 'blocklyBoldText') || this;
-            _this.isFieldCustom_ = true;
-            return _this;
+var pxt;
+(function (pxt) {
+    var blocks;
+    (function (blocks) {
+        function appendMutation(block, mutation) {
+            var b = block;
+            var oldMTD = b.mutationToDom;
+            var oldDTM = b.domToMutation;
+            b.mutationToDom = function () {
+                var el = oldMTD ? oldMTD() : document.createElement("mutation");
+                return mutation.mutationToDom(el);
+            };
+            b.domToMutation = function (saved) {
+                if (oldDTM) {
+                    oldDTM(saved);
+                }
+                mutation.domToMutation(saved);
+            };
         }
-        return FieldBoldLabel;
-    }(Blockly.FieldLabel));
-    pxtblockly.FieldBoldLabel = FieldBoldLabel;
-})(pxtblockly || (pxtblockly = {}));
+        blocks.appendMutation = appendMutation;
+        function initVariableArgsBlock(b, handlerArgs) {
+            var currentlyVisible = 0;
+            var actuallyVisible = 0;
+            var i = b.appendDummyInput();
+            var updateShape = function () {
+                if (currentlyVisible === actuallyVisible) {
+                    return;
+                }
+                if (currentlyVisible > actuallyVisible) {
+                    var diff = currentlyVisible - actuallyVisible;
+                    for (var j = 0; j < diff; j++) {
+                        var arg = handlerArgs[actuallyVisible + j];
+                        i.insertFieldAt(i.fieldRow.length - 1, new Blockly.FieldVariable(arg.name), "HANDLER_" + arg.name);
+                    }
+                }
+                else {
+                    var diff = actuallyVisible - currentlyVisible;
+                    for (var j = 0; j < diff; j++) {
+                        var arg = handlerArgs[actuallyVisible - j - 1];
+                        i.removeField("HANDLER_" + arg.name);
+                    }
+                }
+                if (currentlyVisible >= handlerArgs.length) {
+                    i.removeField("_HANDLER_ADD");
+                }
+                else if (actuallyVisible >= handlerArgs.length) {
+                    addPlusButton();
+                }
+                actuallyVisible = currentlyVisible;
+            };
+            Blockly.Extensions.apply('inline-svgs', b, false);
+            addPlusButton();
+            appendMutation(b, {
+                mutationToDom: function (el) {
+                    el.setAttribute("numArgs", currentlyVisible.toString());
+                    for (var j = 0; j < currentlyVisible; j++) {
+                        var varName = b.getFieldValue("HANDLER_" + handlerArgs[j].name);
+                        el.setAttribute("arg" + j, varName);
+                    }
+                    return el;
+                },
+                domToMutation: function (saved) {
+                    var numArgs = parseInt(saved.getAttribute("numargs"));
+                    currentlyVisible = Math.min(isNaN(numArgs) ? 0 : numArgs, handlerArgs.length);
+                    updateShape();
+                    for (var j = 0; j < currentlyVisible; j++) {
+                        var varName = saved.getAttribute("arg" + j);
+                        b.setFieldValue(varName, "HANDLER_" + handlerArgs[j].name);
+                    }
+                }
+            });
+            function addPlusButton() {
+                i.appendField(new Blockly.FieldImage(b.ADD_IMAGE_DATAURI, 24, 24, false, lf("Add argument"), function () {
+                    currentlyVisible = Math.min(currentlyVisible + 1, handlerArgs.length);
+                    updateShape();
+                }), "_HANDLER_ADD");
+            }
+        }
+        blocks.initVariableArgsBlock = initVariableArgsBlock;
+        function initExpandableBlock(b, def, comp, toggle, addInputs) {
+            // Add numbers before input names to prevent clashes with the ones added
+            // by BlocklyLoader. The number makes it an invalid JS identifier
+            var buttonAddName = "0_add_button";
+            var buttonRemName = "0_rem_button";
+            var attributeName = "_expanded";
+            var inputsAttributeName = "_input_init";
+            var optionNames = def.parameters.map(function (p) { return p.name; });
+            var totalOptions = def.parameters.length;
+            var buttonDelta = toggle ? totalOptions : 1;
+            // These two variables are the "state" of the mutation
+            var visibleOptions = 0;
+            var inputsInitialized = false;
+            Blockly.Extensions.apply('inline-svgs', b, false);
+            addPlusButton();
+            var onFirstRender = function () {
+                if (b.rendered) {
+                    updateShape(0, undefined, true);
+                    // We don't need anything once the dom is initialized, so clean up
+                    b.workspace.removeChangeListener(onFirstRender);
+                }
+            };
+            // Blockly only lets you hide an input once it is rendered, so we can't
+            // hide the inputs in init() or domToMutation(). This will get called
+            // whenever a change is made to the workspace (including after the first
+            // block render) and then remove itself
+            b.setOnChange(onFirstRender);
+            appendMutation(b, {
+                mutationToDom: function (el) {
+                    // The reason we store the inputsInitialized variable separately from visibleOptions
+                    // is because it's possible for the block to get into a state where all inputs are
+                    // initialized but they aren't visible (i.e. the user hit the - button). Blockly
+                    // gets upset if a block has a different number of inputs when it is saved and restored.
+                    el.setAttribute(attributeName, visibleOptions.toString());
+                    el.setAttribute(inputsAttributeName, inputsInitialized.toString());
+                    return el;
+                },
+                domToMutation: function (saved) {
+                    if (saved.hasAttribute(inputsAttributeName) && saved.getAttribute(inputsAttributeName) == "true" && !inputsInitialized) {
+                        initOptionalInputs();
+                    }
+                    if (saved.hasAttribute(attributeName)) {
+                        var val = parseInt(saved.getAttribute(attributeName));
+                        if (!isNaN(val)) {
+                            if (inputsInitialized) {
+                                visibleOptions = addDelta(val);
+                            }
+                            else {
+                                updateShape(val, true);
+                            }
+                            return;
+                        }
+                    }
+                }
+            });
+            // Set skipRender to true if the block is still initializing. Otherwise
+            // the inputs will render before their shadow blocks are created and
+            // leave behind annoying artifacts
+            function updateShape(delta, skipRender, force) {
+                if (skipRender === void 0) { skipRender = false; }
+                if (force === void 0) { force = false; }
+                var newValue = addDelta(delta);
+                if (!force && !skipRender && newValue === visibleOptions)
+                    return;
+                visibleOptions = newValue;
+                if (!inputsInitialized && visibleOptions > 0) {
+                    initOptionalInputs();
+                    if (!b.rendered) {
+                        return;
+                    }
+                }
+                var optIndex = 0;
+                for (var i = 0; i < b.inputList.length; i++) {
+                    var input = b.inputList[i];
+                    if (pxt.Util.startsWith(input.name, blocks.optionalDummyInputPrefix)) {
+                        setInputVisible(input, optIndex < visibleOptions);
+                    }
+                    else if (pxt.Util.startsWith(input.name, blocks.optionalInputWithFieldPrefix) || optionNames.indexOf(input.name) !== -1) {
+                        var visible = optIndex < visibleOptions;
+                        setInputVisible(input, visible);
+                        if (visible && input.connection && !input.connection.isConnected() && !b.isInsertionMarker()) {
+                            // FIXME: Could probably be smarter here, right now this does not respect
+                            // any options passed to the child block. Need to factor that out of BlocklyLoader
+                            var param = comp.definitionNameToParam[def.parameters[optIndex].name];
+                            var shadowId = param.shadowBlockId || shadowBlockForType(param.type);
+                            if (shadowId) {
+                                var nb = b.workspace.newBlock(shadowId);
+                                nb.setShadow(true);
+                                // Because this function is sometimes called before the block is
+                                // rendered, we need to guard these calls to initSvg and render
+                                if (nb.initSvg)
+                                    nb.initSvg();
+                                input.connection.connect(nb.outputConnection);
+                                if (nb.render)
+                                    nb.render();
+                            }
+                        }
+                        ++optIndex;
+                    }
+                }
+                setButton(buttonAddName, visibleOptions !== totalOptions);
+                setButton(buttonRemName, visibleOptions !== 0);
+                if (!skipRender)
+                    b.render();
+            }
+            function addButton(name, uri, alt, delta) {
+                b.appendDummyInput(name)
+                    .appendField(new Blockly.FieldImage(uri, 24, 24, false, alt, function () { return updateShape(delta); }));
+            }
+            function addPlusButton() {
+                addButton(buttonAddName, b.ADD_IMAGE_DATAURI, lf("Reveal optional arguments"), buttonDelta);
+            }
+            function addMinusButton() {
+                addButton(buttonRemName, b.REMOVE_IMAGE_DATAURI, lf("Hide optional arguments"), -1 * buttonDelta);
+            }
+            function initOptionalInputs() {
+                inputsInitialized = true;
+                addInputs();
+                b.removeInput(buttonAddName);
+                addMinusButton();
+                addPlusButton();
+            }
+            function addDelta(delta) {
+                return Math.min(Math.max(visibleOptions + delta, 0), totalOptions);
+            }
+            function setButton(name, visible) {
+                b.inputList.forEach(function (i) {
+                    if (i.name === name)
+                        setInputVisible(i, visible);
+                });
+            }
+            function setInputVisible(input, visible) {
+                // If the block isn't rendered, Blockly will crash
+                if (b.rendered) {
+                    input.setVisible(visible);
+                }
+            }
+        }
+        blocks.initExpandableBlock = initExpandableBlock;
+        function shadowBlockForType(type) {
+            switch (type) {
+                case "number": return "math_number";
+                case "boolean": return "logic_boolean";
+                case "string": return "text";
+            }
+            if (blocks.isArrayType(type)) {
+                return "lists_create_with";
+            }
+            return undefined;
+        }
+    })(blocks = pxt.blocks || (pxt.blocks = {}));
+})(pxt || (pxt = {}));
+var pxt;
+(function (pxt) {
+    var blocks;
+    (function (blocks) {
+        var allOperations = pxt.blocks.MATH_FUNCTIONS.unary.concat(pxt.blocks.MATH_FUNCTIONS.binary);
+        function initMathOpBlock() {
+            var mathOpId = "math_js_op";
+            var mathOpDef = pxt.blocks.getBlockDefinition(mathOpId);
+            Blockly.Blocks[mathOpId] = {
+                init: function () {
+                    var b = this;
+                    b.setPreviousStatement(false);
+                    b.setNextStatement(false);
+                    b.setOutput(true, "Number");
+                    b.setOutputShape(Blockly.OUTPUT_SHAPE_ROUND);
+                    b.setInputsInline(true);
+                    var ddi = b.appendDummyInput("op_dropdown");
+                    ddi.appendField(new Blockly.FieldDropdown(allOperations.map(function (op) { return [mathOpDef.block[op], op]; }), function (op) { return onOperatorSelect(b, op); }), "OP");
+                    addArgInput(b, false);
+                    // Because the number of inputs changes, we need a mutation. Technically the op tells us
+                    // how many inputs we should have but we can't read its value at init time
+                    blocks.appendMutation(b, {
+                        mutationToDom: function (mutation) {
+                            mutation.setAttribute("op-type", (b.getInput("ARG1", true) ? "binary" : "unary").toString());
+                            return mutation;
+                        },
+                        domToMutation: function (saved) {
+                            if (saved.hasAttribute("op-type")) {
+                                if (saved.getAttribute("op-type") == "binary") {
+                                    addArgInput(b, true);
+                                }
+                            }
+                        }
+                    });
+                }
+            };
+            blocks.installHelpResources(mathOpId, mathOpDef.name, function (block) {
+                return mathOpDef.tooltip[block.getFieldValue("OP")];
+            }, mathOpDef.url, blocks.getNamespaceColor(mathOpDef.category));
+            function onOperatorSelect(b, op) {
+                if (isUnaryOp(op)) {
+                    b.removeInput("ARG1", true);
+                }
+                else if (!(b.getInput("ARG1"))) {
+                    addArgInput(b, true);
+                }
+            }
+            function addArgInput(b, second) {
+                var i = b.appendValueInput("ARG" + (second ? 1 : 0));
+                i.setCheck("Number");
+                if (second) {
+                    i.connection.setShadowDom(numberShadowDom());
+                    i.connection.respawnShadow_();
+                }
+            }
+        }
+        blocks.initMathOpBlock = initMathOpBlock;
+        function isUnaryOp(op) {
+            return pxt.blocks.MATH_FUNCTIONS.unary.indexOf(op) !== -1;
+        }
+        var cachedDom;
+        function numberShadowDom() {
+            // <shadow type="math_number"><field name="NUM">0</field></shadow>
+            if (!cachedDom) {
+                cachedDom = document.createElement("shadow");
+                cachedDom.setAttribute("type", "math_number");
+                var field = document.createElement("field");
+                field.setAttribute("name", "NUM");
+                field.textContent = "0";
+                cachedDom.appendChild(field);
+            }
+            return cachedDom;
+        }
+    })(blocks = pxt.blocks || (pxt.blocks = {}));
+})(pxt || (pxt = {}));
 /// <reference path="../../localtypings/blockly.d.ts" />
 var pxtblockly;
 (function (pxtblockly) {
@@ -6173,6 +6493,46 @@ var pxtblockly;
                 this.close();
             }
         };
+        /**
+         * Set the language-neutral value for this dropdown menu.
+         * We have to override this from field.js because the grid picker needs to redraw the selected item's image.
+         * @param {string} newValue New value to set.
+         */
+        FieldGridPicker.prototype.setValue = function (newValue) {
+            if (newValue === null || newValue === this.value_) {
+                return; // No change if null.
+            }
+            if (this.sourceBlock_ && Blockly.Events.isEnabled()) {
+                Blockly.Events.fire(new Blockly.Events.BlockChange(this.sourceBlock_, 'field', this.name, this.value_, newValue));
+            }
+            // Clear menu item for old value.
+            if (this.selectedItem) {
+                this.selectedItem.setChecked(false);
+                this.selectedItem = null;
+            }
+            this.value_ = newValue;
+            // Look up and display the human-readable text.
+            var options = this.getOptions();
+            for (var i = 0; i < options.length; i++) {
+                // Options are tuples of human-readable text and language-neutral values.
+                if (options[i][1] == newValue) {
+                    var content = options[i][0];
+                    if (typeof content == 'object') {
+                        this.imageJson_ = content;
+                        this.setText(content.alt); // Use setText() because it handles displaying image selection
+                    }
+                    else {
+                        this.imageJson_ = null;
+                        this.setText(content); // Use setText() because it handles displaying image selection
+                    }
+                    return;
+                }
+            }
+            // Value not found.  Add it, maybe it will become valid once set
+            // (like variable names).
+            this.setText(newValue); // Use setText() because it handles displaying image selection
+        };
+        ;
         /**
          * Closes the gridpicker.
          */
@@ -7639,6 +7999,34 @@ var pxtblockly;
         return FieldProcedure;
     }(Blockly.FieldDropdown));
     pxtblockly.FieldProcedure = FieldProcedure;
+})(pxtblockly || (pxtblockly = {}));
+/// <reference path="../../localtypings/pxtblockly.d.ts" />
+var pxtblockly;
+(function (pxtblockly) {
+    var FieldStyledLabel = /** @class */ (function (_super) {
+        __extends(FieldStyledLabel, _super);
+        function FieldStyledLabel(value, options, opt_validator) {
+            var _this = _super.call(this, value, getClass(options)) || this;
+            _this.isFieldCustom_ = true;
+            return _this;
+        }
+        return FieldStyledLabel;
+    }(Blockly.FieldLabel));
+    pxtblockly.FieldStyledLabel = FieldStyledLabel;
+    function getClass(options) {
+        if (options) {
+            if (options.bold && options.italics) {
+                return 'blocklyBoldItalicizedText';
+            }
+            else if (options.bold) {
+                return 'blocklyBoldText';
+            }
+            else if (options.italics) {
+                return 'blocklyItalicizedText';
+            }
+        }
+        return undefined;
+    }
 })(pxtblockly || (pxtblockly = {}));
 /// <reference path="../../localtypings/pxtblockly.d.ts" />
 var pxtblockly;

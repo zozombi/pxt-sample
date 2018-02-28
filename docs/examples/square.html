@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>MakeCode Editor Sample - sample</title>
+    <title>MakeCode for Phaser CE - Phaser CE</title>
     <meta name="Description" content="A simple example" />
 
     
@@ -18,11 +18,11 @@
 
 <meta name="twitter:card" content="summary" />
 <meta name="twitter:site" content="@msmakecode" />
-<meta name="twitter:title" content="MakeCode Editor Sample - sample" />
+<meta name="twitter:title" content="MakeCode for Phaser CE - Phaser CE" />
 <meta name="twitter:description" content="A simple example" />
 <meta name="twitter:image" content="" />
 
-<meta property="og:title" content="MakeCode Editor Sample - sample" />
+<meta property="og:title" content="MakeCode for Phaser CE - Phaser CE" />
 <meta property="og:site_name" content="Microsoft MakeCode" />
 <meta property="og:type" content="website" />
 <meta property="og:description" content="A simple example" />
@@ -85,7 +85,7 @@
     <div class="item">
         <form id="tocsearch1" role="form" method="get" action="https://www.bing.com/search">
             <div class="ui fluid icon input">
-                <input type="hidden" name="q1" value="site:http://microsoft.github.io/pxt-sample/" />
+                <input type="hidden" name="q1" value="site:http://microsoft.github.io/pxt-phaser-ce/" />
                 
                 <input type="search" name="q" placeholder="Search..." aria-label="Search Documentation">
                 <i onclick="document.getElementById('tocsearch1').submit();" tabindex="0" class="search link icon" aria-label="Search" role="button"></i>
@@ -278,7 +278,7 @@
         <div class="item">
             <form id="tocsearch2" role="form" method="get" target="_blank" action="https://www.bing.com/search">
                 <div class="ui fluid icon input">
-                    <input type="hidden" name="q1" value="site:http://microsoft.github.io/pxt-sample/" />
+                    <input type="hidden" name="q1" value="site:http://microsoft.github.io/pxt-phaser-ce/" />
                     
                 <input type="search" name="q" placeholder="Search..." aria-label="Search Documentation">
                 <i onclick="document.getElementById('tocsearch2').submit();" tabindex="0" class="search link icon" aria-label="Search" role="button"></i>
@@ -578,7 +578,7 @@
             overridePageViewDuration: false,
             disableExceptionTracking: true,
             isCookieUseDisabled: !includeCookie,
-            isStorageUseDisabled: true
+            isStorageUseDisabled: !includeCookie
         });
         window.appInsights=appInsights;
         appInsights.queue.push(function () {
@@ -589,8 +589,6 @@
                 telemetryItem.properties["target"] = pxtConfig.targetId;
                 telemetryItem.properties["version"] = pxtConfig.targetVersion;
                 telemetryItem.properties["stage"] = (pxtConfig.relprefix || "/--").replace(/[^a-z]/ig, '')
-                if (typeof window !== "undefined" && window.location && /[?&]electron=1/i.test(window.location.href))
-                    telemetryItem.properties["electron"] = 1;
                 if (typeof Windows !== "undefined")
                     telemetryItem.properties["WindowsApp"] = 1;
             });

@@ -1905,6 +1905,7 @@ var pxsim;
         function start() {
             window.addEventListener("message", receiveMessage, false);
             var frameid = window.location.hash.slice(1);
+            initAppcache();
             pxsim.Runtime.postMessage({ type: 'ready', frameid: frameid });
         }
         Embed.start = start;
@@ -1936,7 +1937,7 @@ var pxsim;
                         pxsim.handleCustomMessage(data);
                     break;
                 case 'pxteditor':
-                    break; //handled elsewhere                
+                    break; //handled elsewhere
                 case 'debugger':
                     if (runtime) {
                         runtime.handleDebuggerMsg(data);
@@ -2020,6 +2021,18 @@ var pxsim;
             window.parent.postMessage(message, "*");
         }
     }
+    function initAppcache() {
+        if (typeof window !== 'undefined') {
+            if (window.applicationCache.status === window.applicationCache.UPDATEREADY) {
+                reload();
+            }
+            window.applicationCache.addEventListener("updateready", function () { return reload(); });
+        }
+    }
+    function reload() {
+        pxsim.Runtime.postMessage({ type: "simulator", command: "reload" });
+    }
+    pxsim.reload = reload;
 })(pxsim || (pxsim = {}));
 pxsim.util.injectPolyphils();
 if (typeof window !== 'undefined') {
@@ -2394,12 +2407,13 @@ var pxsim;
             // wires
             props.allWireColors.forEach(function (clr) {
                 var quant = props.colorToWires[clr].length;
+                var style = props.boardDef.pinStyles[clr] || "female";
                 var cmp = mkCmpDiv("wire", {
                     left: QUANT_LBL(quant),
                     leftSize: WIRE_QUANT_LBL_SIZE,
                     wireClr: clr,
                     cmpScale: PARTS_WIRE_SCALE,
-                    crocClips: props.boardDef.useCrocClips
+                    crocClips: style == "croc"
                 });
                 addClass(cmp, "partslist-wire");
                 panel.appendChild(cmp);
@@ -2435,6 +2449,10 @@ var pxsim;
                     return loc.pin;
             };
             wires.forEach(function (w) {
+                var croc = false;
+                if (w.end.type == "dalboard") {
+                    croc = props.boardDef.pinStyles[w.end.pin] == "croc";
+                }
                 var cmp = mkCmpDiv("wire", {
                     top: mkLabel(w.end),
                     topSize: LOC_LBL_SIZE,
@@ -2442,7 +2460,7 @@ var pxsim;
                     botSize: LOC_LBL_SIZE,
                     wireClr: w.color,
                     cmpHeight: REQ_WIRE_HEIGHT,
-                    crocClips: props.boardDef.useCrocClips
+                    crocClips: croc
                 });
                 addClass(cmp, "cmp-div");
                 reqsDiv.appendChild(cmp);
@@ -2497,6 +2515,8 @@ var pxsim;
             return panel;
         }
         function renderParts(container, options) {
+            if (!options.boardDef.pinStyles)
+                options.boardDef.pinStyles = {};
             if (options.configData)
                 pxsim.setConfigData(options.configData.cfg, options.configData.cfgKey);
             var msg = {
@@ -4059,6 +4079,8 @@ var pxsim;
             this.running = false;
             this.startTime = 0;
             this.globals = {};
+            this.loopLock = null;
+            this.loopLockWaitList = [];
             this.refCountingDebug = false;
             this.refCounting = true;
             this.refObjId = 1;
@@ -4099,11 +4121,19 @@ var pxsim;
                     lastYield = now;
                     s.pc = pc;
                     s.r0 = r0;
+                    var lock_1 = new Object();
+                    __this.loopLock = lock_1;
                     var cont = function () {
                         if (__this.dead)
                             return;
                         U.assert(s.pc == pc);
-                        return loop(s);
+                        U.assert(__this.loopLock === lock_1);
+                        __this.loopLock = null;
+                        loop(s);
+                        while (__this.loopLockWaitList.length > 0 && !__this.loopLock) {
+                            var f = __this.loopLockWaitList.shift();
+                            f();
+                        }
                     };
                     //U.nextTick(cont)
                     setTimeout(cont, 5);
@@ -4205,6 +4235,7 @@ var pxsim;
                     console.log("Runtime terminated");
                     return;
                 }
+                U.assert(!__this.loopLock);
                 try {
                     pxsim.runtime = __this;
                     while (!!p) {
@@ -4288,9 +4319,13 @@ var pxsim;
                 if (currResume)
                     oops("already has resume");
                 s.pc = retPC;
-                return function (v) {
+                var fn = function (v) {
                     if (__this.dead)
                         return;
+                    if (__this.loopLock) {
+                        __this.loopLockWaitList.push(function () { return fn(v); });
+                        return;
+                    }
                     pxsim.runtime = __this;
                     U.assert(s.pc == retPC);
                     // TODO should loop() be called here using U.nextTick?
@@ -4312,6 +4347,7 @@ var pxsim;
                     s.retval = v;
                     return loop(s);
                 };
+                return fn;
             }
             // tslint:disable-next-line
             eval(msg.code);
@@ -5643,9 +5679,11 @@ var pxsim;
                 var _this = this;
                 this.parts = [];
                 this.boardView = view;
+                this.opts = opts;
+                if (!opts.boardDef.pinStyles)
+                    opts.boardDef.pinStyles = {};
                 this.state = opts.state;
                 var activeComponents = opts.partsList;
-                this.useCrocClips = opts.boardDef.useCrocClips;
                 var useBreadboard = 0 < activeComponents.length || opts.forceBreadboardLayout;
                 if (useBreadboard) {
                     this.breadboard = new visuals.Breadboard({
@@ -5673,7 +5711,7 @@ var pxsim;
                     this.partOverGroup = pxsim.svg.child(this.view, "g");
                     this.style = pxsim.svg.child(this.view, "style", {});
                     this.defs = pxsim.svg.child(this.view, "defs", {});
-                    this.wireFactory = new visuals.WireFactory(under, over, edges, this.style, this.getLocCoord.bind(this));
+                    this.wireFactory = new visuals.WireFactory(under, over, edges, this.style, this.getLocCoord.bind(this), this.getPinStyle.bind(this));
                     var allocRes = pxsim.allocateDefinitions({
                         boardDef: opts.boardDef,
                         partDefs: opts.partDefs,
@@ -5744,6 +5782,12 @@ var pxsim;
                 }
                 return coord;
             };
+            BoardHost.prototype.getPinStyle = function (loc) {
+                if (loc.type == "breadboard")
+                    return "female";
+                else
+                    return this.opts.boardDef.pinStyles[loc.pin] || "female";
+            };
             BoardHost.prototype.addPart = function (partInst) {
                 var _this = this;
                 var part = null;
@@ -5791,7 +5835,7 @@ var pxsim;
                 return part;
             };
             BoardHost.prototype.addWire = function (inst) {
-                return this.wireFactory.addWire(inst.start, inst.end, inst.color, this.useCrocClips);
+                return this.wireFactory.addWire(inst.start, inst.end, inst.color);
             };
             BoardHost.prototype.addAll = function (allocRes) {
                 var _this = this;
@@ -6956,7 +7000,7 @@ var pxsim;
         }
         //TODO: make this stupid class obsolete
         var WireFactory = /** @class */ (function () {
-            function WireFactory(underboard, overboard, boardEdges, styleEl, getLocCoord) {
+            function WireFactory(underboard, overboard, boardEdges, styleEl, getLocCoord, getPinStyle) {
                 this.nextWireId = 0;
                 this.styleEl = styleEl;
                 this.styleEl.textContent += visuals.WIRES_CSS;
@@ -6964,6 +7008,7 @@ var pxsim;
                 this.overboard = overboard;
                 this.boardEdges = boardEdges;
                 this.getLocCoord = getLocCoord;
+                this.getPinStyle = getPinStyle;
             }
             WireFactory.prototype.indexOfMin = function (vs) {
                 var minIdx = 0;
@@ -7129,20 +7174,14 @@ var pxsim;
                 this.styleEl.textContent += colorCSS;
                 return { endG: endG, end1: end1, end2: end2, wires: wires };
             };
-            WireFactory.prototype.addWire = function (start, end, color, withCrocs) {
-                if (withCrocs === void 0) { withCrocs = false; }
+            WireFactory.prototype.addWire = function (start, end, color) {
                 var startLoc = this.getLocCoord(start);
                 var endLoc = this.getLocCoord(end);
+                var startStyle = this.getPinStyle(start);
+                var endStyle = this.getPinStyle(end);
                 var wireEls;
-                if (withCrocs && end.type == "dalboard") {
-                    var boardPin = end.pin;
-                    if (boardPin == "P0" || boardPin == "P1" || boardPin == "P2" || boardPin == "GND" || boardPin == "+3v3") {
-                        //HACK
-                        wireEls = this.drawWireWithCrocs(startLoc, endLoc, color);
-                    }
-                    else {
-                        wireEls = this.drawWireWithCrocs(startLoc, endLoc, color, true);
-                    }
+                if (end.type == "dalboard" && endStyle == "croc") {
+                    wireEls = this.drawWireWithCrocs(startLoc, endLoc, color);
                 }
                 else {
                     wireEls = this.drawWire(startLoc, endLoc, color);

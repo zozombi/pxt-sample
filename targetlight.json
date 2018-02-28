@@ -1,7 +1,7 @@
 {
-  "id": "sample",
-  "name": "sample",
-  "title": "MakeCode Editor Sample",
+  "id": "phaserce",
+  "name": "Phaser CE",
+  "title": "MakeCode for Phaser CE",
   "corepkg": "core",
   "cloud": {
     "workspace": false,
@@ -63,7 +63,7 @@
     "floatingPoint": true
   },
   "versions": {
-    "target": "2.0.1",
-    "pxt": "3.2.4"
+    "target": "0.0.1",
+    "pxt": "3.4.12"
   }
 }

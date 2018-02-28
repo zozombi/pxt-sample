@@ -3065,11 +3065,6 @@ var ts;
              *      (?:\*?\*\/)?$                               - matches the end of the multiline comment (one or two asterisks and a slash) or the end of a line within the comment
              */
             var multiLineCommentRegex = /^\s*(?:(?:(?:\/\*\*?)|(?:\*))(?!\/))?\s*(.*?)(?:\*?\*\/)?$/;
-            var builtinBlocks = {
-                "Math.abs": { blockId: "math_op3", block: "absolute of %x" },
-                "Math.min": { blockId: "math_op2", block: "of %x|and %y" },
-                "Math.max": { blockId: "math_op2", block: "of %x|and %y" }
-            };
             var RenameMap = /** @class */ (function () {
                 function RenameMap(renames) {
                     this.renames = renames;
@@ -3607,40 +3602,39 @@ var ts;
                     }
                     return undefined;
                 }
-                function getPropertyAccessExpression(n) {
+                function getPropertyAccessExpression(n, asField, blockId) {
+                    if (asField === void 0) { asField = false; }
                     var callInfo = n.callInfo;
                     if (!callInfo) {
                         error(n);
                         return undefined;
                     }
                     if (callInfo.attrs.blockId === "lists_length" || callInfo.attrs.blockId === "text_length") {
-                        var r = mkExpr(pxtc.U.htmlEscape(callInfo.attrs.blockId));
-                        r.inputs = [getValue("VALUE", n.expression)];
-                        return r;
+                        var r_1 = mkExpr(pxtc.U.htmlEscape(callInfo.attrs.blockId));
+                        r_1.inputs = [getValue("VALUE", n.expression)];
+                        return r_1;
                     }
                     var value = pxtc.U.htmlEscape(callInfo.attrs.blockId || callInfo.qName);
                     var parent = getParent(n)[0];
                     var parentCallInfo = parent && parent.callInfo;
-                    if (callInfo.attrs.blockIdentity && !(parentCallInfo && parentCallInfo.qName === callInfo.attrs.blockIdentity)) {
-                        if (callInfo.attrs.enumval && parentCallInfo && parentCallInfo.attrs.useEnumVal) {
-                            value = callInfo.attrs.enumval;
-                        }
-                        var idfn = blocksInfo.apis.byQName[callInfo.attrs.blockIdentity];
-                        var f = /%([a-zA-Z0-9_]+)/.exec(idfn.attributes.block);
-                        var r = mkExpr(pxtc.U.htmlEscape(idfn.attributes.blockId));
-                        r.fields = [{
-                                kind: "field",
-                                name: pxtc.U.htmlEscape(f[1]),
-                                value: value
-                            }];
-                        return r;
-                    }
-                    else {
+                    if (asField || !(blockId || callInfo.attrs.blockIdentity) || parentCallInfo && parentCallInfo.qName === callInfo.attrs.blockIdentity) {
                         return {
                             kind: "text",
                             value: value
                         };
                     }
+                    if (callInfo.attrs.enumval && parentCallInfo && parentCallInfo.attrs.useEnumVal) {
+                        value = callInfo.attrs.enumval;
+                    }
+                    var idfn = blockId ? blocksInfo.blocksById[blockId] : blocksInfo.apis.byQName[callInfo.attrs.blockIdentity];
+                    var f = /%([a-zA-Z0-9_]+)/.exec(idfn.attributes.block);
+                    var r = mkExpr(pxtc.U.htmlEscape(idfn.attributes.blockId));
+                    r.fields = [{
+                            kind: "field",
+                            name: pxtc.U.htmlEscape(f[1]),
+                            value: value
+                        }];
+                    return r;
                 }
                 function getArrayLiteralExpression(n) {
                     var r = mkExpr("lists_create_with");
@@ -3942,16 +3936,26 @@ var ts;
                 function getCallStatement(node, asExpression) {
                     var info = node.callInfo;
                     if (info.qName == "Math.pow") {
-                        var r_1 = mkExpr("math_arithmetic");
-                        r_1.inputs = [
+                        var r_2 = mkExpr("math_arithmetic");
+                        r_2.inputs = [
                             mkValue("A", getOutputBlock(node.arguments[0]), numberType),
                             mkValue("B", getOutputBlock(node.arguments[1]), numberType)
                         ];
-                        r_1.fields = [getField("OP", "POWER")];
-                        return r_1;
+                        r_2.fields = [getField("OP", "POWER")];
+                        return r_2;
+                    }
+                    else if (pxt.Util.startsWith(info.qName, "Math.")) {
+                        var op = info.qName.substring(5);
+                        if (isSupportedMathFunction(op)) {
+                            var r_3 = mkExpr("math_js_op");
+                            r_3.inputs = info.args.map(function (arg, index) { return mkValue("ARG" + index, getOutputBlock(arg), "math_number"); });
+                            r_3.fields = [getField("OP", op)];
+                            r_3.mutation = { "op-type": info.args.length == 2 ? "binary" : "unary" };
+                            return r_3;
+                        }
                     }
                     if (info.attrs.blockId === pxtc.PAUSE_UNTIL_TYPE) {
-                        var r_2 = mkStmt(pxtc.PAUSE_UNTIL_TYPE);
+                        var r_4 = mkStmt(pxtc.PAUSE_UNTIL_TYPE);
                         var lambda = node.arguments[0];
                         var condition = void 0;
                         if (lambda.body.kind === SK.Block) {
@@ -3961,23 +3965,22 @@ var ts;
                         else {
                             condition = lambda.body;
                         }
-                        r_2.inputs = [mkValue("PREDICATE", getOutputBlock(condition), "logic_boolean")];
-                        return r_2;
+                        r_4.inputs = [mkValue("PREDICATE", getOutputBlock(condition), "logic_boolean")];
+                        return r_4;
                     }
                     if (!info.attrs.blockId || !info.attrs.block) {
-                        var builtin = builtinBlocks[info.qName];
+                        var builtin = pxt.blocks.builtinFunctionInfo[info.qName];
                         if (!builtin) {
                             var name_2 = getVariableName(node.expression);
                             if (env.declaredFunctions[name_2]) {
-                                var r_3 = mkStmt("procedures_callnoreturn");
-                                r_3.mutation = { "name": name_2 };
-                                return r_3;
+                                var r_5 = mkStmt("procedures_callnoreturn");
+                                r_5.mutation = { "name": name_2 };
+                                return r_5;
                             }
                             else {
                                 return getTypeScriptStatementBlock(node);
                             }
                         }
-                        info.attrs.block = builtin.block;
                         info.attrs.blockId = builtin.blockId;
                     }
                     if (info.attrs.imageLiteral) {
@@ -3990,21 +3993,28 @@ var ts;
                         //     return;
                         // }
                     }
-                    var paramInfo = getParameterInfo(info, blocksInfo);
+                    var args = paramList(info, env.blocks);
+                    var api = env.blocks.apis.byQName[info.qName];
+                    var comp = pxt.blocks.compileInfo(api);
                     countBlock();
                     var r = {
                         kind: asExpression ? "expr" : "statement",
                         type: info.attrs.blockId
                     };
+                    var addInput = function (v) { return (r.inputs || (r.inputs = [])).push(v); };
+                    var addField = function (f) { return (r.fields || (r.fields = [])).push(f); };
                     if (info.qName == "Math.max") {
-                        (r.fields || (r.fields = [])).push({
+                        addField({
                             kind: "field",
                             name: "op",
                             value: "max"
                         });
                     }
-                    info.args.forEach(function (e, i) {
-                        e = unwrapNode(e);
+                    var optionalCount = 0;
+                    args.forEach(function (arg, i) {
+                        var e = arg.value;
+                        var param = arg.param;
+                        var paramInfo = arg.info;
                         if (i === 0 && info.attrs.defaultInstance) {
                             if (e.getText() === info.attrs.defaultInstance) {
                                 return;
@@ -4016,6 +4026,23 @@ var ts;
                         if (info.attrs.mutatePropertyEnum && i === info.args.length - 2) {
                             // Implicit in the blocks
                             return;
+                        }
+                        if (param && param.isOptional) {
+                            ++optionalCount;
+                        }
+                        var shadowBlockInfo;
+                        if (param && param.shadowBlockId) {
+                            shadowBlockInfo = blocksInfo.blocksById[param.shadowBlockId];
+                        }
+                        if (e.kind === SK.CallExpression) {
+                            // Many enums have shim wrappers that need to be unwrapped if used
+                            // in a parameter that is of an enum type. By default, enum parameters
+                            // are dropdown fields (not value inputs) so we want to decompile the
+                            // inner enum value as a field and not the shim block as a value
+                            var shimCall = e.callInfo;
+                            if (shimCall && shimCall.attrs.shim === "TD_ID") {
+                                e = unwrapNode(shimCall.args[0]);
+                            }
                         }
                         switch (e.kind) {
                             case SK.FunctionExpression:
@@ -4040,7 +4067,7 @@ var ts;
                                             var paramDesc_1 = sym.parameters[i];
                                             arrow.parameters.forEach(function (parameter, i) {
                                                 var arg = paramDesc_1.handlerParameters[i];
-                                                (r.fields || (r.fields = [])).push(getField("HANDLER_" + arg.name, parameter.name.text));
+                                                addField(getField("HANDLER_" + arg.name, parameter.name.text));
                                             });
                                         }
                                     }
@@ -4049,56 +4076,70 @@ var ts;
                                 break;
                             case SK.PropertyAccessExpression:
                                 var callInfo = e.callInfo;
-                                var shadow = callInfo && !!callInfo.attrs.blockIdentity;
-                                var aName = pxtc.U.htmlEscape(paramInfo[i].name);
-                                if (shadow && callInfo.attrs.blockIdentity !== info.qName) {
-                                    (r.inputs || (r.inputs = [])).push(getValue(aName, e, paramInfo[i].type));
+                                var aName = pxtc.U.htmlEscape(param.definitionName);
+                                if (shadowBlockInfo && shadowBlockInfo.attributes.shim === "TD_ID") {
+                                    addInput(mkValue(aName, getPropertyAccessExpression(e, false, param.shadowBlockId), param.shadowBlockId));
+                                }
+                                else if (paramInfo && paramInfo.isEnum || callInfo && (callInfo.attrs.fixedInstance || callInfo.attrs.blockIdentity === info.qName)) {
+                                    addField(getField(aName, getPropertyAccessExpression(e, true).value));
                                 }
                                 else {
-                                    var expr = getOutputBlock(e);
-                                    if (expr.kind === "text") {
-                                        (r.fields || (r.fields = [])).push(getField(aName, expr.value));
-                                    }
-                                    else {
-                                        if (paramInfo[i].type && expr.type !== paramInfo[i].type) {
-                                            countBlock();
-                                        }
-                                        (r.inputs || (r.inputs = [])).push(mkValue(aName, expr, paramInfo[i].type));
-                                    }
+                                    addInput(getValue(aName, e, param.shadowBlockId));
                                 }
                                 break;
                             default:
                                 var v = void 0;
-                                var vName = pxtc.U.htmlEscape(paramInfo[i].name);
+                                var vName = pxtc.U.htmlEscape(param.definitionName);
                                 var defaultV = true;
                                 if (info.qName == "Math.random") {
                                     v = mkValue(vName, getMathRandomArgumentExpresion(e), numberType);
                                     defaultV = false;
                                 }
                                 else if (isLiteralNode(e)) {
-                                    var param = paramInfo[i];
-                                    var fieldText = param.paramFieldEditor == 'text' ? e.text : e.getText();
-                                    if (param.decompileLiterals) {
-                                        var fieldBlock = getFieldBlock(param.type, param.fieldName, fieldText, true);
-                                        if (param.paramShadowOptions) {
-                                            fieldBlock.mutation = { "customfield": pxtc.Util.htmlEscape(JSON.stringify(param.paramShadowOptions)) };
-                                        }
-                                        v = mkValue(vName, fieldBlock, param.type);
-                                        defaultV = false;
-                                    }
-                                    else if (param.paramFieldEditorOptions && param.paramFieldEditorOptions['onParentBlock']) {
-                                        (r.fields || (r.fields = [])).push(getField(vName, fieldText));
+                                    // Remove quotes on strings
+                                    var fieldText = param.fieldEditor == 'text' ? e.text : e.getText();
+                                    var isFieldBlock = param.shadowBlockId && !isLiteralBlockType(param.shadowBlockId);
+                                    if (decompileLiterals(param) && param.fieldOptions['onParentBlock']) {
+                                        addField(getField(vName, fieldText));
                                         return;
+                                    }
+                                    else if (isFieldBlock) {
+                                        var field = fieldBlockInfo(param.shadowBlockId);
+                                        if (field && decompileLiterals(field)) {
+                                            var fieldBlock = getFieldBlock(param.shadowBlockId, field.definitionName, fieldText, true);
+                                            if (param.shadowOptions) {
+                                                fieldBlock.mutation = { "customfield": pxtc.Util.htmlEscape(JSON.stringify(param.shadowOptions)) };
+                                            }
+                                            v = mkValue(vName, fieldBlock, param.shadowBlockId);
+                                            defaultV = false;
+                                        }
                                     }
                                 }
                                 if (defaultV) {
-                                    v = getValue(vName, e, paramInfo[i].type);
+                                    v = getValue(vName, e, param.shadowBlockId);
                                 }
-                                (r.inputs || (r.inputs = [])).push(v);
+                                addInput(v);
                                 break;
                         }
                     });
+                    if (optionalCount) {
+                        if (!r.mutation)
+                            r.mutation = {};
+                        r.mutation["_expanded"] = optionalCount.toString();
+                    }
                     return r;
+                }
+                function fieldBlockInfo(blockId) {
+                    if (blocksInfo.blocksById[blockId]) {
+                        var comp = pxt.blocks.compileInfo(blocksInfo.blocksById[blockId]);
+                        if (!comp.thisParameter && comp.parameters.length === 1) {
+                            return comp.parameters[0];
+                        }
+                    }
+                    return undefined;
+                }
+                function decompileLiterals(param) {
+                    return param && param.fieldOptions && param.fieldOptions["decompileLiterals"];
                 }
                 // function openCallExpressionBlockWithRestParameter(call: ts.CallExpression, info: pxtc.CallInfo) {
                 //     openBlockTag(info.attrs.blockId);
@@ -4469,6 +4510,12 @@ var ts;
                     else if (info.qName == "Math.pow") {
                         return undefined;
                     }
+                    else if (pxt.Util.startsWith(info.qName, "Math.")) {
+                        var op = info.qName.substring(5);
+                        if (isSupportedMathFunction(op)) {
+                            return undefined;
+                        }
+                    }
                     if (info.attrs.blockId === pxtc.PAUSE_UNTIL_TYPE) {
                         var predicate = n.arguments[0];
                         if (n.arguments.length === 1 && checkPredicate(predicate)) {
@@ -4481,7 +4528,7 @@ var ts;
                         return pxtc.Util.lf("Events must be top level");
                     }
                     if (!info.attrs.blockId || !info.attrs.block) {
-                        var builtin = builtinBlocks[info.qName];
+                        var builtin = pxt.blocks.builtinFunctionInfo[info.qName];
                         if (!builtin) {
                             if (n.arguments.length === 0 && n.expression.kind === SK.Identifier) {
                                 if (!env.declaredFunctions[n.expression.text]) {
@@ -4493,13 +4540,15 @@ var ts;
                             }
                             return pxtc.Util.lf("Function call not supported in the blocks");
                         }
-                        info.attrs.block = builtin.block;
                         info.attrs.blockId = builtin.blockId;
                     }
-                    var params = getParameterInfo(info, env.blocks);
-                    var argumentDifference = info.args.length - params.length;
+                    var args = paramList(info, env.blocks);
+                    var api = env.blocks.apis.byQName[info.qName];
+                    var comp = pxt.blocks.compileInfo(api);
+                    var totalDecompilableArgs = comp.parameters.length + (comp.thisParameter ? 1 : 0);
                     if (info.attrs.imageLiteral) {
-                        if (argumentDifference > 1) {
+                        // Image literals do not show up in the block string, so it won't be in comp
+                        if (info.args.length - totalDecompilableArgs > 1) {
                             return pxtc.Util.lf("Function call has more arguments than are supported by its block");
                         }
                         var arg = n.arguments[0];
@@ -4513,65 +4562,29 @@ var ts;
                         }
                         return undefined;
                     }
+                    var argumentDifference = info.args.length - totalDecompilableArgs;
                     if (argumentDifference > 0 && !checkForDestructuringMutation()) {
-                        if (argumentDifference > 1 || !hasCallback) {
+                        var diff = argumentDifference;
+                        // Callbacks and default instance parameters do not appear in the block
+                        // definition string so they won't show up in the above count
+                        if (hasCallback)
+                            --diff;
+                        if (info.attrs.defaultInstance)
+                            --diff;
+                        if (diff > 0) {
                             return pxtc.Util.lf("Function call has more arguments than are supported by its block");
                         }
                     }
-                    var api = env.blocks.apis.byQName[info.qName];
-                    if (api && api.parameters && api.parameters.length) {
+                    if (comp.parameters.length || hasCallback) {
                         var fail_1;
-                        var instance_1 = api.kind == pxtc.SymbolKind.Method || api.kind == pxtc.SymbolKind.Property;
-                        info.args.forEach(function (e, i) {
-                            e = unwrapNode(e);
-                            if (instance_1 && i === 0) {
+                        var instance_1 = info.attrs.defaultInstance || !!comp.thisParameter;
+                        args.forEach(function (arg, i) {
+                            if (fail_1 || instance_1 && i === 0) {
                                 return;
                             }
-                            var paramInfo = api.parameters[instance_1 ? i - 1 : i];
-                            if (paramInfo.isEnum) {
-                                if (e.kind === SK.PropertyAccessExpression) {
-                                    var enumName = e.expression;
-                                    if (enumName.kind === SK.Identifier && enumName.text === paramInfo.type) {
-                                        return;
-                                    }
-                                }
-                                fail_1 = pxtc.Util.lf("Enum arguments may only be literal property access expressions");
-                                return;
-                            }
-                            else if (isLiteralNode(e)) {
-                                var inf = params[i];
-                                if (inf.paramFieldEditor && (!inf.paramFieldEditorOptions || !inf.paramFieldEditorOptions["decompileLiterals"])) {
-                                    fail_1 = pxtc.Util.lf("Field editor does not support literal arguments");
-                                }
-                            }
-                            else if (e.kind === SK.ArrowFunction) {
-                                var ar = e;
-                                if (ar.parameters.length) {
-                                    if (info.attrs.mutate === "objectdestructuring") {
-                                        var param = unwrapNode(ar.parameters[0]);
-                                        if (param.kind === SK.Parameter && param.name.kind !== SK.ObjectBindingPattern) {
-                                            fail_1 = pxtc.Util.lf("Object destructuring mutation callbacks can only have destructuring patters as arguments");
-                                        }
-                                    }
-                                    else {
-                                        ar.parameters.forEach(function (param) {
-                                            if (param.name.kind !== SK.Identifier) {
-                                                fail_1 = pxtc.Util.lf("Only identifiers allowed as function arguments");
-                                            }
-                                        });
-                                    }
-                                }
-                            }
-                            else if (env.blocks.apis.byQName[paramInfo.type]) {
-                                var typeInfo = env.blocks.apis.byQName[paramInfo.type];
-                                if (typeInfo.attributes.fixedInstances) {
-                                    var callInfo = e.callInfo;
-                                    if (callInfo && callInfo.attrs.fixedInstance) {
-                                        return undefined;
-                                    }
-                                    fail_1 = pxtc.Util.lf("Arguments of a fixed instance type must be a reference to a fixed instance declaration");
-                                }
-                            }
+                            if (instance_1)
+                                --i;
+                            fail_1 = checkArgument(arg);
                         });
                         if (fail_1) {
                             return fail_1;
@@ -4632,6 +4645,86 @@ var ts;
                         }
                         return false;
                     }
+                    function checkArgument(arg) {
+                        var e = unwrapNode(arg.value);
+                        var paramInfo = arg.info;
+                        var param = arg.param;
+                        if (paramInfo.isEnum) {
+                            if (checkEnumArgument(e)) {
+                                return undefined;
+                            }
+                            else if (e.kind === SK.CallExpression) {
+                                var callInfo = e.callInfo;
+                                if (callInfo && callInfo.attrs.shim === "TD_ID" && callInfo.args && callInfo.args.length === 1) {
+                                    var arg_1 = unwrapNode(callInfo.args[0]);
+                                    if (checkEnumArgument(arg_1)) {
+                                        return undefined;
+                                    }
+                                }
+                            }
+                            return pxtc.Util.lf("Enum arguments may only be literal property access expressions");
+                        }
+                        else if (isLiteralNode(e) && (param.fieldEditor || param.shadowBlockId)) {
+                            var dl = !!(param.fieldOptions && param.fieldOptions["decompileLiterals"]);
+                            if (!dl && param.shadowBlockId) {
+                                var shadowInfo = env.blocks.blocksById[param.shadowBlockId];
+                                if (shadowInfo && shadowInfo.parameters && shadowInfo.parameters.length) {
+                                    var name_3 = shadowInfo.parameters[0].name;
+                                    if (shadowInfo.attributes.paramFieldEditorOptions && shadowInfo.attributes.paramFieldEditorOptions[name_3]) {
+                                        dl = !!(shadowInfo.attributes.paramFieldEditorOptions[name_3]["decompileLiterals"]);
+                                    }
+                                    else {
+                                        dl = true;
+                                    }
+                                }
+                                else {
+                                    dl = true;
+                                }
+                            }
+                            if (!dl) {
+                                return pxtc.Util.lf("Field editor does not support literal arguments");
+                            }
+                        }
+                        else if (e.kind === SK.ArrowFunction) {
+                            var ar = e;
+                            if (ar.parameters.length) {
+                                if (info.attrs.mutate === "objectdestructuring") {
+                                    var param_1 = unwrapNode(ar.parameters[0]);
+                                    if (param_1.kind === SK.Parameter && param_1.name.kind !== SK.ObjectBindingPattern) {
+                                        return pxtc.Util.lf("Object destructuring mutation callbacks can only have destructuring patters as arguments");
+                                    }
+                                }
+                                else {
+                                    for (var _i = 0, _a = ar.parameters; _i < _a.length; _i++) {
+                                        var param_2 = _a[_i];
+                                        if (param_2.name.kind !== SK.Identifier) {
+                                            return pxtc.Util.lf("Only identifiers allowed as function arguments");
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        else if (env.blocks.apis.byQName[paramInfo.type]) {
+                            var typeInfo = env.blocks.apis.byQName[paramInfo.type];
+                            if (typeInfo.attributes.fixedInstances) {
+                                var callInfo = e.callInfo;
+                                if (callInfo && callInfo.attrs.fixedInstance) {
+                                    return undefined;
+                                }
+                                return pxtc.Util.lf("Arguments of a fixed instance type must be a reference to a fixed instance declaration");
+                            }
+                        }
+                        return undefined;
+                        function checkEnumArgument(enumArg) {
+                            if (enumArg.kind === SK.PropertyAccessExpression) {
+                                var enumName = enumArg.expression;
+                                if (enumName.kind === SK.Identifier && enumName.text === paramInfo.type) {
+                                    return true;
+                                }
+                            }
+                            return false;
+                        }
+                    }
                 }
                 function checkFunctionDeclaration(n, topLevel) {
                     if (!topLevel) {
@@ -4688,13 +4781,13 @@ var ts;
                     var renames_1 = {};
                     var properties = elements.map(function (e) {
                         if (checkName(e.propertyName) && checkName(e.name)) {
-                            var name_3 = e.name.text;
+                            var name_4 = e.name.text;
                             if (e.propertyName) {
                                 var propName = e.propertyName.text;
-                                renames_1[propName] = name_3;
+                                renames_1[propName] = name_4;
                                 return propName;
                             }
-                            return name_3;
+                            return name_4;
                         }
                         else {
                             return "";
@@ -4843,47 +4936,43 @@ var ts;
                         return false;
                 }
             }
-            function getParameterInfo(info, blocksInfo) {
-                var argNames = [];
-                info.attrs.block.replace(/%(\w+)(?:=(\w+))?/g, function (f, n, v) {
-                    argNames.push([n, v]);
-                    return "";
-                });
-                if (info.attrs.defaultInstance) {
-                    argNames.unshift(["__instance__", undefined]);
-                }
-                return argNames.map(function (_a) {
-                    var name = _a[0], type = _a[1];
-                    var res = { name: name, type: type };
-                    if (name && type) {
-                        var shadowBlock = blocksInfo.blocksById[type];
-                        if (shadowBlock) {
-                            var fieldName_1 = '';
-                            shadowBlock.attributes.block.replace(/%(\w+)/g, function (f, n) {
-                                fieldName_1 = n;
-                                return "";
-                            });
-                            res.fieldName = fieldName_1;
-                            var shadowA = shadowBlock.attributes;
-                            if (shadowA && shadowA.paramFieldEditor && shadowA.paramFieldEditor[fieldName_1]) {
-                                if (info.attrs.paramShadowOptions && info.attrs.paramShadowOptions[name]) {
-                                    res.paramShadowOptions = info.attrs.paramShadowOptions[name];
-                                }
-                                res.decompileLiterals = !!(shadowA.paramFieldEditorOptions && shadowA.paramFieldEditorOptions[fieldName_1] && shadowA.paramFieldEditorOptions[fieldName_1]["decompileLiterals"]);
-                            }
-                        }
-                    }
-                    if (info.attrs.paramFieldEditorOptions) {
-                        res.paramFieldEditorOptions = info.attrs.paramFieldEditorOptions[name];
-                    }
-                    if (info.attrs.paramFieldEditor) {
-                        res.paramFieldEditor = info.attrs.paramFieldEditor[name];
-                    }
-                    return res;
-                });
-            }
             function isFunctionExpression(node) {
                 return node.kind === SK.ArrowFunction || node.kind === SK.FunctionExpression;
+            }
+            function paramList(info, blocksInfo) {
+                var res = [];
+                var sym = blocksInfo.apis.byQName[info.qName];
+                if (sym) {
+                    var comp = pxt.blocks.compileInfo(sym);
+                    var builtin = pxt.blocks.builtinFunctionInfo[info.qName];
+                    var offset = info.attrs.imageLiteral ? 1 : 0;
+                    if (comp.thisParameter) {
+                        res.push({
+                            value: unwrapNode(info.args[0]),
+                            info: sym.parameters[0],
+                            param: comp.thisParameter
+                        });
+                    }
+                    else if (info.attrs.defaultInstance) {
+                        res.push({
+                            value: unwrapNode(info.args[0]),
+                            info: sym.parameters[0],
+                            param: { definitionName: "__instance__", actualName: "this" }
+                        });
+                    }
+                    var hasThisArgInSymbol = !!(comp.thisParameter || info.attrs.defaultInstance);
+                    if (hasThisArgInSymbol) {
+                        offset++;
+                    }
+                    for (var i = offset; i < info.args.length; i++) {
+                        res.push({
+                            value: unwrapNode(info.args[i]),
+                            info: sym.parameters[hasThisArgInSymbol ? i - 1 : i],
+                            param: comp.parameters[i - offset]
+                        });
+                    }
+                }
+                return res;
             }
             function isOutputExpression(expr) {
                 switch (expr.kind) {
@@ -4912,6 +5001,21 @@ var ts;
                         return true;
                     default: return false;
                 }
+            }
+            function isLiteralBlockType(type) {
+                switch (type) {
+                    case numberType:
+                    case integerNumberType:
+                    case wholeNumberType:
+                    case stringType:
+                    case booleanType:
+                        return true;
+                    default:
+                        return false;
+                }
+            }
+            function isSupportedMathFunction(op) {
+                return pxt.blocks.MATH_FUNCTIONS.unary.indexOf(op) !== -1 || pxt.blocks.MATH_FUNCTIONS.binary.indexOf(op) !== -1;
             }
         })(decompiler = pxtc.decompiler || (pxtc.decompiler = {}));
     })(pxtc = ts.pxtc || (ts.pxtc = {}));
@@ -5746,14 +5850,14 @@ var ts;
                                 return e.data + "(" + e.args.map(str).join(", ") + ")";
                             case EK.ProcCall:
                                 var procid = e.data;
-                                var name_4 = "";
+                                var name_5 = "";
                                 if (procid.ifaceIndex != null)
-                                    name_4 = "IFACE@" + procid.ifaceIndex;
+                                    name_5 = "IFACE@" + procid.ifaceIndex;
                                 else if (procid.virtualIndex != null)
-                                    name_4 = "VTABLE@" + procid.virtualIndex;
+                                    name_5 = "VTABLE@" + procid.virtualIndex;
                                 else
-                                    name_4 = pxtc.getDeclName(procid.proc.action);
-                                return name_4 + "(" + e.args.map(str).join(", ") + ")";
+                                    name_5 = pxtc.getDeclName(procid.proc.action);
+                                return name_5 + "(" + e.args.map(str).join(", ") + ")";
                             case EK.Sequence:
                                 return "(" + e.args.map(str).join("; ") + ")";
                             case EK.Store:
@@ -8453,15 +8557,15 @@ var ts;
                         return emitPlain();
                     }
                     else if (decl.kind == pxtc.SK.MethodSignature) {
-                        var name_5 = getName(decl);
-                        return mkProcCallCore(null, null, args.map(function (x) { return emitExpr(x); }), getIfaceMemberId(name_5));
+                        var name_6 = getName(decl);
+                        return mkProcCallCore(null, null, args.map(function (x) { return emitExpr(x); }), getIfaceMemberId(name_6));
                     }
                     else if (decl.kind == pxtc.SK.PropertySignature || decl.kind == pxtc.SK.PropertyAssignment) {
                         if (node == funcExpr) {
                             // in this special base case, we have property access recv.foo
                             // where recv is a map obejct
-                            var name_6 = getName(decl);
-                            var res_3 = mkProcCallCore(null, null, args.map(function (x) { return emitExpr(x); }), getIfaceMemberId(name_6));
+                            var name_7 = getName(decl);
+                            var res_3 = mkProcCallCore(null, null, args.map(function (x) { return emitExpr(x); }), getIfaceMemberId(name_7));
                             if (decl.kind == pxtc.SK.PropertySignature || decl.kind == pxtc.SK.PropertyAssignment) {
                                 var pid = res_3.data;
                                 pid.mapIdx = pid.ifaceIndex;
@@ -8469,7 +8573,7 @@ var ts;
                                 if (args.length == 2) {
                                     if (isRefCountedExpr(args[1]))
                                         refSuff = "Ref";
-                                    pid.ifaceIndex = getIfaceMemberId("set/" + name_6);
+                                    pid.ifaceIndex = getIfaceMemberId("set/" + name_7);
                                     pid.mapMethod = "pxtrt::mapSet" + refSuff;
                                 }
                                 else {
@@ -8681,7 +8785,10 @@ var ts;
                             default:
                                 var v = pxtc.U.lookup(tbl, c);
                                 if (v == null) {
-                                    throw unhandled(node, lf("invalid character in image literal: '{0}'", v), 9273);
+                                    if (attrs.groups.length == 2)
+                                        v = 1; // default anything non-zero to one
+                                    else
+                                        throw unhandled(node, lf("invalid character in image literal: '{0}'", v), 9273);
                                 }
                                 line.push(v);
                                 break;
@@ -8694,18 +8801,28 @@ var ts;
                             l.push(0);
                     }
                     var r = "";
-                    if (attrs.groups.length > 16) {
-                        r = "f5" + hex2(maxLen);
+                    if (attrs.groups.length <= 2) {
+                        r = "f1" + hex2(maxLen) + hex2(matrix.length);
                         for (var _a = 0, matrix_2 = matrix; _a < matrix_2.length; _a++) {
                             var l = matrix_2[_a];
+                            var mask = 0x80;
+                            var v = 0;
                             for (var _b = 0, l_1 = l; _b < l_1.length; _b++) {
                                 var n = l_1[_b];
-                                r += hex2(n);
+                                if (mask == 0) {
+                                    r += hex2(v);
+                                    mask = 0x80;
+                                    v = 0;
+                                }
+                                if (n)
+                                    v |= mask;
+                                mask >>= 1;
                             }
+                            r += hex2(v);
                         }
                     }
-                    else {
-                        r = "f4" + hex2(maxLen);
+                    else if (attrs.groups.length <= 16) {
+                        r = "f4" + hex2(maxLen) + hex2(matrix.length);
                         for (var _c = 0, matrix_3 = matrix; _c < matrix_3.length; _c++) {
                             var l = matrix_3[_c];
                             for (var _d = 0, l_2 = l; _d < l_2.length; _d++) {
@@ -8714,6 +8831,16 @@ var ts;
                             }
                             if (r.length & 1)
                                 r += "0";
+                        }
+                    }
+                    else {
+                        r = "f8" + hex2(maxLen) + hex2(matrix.length);
+                        for (var _e = 0, matrix_4 = matrix; _e < matrix_4.length; _e++) {
+                            var l = matrix_4[_e];
+                            for (var _f = 0, l_3 = l; _f < l_3.length; _f++) {
+                                var n = l_3[_f];
+                                r += hex2(n);
+                            }
                         }
                     }
                     return r;
@@ -10569,14 +10696,14 @@ var ts;
             if (res.diagnostics.length == 0) {
                 res.diagnostics = patchUpDiagnostics(program.getSemanticDiagnostics(), opts.ignoreFileResolutionErrors);
             }
-            var emitStart = Date.now();
+            var emitStart = pxtc.U.now();
             res.times["typescript"] = emitStart - startTime;
             if (opts.ast) {
                 res.ast = program;
             }
             if (opts.ast || opts.forceEmit || res.diagnostics.length == 0) {
                 var binOutput = pxtc.compileBinary(program, host, opts, res, entryPoint);
-                res.times["compilebinary"] = Date.now() - emitStart;
+                res.times["compilebinary"] = pxtc.U.now() - emitStart;
                 res.diagnostics = res.diagnostics.concat(patchUpDiagnostics(binOutput.diagnostics));
             }
             if (res.diagnostics.length == 0)
@@ -10586,6 +10713,8 @@ var ts;
                 if (pxtc.Util.startsWith(f, "built/"))
                     res.outfiles[f.slice(6)] = opts.fileSystem[f];
             }
+            res.times["all"] = pxtc.U.now() - startTime;
+            pxt.tickEvent("compile", res.times);
             return res;
         }
         pxtc.compile = compile;
@@ -12500,7 +12629,13 @@ var ts;
                 if (stripParams) {
                     t = t.getCallSignatures()[0].getReturnType();
                 }
-                return typechecker.typeToString(t, undefined, ts.TypeFormatFlags.UseFullyQualifiedType);
+                var readableName = typechecker.typeToString(t, undefined, ts.TypeFormatFlags.UseFullyQualifiedType);
+                // TypeScript 2.0.0+ will assign constant variables numeric literal types which breaks the
+                // type checking we do in the blocks
+                if (!isNaN(Number(readableName))) {
+                    return "number";
+                }
+                return readableName;
             }
             var kind = getSymbolKind(stmt);
             if (kind != pxtc.SymbolKind.None) {

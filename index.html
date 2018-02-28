@@ -13,16 +13,16 @@
 
 <!-- end include robotsmeta.html -->
 
-<title>MakeCode Editor Sample</title>
+<title>MakeCode for Phaser CE</title>
 <meta name="description" content="" />
 <link rel="manifest" href="/pxt-sample/sim.webmanifest">
 
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="MakeCode Editor Sample">
+<meta name="apple-mobile-web-app-title" content="MakeCode for Phaser CE">
 <meta name="apple-mobile-web-app-status-bar-style" content="translucent-black">
 <meta name="format-detection" content="telephone=no">
-<meta name="application-name" content="MakeCode Editor Sample">
+<meta name="application-name" content="MakeCode for Phaser CE">
 
 <meta name="msapplication-TileColor" content="">
 <meta name="msapplication-TileImage" content="">
@@ -31,12 +31,12 @@
 
 <meta name="twitter:card" content="summary" />
 <meta name="twitter:site" content="" />
-<meta name="twitter:title" content="MakeCode Editor Sample" />
+<meta name="twitter:title" content="MakeCode for Phaser CE" />
 <meta name="twitter:description" content="" />
 <meta name="twitter:image" content="" />
 
-<meta property="og:title" content="MakeCode Editor Sample" />
-<meta property="og:site_name" content="MakeCode Editor Sample" />
+<meta property="og:title" content="MakeCode for Phaser CE" />
+<meta property="og:site_name" content="MakeCode for Phaser CE" />
 <meta property="og:description" content="" />
 <meta property="og:image" content="" />
 
@@ -85,7 +85,7 @@
     "workerjs": "/pxt-sample/worker.js",
     "tdworkerjs": "/pxt-sample/tdworker.js",
     "monacoworkerjs": "/pxt-sample/monacoworker.js",
-    "pxtVersion": "3.2.4",
+    "pxtVersion": "3.4.12",
     "pxtRelId": "",
     "pxtCdnUrl": "/pxt-sample/",
     "commitCdnUrl": "/pxt-sample/",
@@ -94,7 +94,7 @@
     "targetVersion": "0.0.0",
     "targetRelId": "",
     "targetUrl": "",
-    "targetId": "sample",
+    "targetId": "phaserce",
     "simUrl": "/pxt-sample/simulator.html",
     "partsUrl": "/pxt-sample/siminstructions.html",
     "runUrl": "/pxt-sample/run.html",
@@ -115,7 +115,7 @@
             overridePageViewDuration: false,
             disableExceptionTracking: true,
             isCookieUseDisabled: !includeCookie,
-            isStorageUseDisabled: true
+            isStorageUseDisabled: !includeCookie
         });
         window.appInsights=appInsights;
         appInsights.queue.push(function () {
@@ -126,8 +126,6 @@
                 telemetryItem.properties["target"] = pxtConfig.targetId;
                 telemetryItem.properties["version"] = pxtConfig.targetVersion;
                 telemetryItem.properties["stage"] = (pxtConfig.relprefix || "/--").replace(/[^a-z]/ig, '')
-                if (typeof window !== "undefined" && window.location && /[?&]electron=1/i.test(window.location.href))
-                    telemetryItem.properties["electron"] = 1;
                 if (typeof Windows !== "undefined")
                     telemetryItem.properties["WindowsApp"] = 1;
             });
@@ -143,17 +141,12 @@
 </script>
 <!-- end include apptracking.html -->
 
-    <!-- patch to load JS in electron -->
-    <script>if (typeof module === 'object') {window.module = module; module = undefined;}</script>
     <script type="text/javascript" src="/pxt-sample/jquery.js"></script>
     <script type="text/javascript" src="/pxt-sample/blockly/blockly_compressed.js"></script>
     <script type="text/javascript" src="/pxt-sample/blockly/blocks_compressed.js"></script>
     <script type="text/javascript" src="/pxt-sample/blockly/msg/js/en.js"></script>
     <script type="text/javascript" src="/pxt-sample/smoothie/smoothie_compressed.js"></script>
     <script type="text/javascript" src="/pxt-sample/semantic.js"></script>
-    <!-- unpatch to load JS in electron -->
-    <script>if (window.module) module = window.module;</script>
-
     <script type="text/javascript" src="/pxt-sample/pxtlib.js"></script>
     <script type="text/javascript" src="/pxt-sample/pxtblocks.js"></script>
     <script type="text/javascript" src="/pxt-sample/pxtwinrt.js"></script>

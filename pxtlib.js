@@ -72,6 +72,12 @@ var pxt;
             };
         }
         analytics.enable = enable;
+        function enableCookies() {
+            if (typeof mscc !== "undefined" && !mscc.hasConsent()) {
+                mscc.setConsent();
+            }
+        }
+        analytics.enableCookies = enableCookies;
     })(analytics = pxt.analytics || (pxt.analytics = {}));
 })(pxt || (pxt = {}));
 var ts;
@@ -1570,10 +1576,17 @@ var pxt;
     }
     pxt.getEmbeddedScript = getEmbeddedScript;
     var _targetConfig = undefined;
+    var _targetConfigPromise = undefined;
     function targetConfigAsync() {
-        return _targetConfig ? Promise.resolve(_targetConfig)
-            : pxt.Cloud.downloadTargetConfigAsync()
-                .then(function (js) { _targetConfig = js; return _targetConfig; }, function (err) { _targetConfig = undefined; return undefined; });
+        if (_targetConfig)
+            return Promise.resolve(_targetConfig);
+        if (!pxt.Cloud.isOnline())
+            return Promise.resolve(undefined);
+        if (_targetConfigPromise)
+            return _targetConfigPromise;
+        return _targetConfigPromise = pxt.Cloud.downloadTargetConfigAsync()
+            .then(function (js) { _targetConfig = js; }, function (err) { _targetConfig = undefined; })
+            .then(function () { return _targetConfig; });
     }
     pxt.targetConfigAsync = targetConfigAsync;
     function packagesConfigAsync() {
@@ -1610,6 +1623,20 @@ var pxt;
 (function (pxt) {
     var blocks;
     (function (blocks) {
+        var THIS_NAME = "this";
+        // The JS Math functions supported in the blocks. The order of this array
+        // determines the order of the dropdown in the math_js_op block
+        blocks.MATH_FUNCTIONS = {
+            unary: ["sqrt", "sin", "cos", "tan", "ceil", "floor"],
+            binary: ["atan2"]
+        };
+        // Information for blocks that compile to function calls but are defined by vanilla Blockly
+        // and not dynamically by BlocklyLoader
+        blocks.builtinFunctionInfo = {
+            "Math.abs": { blockId: "math_op3", params: ["x"] },
+            "Math.min": { blockId: "math_op2", params: ["x", "y"] },
+            "Math.max": { blockId: "math_op2", params: ["x", "y"] }
+        };
         function normalizeBlock(b) {
             if (!b)
                 return b;
@@ -1624,50 +1651,81 @@ var pxt;
             return nb;
         }
         blocks.normalizeBlock = normalizeBlock;
-        function parameterNames(fn) {
-            // collect blockly parameter name mapping
+        function compileInfo(fn) {
+            var res = {
+                parameters: [],
+                actualNameToParam: {},
+                definitionNameToParam: {},
+                handlerArgs: []
+            };
             var instance = (fn.kind == ts.pxtc.SymbolKind.Method || fn.kind == ts.pxtc.SymbolKind.Property) && !fn.attributes.defaultInstance;
-            var attrNames = {};
-            var handlerArgs = [];
-            if (instance)
-                attrNames["this"] = { name: "this", type: fn.namespace };
-            if (fn.parameters)
-                fn.parameters.forEach(function (pr) {
-                    attrNames[pr.name] = {
-                        name: pr.name,
-                        type: pr.type,
-                        shadowValue: pr.default || undefined
-                    };
-                    if (pr.handlerParameters) {
-                        pr.handlerParameters.forEach(function (arg) { return handlerArgs.push(arg); });
+            var hasBlockDef = !!fn.attributes._def;
+            var defParameters = hasBlockDef ? fn.attributes._def.parameters.slice(0) : undefined;
+            var optionalStart = hasBlockDef ? defParameters.length : (fn.parameters ? fn.parameters.length : 0);
+            var bInfo = blocks.builtinFunctionInfo[fn.qName];
+            if (hasBlockDef && fn.attributes._expandedDef) {
+                defParameters.push.apply(defParameters, fn.attributes._expandedDef.parameters);
+            }
+            if (instance && hasBlockDef && defParameters.length) {
+                var defName = defParameters[0].name;
+                res.thisParameter = {
+                    actualName: THIS_NAME,
+                    definitionName: defName,
+                    shadowBlockId: defParameters[0].shadowBlockId,
+                    type: fn.namespace,
+                    // Normally we pass ths actual parameter name, but the "this" parameter doesn't have one
+                    fieldEditor: fieldEditor(defName, THIS_NAME),
+                    fieldOptions: fieldOptions(defName, THIS_NAME),
+                    shadowOptions: shadowOptions(defName, THIS_NAME),
+                };
+            }
+            if (fn.parameters) {
+                fn.parameters.forEach(function (p, i) {
+                    var defIndex = instance ? i + 1 : i;
+                    if (!hasBlockDef || defIndex < defParameters.length) {
+                        var def = hasBlockDef && defParameters[defIndex];
+                        var range = undefined;
+                        if (p.options && p.options["min"] && p.options["max"]) {
+                            range = { min: p.options["min"].value, max: p.options["max"].value };
+                        }
+                        var defName = def ? def.name : (bInfo ? bInfo.params[defIndex] : p.name);
+                        res.parameters.push({
+                            actualName: p.name,
+                            type: p.type,
+                            defaultValue: p.default,
+                            definitionName: defName,
+                            shadowBlockId: def && def.shadowBlockId,
+                            isOptional: defIndex >= optionalStart,
+                            fieldEditor: fieldEditor(defName, p.name),
+                            fieldOptions: fieldOptions(defName, p.name),
+                            shadowOptions: shadowOptions(defName, p.name),
+                            range: range
+                        });
+                    }
+                    if (p.handlerParameters) {
+                        p.handlerParameters.forEach(function (arg) { return res.handlerArgs.push(arg); });
                     }
                 });
-            if (fn.attributes.block) {
-                Object.keys(attrNames).forEach(function (k) { return attrNames[k].name = ""; });
-                var rx = /%([a-zA-Z0-9_]+)(=([a-zA-Z0-9_]+))?/g;
-                var m = void 0;
-                var i = 0;
-                while (m = rx.exec(fn.attributes.block)) {
-                    if (i == 0 && instance) {
-                        attrNames["this"].name = m[1];
-                        if (m[3])
-                            attrNames["this"].shadowType = m[3];
-                        m = rx.exec(fn.attributes.block);
-                        if (!m)
-                            break;
-                    }
-                    var at = attrNames[fn.parameters[i++].name];
-                    at.name = m[1];
-                    if (m[3])
-                        at.shadowType = m[3];
-                }
             }
-            return {
-                attrNames: attrNames,
-                handlerArgs: handlerArgs
-            };
+            res.parameters.forEach(function (p) {
+                res.actualNameToParam[p.actualName] = p;
+                res.definitionNameToParam[p.definitionName] = p;
+            });
+            return res;
+            function fieldEditor(defName, actualName) {
+                return fn.attributes.paramFieldEditor &&
+                    (fn.attributes.paramFieldEditor[defName] || fn.attributes.paramFieldEditor[actualName]);
+            }
+            function fieldOptions(defName, actualName) {
+                return fn.attributes.paramFieldEditorOptions &&
+                    (fn.attributes.paramFieldEditorOptions[defName] || fn.attributes.paramFieldEditorOptions[actualName]);
+            }
+            function shadowOptions(defName, actualName) {
+                return fn.attributes.paramShadowOptions &&
+                    (fn.attributes.paramShadowOptions[defName] || fn.attributes.paramShadowOptions[actualName]);
+            }
         }
-        blocks.parameterNames = parameterNames;
+        blocks.compileInfo = compileInfo;
         function parseFields(b) {
             // normalize and validate common errors
             // made while translating
@@ -1805,6 +1863,32 @@ var pxt;
                     category: 'math',
                     block: {
                         MATH_MODULO_TITLE: pxt.Util.lf("remainder of %1 ÷ %2")
+                    }
+                },
+                'math_js_op': {
+                    name: pxt.Util.lf("math function"),
+                    tooltip: {
+                        "sin": pxt.Util.lf("Returns the sine of the argument"),
+                        "cos": pxt.Util.lf("Returns the cosine of the argument"),
+                        "tan": pxt.Util.lf("Returns the tangent of the argument"),
+                        "sqrt": pxt.Util.lf("Returns the square root of the argument"),
+                        "ceil": pxt.Util.lf("Returns the lowest integer value greater than or equal to the argument"),
+                        "floor": pxt.Util.lf("Returns the highest integer value lesser than or equal to the argument"),
+                        "atan2": pxt.Util.lf("Returns the arctangent of the quotient of the two arguments"),
+                    },
+                    url: '/blocks/math',
+                    operators: {
+                        'OP': ["sqrt", "sin", "cos", "tan", "ceil", "floor", "atan2"]
+                    },
+                    category: 'math',
+                    block: {
+                        "sin": pxt.Util.lf("{id:op}sin"),
+                        "cos": pxt.Util.lf("{id:op}cos"),
+                        "tan": pxt.Util.lf("{id:op}tan"),
+                        "sqrt": pxt.Util.lf("{id:op}square root"),
+                        "ceil": pxt.Util.lf("{id:op}ceiling"),
+                        "floor": pxt.Util.lf("{id:op}floor"),
+                        "atan2": pxt.Util.lf("{id:op}atan2"),
                     }
                 },
                 'variables_change': {
@@ -5067,9 +5151,13 @@ var pxt;
         function repoIconUrl(repo) {
             if (repo.status != GitRepoStatus.Approved)
                 return undefined;
-            return pxt.Cloud.apiRoot + ("gh/" + repo.fullName + "/icon");
+            return mkRepoIconUrl(repo);
         }
         github.repoIconUrl = repoIconUrl;
+        function mkRepoIconUrl(repo) {
+            return pxt.Cloud.apiRoot + ("gh/" + repo.fullName + "/icon");
+        }
+        github.mkRepoIconUrl = mkRepoIconUrl;
         function mkRepo(r, config, tag) {
             if (!r)
                 return undefined;
@@ -5605,7 +5693,11 @@ var pxt;
                 if (this.bootloaderMode)
                     return Promise.resolve();
                 log("Switching into bootloader mode");
-                return this.talkAsync(HF2.HF2_CMD_START_FLASH)
+                if (this.io.isSwitchingToBootloader) {
+                    this.io.isSwitchingToBootloader();
+                }
+                return this.maybeReconnectAsync()
+                    .then(function () { return _this.talkAsync(HF2.HF2_CMD_START_FLASH); })
                     .then(function () { return _this.initAsync(); })
                     .then(function () {
                     if (!_this.bootloaderMode)
@@ -5636,6 +5728,14 @@ var pxt;
                     return Promise.resolve();
                 return this.talkAsync(HF2.HF2_CMD_BININFO)
                     .then(function (buf) { });
+            };
+            Wrapper.prototype.maybeReconnectAsync = function () {
+                var _this = this;
+                return this.pingAsync()
+                    .catch(function (e) {
+                    return _this.reconnectAsync()
+                        .then(function () { return _this.pingAsync(); });
+                });
             };
             Wrapper.prototype.flashAsync = function (blocks) {
                 var _this = this;
@@ -6946,7 +7046,10 @@ var pxt;
                 initPromise = initPromise.then(function () {
                     if (_this.config.files.indexOf("board.json") < 0)
                         return;
-                    pxt.appTarget.simulator.boardDefinition = JSON.parse(_this.readFile("board.json"));
+                    var def = pxt.appTarget.simulator.boardDefinition = JSON.parse(_this.readFile("board.json"));
+                    def.id = _this.config.name;
+                    pxt.appTarget.appTheme.boardName = def.boardName || lf("board");
+                    pxt.appTarget.appTheme.driveDisplayName = def.driveDisplayName || lf("DRIVE");
                     var expandPkg = function (v) {
                         var m = /^pkg:\/\/(.*)/.exec(v);
                         if (m) {
@@ -7558,11 +7661,11 @@ var ts;
                     }
                 }
                 else if (fn.attributes.block && locBlock) {
-                    var ps = pxt.blocks.parameterNames(fn).attrNames;
+                    var ps = pxt.blocks.compileInfo(fn);
                     var oldBlock = fn.attributes.block;
                     fn.attributes.block = pxt.blocks.normalizeBlock(locBlock);
                     if (oldBlock != fn.attributes.block) {
-                        var locps = pxt.blocks.parameterNames(fn).attrNames;
+                        var locps = pxt.blocks.compileInfo(fn);
                         if (JSON.stringify(ps) != JSON.stringify(locps)) {
                             pxt.log("block has non matching arguments: " + oldBlock + " vs " + fn.attributes.block);
                             fn.attributes.block = oldBlock;
@@ -7599,7 +7702,7 @@ var ts;
         }
         pxtc.emptyExtInfo = emptyExtInfo;
         var numberAttributes = ["weight", "imageLiteral"];
-        var booleanAttributes = ["advanced", "handlerStatement", "afterOnStart", "optionalVariableArgs", "blockHidden"];
+        var booleanAttributes = ["advanced", "handlerStatement", "afterOnStart", "optionalVariableArgs", "blockHidden", "constantShim"];
         function parseCommentString(cmt) {
             var res = {
                 paramDefl: {},
@@ -7737,9 +7840,190 @@ var ts;
                     res.groupIcons = undefined;
                 }
             }
+            if (res.block) {
+                var parts = res.block.split("||");
+                res._def = parseBlockDefinition(parts[0]);
+                if (!res._def)
+                    pxt.debug("Unable to parse block def for id: " + res.blockId);
+                if (parts[1])
+                    res._expandedDef = parseBlockDefinition(parts[1]);
+                if (parts[1] && !res._expandedDef)
+                    pxt.debug("Unable to parse expanded block def for id: " + res.blockId);
+            }
             return res;
         }
         pxtc.parseCommentString = parseCommentString;
+        function parseBlockDefinition(def) {
+            var tokens = [];
+            var currentWord;
+            var strIndex = 0;
+            var _loop_7 = function () {
+                var char = def[strIndex];
+                var newToken = void 0;
+                switch (char) {
+                    case "*":
+                    case "_":
+                        var tk = eatToken(function (c) { return c == char; }).length;
+                        var offset = char === "_" ? 2 : 0;
+                        if (tk === 1)
+                            newToken = { kind: 1 /* SingleAsterisk */ << offset };
+                        else if (tk === 2)
+                            newToken = { kind: 2 /* DoubleAsterisk */ << offset };
+                        else if (tk === 3)
+                            newToken = { kind: 3 /* TripleAsterisk */ << offset };
+                        else
+                            return { value: undefined };
+                        break;
+                    case "`":
+                        var image = eatEnclosure("`");
+                        if (image === undefined)
+                            return { value: undefined }; // error: not terminated
+                        newToken = { kind: 256 /* Image */, content: image };
+                        break;
+                    case "|":
+                        newToken = { kind: 32 /* Pipe */ };
+                        break;
+                    case "\\":
+                        if (strIndex < (def.length - 1))
+                            newToken = { kind: 16 /* Escape */, content: def[1 + (strIndex++)] };
+                        break;
+                    case "[":
+                        var contentText = eatEnclosure("]");
+                        if (contentText === undefined)
+                            return { value: undefined }; // error: not terminated
+                        if (def[strIndex++ + 1] !== "(")
+                            return { value: undefined }; // error: must be followed by class
+                        var contentClass = eatEnclosure(")");
+                        if (contentClass === undefined)
+                            return { value: undefined }; // error: not terminated
+                        newToken = { kind: 512 /* TaggedText */, content: contentText, type: contentClass };
+                        break;
+                    case "%":
+                        var param = eatToken(function (c) { return /[a-zA-Z0-9_=]/.test(c); }, true).split("=");
+                        if (param.length > 2)
+                            return { value: undefined }; // error: invalid parameter
+                        newToken = { kind: 64 /* Parameter */, content: param[0], type: param[1] };
+                        break;
+                }
+                if (newToken) {
+                    if (currentWord)
+                        tokens.push({ kind: 128 /* Word */, content: currentWord });
+                    currentWord = undefined;
+                    tokens.push(newToken);
+                }
+                else if (!currentWord) {
+                    currentWord = char;
+                }
+                else {
+                    currentWord += char;
+                }
+            };
+            for (; strIndex < def.length; strIndex++) {
+                var state_2 = _loop_7();
+                if (typeof state_2 === "object")
+                    return state_2.value;
+            }
+            if (currentWord)
+                tokens.push({ kind: 128 /* Word */, content: currentWord });
+            var parts = [];
+            var parameters = [];
+            var stack = [];
+            var open = 0;
+            var currentLabel = "";
+            for (var i = 0; i < tokens.length; i++) {
+                var token = tokens[i].kind;
+                var top_1 = stack[stack.length - 1];
+                var wordEnd = false;
+                var styles = [];
+                if (open & 10 /* Bold */)
+                    styles.push("bold");
+                if (open & 5 /* Italics */)
+                    styles.push("italics");
+                if (token & 15 /* StyleMarks */) {
+                    wordEnd = true;
+                    if (token & open) {
+                        if (top_1 & token) {
+                            stack.pop();
+                            open ^= token;
+                            // Handle triple tokens
+                            var remainder = (top_1 & open) | (token & open);
+                            if (remainder) {
+                                stack.push(remainder);
+                            }
+                        }
+                        else {
+                            return undefined; // error: mismatched!
+                        }
+                    }
+                    else {
+                        open |= token;
+                        stack.push(token);
+                    }
+                }
+                else {
+                    switch (token) {
+                        case 16 /* Escape */:
+                        case 128 /* Word */:
+                            currentLabel += tokens[i].content;
+                            break;
+                        case 32 /* Pipe */:
+                        case 64 /* Parameter */:
+                            if (open) {
+                                return undefined; // error: style marks should be closed
+                            }
+                        case 256 /* Image */: // deliberate fallthrough
+                        case 512 /* TaggedText */:
+                            wordEnd = true;
+                            break;
+                    }
+                }
+                if (wordEnd && currentLabel) {
+                    parts.push({ kind: "label", text: currentLabel, style: styles });
+                    currentLabel = "";
+                }
+                if (token == 64 /* Parameter */) {
+                    var param = { kind: "param", name: tokens[i].content, shadowBlockId: tokens[i].type };
+                    parts.push(param);
+                    parameters.push(param);
+                }
+                else if (token == 256 /* Image */) {
+                    parts.push({ kind: "image", uri: tokens[i].content });
+                }
+                else if (token == 512 /* TaggedText */) {
+                    parts.push({ kind: "label", text: tokens[i].content, cssClass: tokens[i].type });
+                }
+                else if (token == 32 /* Pipe */) {
+                    parts.push({ kind: "break" });
+                }
+            }
+            if (open)
+                return undefined; // error: style marks should terminate
+            if (currentLabel) {
+                parts.push({ kind: "label", text: currentLabel, style: [] });
+            }
+            return { parts: parts, parameters: parameters };
+            function eatToken(pred, skipCurrent) {
+                if (skipCurrent === void 0) { skipCurrent = false; }
+                var current = "";
+                if (skipCurrent)
+                    ++strIndex;
+                while (strIndex < def.length && pred(def[strIndex])) {
+                    current += def[strIndex];
+                    ++strIndex;
+                }
+                if (current)
+                    --strIndex;
+                return current;
+            }
+            function eatEnclosure(endMark) {
+                var content = eatToken(function (c) { return c !== endMark; }, true);
+                if (def[strIndex + 1] !== endMark)
+                    return undefined;
+                ++strIndex;
+                return content;
+            }
+        }
+        pxtc.parseBlockDefinition = parseBlockDefinition;
         // TODO should be internal
         var hex;
         (function (hex) {
@@ -8216,6 +8500,15 @@ var pxt;
             return USBError;
         }(Error));
         usb.USBError = USBError;
+        // this is for HF2
+        usb.filters = [{
+                classCode: 255,
+                subclassCode: 42,
+            }];
+        function setFilters(f) {
+            usb.filters = f;
+        }
+        usb.setFilters = setFilters;
         ;
         ;
         ;
@@ -8231,12 +8524,21 @@ var pxt;
             HID.prototype.error = function (msg) {
                 throw new USBError(pxt.U.lf("USB error on device {0} ({1})", this.dev.productName, msg));
             };
+            HID.prototype.log = function (msg) {
+                msg = "WebUSB: " + msg;
+                //pxt.log(msg)
+                pxt.debug(msg);
+            };
             HID.prototype.disconnectAsync = function () {
                 var _this = this;
                 if (!this.dev)
                     return Promise.resolve();
                 this.ready = false;
+                this.log("close device");
                 return this.dev.close()
+                    .catch(function (e) {
+                    // just ignore errors closing, most likely device just disconnected
+                })
                     .then(function () {
                     _this.dev = null;
                     return Promise.delay(500);
@@ -8244,9 +8546,11 @@ var pxt;
             };
             HID.prototype.reconnectAsync = function () {
                 var _this = this;
+                this.log("reconnect");
                 return this.disconnectAsync()
-                    .then(requestDeviceAsync)
+                    .then(getDeviceAsync)
                     .then(function (dev) {
+                    _this.log("got device: " + dev.manufacturerName + " " + dev.productName);
                     _this.dev = dev;
                     return _this.initAsync();
                 });
@@ -8292,57 +8596,94 @@ var pxt;
             HID.prototype.initAsync = function () {
                 var _this = this;
                 var dev = this.dev;
+                this.log("open device");
                 return dev.open()
-                    .then(function () { return dev.selectConfiguration(1); })
                     .then(function () {
-                    var isHID = function (iface) {
-                        return iface.alternates[0].interfaceClass == 0xff &&
-                            iface.alternates[0].interfaceSubclass == 42;
+                    _this.log("select configuration");
+                    return dev.selectConfiguration(1);
+                })
+                    .then(function () {
+                    var matchesFilters = function (iface) {
+                        var a0 = iface.alternates[0];
+                        for (var _i = 0, filters_1 = usb.filters; _i < filters_1.length; _i++) {
+                            var f = filters_1[_i];
+                            if (f.classCode == null || a0.interfaceClass === f.classCode) {
+                                if (f.subclassCode == null || a0.interfaceSubclass === f.subclassCode) {
+                                    if (f.protocolCode == null || a0.interfaceProtocol === f.protocolCode) {
+                                        if (a0.endpoints.length == 2 &&
+                                            a0.endpoints.every(function (e) { return e.packetSize == 64; }))
+                                            return true;
+                                    }
+                                }
+                            }
+                        }
+                        return false;
                     };
-                    //iface.alternates[0].endpoints[0].type == "interrupt";
-                    var hid = dev.configurations[0].interfaces.filter(isHID)[0];
+                    _this.log("got " + dev.configurations[0].interfaces.length + " interfaces");
+                    var hid = dev.configurations[0].interfaces.filter(matchesFilters)[0];
                     if (!hid)
-                        _this.error("cannot find USB HID interface");
+                        _this.error("cannot find supported USB interface");
                     _this.altIface = hid.alternates[0];
                     _this.epIn = _this.altIface.endpoints.filter(function (e) { return e.direction == "in"; })[0];
                     _this.epOut = _this.altIface.endpoints.filter(function (e) { return e.direction == "out"; })[0];
                     pxt.Util.assert(_this.epIn.packetSize == 64);
                     pxt.Util.assert(_this.epOut.packetSize == 64);
-                    //Util.assert(this.epIn.type == "interrupt");
-                    //Util.assert(this.epOut.type == "interrupt");
-                    //console.log("USB-device", dev)
+                    _this.log("claim interface");
                     return dev.claimInterface(hid.interfaceNumber);
                 })
-                    .then(function () { _this.ready = true; });
+                    .then(function () {
+                    _this.log("device ready");
+                    _this.ready = true;
+                });
             };
             return HID;
         }());
-        function requestDeviceAsync() {
-            return navigator.usb.requestDevice({ filters: [] });
+        function pairAsync() {
+            return navigator.usb.requestDevice({
+                filters: usb.filters
+            }).then(function (dev) {
+                // try connecting to it
+                return mkPacketIOAsync();
+            }).then(function (io) { return io.reconnectAsync(); });
         }
-        function getHidAsync() {
-            return requestDeviceAsync()
-                .then(function (dev) {
-                var h = new HID(dev);
-                return h.initAsync()
-                    .then(function () { return h; });
+        usb.pairAsync = pairAsync;
+        function getDeviceAsync() {
+            return navigator.usb.getDevices()
+                .then(function (devs) {
+                if (!devs || !devs.length)
+                    return Promise.reject(new USBError(pxt.U.lf("No USB device selected or connected; try pairing!")));
+                return devs[0];
             });
         }
-        function hf2Async() {
-            return getHidAsync()
-                .then(function (h) {
-                var w = new pxt.HF2.Wrapper(h);
-                return w.reconnectAsync(true)
-                    .then(function () { return w; });
-            });
+        var getDevPromise;
+        function mkPacketIOAsync() {
+            if (!getDevPromise)
+                getDevPromise = getDeviceAsync()
+                    .then(function (dev) {
+                    var h = new HID(dev);
+                    return h.initAsync()
+                        .then(function () { return h; });
+                })
+                    .catch(function (e) {
+                    getDevPromise = null;
+                    return Promise.reject(e);
+                });
+            return getDevPromise;
         }
-        var initPromise;
-        function initAsync() {
-            if (!initPromise)
-                initPromise = hf2Async();
-            return initPromise;
+        usb.mkPacketIOAsync = mkPacketIOAsync;
+        usb.isEnabled = false;
+        function setEnabled(v) {
+            if (!isAvailable())
+                v = false;
+            usb.isEnabled = v;
         }
-        usb.initAsync = initAsync;
+        usb.setEnabled = setEnabled;
+        function isAvailable() {
+            // TODO: support other Windows SKU than Windows 10
+            return !!navigator.usb &&
+                (!pxt.BrowserUtils.isWindows() || pxt.BrowserUtils.isWindows10());
+        }
+        usb.isAvailable = isAvailable;
     })(usb = pxt.usb || (pxt.usb = {}));
 })(pxt || (pxt = {}));
 var pxt;
@@ -9762,8 +10103,6 @@ var pxt;
                 domains.push(target.appTheme.embedUrl);
             if (target.appTheme.shareUrl)
                 domains.push(target.appTheme.shareUrl);
-            if (target.appTheme.legacyDomain)
-                domains.push(target.appTheme.legacyDomain);
             domains = Util.unique(domains, function (d) { return d; }).map(function (d) { return Util.escapeForRegex(Util.stripUrlProtocol(d).replace(/\/$/, '')).toLowerCase(); });
             var rx = "^((https://)?(?:" + domains.join('|') + ")/)?(api/oembed?url=.*%2F([^&]*)&.*?|([a-z0-9-_]+))$";
             var m = new RegExp(rx, 'i').exec(uri.trim());

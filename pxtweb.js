@@ -1,4 +1,5 @@
 /// <reference path="../../localtypings/mscc.d.ts" />
+/// <reference path="../../pxtwinrt/winrtrefs.d.ts"/>
 var pxt;
 (function (pxt) {
     var eventBufferSizeLimit = 20;
@@ -31,6 +32,10 @@ var pxt;
     var eventLogger;
     var exceptionLogger;
     function initAnalyticsAsync() {
+        if (isNativeApp()) {
+            initializeAppInsights(true);
+            return;
+        }
         getCookieBannerAsync(document.domain, detectLocale(), function (bannerErr, info) {
             if (bannerErr || info.Error) {
                 // Start app insights, just don't drop any cookies
@@ -188,6 +193,12 @@ var pxt;
         else {
             throw new Error("Bad call to injectScriptAsync");
         }
+    }
+    /**
+     * Checks for winrt
+     */
+    function isNativeApp() {
+        return typeof Windows !== "undefined";
     }
     // No promises, so here we are
     function all(values, func, cb) {

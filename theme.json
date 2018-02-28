@@ -1,6 +1,6 @@
 {
-  "logoUrl": "https://github.com/Microsoft/pxt-sample",
-  "homeUrl": "http://microsoft.github.io/pxt-sample/",
+  "logoUrl": "https://github.com/Microsoft/pxt-phaser-ce",
+  "homeUrl": "http://microsoft.github.io/pxt-phaser-ce/",
   "privacyUrl": "https://go.microsoft.com/fwlink/?LinkId=521839",
   "termsOfUseUrl": "https://go.microsoft.com/fwlink/?LinkID=206977",
   "betaUrl": "https://makecode.com/",
@@ -437,10 +437,10 @@
       "prevPath": "/offline"
     }
   ],
-  "embedUrl": "http://microsoft.github.io/pxt-sample/",
-  "id": "sample",
-  "title": "MakeCode Editor Sample",
-  "name": "sample",
+  "embedUrl": "http://microsoft.github.io/pxt-phaser-ce/",
+  "id": "phaserce",
+  "title": "MakeCode for Phaser CE",
+  "name": "Phaser CE",
   "homeScreenHeroCDN": "@cdnUrl@/blob/6c9689d39f7e9531f0e0e05a74cc408098e4a07d/static/hero.png",
   "htmlDocIncludes": {}
 }

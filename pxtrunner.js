@@ -302,7 +302,7 @@ var pxt;
                         c = c.parent();
                     var segment = $('<div class="ui segment"/>').append(s);
                     c.replaceWith(segment);
-                }, { package: options.package, snippetMode: false });
+                }, { package: options.package, snippetMode: false, aspectRatio: options.blocksAspectRatio });
             }
             var snippetCount = 0;
             return renderNextSnippetAsync(options.snippetClass, function (c, r) {
@@ -321,7 +321,7 @@ var pxt;
                     hexname: hexname,
                     hex: hex,
                 });
-            }, { package: options.package });
+            }, { package: options.package, aspectRatio: options.blocksAspectRatio });
         }
         function decompileCallInfo(stmt) {
             if (!stmt || stmt.kind != ts.SyntaxKind.ExpressionStatement)
@@ -351,7 +351,7 @@ var pxt;
                 if (options.snippetReplaceParent)
                     c = c.parent();
                 fillWithWidget(options, c, js, s, r, { showJs: true, hideGutter: true });
-            }, { package: options.package, snippetMode: true });
+            }, { package: options.package, snippetMode: true, aspectRatio: options.blocksAspectRatio });
         }
         function renderBlocksAsync(options) {
             return renderNextSnippetAsync(options.blocksClass, function (c, r) {
@@ -360,7 +360,7 @@ var pxt;
                     c = c.parent();
                 var segment = $('<div class="ui segment"/>').append(s);
                 c.replaceWith(segment);
-            }, { package: options.package, snippetMode: true });
+            }, { package: options.package, snippetMode: true, aspectRatio: options.blocksAspectRatio });
         }
         function renderNamespaces(options) {
             if (pxt.appTarget.id == "core")
@@ -599,7 +599,7 @@ var pxt;
                 if (replaceParent)
                     c = c.parent();
                 c.replaceWith(ul);
-            }, { package: options.package });
+            }, { package: options.package, aspectRatio: options.blocksAspectRatio });
         }
         function fillCodeCardAsync(c, cards, options) {
             if (!cards || cards.length == 0)
@@ -612,7 +612,36 @@ var pxt;
                 var cd_1 = document.createElement("div");
                 cd_1.className = "ui cards";
                 cd_1.setAttribute("role", "listbox");
-                cards.forEach(function (card) { return cd_1.appendChild(pxt.docs.codeCard.render(card, options)); });
+                cards.forEach(function (card) {
+                    var cardEl = pxt.docs.codeCard.render(card, options);
+                    cd_1.appendChild(cardEl);
+                    // automitcally display package icon for approved packages
+                    if (card.cardType == "package") {
+                        var repoId_1 = pxt.github.parseRepoId((card.url || "").replace(/^\/pkg\//, ''));
+                        if (repoId_1) {
+                            pxt.packagesConfigAsync()
+                                .then(function (pkgConfig) {
+                                var status = pxt.github.repoStatus(repoId_1, pkgConfig);
+                                switch (status) {
+                                    case pxt.github.GitRepoStatus.Banned:
+                                        cardEl.remove();
+                                        break;
+                                    case pxt.github.GitRepoStatus.Approved:
+                                        // update card info
+                                        card.imageUrl = pxt.github.mkRepoIconUrl(repoId_1);
+                                        // inject
+                                        cd_1.insertBefore(pxt.docs.codeCard.render(card, options), cardEl);
+                                        cardEl.remove();
+                                        break;
+                                }
+                            })
+                                .catch(function (e) {
+                                // swallow
+                                pxt.debug("failed to load repo " + card.url);
+                            });
+                        }
+                    }
+                });
                 c.replaceWith(cd_1);
             }
             return Promise.resolve();
@@ -1189,7 +1218,7 @@ var pxt;
                 return renderMarkdownAsync(content, md);
             });
         }
-        var template = "\n<aside id=button class=box>\n   <a class=\"ui primary button\" href=\"@ARGS@\">@BODY@</a>\n</aside>\n\n<aside id=vimeo>\n<div class=\"ui two column stackable grid container\">\n<div class=\"column\">\n    <div class=\"ui embed mdvid\" data-source=\"vimeo\" data-id=\"@ARGS@\" data-placeholder=\"/thumbnail/1024/vimeo/@ARGS@\" data-icon=\"video play\">\n    </div>\n</div></div>\n</aside>\n\n<aside id=youtube>\n<div class=\"ui two column stackable grid container\">\n<div class=\"column\">\n    <div class=\"ui embed mdvid\" data-source=\"youtube\" data-id=\"@ARGS@\" data-placeholder=\"https://img.youtube.com/vi/@ARGS@/maxresdefault.jpg\">\n    </div>\n</div></div>\n</aside>\n\n<aside id=section>\n    <!-- section @ARGS@ -->\n</aside>\n\n<aside id=hide class=box>\n    <div style='display:none'>\n        @BODY@\n    </div>\n</aside>\n\n<aside id=avatar class=box>\n    <div class='avatar @ARGS@'>\n        <div class='avatar-image'></div>\n        <div class='ui compact message'>\n            @BODY@\n        </div>\n    </div>\n</aside>\n\n<aside id=hint class=box>\n    <div class=\"ui icon green message\">\n        <div class=\"content\">\n            <div class=\"header\">Hint</div>\n            @BODY@\n        </div>\n    </div>\n</aside>\n\n<!-- wrapped around ordinary content -->\n<aside id=main-container class=box>\n    <div class=\"ui text\">\n        @BODY@\n    </div>\n</aside>\n\n<!-- used for 'column' box - they are collected and wrapped in 'column-container' -->\n<aside id=column class=aside>\n    <div class='column'>\n        @BODY@\n    </div>\n</aside>\n<aside id=column-container class=box>\n    <div class=\"ui three column stackable grid text\">\n        @BODY@\n    </div>\n</aside>\n@breadcrumb@\n@body@";
+        var template = "\n<aside id=button class=box>\n   <a class=\"ui primary button\" href=\"@ARGS@\">@BODY@</a>\n</aside>\n\n<aside id=vimeo>\n<div class=\"ui two column stackable grid container\">\n<div class=\"column\">\n    <div class=\"ui embed mdvid\" data-source=\"vimeo\" data-id=\"@ARGS@\" data-placeholder=\"/thumbnail/1024/vimeo/@ARGS@\" data-icon=\"video play\">\n    </div>\n</div></div>\n</aside>\n\n<aside id=youtube>\n<div class=\"ui two column stackable grid container\">\n<div class=\"column\">\n    <div class=\"ui embed mdvid\" data-source=\"youtube\" data-id=\"@ARGS@\" data-placeholder=\"https://img.youtube.com/vi/@ARGS@/0.jpg\">\n    </div>\n</div></div>\n</aside>\n\n<aside id=section>\n    <!-- section @ARGS@ -->\n</aside>\n\n<aside id=hide class=box>\n    <div style='display:none'>\n        @BODY@\n    </div>\n</aside>\n\n<aside id=avatar class=box>\n    <div class='avatar @ARGS@'>\n        <div class='avatar-image'></div>\n        <div class='ui compact message'>\n            @BODY@\n        </div>\n    </div>\n</aside>\n\n<aside id=hint class=box>\n    <div class=\"ui icon green message\">\n        <div class=\"content\">\n            <div class=\"header\">Hint</div>\n            @BODY@\n        </div>\n    </div>\n</aside>\n\n<!-- wrapped around ordinary content -->\n<aside id=main-container class=box>\n    <div class=\"ui text\">\n        @BODY@\n    </div>\n</aside>\n\n<!-- used for 'column' box - they are collected and wrapped in 'column-container' -->\n<aside id=column class=aside>\n    <div class='column'>\n        @BODY@\n    </div>\n</aside>\n<aside id=column-container class=box>\n    <div class=\"ui three column stackable grid text\">\n        @BODY@\n    </div>\n</aside>\n@breadcrumb@\n@body@";
         function renderMarkdownAsync(content, md, options) {
             if (options === void 0) { options = {}; }
             var path = options.path;
@@ -1199,10 +1228,12 @@ var pxt;
                 markdown: md,
                 theme: pxt.appTarget.appTheme,
             });
+            var blocksAspectRatio = options.blocksAspectRatio
+                || window.innerHeight < window.innerWidth ? 1.62 : 1 / 1.62;
             $(content).html(html);
             $(content).find('a').attr('target', '_blank');
             return pxt.runner.renderAsync({
-                blocksAspectRatio: 0.5,
+                blocksAspectRatio: blocksAspectRatio,
                 snippetClass: 'lang-blocks',
                 signatureClass: 'lang-sig',
                 blocksClass: 'lang-block',
