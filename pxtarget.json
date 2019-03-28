@@ -53,6 +53,11 @@
         },
         "simAnimationEnter": "fly right in",
         "simAnimationExit": "fly right out",
+        "scriptManager": true,
+        "debugger": true,
+        "print": true,
+        "highContrast": true,
+        "greenScreen": true,
         "monacoColors": {
             "editor.background": "#ecf0f1"
         }
