@@ -1,0 +1,43 @@
+{
+    "name": "pxt-sample",
+    "files": [
+        "README.md",
+        "docs/about.md",
+        "docs/beta-ref.json",
+        "docs/docs.md",
+        "docs/examples.md",
+        "docs/examples/square.md",
+        "docs/examples/square2.md",
+        "docs/index-ref.json",
+        "docs/projects.md",
+        "libs/blocksprj/README.md",
+        "libs/blocksprj/main.blocks",
+        "libs/blocksprj/main.ts",
+        "libs/blocksprj/pxt.json",
+        "libs/core/README.md",
+        "libs/core/_locales/core-jsdoc-strings.json",
+        "libs/core/_locales/core-strings.json",
+        "libs/core/_locales/sample-jsdoc-strings.json",
+        "libs/core/_locales/sample-strings.json",
+        "libs/core/enums.d.ts",
+        "libs/core/ns.ts",
+        "libs/core/pxt.json",
+        "libs/core/sims.d.ts",
+        "libs/core/test.ts",
+        "libs/tsconfig.json",
+        "package-lock.json",
+        "package.json",
+        "pxtarget.json",
+        "sim/api.ts",
+        "sim/simulator.ts",
+        "sim/tsconfig.json",
+        "targetconfig.json"
+    ],
+    "dependencies": {
+        "core": "*"
+    },
+    "preferredEditor": "blocksprj",
+    "testFiles": [
+        "test.ts"
+    ]
+}
